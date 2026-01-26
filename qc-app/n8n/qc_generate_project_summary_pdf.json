@@ -1,0 +1,98 @@
+{
+    "name": "Generate Project Summary PDF",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-report",
+                "options": {}
+            },
+            "name": "Webhook Report Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "generate-report"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM projects WHERE id = $json.body.projectId"
+            },
+            "name": "Get Project",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "postgresCredentials",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "html": "<html><body><h1>Project Summary: {{$json.name}}</h1><p>Status: {{$json.status}}</p></body></html>"
+            },
+            "name": "HTML Template",
+            "type": "n8n-nodes-base.html",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "binaryPropertyName": "data"
+            },
+            "name": "HTML to PDF",
+            "type": "n8n-nodes-base.htmlToPdf",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Report Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Get Project",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Project": {
+            "main": [
+                [
+                    {
+                        "node": "HTML Template",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HTML Template": {
+            "main": [
+                [
+                    {
+                        "node": "HTML to PDF",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

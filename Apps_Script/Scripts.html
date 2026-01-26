@@ -1,0 +1,276 @@
+<script>
+// Global state
+let dashboardData = null;
+let currentEditUuid = null;
+
+document.addEventListener('DOMContentLoaded', function() { loadDashboard(); });
+
+function loadDashboard() {
+  showLoading();
+  google.script.run.withSuccessHandler(onDashboardLoaded).withFailureHandler(onError).getDashboardData();
+}
+
+function onDashboardLoaded(data) {
+  dashboardData = data;
+  renderMetrics(data.metrics);
+  renderProjects(data.projects);
+  renderTasks(data.tasks);
+  renderResources(data.resources);
+  loadFormOptions();
+  hideLoading();
+  showSections();
+}
+
+function refreshDashboard() {
+  showMessage('Refreshing...', 'info');
+  loadDashboard();
+}
+
+function renderMetrics(m) {
+  document.getElementById('metric-projects').textContent = m.totalProjects;
+  document.getElementById('metric-tasks').textContent = m.totalTasks;
+  document.getElementById('metric-done').textContent = m.doneTasks;
+  document.getElementById('metric-progress').textContent = m.inProgressTasks;
+  document.getElementById('metric-completion').textContent = m.overallCompletion;
+  document.getElementById('metric-est-hours').textContent = m.totalEstHours;
+}
+
+function renderProjects(projects) {
+  const tbody = document.getElementById('projects-tbody');
+  if (projects.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">No projects found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = projects.map(p => `
+    <tr>
+      <td><strong>${p.projectId}</strong></td>
+      <td>${p.projectName}</td>
+      <td><span class="badge badge-info">${p.priority}</span></td>
+      <td>${p.taskHrsEst}</td>
+      <td>${p.taskHrsActual}</td>
+      <td>${p.completionPct}</td>
+      <td>${p.tasksDone} / ${p.tasksTotal}</td>
+      <td><span class="badge" style="background-color:${p.statusColor};color:white">${p.status}</span></td>
+      <td><button class="btn btn-sm btn-secondary" onclick='editProject("${p.uuid}")'>Edit</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderTasks(tasks) {
+  const tbody = document.getElementById('tasks-tbody');
+  if (tasks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center">No tasks found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tasks.map(t => `
+    <tr>
+      <td><strong>${t.taskId}</strong></td>
+      <td>${t.taskName}</td>
+      <td>${t.projectId}</td>
+      <td><span class="badge" style="background-color:${t.statusColor};color:white">${t.status}</span></td>
+      <td>${t.resources}</td>
+      <td>${t.totalEstHrs}</td>
+      <td>${t.totalActualHrs}</td>
+      <td>${t.overallCompletionPct}</td>
+      <td>${t.deadline || '-'}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick='editTask("${t.uuid}")'>Edit</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderResources(resources) {
+  const tbody = document.getElementById('resources-tbody');
+  if (resources.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No resources found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = resources.map(r => `
+    <tr>
+      <td><strong>${r.resourceName}</strong></td>
+      <td>${r.weeklyCapacity}</td>
+      <td>${r.currentAllocation}</td>
+      <td><span style="color:${r.utilizationColor}">${r.utilizationPct}</span></td>
+      <td>${r.availableHours}</td>
+    </tr>
+  `).join('');
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(tabName + '-tab').classList.add('active');
+  event.target.classList.add('active');
+  if (tabName === 'activity') loadActivity();
+}
+
+function loadActivity() {
+  google.script.run.withSuccessHandler(function(activity) {
+    const feed = document.getElementById('activity-feed');
+    if (activity.length === 0) {
+      feed.innerHTML = '<p class="text-center">No recent activity</p>';
+      return;
+    }
+    feed.innerHTML = activity.map(a => `
+      <div class="activity-item">
+        <div class="activity-header">
+          <span class="activity-action">${a.action} ${a.entity}</span>
+          <span class="activity-time">${a.timestamp}</span>
+        </div>
+        <div class="activity-description">${a.description}</div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px">by ${a.user}</div>
+      </div>
+    `).join('');
+  }).withFailureHandler(onError).getRecentActivity(20);
+}
+
+function showCreateProjectModal() {
+  currentEditUuid = null;
+  document.getElementById('project-modal-title').textContent = 'Create Project';
+  document.getElementById('project-submit-text').textContent = 'Create Project';
+  document.getElementById('project-form').reset();
+  document.getElementById('project-modal').classList.add('show');
+}
+
+function editProject(uuid) {
+  currentEditUuid = uuid;
+  document.getElementById('project-modal-title').textContent = 'Edit Project';
+  document.getElementById('project-submit-text').textContent = 'Update Project';
+  google.script.run.withSuccessHandler(function(project) {
+    document.getElementById('project-id').value = project.projectId;
+    document.getElementById('project-name').value = project.projectName;
+    document.getElementById('project-weight').value = project.totalWeight;
+    document.getElementById('project-priority').value = project.priority;
+    document.getElementById('project-start-date').value = project.startDate;
+    document.getElementById('project-target-date').value = project.targetDate;
+    document.getElementById('project-modal').classList.add('show');
+  }).withFailureHandler(onError).getProject(uuid);
+}
+
+function closeProjectModal() {
+  document.getElementById('project-modal').classList.remove('show');
+  currentEditUuid = null;
+}
+
+function handleProjectSubmit(event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData);
+  if (data.startDate) data.startDate = new Date(data.startDate);
+  if (data.targetDate) data.targetDate = new Date(data.targetDate);
+  data.totalWeight = parseInt(data.totalWeight);
+
+  if (currentEditUuid) {
+    google.script.run.withSuccessHandler(function(result) {
+      if (result.success) { showMessage(result.message, 'success'); closeProjectModal(); loadDashboard(); }
+      else { showMessage(result.error, 'error'); }
+    }).withFailureHandler(onError).updateProject(currentEditUuid, data);
+  } else {
+    google.script.run.withSuccessHandler(function(result) {
+      if (result.success) { showMessage(result.message, 'success'); closeProjectModal(); loadDashboard(); }
+      else { showMessage(result.error, 'error'); }
+    }).withFailureHandler(onError).createProject(data);
+  }
+}
+
+function showCreateTaskModal() {
+  currentEditUuid = null;
+  document.getElementById('task-modal-title').textContent = 'Create Task';
+  document.getElementById('task-submit-text').textContent = 'Create Task';
+  document.getElementById('task-form').reset();
+  document.getElementById('task-modal').classList.add('show');
+}
+
+function editTask(uuid) {
+  currentEditUuid = uuid;
+  document.getElementById('task-modal-title').textContent = 'Edit Task';
+  document.getElementById('task-submit-text').textContent = 'Update Task';
+  google.script.run.withSuccessHandler(function(task) {
+    document.getElementById('task-id').value = task.taskId;
+    document.getElementById('task-project').value = task.projectId;
+    document.getElementById('task-name').value = task.taskName;
+    document.getElementById('task-status').value = task.status;
+    document.getElementById('task-estimate').value = task.estimateDays;
+    document.getElementById('task-resource1').value = task.resource1;
+    document.getElementById('task-r1-est').value = task.r1EstHrs;
+    document.getElementById('task-r1-actual').value = task.r1ActualHrs;
+    document.getElementById('task-resource2').value = task.resource2;
+    document.getElementById('task-r2-est').value = task.r2EstHrs;
+    document.getElementById('task-r2-actual').value = task.r2ActualHrs;
+    document.getElementById('task-deadline').value = task.deadline;
+    document.getElementById('task-completed').value = task.completedDate;
+    document.getElementById('task-modal').classList.add('show');
+  }).withFailureHandler(onError).getTask(uuid);
+}
+
+function closeTaskModal() {
+  document.getElementById('task-modal').classList.remove('show');
+  currentEditUuid = null;
+}
+
+function handleTaskSubmit(event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData);
+  data.estimateDays = parseFloat(data.estimateDays);
+  data.r1EstHrs = parseFloat(data.r1EstHrs);
+  data.r1ActualHrs = parseFloat(data.r1ActualHrs);
+  data.r2EstHrs = parseFloat(data.r2EstHrs);
+  data.r2ActualHrs = parseFloat(data.r2ActualHrs);
+  if (data.deadline) data.deadline = new Date(data.deadline);
+  if (data.completedDate) data.completedDate = new Date(data.completedDate);
+
+  if (currentEditUuid) {
+    google.script.run.withSuccessHandler(function(result) {
+      if (result.success) { showMessage(result.message, 'success'); closeTaskModal(); loadDashboard(); }
+      else { showMessage(result.error, 'error'); }
+    }).withFailureHandler(onError).updateTask(currentEditUuid, data);
+  } else {
+    google.script.run.withSuccessHandler(function(result) {
+      if (result.success) { showMessage(result.message, 'success'); closeTaskModal(); loadDashboard(); }
+      else { showMessage(result.error, 'error'); }
+    }).withFailureHandler(onError).createTask(data);
+  }
+}
+
+function loadFormOptions() {
+  google.script.run.withSuccessHandler(function(options) {
+    const projectSelect = document.getElementById('task-project');
+    projectSelect.innerHTML = '<option value="">Select project...</option>' +
+      options.projects.map(p => `<option value="${p.value}">${p.label}</option>`).join('');
+    const resourceOptions = '<option value="">Select...</option>' +
+      options.resources.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+    document.getElementById('task-resource1').innerHTML = resourceOptions;
+    document.getElementById('task-resource2').innerHTML = resourceOptions;
+  }).withFailureHandler(onError).getFormOptions();
+}
+
+function showLoading() { document.getElementById('loading').style.display = 'flex'; }
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+function showSections() {
+  document.getElementById('metrics-section').style.display = 'grid';
+  document.getElementById('tabs-section').style.display = 'flex';
+}
+
+function showMessage(message, type) {
+  const alertId = type === 'error' ? 'error-message' : 'success-message';
+  const alert = document.getElementById(alertId);
+  alert.textContent = message;
+  alert.style.display = 'block';
+  setTimeout(() => { alert.style.display = 'none'; }, 5000);
+}
+
+function onError(error) {
+  console.error(error);
+  showMessage('Error: ' + error.message, 'error');
+  hideLoading();
+}
+
+function filterTasks() {
+  const status = document.getElementById('task-status-filter').value;
+  if (!dashboardData) return;
+  const filtered = status ? dashboardData.tasks.filter(t => t.status === status) : dashboardData.tasks;
+  renderTasks(filtered);
+}
+</script>

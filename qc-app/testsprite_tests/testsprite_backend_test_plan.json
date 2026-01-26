@@ -1,0 +1,170 @@
+{
+  "test_type": "backend",
+  "base_url": "http://localhost:3001",
+  "test_cases": [
+    {
+      "id": "TC-API-001",
+      "name": "Health Check - GET /health",
+      "description": "Verify API health endpoint returns ok status",
+      "method": "GET",
+      "endpoint": "/health",
+      "expected_status": 200,
+      "expected_response": {
+        "status": "ok"
+      }
+    },
+    {
+      "id": "TC-API-002",
+      "name": "Get All Projects - GET /api/projects",
+      "description": "Retrieve all projects with metrics",
+      "method": "GET",
+      "endpoint": "/api/projects",
+      "expected_status": 200,
+      "expected_response_type": "array"
+    },
+    {
+      "id": "TC-API-003",
+      "name": "Create Project - POST /api/projects",
+      "description": "Create a new project with valid data",
+      "method": "POST",
+      "endpoint": "/api/projects",
+      "request_body": {
+        "project_id": "PRJ-TEST-001",
+        "name": "Test Project",
+        "description": "A test project for API testing",
+        "total_weight": 3,
+        "priority": "High",
+        "start_date": "2026-01-01",
+        "target_date": "2026-03-31"
+      },
+      "expected_status": 201
+    },
+    {
+      "id": "TC-API-004",
+      "name": "Create Project - Invalid Data",
+      "description": "Attempt to create project with missing required fields",
+      "method": "POST",
+      "endpoint": "/api/projects",
+      "request_body": {
+        "name": "Invalid Project"
+      },
+      "expected_status": 400
+    },
+    {
+      "id": "TC-API-005",
+      "name": "Get Single Project - GET /api/projects/:id",
+      "description": "Get a specific project by UUID",
+      "method": "GET",
+      "endpoint": "/api/projects/{project_id}",
+      "expected_status": 200,
+      "depends_on": "TC-API-003"
+    },
+    {
+      "id": "TC-API-006",
+      "name": "Get Non-existent Project",
+      "description": "Attempt to get a project that doesn't exist",
+      "method": "GET",
+      "endpoint": "/api/projects/00000000-0000-0000-0000-000000000000",
+      "expected_status": 404
+    },
+    {
+      "id": "TC-API-007",
+      "name": "Update Project - PATCH /api/projects/:id",
+      "description": "Update project fields",
+      "method": "PATCH",
+      "endpoint": "/api/projects/{project_id}",
+      "request_body": {
+        "name": "Updated Test Project",
+        "priority": "Medium"
+      },
+      "expected_status": 200,
+      "depends_on": "TC-API-003"
+    },
+    {
+      "id": "TC-API-008",
+      "name": "Get All Tasks - GET /api/tasks",
+      "description": "Retrieve all tasks",
+      "method": "GET",
+      "endpoint": "/api/tasks",
+      "expected_status": 200,
+      "expected_response_type": "array"
+    },
+    {
+      "id": "TC-API-009",
+      "name": "Create Task - POST /api/tasks",
+      "description": "Create a new task linked to a project",
+      "method": "POST",
+      "endpoint": "/api/tasks",
+      "request_body": {
+        "task_id": "TSK-TEST-001",
+        "project_id": "{project_id}",
+        "task_name": "Test Task",
+        "status": "Backlog",
+        "estimate_days": 3,
+        "r1_estimate_hrs": 24,
+        "deadline": "2026-02-15"
+      },
+      "expected_status": 201,
+      "depends_on": "TC-API-003"
+    },
+    {
+      "id": "TC-API-010",
+      "name": "Update Task Status - PATCH /api/tasks/:id",
+      "description": "Update task status to In Progress",
+      "method": "PATCH",
+      "endpoint": "/api/tasks/{task_id}",
+      "request_body": {
+        "status": "In Progress"
+      },
+      "expected_status": 200,
+      "depends_on": "TC-API-009"
+    },
+    {
+      "id": "TC-API-011",
+      "name": "Complete Task - PATCH /api/tasks/:id",
+      "description": "Update task status to Done",
+      "method": "PATCH",
+      "endpoint": "/api/tasks/{task_id}",
+      "request_body": {
+        "status": "Done",
+        "completed_date": "2026-01-20"
+      },
+      "expected_status": 200,
+      "depends_on": "TC-API-010"
+    },
+    {
+      "id": "TC-API-012",
+      "name": "Get All Resources - GET /api/resources",
+      "description": "Retrieve all resources",
+      "method": "GET",
+      "endpoint": "/api/resources",
+      "expected_status": 200,
+      "expected_response_type": "array"
+    },
+    {
+      "id": "TC-API-013",
+      "name": "Create Resource - POST /api/resources",
+      "description": "Create a new team resource",
+      "method": "POST",
+      "endpoint": "/api/resources",
+      "request_body": {
+        "name": "Test Resource",
+        "role": "Developer",
+        "weekly_capacity_hrs": 40,
+        "email": "test@example.com"
+      },
+      "expected_status": 201
+    },
+    {
+      "id": "TC-API-014",
+      "name": "Create Resource - Missing Name",
+      "description": "Attempt to create resource without required name",
+      "method": "POST",
+      "endpoint": "/api/resources",
+      "request_body": {
+        "role": "Developer"
+      },
+      "expected_status": 400
+    }
+  ]
+}

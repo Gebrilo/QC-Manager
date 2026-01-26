@@ -1,0 +1,77 @@
+{
+    "name": "Export Tasks to Excel",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "GET",
+                "path": "export-tasks",
+                "options": {}
+            },
+            "name": "Webhook Export Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "export-tasks"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM tasks"
+            },
+            "name": "Get All Tasks",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "postgresCredentials",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "toFile",
+                "fileFormat": "xlsx",
+                "options": {}
+            },
+            "name": "Spreadsheet File",
+            "type": "n8n-nodes-base.spreadsheetFile",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Export Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Get All Tasks",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get All Tasks": {
+            "main": [
+                [
+                    {
+                        "node": "Spreadsheet File",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

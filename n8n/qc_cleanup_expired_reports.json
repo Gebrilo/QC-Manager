@@ -1,0 +1,178 @@
+{
+  "name": "qc_cleanup_expired_reports",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 2,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Cleanup Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retention Policy Configuration\nconst retentionPolicy = {\n  // On-demand reports: delete after 7 days\n  onDemand: {\n    days: 7,\n    prefix: ['project-summary-', 'task-export-']\n  },\n  // Scheduled reports: keep for 90 days\n  scheduled: {\n    days: 90,\n    prefix: ['weekly-summary-', 'monthly-summary-']\n  },\n  // Temporary files: delete after 1 day\n  temp: {\n    days: 1,\n    prefix: ['temp-', 'draft-']\n  }\n};\n\nconst now = new Date();\nconst cutoffDates = {};\n\nfor (const [category, config] of Object.entries(retentionPolicy)) {\n  const cutoff = new Date(now);\n  cutoff.setDate(cutoff.getDate() - config.days);\n  cutoffDates[category] = {\n    cutoffDate: cutoff.toISOString(),\n    prefixes: config.prefix,\n    retentionDays: config.days\n  };\n}\n\nreturn [{ json: { retentionPolicy: cutoffDates, executedAt: now.toISOString() } }];"
+      },
+      "id": "retention-config",
+      "name": "Define Retention Policy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "bucketName": "qc-reports",
+        "options": {}
+      },
+      "id": "list-s3-objects",
+      "name": "List S3 Objects",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "aws": {
+          "id": "aws-credentials-id",
+          "name": "AWS Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const objects = $input.all();\nconst policy = $('Define Retention Policy').first().json.retentionPolicy;\nconst now = new Date();\n\nconst toDelete = [];\nconst toKeep = [];\n\nfor (const obj of objects) {\n  const key = obj.json.Key;\n  const lastModified = new Date(obj.json.LastModified);\n  let shouldDelete = false;\n  let matchedCategory = null;\n\n  // Check each retention category\n  for (const [category, config] of Object.entries(policy)) {\n    const cutoff = new Date(config.cutoffDate);\n    const matchesPrefix = config.prefixes.some(prefix => key.includes(prefix));\n    \n    if (matchesPrefix && lastModified < cutoff) {\n      shouldDelete = true;\n      matchedCategory = category;\n      break;\n    }\n  }\n\n  if (shouldDelete) {\n    toDelete.push({\n      key,\n      lastModified: lastModified.toISOString(),\n      category: matchedCategory,\n      ageInDays: Math.floor((now - lastModified) / (1000 * 60 * 60 * 24))\n    });\n  } else {\n    toKeep.push({ key, lastModified: lastModified.toISOString() });\n  }\n}\n\nreturn [{ json: { toDelete, toKeep, summary: { deleteCount: toDelete.length, keepCount: toKeep.length } } }];"
+      },
+      "id": "filter-expired",
+      "name": "Filter Expired Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.summary.deleteCount }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check-delete-needed",
+      "name": "Has Files to Delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const toDelete = $input.first().json.toDelete;\nreturn toDelete.map(file => ({ json: file }));"
+      },
+      "id": "split-files",
+      "name": "Split Into Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "bucketName": "qc-reports",
+        "fileKey": "={{ $json.key }}"
+      },
+      "id": "delete-s3-object",
+      "name": "Delete S3 Object",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "credentials": {
+        "aws": {
+          "id": "aws-credentials-id",
+          "name": "AWS Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_log (id, action, entity_type, details, created_at) VALUES (gen_random_uuid(), 'report_cleanup', 'report_file', $1, NOW())",
+        "options": {
+          "queryParams": "={{ JSON.stringify({ deleted_files: $('Filter Expired Files').first().json.toDelete, summary: $('Filter Expired Files').first().json.summary }) }}"
+        }
+      },
+      "id": "log-cleanup",
+      "name": "Log Cleanup Action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [1650, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials-id",
+          "name": "QC Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $('Filter Expired Files').first().json.summary;\nreturn [{ json: { message: 'No files to delete', ...summary } }];"
+      },
+      "id": "no-delete-needed",
+      "name": "No Cleanup Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Daily Cleanup Trigger": {
+      "main": [
+        [{ "node": "Define Retention Policy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Define Retention Policy": {
+      "main": [
+        [{ "node": "List S3 Objects", "type": "main", "index": 0 }]
+      ]
+    },
+    "List S3 Objects": {
+      "main": [
+        [{ "node": "Filter Expired Files", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Expired Files": {
+      "main": [
+        [{ "node": "Has Files to Delete?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Files to Delete?": {
+      "main": [
+        [{ "node": "Split Into Items", "type": "main", "index": 0 }],
+        [{ "node": "No Cleanup Needed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Into Items": {
+      "main": [
+        [{ "node": "Delete S3 Object", "type": "main", "index": 0 }]
+      ]
+    },
+    "Delete S3 Object": {
+      "main": [
+        [{ "node": "Log Cleanup Action", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,81 @@
+{
+    "name": "Update Task Workflow",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "task-updated",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$node[\"Webhook\"].json[\"body\"][\"status\"]}}",
+                            "value2": "completed"
+                        }
+                    ]
+                }
+            },
+            "name": "Is Completed?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO audit_logs (entity_type, entity_id, action, payload) VALUES ('n8n_workflow', '{{$node[\"Webhook\"].json[\"body\"][\"id\"]}}', 'TASK_COMPLETION_LOG', '{\"note\": \"Task marked as done\"}')"
+            },
+            "name": "Log Completion",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                650,
+                200
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "1",
+                    "name": "Local Postgres"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Is Completed?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Completed?": {
+            "main": [
+                [
+                    {
+                        "node": "Log Completion",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,106 @@
+{
+    "name": "Generate Report Workflow",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-report",
+                "options": {}
+            },
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM tasks WHERE status != 'deleted'"
+            },
+            "name": "Fetch Tasks",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "1",
+                    "name": "Local Postgres"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "toFile",
+                "fileFormat": "xlsx",
+                "options": {}
+            },
+            "name": "Create Excel",
+            "type": "n8n-nodes-base.spreadsheetFile",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO audit_logs (entity_type, entity_id, action, payload) VALUES ('report', 'global', 'GENERATED_XLSX', '{\"count\": {{$items().length}}}')"
+            },
+            "name": "Log Generation",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "1",
+                    "name": "Local Postgres"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Tasks",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Tasks": {
+            "main": [
+                [
+                    {
+                        "node": "Create Excel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Excel": {
+            "main": [
+                [
+                    {
+                        "node": "Log Generation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

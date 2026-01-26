@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QC Scenario Planning</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <h1 class="header-title">QC Scenario Planning</h1>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="showCreateProjectModal()">
+          <span class="icon">+</span> New Project
+        </button>
+        <button class="btn btn-primary" onclick="showCreateTaskModal()">
+          <span class="icon">+</span> New Task
+        </button>
+        <button class="btn btn-secondary" onclick="refreshDashboard()">
+          <span class="icon">↻</span> Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container">
+
+      <!-- Loading Spinner -->
+      <div id="loading" class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading dashboard...</p>
+      </div>
+
+      <!-- Error Message -->
+      <div id="error-message" class="alert alert-error" style="display:none;"></div>
+
+      <!-- Success Message -->
+      <div id="success-message" class="alert alert-success" style="display:none;"></div>
+
+      <!-- Dashboard Metrics -->
+      <section id="metrics-section" class="metrics-grid" style="display:none;">
+        <div class="metric-card">
+          <div class="metric-label">Total Projects</div>
+          <div class="metric-value" id="metric-projects">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total Tasks</div>
+          <div class="metric-value" id="metric-tasks">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Tasks Done</div>
+          <div class="metric-value" id="metric-done">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">In Progress</div>
+          <div class="metric-value" id="metric-progress">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Overall Completion</div>
+          <div class="metric-value" id="metric-completion">0%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total Est. Hours</div>
+          <div class="metric-value" id="metric-est-hours">0</div>
+        </div>
+      </section>
+
+      <!-- Tabs -->
+      <section id="tabs-section" class="tabs" style="display:none;">
+        <button class="tab-button active" onclick="switchTab('projects')">Projects</button>
+        <button class="tab-button" onclick="switchTab('tasks')">Tasks</button>
+        <button class="tab-button" onclick="switchTab('resources')">Resources</button>
+        <button class="tab-button" onclick="switchTab('activity')">Recent Activity</button>
+      </section>
+
+      <!-- Projects Tab -->
+      <section id="projects-tab" class="tab-content active">
+        <div class="section-header">
+          <h2>Projects</h2>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="projects-table">
+            <thead>
+              <tr>
+                <th>Project ID</th>
+                <th>Project Name</th>
+                <th>Priority</th>
+                <th>Est Hours</th>
+                <th>Actual Hours</th>
+                <th>Completion</th>
+                <th>Tasks</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="projects-tbody">
+              <tr>
+                <td colspan="9" class="text-center">No projects found</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tasks Tab -->
+      <section id="tasks-tab" class="tab-content">
+        <div class="section-header">
+          <h2>Tasks</h2>
+          <div class="filter-group">
+            <label>Filter by Status:</label>
+            <select id="task-status-filter" onchange="filterTasks()">
+              <option value="">All</option>
+              <option value="Backlog">Backlog</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="tasks-table">
+            <thead>
+              <tr>
+                <th>Task ID</th>
+                <th>Task Name</th>
+                <th>Project</th>
+                <th>Status</th>
+                <th>Resources</th>
+                <th>Est Hours</th>
+                <th>Actual Hours</th>
+                <th>Completion</th>
+                <th>Deadline</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-tbody">
+              <tr>
+                <td colspan="10" class="text-center">No tasks found</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Resources Tab -->
+      <section id="resources-tab" class="tab-content">
+        <div class="section-header">
+          <h2>Resources</h2>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="resources-table">
+            <thead>
+              <tr>
+                <th>Resource Name</th>
+                <th>Weekly Capacity</th>
+                <th>Current Allocation</th>
+                <th>Utilization</th>
+                <th>Available Hours</th>
+              </tr>
+            </thead>
+            <tbody id="resources-tbody">
+              <tr>
+                <td colspan="5" class="text-center">No resources found</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Activity Tab -->
+      <section id="activity-tab" class="tab-content">
+        <div class="section-header">
+          <h2>Recent Activity</h2>
+        </div>
+        <div id="activity-feed" class="activity-feed">
+          <p class="text-center">No recent activity</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Project Modal -->
+  <div id="project-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="project-modal-title">Create Project</h2>
+        <button class="modal-close" onclick="closeProjectModal()">&times;</button>
+      </div>
+      <form id="project-form" onsubmit="handleProjectSubmit(event)">
+        <div class="form-group">
+          <label for="project-id">Project ID *</label>
+          <input type="text" id="project-id" name="projectId"
+                 pattern="PRJ-\d{3}" placeholder="PRJ-001" required>
+          <small>Format: PRJ-XXX (e.g., PRJ-001)</small>
+        </div>
+        <div class="form-group">
+          <label for="project-name">Project Name *</label>
+          <input type="text" id="project-name" name="projectName"
+                 maxlength="100" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="project-weight">Total Weight (1-5) *</label>
+            <input type="number" id="project-weight" name="totalWeight"
+                   min="1" max="5" required>
+          </div>
+          <div class="form-group">
+            <label for="project-priority">Priority *</label>
+            <select id="project-priority" name="priority" required>
+              <option value="">Select...</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="project-start-date">Start Date</label>
+            <input type="date" id="project-start-date" name="startDate">
+          </div>
+          <div class="form-group">
+            <label for="project-target-date">Target Date</label>
+            <input type="date" id="project-target-date" name="targetDate">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeProjectModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <span id="project-submit-text">Create Project</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Task Modal -->
+  <div id="task-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="task-modal-title">Create Task</h2>
+        <button class="modal-close" onclick="closeTaskModal()">&times;</button>
+      </div>
+      <form id="task-form" onsubmit="handleTaskSubmit(event)">
+        <div class="form-group">
+          <label for="task-id">Task ID *</label>
+          <input type="text" id="task-id" name="taskId"
+                 pattern="TSK-\d{3}" placeholder="TSK-001" required>
+          <small>Format: TSK-XXX (e.g., TSK-001)</small>
+        </div>
+        <div class="form-group">
+          <label for="task-project">Project *</label>
+          <select id="task-project" name="projectId" required>
+            <option value="">Select project...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="task-name">Task Name *</label>
+          <input type="text" id="task-name" name="taskName"
+                 maxlength="200" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-status">Status *</label>
+            <select id="task-status" name="status" required>
+              <option value="Backlog">Backlog</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-estimate">Estimate (days) *</label>
+            <input type="number" id="task-estimate" name="estimateDays"
+                   min="0" step="0.25" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-resource1">Resource 1</label>
+            <select id="task-resource1" name="resource1">
+              <option value="">Select...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-r1-est">R1 Est Hours</label>
+            <input type="number" id="task-r1-est" name="r1EstHrs"
+                   min="0" step="0.5" value="0">
+          </div>
+          <div class="form-group">
+            <label for="task-r1-actual">R1 Actual Hours</label>
+            <input type="number" id="task-r1-actual" name="r1ActualHrs"
+                   min="0" step="0.5" value="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-resource2">Resource 2</label>
+            <select id="task-resource2" name="resource2">
+              <option value="">Select...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-r2-est">R2 Est Hours</label>
+            <input type="number" id="task-r2-est" name="r2EstHrs"
+                   min="0" step="0.5" value="0">
+          </div>
+          <div class="form-group">
+            <label for="task-r2-actual">R2 Actual Hours</label>
+            <input type="number" id="task-r2-actual" name="r2ActualHrs"
+                   min="0" step="0.5" value="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-deadline">Deadline</label>
+            <input type="date" id="task-deadline" name="deadline">
+          </div>
+          <div class="form-group">
+            <label for="task-completed">Completed Date</label>
+            <input type="date" id="task-completed" name="completedDate">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <span id="task-submit-text">Create Task</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <?!= include('Scripts'); ?>
+</body>
+</html>

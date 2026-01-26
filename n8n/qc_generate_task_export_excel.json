@@ -1,0 +1,194 @@
+{
+  "name": "qc_generate_task_export_excel",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "qc/reports/task-export",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "qc-task-export"
+    },
+    {
+      "parameters": {
+        "jsCode": "const filters = $json.body || {};\nlet query = `\n  SELECT \n    t.id as task_id,\n    t.name as task_name,\n    t.project_id,\n    p.name as project_name,\n    t.status,\n    t.assignee,\n    t.created_at,\n    t.due_date,\n    t.completed_at,\n    t.priority,\n    t.notes\n  FROM task t\n  JOIN project p ON t.project_id = p.id\n  WHERE t.status != 'deleted'\n`;\n\nconst params = [];\nlet paramIndex = 1;\nconst appliedFilters = {};\n\nif (filters.project_id) {\n  query += ` AND t.project_id = $${paramIndex++}`;\n  params.push(filters.project_id);\n  appliedFilters.project_id = filters.project_id;\n}\n\nif (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {\n  const placeholders = filters.status.map(() => `$${paramIndex++}`).join(', ');\n  query += ` AND t.status IN (${placeholders})`;\n  params.push(...filters.status);\n  appliedFilters.status = filters.status;\n}\n\nif (filters.date_from) {\n  query += ` AND t.created_at >= $${paramIndex++}`;\n  params.push(filters.date_from);\n  appliedFilters.date_from = filters.date_from;\n}\n\nif (filters.date_to) {\n  query += ` AND t.created_at <= $${paramIndex++}`;\n  params.push(filters.date_to);\n  appliedFilters.date_to = filters.date_to;\n}\n\nif (filters.assignee) {\n  query += ` AND t.assignee = $${paramIndex++}`;\n  params.push(filters.assignee);\n  appliedFilters.assignee = filters.assignee;\n}\n\nquery += ' ORDER BY t.created_at DESC';\n\nreturn [{ json: { query, params, appliedFilters } }];"
+      },
+      "id": "build-query",
+      "name": "Build Dynamic Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}",
+        "options": {}
+      },
+      "id": "query-tasks",
+      "name": "Query Tasks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials-id",
+          "name": "QC Database"
+        }
+      },
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check-results",
+      "name": "Has Results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: { code: 'NO_DATA', message: 'No tasks match the specified filters' } }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "error-no-data",
+      "name": "Error: No Data",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = $input.all();\nconst appliedFilters = $('Build Dynamic Query').first().json.appliedFilters;\n\n// Format dates for Excel display\nconst formatDate = (dateStr) => {\n  if (!dateStr) return '';\n  return new Date(dateStr).toISOString().split('T')[0];\n};\n\nconst formatDateTime = (dateStr) => {\n  if (!dateStr) return '';\n  const date = new Date(dateStr);\n  return date.toISOString().replace('T', ' ').split('.')[0];\n};\n\n// Transform tasks for spreadsheet\nconst rows = tasks.map(t => ({\n  'Task ID': t.json.task_id,\n  'Task Name': t.json.task_name,\n  'Project ID': t.json.project_id,\n  'Project Name': t.json.project_name,\n  'Status': t.json.status,\n  'Assignee': t.json.assignee || '',\n  'Created At': formatDateTime(t.json.created_at),\n  'Due Date': formatDate(t.json.due_date),\n  'Completed At': formatDateTime(t.json.completed_at),\n  'Priority': t.json.priority || '',\n  'Notes': t.json.notes || ''\n}));\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "transform-rows",
+      "name": "Transform to Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "fileFormat": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Task Export"
+        }
+      },
+      "id": "create-excel",
+      "name": "Create Excel File",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "qc-reports",
+        "fileName": "={{ 'task-export-' + Date.now() + '.xlsx' }}",
+        "binaryPropertyName": "data"
+      },
+      "id": "upload-s3",
+      "name": "Upload to S3",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "credentials": {
+        "aws": {
+          "id": "aws-credentials-id",
+          "name": "AWS Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const filename = 'task-export-' + Date.now() + '.xlsx';\nconst bucketName = 'qc-reports';\nconst region = 'us-east-1';\nconst expiresIn = 3600;\nconst rowCount = $('Transform to Rows').all().length;\nconst appliedFilters = $('Build Dynamic Query').first().json.appliedFilters;\n\nconst downloadUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${filename}?presigned=true&expires=${expiresIn}`;\n\nreturn [{\n  json: {\n    success: true,\n    download_url: downloadUrl,\n    filename: filename,\n    expires_in: expiresIn,\n    generated_at: new Date().toISOString(),\n    row_count: rowCount,\n    filters_applied: appliedFilters\n  }\n}];"
+      },
+      "id": "generate-url",
+      "name": "Generate Signed URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Build Dynamic Query", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Dynamic Query": {
+      "main": [
+        [{ "node": "Query Tasks", "type": "main", "index": 0 }]
+      ]
+    },
+    "Query Tasks": {
+      "main": [
+        [{ "node": "Has Results?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Results?": {
+      "main": [
+        [{ "node": "Transform to Rows", "type": "main", "index": 0 }],
+        [{ "node": "Error: No Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Transform to Rows": {
+      "main": [
+        [{ "node": "Create Excel File", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Excel File": {
+      "main": [
+        [{ "node": "Upload to S3", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload to S3": {
+      "main": [
+        [{ "node": "Generate Signed URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Signed URL": {
+      "main": [
+        [{ "node": "Respond Success", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
