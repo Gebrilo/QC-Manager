@@ -1,271 +1,98 @@
 {
-  "name": "qc_generate_project_summary_pdf",
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "qc/reports/project-summary",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "webhook-trigger",
-      "name": "Webhook Trigger",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1.1,
-      "position": [250, 300],
-      "webhookId": "qc-project-summary"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ $json.body.project_id }}",
-              "operation": "isNotEmpty"
+    "name": "Generate Project Summary PDF",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-report",
+                "options": {}
+            },
+            "name": "Webhook Report Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "generate-report"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM projects WHERE id = $json.body.projectId"
+            },
+            "name": "Get Project",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "postgresCredentials",
+                    "name": "Postgres account"
+                }
             }
-          ]
+        },
+        {
+            "parameters": {
+                "html": "<html><body><h1>Project Summary: {{$json.name}}</h1><p>Status: {{$json.status}}</p></body></html>"
+            },
+            "name": "HTML Template",
+            "type": "n8n-nodes-base.html",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "binaryPropertyName": "data"
+            },
+            "name": "HTML to PDF",
+            "type": "n8n-nodes-base.htmlToPdf",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
         }
-      },
-      "id": "validate-params",
-      "name": "Validate Params",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: false, error: { code: 'INVALID_REQUEST', message: 'project_id is required' } }) }}",
-        "options": {
-          "responseCode": 400
+    ],
+    "connections": {
+        "Webhook Report Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Get Project",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Project": {
+            "main": [
+                [
+                    {
+                        "node": "HTML Template",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HTML Template": {
+            "main": [
+                [
+                    {
+                        "node": "HTML to PDF",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
-      },
-      "id": "error-missing-params",
-      "name": "Error: Missing Params",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [650, 450]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT p.id, p.name, p.owner, p.start_date, p.target_date, p.status, p.created_at FROM project p WHERE p.id = $1 AND p.status != 'deleted'",
-        "options": {
-          "queryParams": "={{ $json.body.project_id }}"
-        }
-      },
-      "id": "query-project",
-      "name": "Query Project",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [650, 200],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials-id",
-          "name": "QC Database"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "number": [
-            {
-              "value1": "={{ $json.length }}",
-              "operation": "larger",
-              "value2": 0
-            }
-          ]
-        }
-      },
-      "id": "check-project-exists",
-      "name": "Project Exists?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [850, 200]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: false, error: { code: 'PROJECT_NOT_FOUND', message: 'Project not found or has been deleted' } }) }}",
-        "options": {
-          "responseCode": 404
-        }
-      },
-      "id": "error-not-found",
-      "name": "Error: Not Found",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1050, 350]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT t.id, t.name, t.status, t.assignee, t.due_date, t.completed_at, t.priority FROM task t WHERE t.project_id = $1 AND t.status != 'deleted' ORDER BY t.due_date ASC",
-        "options": {
-          "queryParams": "={{ $('Webhook Trigger').first().json.body.project_id }}"
-        }
-      },
-      "id": "query-tasks",
-      "name": "Query Tasks",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.3,
-      "position": [1050, 100],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-credentials-id",
-          "name": "QC Database"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const tasks = $input.all();\nconst total = tasks.length;\nconst completed = tasks.filter(t => t.json.status === 'completed').length;\nconst pending = tasks.filter(t => t.json.status === 'pending').length;\nconst in_progress = tasks.filter(t => t.json.status === 'in_progress').length;\nconst failed = tasks.filter(t => t.json.status === 'failed').length;\nconst completion_pct = total > 0 ? Math.round((completed / total) * 100) : 0;\n\nreturn [{\n  json: {\n    total,\n    completed,\n    pending,\n    in_progress,\n    failed,\n    completion_pct,\n    tasks: tasks.map(t => t.json)\n  }\n}];"
-      },
-      "id": "calculate-stats",
-      "name": "Calculate Stats",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1250, 100]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Template rendering - generates HTML for PDF conversion\nconst project = $('Query Project').first().json[0];\nconst stats = $input.first().json;\nconst generatedAt = new Date().toISOString();\nconst reportId = `RPT-${Date.now().toString(36).toUpperCase()}`;\n\n// Format date helper\nconst formatDate = (dateStr) => {\n  if (!dateStr) return '—';\n  const date = new Date(dateStr);\n  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });\n};\n\nconst formatDateTime = (dateStr) => {\n  if (!dateStr) return '—';\n  const date = new Date(dateStr);\n  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });\n};\n\nconst escapeHtml = (text) => {\n  if (!text) return '';\n  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#039;' };\n  return String(text).replace(/[&<>\"']/g, m => map[m]);\n};\n\n// Generate task rows\nconst taskRows = stats.tasks.map(task => `\n  <tr>\n    <td>${escapeHtml(task.name)}</td>\n    <td>${escapeHtml(task.assignee || '—')}</td>\n    <td><span class=\"status-badge status-${task.status}\">${(task.status || '').replace('_', ' ')}</span></td>\n    <td class=\"priority-${task.priority}\">${task.priority || '—'}</td>\n    <td>${formatDate(task.due_date)}</td>\n    <td>${formatDate(task.completed_at)}</td>\n  </tr>\n`).join('');\n\nconst html = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Project Summary - ${escapeHtml(project.name)}</title>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 12px; line-height: 1.5; color: #333; }\n    .page { max-width: 210mm; margin: 0 auto; padding: 20mm; }\n    .header { border-bottom: 3px solid #2563eb; padding-bottom: 15px; margin-bottom: 25px; }\n    .header-top { display: flex; justify-content: space-between; margin-bottom: 10px; }\n    .logo { font-size: 24px; font-weight: bold; color: #2563eb; }\n    .report-meta { text-align: right; font-size: 10px; color: #666; }\n    .report-title { font-size: 20px; font-weight: 600; color: #1e293b; margin-top: 10px; }\n    .project-info { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }\n    .project-info h2 { font-size: 14px; color: #475569; margin-bottom: 12px; text-transform: uppercase; }\n    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }\n    .info-item { display: flex; flex-direction: column; }\n    .info-label { font-size: 10px; color: #64748b; text-transform: uppercase; }\n    .info-value { font-size: 13px; font-weight: 500; color: #1e293b; }\n    .statistics { margin-bottom: 25px; }\n    .statistics h2 { font-size: 14px; color: #475569; margin-bottom: 15px; text-transform: uppercase; }\n    .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }\n    .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }\n    .stat-value { font-size: 24px; font-weight: bold; color: #2563eb; }\n    .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; margin-top: 4px; }\n    .stat-card.completed .stat-value { color: #16a34a; }\n    .stat-card.pending .stat-value { color: #eab308; }\n    .stat-card.in-progress .stat-value { color: #3b82f6; }\n    .stat-card.failed .stat-value { color: #dc2626; }\n    .progress-section { margin-bottom: 25px; }\n    .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; }\n    .progress-label { font-size: 12px; font-weight: 500; color: #475569; }\n    .progress-value { font-size: 14px; font-weight: bold; color: #2563eb; }\n    .progress-bar { height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden; }\n    .progress-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); width: ${stats.completion_pct}%; }\n    .task-section { margin-bottom: 25px; }\n    .task-section h2 { font-size: 14px; color: #475569; margin-bottom: 15px; text-transform: uppercase; }\n    .task-table { width: 100%; border-collapse: collapse; font-size: 11px; }\n    .task-table th { background: #f1f5f9; padding: 10px 8px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; font-size: 10px; text-transform: uppercase; }\n    .task-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; color: #334155; }\n    .task-table tr:nth-child(even) { background: #f8fafc; }\n    .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; text-transform: uppercase; }\n    .status-completed { background: #dcfce7; color: #166534; }\n    .status-pending { background: #fef3c7; color: #92400e; }\n    .status-in_progress { background: #dbeafe; color: #1e40af; }\n    .status-failed { background: #fee2e2; color: #991b1b; }\n    .priority-high { color: #dc2626; font-weight: 600; }\n    .priority-medium { color: #d97706; }\n    .priority-low { color: #6b7280; }\n    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }\n    .confidential { color: #ef4444; font-weight: 500; }\n  </style>\n</head>\n<body>\n  <div class=\"page\">\n    <header class=\"header\">\n      <div class=\"header-top\">\n        <div class=\"logo\">QC Management</div>\n        <div class=\"report-meta\">\n          <div>Generated: ${formatDateTime(generatedAt)}</div>\n          <div>Report ID: ${reportId}</div>\n        </div>\n      </div>\n      <h1 class=\"report-title\">Project Summary Report</h1>\n    </header>\n    <section class=\"project-info\">\n      <h2>Project Details</h2>\n      <div class=\"info-grid\">\n        <div class=\"info-item\"><span class=\"info-label\">Project Name</span><span class=\"info-value\">${escapeHtml(project.name)}</span></div>\n        <div class=\"info-item\"><span class=\"info-label\">Project ID</span><span class=\"info-value\">${project.id}</span></div>\n        <div class=\"info-item\"><span class=\"info-label\">Owner</span><span class=\"info-value\">${escapeHtml(project.owner || '—')}</span></div>\n        <div class=\"info-item\"><span class=\"info-label\">Status</span><span class=\"info-value\">${escapeHtml(project.status)}</span></div>\n        <div class=\"info-item\"><span class=\"info-label\">Start Date</span><span class=\"info-value\">${formatDate(project.start_date)}</span></div>\n        <div class=\"info-item\"><span class=\"info-label\">Target Completion</span><span class=\"info-value\">${formatDate(project.target_date)}</span></div>\n      </div>\n    </section>\n    <section class=\"statistics\">\n      <h2>Task Statistics</h2>\n      <div class=\"stats-grid\">\n        <div class=\"stat-card\"><div class=\"stat-value\">${stats.total}</div><div class=\"stat-label\">Total Tasks</div></div>\n        <div class=\"stat-card completed\"><div class=\"stat-value\">${stats.completed}</div><div class=\"stat-label\">Completed</div></div>\n        <div class=\"stat-card in-progress\"><div class=\"stat-value\">${stats.in_progress}</div><div class=\"stat-label\">In Progress</div></div>\n        <div class=\"stat-card pending\"><div class=\"stat-value\">${stats.pending}</div><div class=\"stat-label\">Pending</div></div>\n        <div class=\"stat-card failed\"><div class=\"stat-value\">${stats.failed}</div><div class=\"stat-label\">Failed</div></div>\n      </div>\n    </section>\n    <section class=\"progress-section\">\n      <div class=\"progress-header\">\n        <span class=\"progress-label\">Overall Completion</span>\n        <span class=\"progress-value\">${stats.completion_pct}%</span>\n      </div>\n      <div class=\"progress-bar\"><div class=\"progress-fill\"></div></div>\n    </section>\n    <section class=\"task-section\">\n      <h2>Task Breakdown</h2>\n      <table class=\"task-table\">\n        <thead><tr><th>Task Name</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due Date</th><th>Completed</th></tr></thead>\n        <tbody>${taskRows}</tbody>\n      </table>\n    </section>\n    <footer class=\"footer\">\n      <div class=\"confidential\">CONFIDENTIAL - Internal Use Only</div>\n      <div>Generated by QC Management System</div>\n      <div>Page 1 of 1</div>\n    </footer>\n  </div>\n</body>\n</html>`;\n\nreturn [{ json: { html, filename: `project-summary-${project.id}-${Date.now()}.pdf`, reportId } }];"
-      },
-      "id": "render-html",
-      "name": "Render HTML",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1450, 100]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.pdfshift.io/v3/convert/pdf",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ source: $json.html, format: 'A4', margin: '20mm' }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
-        }
-      },
-      "id": "html-to-pdf",
-      "name": "HTML to PDF",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [1650, 100],
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "pdfshift-credentials-id",
-          "name": "PDFShift API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "upload",
-        "bucketName": "qc-reports",
-        "fileName": "={{ $('Render HTML').first().json.filename }}",
-        "binaryPropertyName": "data"
-      },
-      "id": "upload-s3",
-      "name": "Upload to S3",
-      "type": "n8n-nodes-base.awsS3",
-      "typeVersion": 1,
-      "position": [1850, 100],
-      "credentials": {
-        "aws": {
-          "id": "aws-credentials-id",
-          "name": "AWS Credentials"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const filename = $('Render HTML').first().json.filename;\nconst reportId = $('Render HTML').first().json.reportId;\nconst bucketName = 'qc-reports';\nconst region = 'us-east-1'; // Update as needed\nconst expiresIn = 3600; // 1 hour\n\n// For production, use AWS SDK to generate presigned URL\n// This is a placeholder showing the expected output structure\nconst downloadUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${filename}?presigned=true&expires=${expiresIn}`;\n\nreturn [{\n  json: {\n    success: true,\n    download_url: downloadUrl,\n    filename: filename,\n    expires_in: expiresIn,\n    report_id: reportId,\n    generated_at: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "generate-url",
-      "name": "Generate Signed URL",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2050, 100]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "respond-success",
-      "name": "Respond Success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [2250, 100]
     }
-  ],
-  "connections": {
-    "Webhook Trigger": {
-      "main": [
-        [{ "node": "Validate Params", "type": "main", "index": 0 }]
-      ]
-    },
-    "Validate Params": {
-      "main": [
-        [{ "node": "Query Project", "type": "main", "index": 0 }],
-        [{ "node": "Error: Missing Params", "type": "main", "index": 0 }]
-      ]
-    },
-    "Query Project": {
-      "main": [
-        [{ "node": "Project Exists?", "type": "main", "index": 0 }]
-      ]
-    },
-    "Project Exists?": {
-      "main": [
-        [{ "node": "Query Tasks", "type": "main", "index": 0 }],
-        [{ "node": "Error: Not Found", "type": "main", "index": 0 }]
-      ]
-    },
-    "Query Tasks": {
-      "main": [
-        [{ "node": "Calculate Stats", "type": "main", "index": 0 }]
-      ]
-    },
-    "Calculate Stats": {
-      "main": [
-        [{ "node": "Render HTML", "type": "main", "index": 0 }]
-      ]
-    },
-    "Render HTML": {
-      "main": [
-        [{ "node": "HTML to PDF", "type": "main", "index": 0 }]
-      ]
-    },
-    "HTML to PDF": {
-      "main": [
-        [{ "node": "Upload to S3", "type": "main", "index": 0 }]
-      ]
-    },
-    "Upload to S3": {
-      "main": [
-        [{ "node": "Generate Signed URL", "type": "main", "index": 0 }]
-      ]
-    },
-    "Generate Signed URL": {
-      "main": [
-        [{ "node": "Respond Success", "type": "main", "index": 0 }]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  }
 }

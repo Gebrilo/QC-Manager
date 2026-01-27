@@ -1,0 +1,49 @@
+import * as React from 'react';
+
+interface StatCardProps {
+    label?: string;
+    title?: string;
+    value: string | number;
+    subtitle?: string;
+    trend?: {
+        value: number;
+        isPositive: boolean;
+    } | 'up' | 'down';
+    icon?: React.ReactNode;
+}
+
+export function StatCard({ label, title, value, subtitle, trend, icon }: StatCardProps) {
+    const displayLabel = label || title || '';
+    
+    const trendObj = typeof trend === 'string' 
+        ? { value: 0, isPositive: trend === 'up' }
+        : trend;
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                    {displayLabel}
+                </span>
+                {icon && (
+                    <div className="text-slate-400">
+                        {icon}
+                    </div>
+                )}
+            </div>
+            <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {value}
+                </span>
+                {trendObj && (
+                    <span className={`text-xs font-semibold ${trendObj.isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {trendObj.isPositive ? '↑' : '↓'} {trendObj.value > 0 ? `${Math.abs(trendObj.value)}%` : ''}
+                    </span>
+                )}
+            </div>
+            {subtitle && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>
+            )}
+        </div>
+    );
+}
