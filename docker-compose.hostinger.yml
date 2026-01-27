@@ -62,7 +62,7 @@ services:
       - "3001:3001"
     volumes:
       - ./apps/api:/app
-      - /app/node_modules
+      - api_node_modules:/app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,7 +77,7 @@ services:
     image: node:18-alpine
     restart: always
     working_dir: /app
-    command: sh -c "apk add --no-cache wget && npm install && npm run build && npm start"
+    command: sh -c "apk add --no-cache wget && npm install && if [ ! -d .next ] || [ ! -f .next/BUILD_ID ]; then echo 'Building Next.js app...' && npm run build; else echo 'Using existing build'; fi && npm start"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
       - NODE_ENV=production
@@ -85,8 +85,8 @@ services:
       - "3000:3000"
     volumes:
       - ./apps/web:/app
-      - /app/.next
-      - /app/node_modules
+      - web_next:/app/.next
+      - web_node_modules:/app/node_modules
     depends_on:
       - api
     healthcheck:
@@ -110,3 +110,6 @@ services:
 volumes:
   postgres_data:
   n8n_data:
+  web_next:
+  web_node_modules:
+  api_node_modules:
