@@ -47,3 +47,14 @@ Thumbs.db
 # Temporary
 *.tmp
 *.temp
+
+# Local development/test directories
+qc-app/
+
+# Backup files
+*.bak
+*.backup
+
+# Docker volumes (local testing)
+postgres_data/
+n8n_data/
