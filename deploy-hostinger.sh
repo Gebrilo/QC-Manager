@@ -78,15 +78,13 @@ else
     exit 1
 fi
 
-# Ensure we're using the Hostinger-specific compose file
-info "Using Hostinger-optimized docker-compose.yml..."
-if [ -f docker-compose.hostinger.yml ]; then
-    cp docker-compose.hostinger.yml docker-compose.yml
-    success "Using docker-compose.hostinger.yml"
-else
+# Verify Hostinger-specific compose file exists
+info "Verifying docker-compose.hostinger.yml exists..."
+if [ ! -f docker-compose.hostinger.yml ]; then
     error "docker-compose.hostinger.yml not found!"
     exit 1
 fi
+success "Found docker-compose.hostinger.yml"
 
 # Pull images with retry logic
 info "Pulling Docker images (this may take 5-10 minutes)..."
@@ -186,9 +184,9 @@ EOF
 fi
 
 # Stop any existing containers
-if docker compose ps -q | grep -q .; then
+if docker compose -f docker-compose.hostinger.yml ps -q | grep -q .; then
     info "Stopping existing containers..."
-    docker compose down
+    docker compose -f docker-compose.hostinger.yml down
     success "Stopped existing containers"
 fi
 
@@ -196,7 +194,7 @@ fi
 info "Starting services..."
 echo ""
 
-docker compose up -d
+docker compose -f docker-compose.hostinger.yml up -d
 
 echo ""
 success "Services started!"
@@ -210,7 +208,7 @@ sleep 10
 
 # Check service status
 info "Checking service status..."
-docker compose ps
+docker compose -f docker-compose.hostinger.yml ps
 
 echo ""
 
@@ -252,14 +250,14 @@ echo "  • API: http://${VPS_IP}:3001"
 echo "  • n8n: http://${VPS_IP}:5678"
 echo ""
 echo "Useful commands:"
-echo "  • View logs: docker compose logs -f"
-echo "  • Check status: docker compose ps"
-echo "  • Restart: docker compose restart"
-echo "  • Stop: docker compose down"
+echo "  • View logs: docker compose -f docker-compose.hostinger.yml logs -f"
+echo "  • Check status: docker compose -f docker-compose.hostinger.yml ps"
+echo "  • Restart: docker compose -f docker-compose.hostinger.yml restart"
+echo "  • Stop: docker compose -f docker-compose.hostinger.yml down"
 echo ""
 echo "⚠️  Important Next Steps:"
-echo "  1. Verify all services are running: docker compose ps"
-echo "  2. Check logs if any issues: docker compose logs"
+echo "  1. Verify all services are running: docker compose -f docker-compose.hostinger.yml ps"
+echo "  2. Check logs if any issues: docker compose -f docker-compose.hostinger.yml logs"
 echo "  3. Configure n8n workflows at http://${VPS_IP}:5678"
 echo "  4. Setup database backups (see docs)"
 echo "  5. Configure firewall to allow ports 80, 443, 5678"

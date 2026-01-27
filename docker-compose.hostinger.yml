@@ -1,6 +1,7 @@
-# Hostinger Docker Manager optimized configuration
-# Use this file when deploying via Hostinger's Docker Manager GUI
-# This avoids build steps and uses smaller, pre-built images
+# HOSTINGER VPS DEPLOYMENT
+# Optimized for Hostinger Docker Manager - uses pre-built Alpine images (no builds)
+# Fixes network timeout issues during image pulls
+# Usage: docker compose -f docker-compose.hostinger.yml up -d
 
 services:
   postgres:

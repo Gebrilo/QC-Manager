@@ -1,3 +1,9 @@
+# PRODUCTION VPS DEPLOYMENT
+# For VPS deployment with custom Docker builds and Nginx reverse proxy
+# Uses .env file for configuration
+# For Hostinger VPS, use docker-compose.hostinger.yml instead
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -50,6 +56,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
       - NODE_ENV=production
+    volumes:
+      - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,6 +70,9 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
+    volumes:
+      - /app/.next
+      - /app/node_modules
     depends_on:
       - api
 

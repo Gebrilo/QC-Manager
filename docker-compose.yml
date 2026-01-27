@@ -1,3 +1,9 @@
+# LOCAL DEVELOPMENT ONLY
+# This file is for local development with Docker builds
+# For VPS deployment, use:
+#   - docker-compose.hostinger.yml (Hostinger VPS)
+#   - docker-compose.prod.yml (Other VPS with custom builds)
+
 version: "3.9"
 
 services:
