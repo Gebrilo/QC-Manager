@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TestResult, ExecutionStatus, Project } from '@/types';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function TestResultsPage() {
+function TestResultsContent() {
   const searchParams = useSearchParams();
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -263,5 +263,13 @@ export default function TestResultsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TestResultsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>}>
+      <TestResultsContent />
+    </Suspense>
   );
 }
