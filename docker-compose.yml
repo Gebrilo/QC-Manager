@@ -17,6 +17,8 @@ services:
       POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
       POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
+    ports:
+    - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
@@ -60,7 +62,7 @@ services:
     command: sh -c "apk add --no-cache wget && npm install && npm start"
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://admin:Wind@123@HOST:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}
+      - DATABASE_URL=postgresql://admin:Wind@123@72.61.157.168:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook
       - NODE_ENV=production
