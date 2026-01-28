@@ -20,8 +20,7 @@ services:
     restart: always
     environment:
       - PORT=3001
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - DATABASE_URL=postgresql://admin:Wind@123@72.61.157.168:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://n8n.srv1206957.hstgr.cloud/webhook}
       - NODE_ENV=production
     depends_on:
