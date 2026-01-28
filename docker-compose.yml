@@ -14,15 +14,15 @@ services:
     image: postgres:15.6-alpine
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-qc_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:-qc_app}
+      POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
+      POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -44,7 +44,7 @@ services:
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-qc_app}
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-qc_user}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - DB_POSTGRESDB_PASSWORD= Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
       - "5678:5678"
     volumes:
@@ -60,7 +60,7 @@ services:
     command: sh -c "apk add --no-cache wget && npm install && npm start"
     environment:
       - PORT=3001
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - DATABASE_URL=postgresql://admin:Wind@123@HOST:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook
       - NODE_ENV=production
