@@ -1,234 +1,296 @@
-# Docker Compose Files Guide
+# Docker Compose Guide
 
-This project has **3 different docker-compose files** for different deployment scenarios.
+This project uses the **Docker Compose Override Pattern** - a best practice approach that eliminates duplication and confusion.
 
 ---
 
-## 📁 Which File to Use?
+## File Structure
 
-### 1. `docker-compose.yml` - Local Development
-**Use when:** Developing locally on your machine
+```
+/
+├── docker-compose.yml           # Base config (production-ready)
+├── docker-compose.override.yml  # Local dev overrides (auto-merged)
+├── env.example                  # Environment template
+└── .env                         # Your config (gitignored)
+```
 
-**Features:**
-- Hard-coded credentials (non-secure, for dev only)
-- Builds Docker images from Dockerfiles
-- Exposes all ports for easy access
-- Container names for easier debugging
+---
 
-**Start:**
+## Quick Start
+
+### Local Development
+
 ```bash
+# No setup needed - override file provides dev defaults
+docker compose up -d
+
+# Access:
+# Frontend: http://localhost:3000
+# API:      http://localhost:3001
+# n8n:      http://localhost:5678
+# Database: localhost:5432
+```
+
+### VPS Deployment (Hostinger or Any)
+
+```bash
+# 1. Configure environment
+cp env.example .env
+nano .env  # Update passwords and YOUR_VPS_IP
+
+# 2. Deploy
+docker compose up -d
+
+# Access:
+# Frontend: http://YOUR_VPS_IP (via nginx)
+# n8n:      http://YOUR_VPS_IP:5678
+```
+
+---
+
+## How It Works
+
+### Automatic Override Merging
+
+When you run `docker compose up`, Docker automatically:
+
+1. Loads `docker-compose.yml` (base config)
+2. Looks for `docker-compose.override.yml`
+3. Merges them together if found
+
+| Environment | Override File Present? | Result |
+|-------------|----------------------|--------|
+| Local Dev   | Yes (in repo)        | Base + Override merged |
+| VPS Server  | No (not deployed)    | Base only (production mode) |
+
+### What Gets Overridden for Local Dev
+
+| Setting | Production (Base) | Local Dev (Override) |
+|---------|-------------------|----------------------|
+| DB Password | From .env (required) | `postgres` (hardcoded) |
+| JWT Secret | From .env (required) | Dev secret (hardcoded) |
+| API URL | From .env (required) | `http://localhost:3001` |
+| DB Port | Not exposed | `5432` (for local tools) |
+| API Port | Not exposed | `3001` (direct access) |
+| Web Port | Not exposed | `3000` (direct access) |
+| Nginx | Enabled | Disabled (use direct ports) |
+
+---
+
+## Environment Variables
+
+### Required for Production
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `POSTGRES_PASSWORD` | Database password | `openssl rand -hex 16` |
+| `JWT_SECRET` | API authentication secret | `openssl rand -hex 32` |
+| `DATABASE_URL` | Full connection string | `postgresql://user:pass@postgres:5432/qc_app` |
+| `NEXT_PUBLIC_API_URL` | Frontend API endpoint | `http://192.168.1.100/api` |
+| `N8N_BASIC_AUTH_PASSWORD` | n8n admin password | `openssl rand -hex 12` |
+| `N8N_HOST` | n8n hostname | `192.168.1.100` |
+| `WEBHOOK_URL` | n8n webhook base URL | `http://192.168.1.100:5678` |
+
+### Generate Secure Passwords
+
+```bash
+# Database password (16 bytes = 32 hex chars)
+openssl rand -hex 16
+
+# JWT secret (32 bytes = 64 hex chars)
+openssl rand -hex 32
+
+# n8n password (12 bytes = 24 hex chars)
+openssl rand -hex 12
+```
+
+---
+
+## Common Commands
+
+### Start Services
+
+```bash
+# Local (with override)
+docker compose up -d
+
+# Production (base only)
 docker compose up -d
 ```
-
-**Stop:**
-```bash
-docker compose down
-```
-
----
-
-### 2. `docker-compose.hostinger.yml` - Hostinger VPS
-**Use when:** Deploying to Hostinger VPS
-
-**Features:**
-- Uses pre-built Alpine images (no Dockerfile builds)
-- Optimized for Hostinger's network constraints
-- Inline `npm install` to avoid build timeouts
-- Requires `.env` file with your VPS IP
-
-**Start:**
-```bash
-docker compose -f docker-compose.hostinger.yml up -d
-```
-
-**Or use the deployment script:**
-```bash
-./deploy-hostinger.sh YOUR_VPS_IP
-```
-
-**Stop:**
-```bash
-docker compose -f docker-compose.hostinger.yml down
-```
-
----
-
-### 3. `docker-compose.prod.yml` - Production VPS
-**Use when:** Deploying to a non-Hostinger VPS with full Docker support
-
-**Features:**
-- Builds custom Docker images
-- Includes Nginx reverse proxy
-- Requires `.env` file for all configuration
-- Suitable for AWS, DigitalOcean, Linode, etc.
-
-**Start:**
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
-
-**Or use the deployment script:**
-```bash
-./deploy-vps.sh YOUR_VPS_IP
-```
-
-**Stop:**
-```bash
-docker compose -f docker-compose.prod.yml down
-```
-
----
-
-## 🎯 Quick Decision Tree
-
-```
-Are you developing locally?
-  ├─ YES → Use docker-compose.yml (default)
-  └─ NO → Deploying to VPS?
-       ├─ Hostinger VPS → Use docker-compose.hostinger.yml
-       └─ Other VPS → Use docker-compose.prod.yml
-```
-
----
-
-## 📝 File Comparison
-
-| Feature | docker-compose.yml | docker-compose.hostinger.yml | docker-compose.prod.yml |
-|---------|-------------------|------------------------------|------------------------|
-| **Purpose** | Local dev | Hostinger VPS | Production VPS |
-| **Build** | Yes (Dockerfiles) | No (pre-built images) | Yes (Dockerfiles) |
-| **Environment** | Hard-coded | .env file | .env file |
-| **Nginx** | ❌ | ✅ | ✅ |
-| **Ports Exposed** | All | All | 80, 443 only |
-| **Optimization** | Developer experience | Hostinger network | Production ready |
-
----
-
-## 🚨 Important Notes
-
-### Never Mix Files!
-When using a specific compose file, **always specify it** with the `-f` flag:
-
-**❌ Wrong:**
-```bash
-# On VPS, this will use docker-compose.yml (local dev config)
-docker compose up -d
-```
-
-**✅ Correct:**
-```bash
-# Explicitly specify the file
-docker compose -f docker-compose.hostinger.yml up -d
-```
-
-### Default Behavior
-If you run `docker compose` without `-f`, it will use `docker-compose.yml` by default. This is fine for local development, but **not for VPS deployment**.
-
----
-
-## 🛠️ Common Commands
 
 ### View Logs
+
 ```bash
-# Local dev
+# All services
 docker compose logs -f
 
-# Hostinger VPS
-docker compose -f docker-compose.hostinger.yml logs -f
-
-# Production VPS
-docker compose -f docker-compose.prod.yml logs -f
+# Specific service
+docker compose logs -f api
+docker compose logs -f web
 ```
 
 ### Check Status
+
 ```bash
-# Local dev
 docker compose ps
-
-# Hostinger VPS
-docker compose -f docker-compose.hostinger.yml ps
-
-# Production VPS
-docker compose -f docker-compose.prod.yml ps
 ```
 
 ### Restart Services
+
 ```bash
-# Local dev
+# All
 docker compose restart
 
-# Hostinger VPS
-docker compose -f docker-compose.hostinger.yml restart
-
-# Production VPS
-docker compose -f docker-compose.prod.yml restart
+# Specific
+docker compose restart api
 ```
 
-### Full Rebuild
+### Stop Services
+
 ```bash
-# Local dev
-docker compose down -v
-docker compose up -d --build
-
-# Hostinger VPS (no build needed)
-docker compose -f docker-compose.hostinger.yml down -v
-docker compose -f docker-compose.hostinger.yml up -d
-
-# Production VPS
-docker compose -f docker-compose.prod.yml down -v
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
----
-
-## 📚 Related Documentation
-
-- **Hostinger Deployment:** `docs/03-guides/HOSTINGER-DOCKER-MANAGER.md`
-- **Production Deployment:** `docs/03-guides/VPS-DEPLOYMENT.md`
-- **Quick Start:** `HOSTINGER-QUICKSTART.md`
-- **Deployment Checklist:** `DEPLOYMENT-CHECKLIST.md`
-
----
-
-## 🔧 Troubleshooting
-
-### Issue: Wrong compose file used on VPS
-**Symptom:** Services fail to start, build errors on VPS
-
-**Solution:**
-```bash
-# Stop everything
+# Stop (keep volumes)
 docker compose down
+
+# Stop and remove volumes (DELETES DATA!)
+docker compose down -v
+```
+
+### Rebuild After Code Changes
+
+```bash
+# Web service (triggers Next.js rebuild)
+docker compose exec web rm -rf .next
+docker compose restart web
+
+# API service (reinstalls dependencies)
+docker compose restart api
+```
+
+---
+
+## Troubleshooting
+
+### "POSTGRES_PASSWORD is required"
+
+You're on a VPS without `.env` file configured.
+
+```bash
+cp env.example .env
+nano .env  # Set all required values
+docker compose up -d
+```
+
+### "Cannot connect to database"
+
+1. Check PostgreSQL is healthy:
+   ```bash
+   docker compose ps postgres
+   docker compose logs postgres
+   ```
+
+2. Verify DATABASE_URL matches POSTGRES_PASSWORD:
+   ```bash
+   grep POSTGRES_PASSWORD .env
+   grep DATABASE_URL .env
+   ```
+
+### "Web shows 'Building...' but never starts"
+
+First build takes 2-3 minutes. Monitor progress:
+```bash
+docker compose logs -f web
+```
+
+### "Nginx returns 502 Bad Gateway"
+
+Backend services aren't ready yet. Wait or check:
+```bash
+docker compose logs api
+docker compose logs web
+```
+
+### Port Already in Use
+
+```bash
+# Find what's using the port
+netstat -tlnp | grep :3000
+
+# Or force recreate
+docker compose down
+docker compose up -d
+```
+
+---
+
+## Architecture
+
+```
+                    ┌─────────────┐
+                    │   Browser   │
+                    └──────┬──────┘
+                           │
+                    ┌──────▼──────┐
+                    │    Nginx    │ :80
+                    │  (reverse   │
+                    │   proxy)    │
+                    └──────┬──────┘
+                           │
+           ┌───────────────┼───────────────┐
+           │               │               │
+    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+    │     Web     │ │     API     │ │     n8n     │
+    │  (Next.js)  │ │  (Express)  │ │ (Workflows) │
+    │    :3000    │ │    :3001    │ │    :5678    │
+    └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+           │               │               │
+           └───────────────┼───────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │  PostgreSQL │
+                    │    :5432    │
+                    └─────────────┘
+```
+
+---
+
+## Migration from Old Setup
+
+If you were using the old multi-file setup:
+
+```bash
+# 1. Stop old containers
 docker compose -f docker-compose.hostinger.yml down
+# or
 docker compose -f docker-compose.prod.yml down
 
-# Start with correct file
-docker compose -f docker-compose.hostinger.yml up -d
+# 2. Pull latest code
+git pull origin main
+
+# 3. Configure environment
+cp env.example .env
+nano .env
+
+# 4. Start with new config
+docker compose up -d
 ```
 
-### Issue: "Connection reset by peer" on Hostinger
-**Solution:** Use `docker-compose.hostinger.yml` which is specifically optimized for Hostinger's network
-
-### Issue: Want to switch from one config to another
-**Solution:**
-```bash
-# Stop current setup
-docker compose -f OLD_FILE.yml down
-
-# Start new setup
-docker compose -f NEW_FILE.yml up -d
-```
+Your data volumes (`postgres_data`, `n8n_data`) are preserved.
 
 ---
 
-## ✅ Best Practices
+## Best Practices
 
-1. **Always use `-f` flag on VPS** - Never rely on default behavior
-2. **Use deployment scripts** - They handle file selection automatically
-3. **Check which file is running** - Use `docker compose ps` and look at container names
-4. **Keep .env updated** - Required for both VPS configs
-5. **Document your choice** - Note which file you're using in deployment docs
+1. **Never commit `.env`** - It's gitignored for security
+2. **Use strong passwords** - Generate with `openssl rand -hex`
+3. **Keep `docker-compose.override.yml` local** - Don't deploy it to VPS
+4. **Monitor logs after deploy** - `docker compose logs -f`
+5. **Backup before updates** - `docker compose exec postgres pg_dump ...`
 
 ---
 
-**Need Help?** Check the full deployment guides in `docs/03-guides/`
+## Related Documentation
+
+- **VPS Deployment Guide**: `docs/03-guides/VPS-DEPLOYMENT.md`
+- **Quick Start**: `HOSTINGER-QUICKSTART.md`
+- **Deployment Checklist**: `DEPLOYMENT-CHECKLIST.md`
+- **n8n Workflows**: `n8n/README.md`
