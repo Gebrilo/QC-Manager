@@ -3,9 +3,9 @@ services:
     image: postgres:15.6-alpine
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-qc_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:-qc_app}
+      POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
+      POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
