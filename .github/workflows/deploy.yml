@@ -62,15 +62,47 @@ jobs:
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN
+          script_stop: true
           script: |
-            cd /opt/QC-Manager
-            git pull origin main
-            docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_TOKEN }}
+            set -euo pipefail
+
+            DEPLOY_DIR="/opt/qc-manager"
+            REPO_URL="https://github.com/Gebrilo/QC-Manager.git"
+
+            echo "=== Checking deployment directory ==="
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "Directory does not exist. Cloning repository..."
+              sudo mkdir -p "$DEPLOY_DIR"
+              sudo chown $USER:$USER "$DEPLOY_DIR"
+              git clone "$REPO_URL" "$DEPLOY_DIR"
+            fi
+
+            cd "$DEPLOY_DIR"
+
+            echo "=== Pulling latest code ==="
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== Docker login ==="
+            echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+
+            echo "=== Pulling images ==="
             docker compose -f docker-compose.prod.yml pull
+
+            echo "=== Deploying containers ==="
             docker compose -f docker-compose.prod.yml up -d --force-recreate
+
+            echo "=== Cleanup ==="
             docker image prune -f
+
+            echo "=== Deployment complete ==="
+            docker compose -f docker-compose.prod.yml ps
