@@ -15,7 +15,7 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-RUN npm run dev
+RUN npm run build
 
 FROM node:18-alpine AS runner
 

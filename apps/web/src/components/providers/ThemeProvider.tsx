@@ -82,7 +82,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                     `,
                 }}
             />
-            {mounted ? children : <div className="invisible">{children}</div>}
+            <div className={mounted ? '' : 'invisible'}>
+                {children}
+            </div>
         </ThemeContext.Provider>
     );
 }
