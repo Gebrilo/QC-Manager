@@ -81,13 +81,12 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET
           script_stop: true
           script: |
             set -euo pipefail
@@ -110,13 +109,8 @@ jobs:
             git reset --hard origin/main
 
             echo "=== Creating .env file ==="
-            cat > .env << EOF
-            DOCKER_HUB_USERNAME=$DOCKER_HUB_USERNAME
-            JWT_SECRET=$JWT_SECRET
-            POSTGRES_USER=admin
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
-            POSTGRES_DB=postgres
-            EOF
+            echo "DOCKER_HUB_USERNAME=$DOCKER_HUB_USERNAME" > .env
+            echo "JWT_SECRET=$JWT_SECRET" >> .env
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
