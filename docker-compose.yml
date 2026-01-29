@@ -1,24 +1,23 @@
 # QC Management Tool - Docker Compose Configuration
-# Production-ready by default - works on any VPS including Hostinger
+# For local development with source mounting and hot reload
 #
 # Usage:
 #   Local Dev:  docker compose up -d  (auto-merges with docker-compose.override.yml)
-#   Production: docker compose up -d  (no override file on server)
+#   Production: Use docker-compose.prod.yml instead
 #
 # Requirements:
 #   - Copy .env.example to .env and configure before running
-#   - On VPS: Only .env file needed, no override file
 
 services:
   postgres:
     image: postgres:15.6-alpine
     restart: always
     environment:
-      POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
-      POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Wind@123}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
-    - "5432:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
@@ -44,9 +43,9 @@ services:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-qc_app}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER:-qc_user}
-      - DB_POSTGRESDB_PASSWORD= Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
     ports:
       - "5678:5678"
     volumes:
@@ -62,7 +61,7 @@ services:
     command: sh -c "apk add --no-cache wget && npm install && npm start"
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://admin:Wind@123@72.61.157.168:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@postgres:5432/${POSTGRES_DB:-postgres}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook
       - NODE_ENV=production

@@ -3,26 +3,26 @@ services:
     image: postgres:15.6-alpine
     restart: always
     environment:
-      POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
-      POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Wind@123}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   api:
     image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-api:latest
     restart: always
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://admin:Wind@123@localhost:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@postgres:5432/${POSTGRES_DB:-postgres}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://n8n.srv1206957.hstgr.cloud/webhook}
       - NODE_ENV=production
     depends_on:
@@ -36,14 +36,12 @@ services:
       start_period: 30s
 
   web:
-    image: ${DOCKER_HUB_USERNAME}/qc-web:latest
+    image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-web:latest
     restart: always
     environment:
       - NODE_ENV=production
     depends_on:
       - api
-    ports:
-      - "3002:3000"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
@@ -55,7 +53,7 @@ services:
     image: nginx:1.25-alpine
     restart: always
     ports:
-      - "8080:80"
+      - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:

@@ -14,7 +14,9 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 apiuser
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY . .
+
+COPY package.json ./
+COPY src/ ./src/
 
 USER apiuser
 
