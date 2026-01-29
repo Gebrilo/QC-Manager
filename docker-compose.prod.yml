@@ -1,33 +1,13 @@
 services:
-  postgres:
-    image: postgres:15.6-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: admin #${POSTGRES_USER:-qc_user}
-      POSTGRES_PASSWORD: Wind@123 #${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: postgres #${POSTGRES_DB:-qc_app}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
   api:
     image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-api:latest
     restart: always
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://admin:Wind@123@localhost:5432/postgres #${DATABASE_URL:?DATABASE_URL is required}      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
-      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://n8n.srv1206957.hstgr.cloud/webhook}
+      - DATABASE_URL=postgresql://admin:22WckPjXlqt2IK0sjLhWyR6AjyzCxHEn@72.61.157.168:32768/Postgres
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - N8N_WEBHOOK_URL=http://72.61.157.168:32769/webhook
       - NODE_ENV=production
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
@@ -62,5 +42,3 @@ services:
       - web
       - api
 
-volumes:
-  postgres_data:
