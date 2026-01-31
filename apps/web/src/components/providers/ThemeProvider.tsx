@@ -17,10 +17,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const [theme, setTheme] = useState<Theme>('light');
     const [density, setDensity] = useState<Density>('comfortable');
-    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Hydrate from localStorage
         const storedTheme = localStorage.getItem('theme') as Theme | null;
         const storedDensity = localStorage.getItem('density') as Density | null;
 
@@ -33,23 +31,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (storedDensity) {
             setDensity(storedDensity);
         }
-
-        setMounted(true);
     }, []);
 
     useEffect(() => {
-        if (!mounted) return;
-
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(theme);
         localStorage.setItem('theme', theme);
-    }, [theme, mounted]);
+    }, [theme]);
 
     useEffect(() => {
-        if (!mounted) return;
         localStorage.setItem('density', density);
-    }, [density, mounted]);
+    }, [density]);
 
     const toggleTheme = () => {
         setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -59,16 +52,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setDensity((prev) => (prev === 'comfortable' ? 'compact' : 'comfortable'));
     };
 
-    // We always render the provider to ensure useTheme() works in children (like Header)
-    // even during initial render/hydration.
-    console.log('ThemeProvider rendering. Mounted:', mounted);
     return (
         <ThemeContext.Provider value={{ theme, density, toggleTheme, toggleDensity }}>
-            {/* 
-                We render children immediately. 
-                Theme might flip from light->dark after mount (hydration), causing a repaint.
-                This is acceptable for a "no-new-libraries" approach to theme persistence.
-            */}
             <script
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -82,7 +67,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                     `,
                 }}
             />
-            {mounted ? children : <div className="invisible">{children}</div>}
+            {children}
         </ThemeContext.Provider>
     );
 }
