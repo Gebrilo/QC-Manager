@@ -2,12 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const errorHandler = require('./middleware/error');
+const { runMigrations } = require('./config/db');
 
 // Load env
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Run migrations on startup
+runMigrations().catch(err => console.error('Migration failed:', err));
 
 // Middleware
 app.use(cors());

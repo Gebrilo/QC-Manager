@@ -1,0 +1,123 @@
+{
+  "projectName": "QC Manager",
+  "projectType": "fullstack",
+  "description": "Quality Control Management Tool with project tracking, task management, resource allocation, and governance dashboards",
+  "backend": {
+    "framework": "Express.js",
+    "language": "JavaScript",
+    "port": 3001,
+    "database": "PostgreSQL",
+    "routes": [
+      {
+        "path": "/api/health",
+        "methods": ["GET"],
+        "description": "Health check endpoint"
+      },
+      {
+        "path": "/api/dashboard",
+        "methods": ["GET"],
+        "description": "Dashboard metrics from v_dashboard_metrics view"
+      },
+      {
+        "path": "/api/projects",
+        "methods": ["GET", "POST"],
+        "description": "List all projects or create new project"
+      },
+      {
+        "path": "/api/projects/:id",
+        "methods": ["GET", "PATCH", "DELETE"],
+        "description": "Get, update, or soft-delete specific project"
+      },
+      {
+        "path": "/api/tasks",
+        "methods": ["GET", "POST"],
+        "description": "List all tasks or create new task"
+      },
+      {
+        "path": "/api/tasks/:id",
+        "methods": ["GET", "PATCH", "DELETE"],
+        "description": "Get, update, or soft-delete specific task"
+      },
+      {
+        "path": "/api/resources",
+        "methods": ["GET", "POST"],
+        "description": "List all resources with utilization or create new resource"
+      },
+      {
+        "path": "/api/resources/:id",
+        "methods": ["GET", "PATCH", "DELETE"],
+        "description": "Get, update, or soft-delete specific resource"
+      },
+      {
+        "path": "/api/governance/release-readiness",
+        "methods": ["GET"],
+        "description": "Get release readiness for all projects"
+      },
+      {
+        "path": "/api/governance/quality-risks",
+        "methods": ["GET"],
+        "description": "Get quality risk assessment for all projects"
+      },
+      {
+        "path": "/api/governance/project-health",
+        "methods": ["GET"],
+        "description": "Get comprehensive project health summary"
+      },
+      {
+        "path": "/api/governance/dashboard-summary",
+        "methods": ["GET"],
+        "description": "Get aggregated dashboard statistics"
+      },
+      {
+        "path": "/api/governance/gates/:projectId",
+        "methods": ["GET"],
+        "description": "Get quality gates configuration for a project"
+      },
+      {
+        "path": "/api/governance/gates",
+        "methods": ["POST"],
+        "description": "Create or update quality gates for a project"
+      },
+      {
+        "path": "/api/governance/approvals",
+        "methods": ["POST"],
+        "description": "Submit a release approval or rejection"
+      }
+    ]
+  },
+  "frontend": {
+    "framework": "Next.js 14",
+    "language": "TypeScript",
+    "port": 3000,
+    "pages": [
+      "/",
+      "/dashboard",
+      "/projects",
+      "/projects/[id]",
+      "/governance",
+      "/reports"
+    ],
+    "components": [
+      "Header",
+      "ProjectList",
+      "TaskList",
+      "ResourceList",
+      "DashboardMetrics",
+      "GovernanceDashboard",
+      "ThemeProvider"
+    ]
+  },
+  "authentication": "None (open API)",
+  "externalServices": [
+    {
+      "name": "n8n",
+      "type": "workflow automation",
+      "port": 5678
+    },
+    {
+      "name": "PostgreSQL",
+      "type": "database",
+      "port": 5432
+    }
+  ]
+}

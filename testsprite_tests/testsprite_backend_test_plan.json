@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "verify health check endpoint",
+    "description": "Test the /api/health GET endpoint to ensure it returns a successful response indicating the service is running."
+  },
+  {
+    "id": "TC002",
+    "title": "validate dashboard metrics retrieval",
+    "description": "Test the /api/dashboard GET endpoint to verify it returns accurate and timely aggregated metrics from the v_dashboard_metrics view within 3 seconds."
+  },
+  {
+    "id": "TC003",
+    "title": "test project creation and listing",
+    "description": "Test the /api/projects POST and GET endpoints to ensure projects can be created with valid data and listed correctly, enforcing input validation and audit logging."
+  },
+  {
+    "id": "TC004",
+    "title": "test project update and soft deletion",
+    "description": "Test the /api/projects/:id PATCH and DELETE endpoints to verify projects can be updated with valid status transitions and soft-deleted, with audit logs capturing before and after states."
+  },
+  {
+    "id": "TC005",
+    "title": "test task creation and listing",
+    "description": "Test the /api/tasks POST and GET endpoints to ensure tasks can be created with proper resource allocation checks and listed with accurate status and assignment details."
+  },
+  {
+    "id": "TC006",
+    "title": "test task update and soft deletion",
+    "description": "Test the /api/tasks/:id PATCH and DELETE endpoints to verify tasks can be updated with valid status transitions and soft-deleted, enforcing resource utilization limits and audit logging."
+  },
+  {
+    "id": "TC007",
+    "title": "test resource creation and listing",
+    "description": "Test the /api/resources POST and GET endpoints to ensure resources can be created with utilization metrics and listed correctly, supporting capacity monitoring."
+  },
+  {
+    "id": "TC008",
+    "title": "test resource update and soft deletion",
+    "description": "Test the /api/resources/:id PATCH and DELETE endpoints to verify resources can be updated and soft-deleted, with audit logs capturing changes and utilization updates."
+  },
+  {
+    "id": "TC009",
+    "title": "validate governance release readiness retrieval",
+    "description": "Test the /api/governance/release-readiness GET endpoint to ensure it returns accurate release readiness status for all projects based on quality gates."
+  },
+  {
+    "id": "TC010",
+    "title": "test quality gates configuration management",
+    "description": "Test the /api/governance/gates/:projectId GET and /api/governance/gates POST endpoints to verify quality gates can be retrieved, created, and updated with correct validation and audit logging."
+  }
+]

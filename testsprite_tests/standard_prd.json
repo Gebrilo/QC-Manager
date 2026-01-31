@@ -1,0 +1,210 @@
+{
+  "meta": {
+    "project": "QC Manager",
+    "date": "2026-01-29",
+    "prepared_by": "Software Development Manager"
+  },
+  "product_overview": "QC Manager is a comprehensive Quality Control Management Tool designed to streamline project tracking, task management, resource allocation, and governance through integrated dashboards. It empowers QA and Test Leads to make data-driven decisions, enforce quality gates, and monitor project health seamlessly.",
+  "core_goals": [
+    "Provide real-time visibility into project quality metrics and task statuses.",
+    "Enable standardized governance with configurable quality gates and release approval workflows.",
+    "Support efficient resource allocation and workload monitoring.",
+    "Deliver automated, rule-based insights and reporting capabilities.",
+    "Ensure full auditability and traceability of all changes and approvals."
+  ],
+  "key_features": [
+    "Project management with creation, updating, and soft deletion capabilities.",
+    "Task management including detailed tracking, status transitions, and resource assignments.",
+    "Resource pool management with utilization metrics and capacity monitoring.",
+    "Governance dashboards offering release readiness, quality risk assessments, and project health summaries.",
+    "Configurable quality gates and manual/automatic release approval workflows.",
+    "Comprehensive audit logging for all CRUD operations and governance actions.",
+    "Automated report generation in multiple formats (PDF, Excel, CSV) with asynchronous processing and polling support.",
+    "n8n workflow integration for business logic, notifications, and complex operations.",
+    "Open API with JWT-based authentication for secure access.",
+    "Deployment support via Docker Compose for local development and Hostinger VPS production environments."
+  ],
+  "user_flow_summary": [
+    "QA Lead logs into the system and views the dashboard with real-time project and task metrics.",
+    "QA Lead creates or updates projects and tasks via the frontend or API, with validation and audit logging occurring in the backend and n8n workflows.",
+    "QA Lead monitors resource allocation to prevent overallocation, receiving warnings on task creation or updates when limits are approached or exceeded.",
+    "QA Lead configures or reviews quality gates on projects to ensure minimum quality thresholds are met before releases.",
+    "QA Lead approves or blocks releases based on quality gate evaluations, with compulsory comments and audit trails recorded.",
+    "Automated workflows generate detailed reports on project status and quality, which QA Leads and stakeholders can download or receive via email.",
+    "System sends notifications and alerts (email, Slack) for overdue tasks, resource overallocations, and critical project statuses.",
+    "Admins deploy and maintain the system using provided Docker Compose files and Hostinger VPS deployment instructions, ensuring secure and scalable production use."
+  ],
+  "validation_criteria": [
+    "API endpoints must enforce JWT authentication and validate all inputs with structured schemas.",
+    "Project and task creation/update must enforce format and status transition rules, rejecting invalid data with clear error messages.",
+    "Audit logs must capture complete before and after states for all CRUD and governance actions.",
+    "Dashboard metrics must load within 3 seconds under typical loads and reflect accurate aggregated data from database views.",
+    "Quality gates must correctly evaluate pass/fail based on configured thresholds and trigger appropriate approval workflows.",
+    "Resource utilization warnings must trigger when allocation exceeds 80% capacity and prevent task creation above 100% without override.",
+    "Report generation endpoints must accept requests, generate reports asynchronously, and allow clients to poll for completion and download URLs.",
+    "Automated workflows must run successfully on schedule with appropriate error handling and notifications.",
+    "Deployment guides must enable reproducible local and production deployments using Docker and Hostinger VPS tools."
+  ],
+  "code_summary": {
+    "projectName": "QC Manager",
+    "projectType": "fullstack",
+    "description": "Quality Control Management Tool with project tracking, task management, resource allocation, and governance dashboards",
+    "backend": {
+      "framework": "Express.js",
+      "language": "JavaScript",
+      "port": 3001,
+      "database": "PostgreSQL",
+      "routes": [
+        {
+          "path": "/api/health",
+          "methods": [
+            "GET"
+          ],
+          "description": "Health check endpoint"
+        },
+        {
+          "path": "/api/dashboard",
+          "methods": [
+            "GET"
+          ],
+          "description": "Dashboard metrics from v_dashboard_metrics view"
+        },
+        {
+          "path": "/api/projects",
+          "methods": [
+            "GET",
+            "POST"
+          ],
+          "description": "List all projects or create new project"
+        },
+        {
+          "path": "/api/projects/:id",
+          "methods": [
+            "GET",
+            "PATCH",
+            "DELETE"
+          ],
+          "description": "Get, update, or soft-delete specific project"
+        },
+        {
+          "path": "/api/tasks",
+          "methods": [
+            "GET",
+            "POST"
+          ],
+          "description": "List all tasks or create new task"
+        },
+        {
+          "path": "/api/tasks/:id",
+          "methods": [
+            "GET",
+            "PATCH",
+            "DELETE"
+          ],
+          "description": "Get, update, or soft-delete specific task"
+        },
+        {
+          "path": "/api/resources",
+          "methods": [
+            "GET",
+            "POST"
+          ],
+          "description": "List all resources with utilization or create new resource"
+        },
+        {
+          "path": "/api/resources/:id",
+          "methods": [
+            "GET",
+            "PATCH",
+            "DELETE"
+          ],
+          "description": "Get, update, or soft-delete specific resource"
+        },
+        {
+          "path": "/api/governance/release-readiness",
+          "methods": [
+            "GET"
+          ],
+          "description": "Get release readiness for all projects"
+        },
+        {
+          "path": "/api/governance/quality-risks",
+          "methods": [
+            "GET"
+          ],
+          "description": "Get quality risk assessment for all projects"
+        },
+        {
+          "path": "/api/governance/project-health",
+          "methods": [
+            "GET"
+          ],
+          "description": "Get comprehensive project health summary"
+        },
+        {
+          "path": "/api/governance/dashboard-summary",
+          "methods": [
+            "GET"
+          ],
+          "description": "Get aggregated dashboard statistics"
+        },
+        {
+          "path": "/api/governance/gates/:projectId",
+          "methods": [
+            "GET"
+          ],
+          "description": "Get quality gates configuration for a project"
+        },
+        {
+          "path": "/api/governance/gates",
+          "methods": [
+            "POST"
+          ],
+          "description": "Create or update quality gates for a project"
+        },
+        {
+          "path": "/api/governance/approvals",
+          "methods": [
+            "POST"
+          ],
+          "description": "Submit a release approval or rejection"
+        }
+      ]
+    },
+    "frontend": {
+      "framework": "Next.js 14",
+      "language": "TypeScript",
+      "port": 3000,
+      "pages": [
+        "/",
+        "/dashboard",
+        "/projects",
+        "/projects/[id]",
+        "/governance",
+        "/reports"
+      ],
+      "components": [
+        "Header",
+        "ProjectList",
+        "TaskList",
+        "ResourceList",
+        "DashboardMetrics",
+        "GovernanceDashboard",
+        "ThemeProvider"
+      ]
+    },
+    "authentication": "None (open API)",
+    "externalServices": [
+      {
+        "name": "n8n",
+        "type": "workflow automation",
+        "port": 5678
+      },
+      {
+        "name": "PostgreSQL",
+        "type": "database",
+        "port": 5432
+      }
+    ]
+  }
+}
