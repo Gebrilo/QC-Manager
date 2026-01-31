@@ -10,7 +10,8 @@ FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs && \
+RUN apk add --no-cache wget && \
+    addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 apiuser
 
 COPY --from=builder /app/node_modules ./node_modules

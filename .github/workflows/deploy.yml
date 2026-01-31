@@ -111,14 +111,14 @@ jobs:
             git reset --hard origin/main
 
             echo "=== Creating .env file ==="
-            cat > .env << EOF
-            DOCKER_HUB_USERNAME=$DOCKER_HUB_USERNAME
-            JWT_SECRET=$JWT_SECRET
-            POSTGRES_USER=admin
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
-            POSTGRES_DB=postgres
-            N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
-            EOF
+            cat > .env <<EOF
+DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}
+JWT_SECRET=${JWT_SECRET}
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
+POSTGRES_DB=postgres
+N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
+EOF
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
