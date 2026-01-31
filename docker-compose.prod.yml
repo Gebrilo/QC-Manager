@@ -36,7 +36,7 @@ services:
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:?N8N_BASIC_AUTH_PASSWORD is required}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
       - N8N_HOST=n8n.gerbil.qc
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
@@ -47,6 +47,8 @@ services:
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
+      - VIRTUAL_HOST=n8n.gerbil.qc
+      - VIRTUAL_PORT=5678
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
@@ -55,6 +57,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    expose:
+      - "5678"
 
   api:
     image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-api:latest
@@ -63,15 +67,19 @@ services:
     environment:
       - PORT=3001
       - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@qc-postgres:5432/${POSTGRES_DB:-postgres}
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_SECRET=${JWT_SECRET:-defaultsecret}
       - N8N_WEBHOOK_URL=http://qc-n8n:5678/webhook
       - NODE_ENV=production
+      - VIRTUAL_HOST=api.gerbil.qc
+      - VIRTUAL_PORT=3001
     networks:
       - proxy
       - internal
     depends_on:
       postgres:
         condition: service_healthy
+    expose:
+      - "3001"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
@@ -85,10 +93,14 @@ services:
     restart: always
     environment:
       - NODE_ENV=production
+      - VIRTUAL_HOST=app.gerbil.qc,gerbil.qc
+      - VIRTUAL_PORT=3000
     networks:
       - proxy
     depends_on:
       - api
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
