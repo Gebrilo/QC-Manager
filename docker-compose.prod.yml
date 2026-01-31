@@ -101,13 +101,6 @@ services:
       - api
     expose:
       - "3000"
-    healthcheck:
-      test: ["CMD", "node", "-e", "const h=require('http');h.get('http://localhost:3000',r=>{process.exit(r.statusCode>=200&&r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
 volumes:
   postgres_data:
   n8n_data:
