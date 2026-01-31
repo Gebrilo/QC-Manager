@@ -10,7 +10,7 @@
 
 services:
   postgres:
-    image: postgres:15.6-alpine
+    image: postgres:17
     container_name: qc-postgres
     restart: always
     environment:
@@ -30,7 +30,7 @@ services:
       start_period: 30s
 
   n8n:
-    image: n8nio/n8n:1.29.0
+    image: docker.n8n.io/n8nio/n8n:latest
     container_name: qc-n8n
     restart: always
     environment:
