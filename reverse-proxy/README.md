@@ -1,114 +1,140 @@
 # Reverse Proxy Setup
 
-Central Nginx reverse proxy for routing subdomains to Docker containers.
+Central Nginx reverse proxy for routing subdomains to Docker containers using **jwilder/nginx-proxy** for automatic container discovery.
 
 ## Architecture
 
 ```
                     ┌─────────────────────────────────────────┐
-                    │              VPS (Port 80)              │
+                    │         VPS: 72.61.157.168              │
+                    │              (Port 80)                  │
                     └─────────────────────────────────────────┘
                                        │
                                        ▼
                     ┌─────────────────────────────────────────┐
-                    │         nginx-proxy container           │
-                    │              (port 80)                  │
+                    │      jwilder/nginx-proxy                │
+                    │  Auto-discovers via VIRTUAL_HOST env    │
                     └─────────────────────────────────────────┘
                            │           │           │
          ┌─────────────────┼───────────┼───────────┼──────────────────┐
          │                 │           │           │                  │
          ▼                 ▼           ▼           ▼                  │
    ┌──────────┐      ┌──────────┐ ┌──────────┐ ┌──────────┐          │
-   │  qc-web  │      │  qc-api  │ │  qc-n8n  │ │qc-postgres│         │
-   │  :3000   │      │  :3001   │ │  :5678   │ │  :5432    │         │
+   │  qc-web  │      │  qc-api  │ │ n8n-lzye │ │postgresql│          │
+   │  :3000   │      │  :3001   │ │  :5678   │ │  :5432   │          │
    └──────────┘      └──────────┘ └──────────┘ └──────────┘          │
          │                 │           │           │                  │
          └─────────────────┴───────────┴───────────┴──────────────────┘
                               Docker network: proxy
 ```
 
-## Required DNS A Records
+## How It Works
 
-Configure these DNS records pointing to your VPS IP:
+**jwilder/nginx-proxy** automatically detects containers with `VIRTUAL_HOST` environment variable and creates nginx server blocks for them. No manual nginx config needed.
 
-| Subdomain       | Type | Value        |
-|-----------------|------|--------------|
-| gerbil.qc       | A    | <VPS_IP>     |
-| app.gerbil.qc   | A    | <VPS_IP>     |
-| api.gerbil.qc   | A    | <VPS_IP>     |
-| n8n.gerbil.qc   | A    | <VPS_IP>     |
-
-## VPS Deployment Steps
-
-After merging changes, execute on VPS:
-
-```bash
-# 1. Create external Docker network (one-time)
-docker network create proxy
-
-# 2. Start the reverse proxy
-cd /opt/qc-manager/reverse-proxy
-docker compose up -d
-
-# 3. Start the application stack
-cd /opt/qc-manager
-docker compose -f docker-compose.prod.yml up -d
-
-# 4. Verify containers are connected
-docker network inspect proxy
+Example container:
+```yaml
+environment:
+  - VIRTUAL_HOST=api.gerbil.qc
+  - VIRTUAL_PORT=3001
 ```
 
-## Container Naming Convention
+## Required DNS A Records
 
-All containers use `qc-` prefix for clarity:
+Configure these DNS records pointing to VPS IP `72.61.157.168`:
 
-| Service   | Container Name | Internal Port |
-|-----------|----------------|---------------|
-| Web       | qc-web         | 3000          |
-| API       | qc-api         | 3001          |
-| n8n       | qc-n8n         | 5678          |
-| PostgreSQL| qc-postgres    | 5432          |
+| Subdomain         | Type | Value          |
+|-------------------|------|----------------|
+| gerbil.qc         | A    | 72.61.157.168  |
+| app.gerbil.qc     | A    | 72.61.157.168  |
+| api.gerbil.qc     | A    | 72.61.157.168  |
+| n8n.gerbil.qc     | A    | 72.61.157.168  |
+
+## Hostinger Deployment
+
+### 1. Deploy reverse-proxy (via Hostinger Docker Manager)
+
+Create project `reverse-proxy` with compose content from `reverse-proxy/docker-compose.yml`
+
+### 2. Deploy qc-app (via Hostinger Docker Manager)
+
+Create project `qc-app` with compose content from `qc-app/docker-compose.yml`
+
+### 3. Update existing n8n (optional)
+
+To route n8n through the proxy, recreate n8n-lzye with:
+```yaml
+environment:
+  - VIRTUAL_HOST=n8n.gerbil.qc
+  - VIRTUAL_PORT=5678
+networks:
+  - proxy
+```
 
 ## Subdomain Routing
 
-| URL                  | Routes To                  |
-|----------------------|----------------------------|
-| http://gerbil.qc     | qc-web:3000 (frontend)     |
-| http://app.gerbil.qc | qc-web:3000 (frontend)     |
-| http://api.gerbil.qc | qc-api:3001 (backend API)  |
-| http://n8n.gerbil.qc | qc-n8n:5678 (automation)   |
+| URL                  | Routes To                  | VIRTUAL_HOST       |
+|----------------------|----------------------------|--------------------|
+| http://gerbil.qc     | qc-web:3000 (frontend)     | app.gerbil.qc      |
+| http://app.gerbil.qc | qc-web:3000 (frontend)     | app.gerbil.qc      |
+| http://api.gerbil.qc | qc-api:3001 (backend API)  | api.gerbil.qc      |
+| http://n8n.gerbil.qc | n8n:5678 (automation)      | n8n.gerbil.qc      |
+
+## Current VPS State
+
+| Project          | Container                    | Port   | Status  |
+|------------------|------------------------------|--------|---------|
+| reverse-proxy    | nginx-proxy                  | 80     | Running |
+| n8n-lzye         | n8n-lzye-n8n-1               | 32769  | Running |
+| postgresql-ju5t  | postgresql-ju5t-postgresql-1 | 32768  | Running |
+| qc-app           | qc-api, qc-web               | -      | Pending |
 
 ## Adding New Apps
 
-1. Create nginx config in `nginx/conf.d/<app>.conf`
-2. Add service to application's docker-compose with:
-   - `container_name: <name>`
-   - `networks: [proxy]`
-   - No `ports:` exposure
-3. Reload nginx: `docker exec nginx-proxy nginx -s reload`
+1. Add container with `VIRTUAL_HOST` and `VIRTUAL_PORT` environment variables
+2. Connect to `proxy` network (external: true)
+3. Expose internal port (no host port mapping needed)
+4. nginx-proxy auto-discovers and routes
 
 ## Troubleshooting
 
 ```bash
-# Check nginx config
-docker exec nginx-proxy nginx -t
+# View nginx-proxy generated config
+docker exec nginx-proxy cat /etc/nginx/conf.d/default.conf
 
-# View nginx logs
+# Check which containers are discovered
 docker logs nginx-proxy
 
 # Verify network connectivity
-docker exec nginx-proxy ping qc-web
-
-# Reload config without restart
-docker exec nginx-proxy nginx -s reload
+docker network inspect proxy
 ```
 
 ## Future HTTPS Upgrade
 
-This setup is designed for easy HTTPS upgrade:
-1. Add Certbot/Let's Encrypt container
-2. Mount certificates volume
-3. Update nginx configs to listen on 443
-4. Add SSL directives
+Use `jwilder/nginx-proxy` with `acme-companion`:
+```yaml
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certs:/etc/nginx/certs
+      - /var/run/docker.sock:/tmp/docker.sock:ro
 
-No breaking changes required to application containers.
+  acme-companion:
+    image: nginxproxy/acme-companion
+    volumes:
+      - certs:/etc/nginx/certs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DEFAULT_EMAIL=your@email.com
+```
+
+Then add to containers:
+```yaml
+environment:
+  - VIRTUAL_HOST=api.gerbil.qc
+  - LETSENCRYPT_HOST=api.gerbil.qc
+```
