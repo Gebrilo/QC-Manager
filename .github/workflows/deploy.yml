@@ -82,12 +82,13 @@ jobs:
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_BASIC_AUTH_PASSWORD
           script_stop: true
           script: |
             set -euo pipefail
@@ -116,15 +117,24 @@ jobs:
             POSTGRES_USER=admin
             POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
             POSTGRES_DB=postgres
+            N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
             EOF
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
 
-            echo "=== Pulling images ==="
+            echo "=== Creating proxy network (if not exists) ==="
+            docker network create proxy 2>/dev/null || true
+
+            echo "=== Starting reverse proxy ==="
+            cd "$DEPLOY_DIR/reverse-proxy"
+            docker compose up -d
+
+            echo "=== Pulling app images ==="
+            cd "$DEPLOY_DIR"
             docker compose -f docker-compose.prod.yml pull
 
-            echo "=== Deploying containers ==="
+            echo "=== Deploying app containers ==="
             docker compose -f docker-compose.prod.yml up -d --force-recreate
 
             echo "=== Cleanup ==="
@@ -132,3 +142,7 @@ jobs:
 
             echo "=== Deployment complete ==="
             docker compose -f docker-compose.prod.yml ps
+            echo ""
+            echo "=== Reverse proxy status ==="
+            cd "$DEPLOY_DIR/reverse-proxy"
+            docker compose ps

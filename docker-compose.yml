@@ -5,23 +5,25 @@
 #   Local Dev:  docker compose up -d  (auto-merges with docker-compose.override.yml)
 #   Production: Use docker-compose.prod.yml instead
 #
-# Requirements:
+# Prerequisites:
+#   - docker network create proxy
 #   - Copy .env.example to .env and configure before running
 
 services:
   postgres:
     image: postgres:15.6-alpine
+    container_name: qc-postgres
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Wind@123}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
       interval: 30s
@@ -31,6 +33,7 @@ services:
 
   n8n:
     image: n8nio/n8n:1.29.0
+    container_name: qc-n8n
     restart: always
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
@@ -41,33 +44,38 @@ services:
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
       - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678}
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_HOST=qc-postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
-    ports:
-      - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
+    networks:
+      - proxy
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
 
   api:
     image: node:18-alpine
+    container_name: qc-api
     restart: always
     working_dir: /app
     command: sh -c "apk add --no-cache wget && npm install && npm start"
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@postgres:5432/${POSTGRES_DB:-postgres}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@qc-postgres:5432/${POSTGRES_DB:-postgres}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
-      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - N8N_WEBHOOK_URL=http://qc-n8n:5678/webhook
       - NODE_ENV=production
     volumes:
       - ./apps/api:/app
       - api_node_modules:/app/node_modules
+    networks:
+      - proxy
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +88,7 @@ services:
 
   web:
     image: node:18-alpine
+    container_name: qc-web
     restart: always
     working_dir: /app
     command: sh -c "apk add --no-cache wget && npm install && if [ ! -f .next/BUILD_ID ]; then echo 'Building Next.js...' && npm run build; else echo 'Using existing build'; fi && npm start"
@@ -90,6 +99,8 @@ services:
       - ./apps/web:/app
       - web_node_modules:/app/node_modules
       - web_next:/app/.next
+    networks:
+      - proxy
     depends_on:
       - api
     healthcheck:
@@ -101,14 +112,19 @@ services:
 
   nginx:
     image: nginx:1.25-alpine
+    container_name: qc-nginx
     restart: always
     ports:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - proxy
     depends_on:
       - web
       - api
+    profiles:
+      - legacy
 
 volumes:
   postgres_data:
@@ -116,3 +132,9 @@ volumes:
   api_node_modules:
   web_node_modules:
   web_next:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    driver: bridge
