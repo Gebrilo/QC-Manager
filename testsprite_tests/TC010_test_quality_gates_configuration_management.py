@@ -17,7 +17,7 @@ def test_quality_gates_configuration_management():
 
     try:
         resp_project = requests.post(
-            f"{BASE_URL}/api/projects",
+            f"{BASE_URL}/projects",
             json=project_payload,
             headers=HEADERS,
             timeout=TIMEOUT,
@@ -28,7 +28,7 @@ def test_quality_gates_configuration_management():
         project_id = created_project["id"]
 
         resp_get_gates_initial = requests.get(
-            f"{BASE_URL}/api/governance/gates/{project_id}",
+            f"{BASE_URL}/governance/gates/{project_id}",
             headers=HEADERS,
             timeout=TIMEOUT,
         )
@@ -41,7 +41,7 @@ def test_quality_gates_configuration_management():
             "is_mandatory": True
         }
         resp_post_gates = requests.post(
-            f"{BASE_URL}/api/governance/gates",
+            f"{BASE_URL}/governance/gates",
             json=gate_payload,
             headers=HEADERS,
             timeout=TIMEOUT,
@@ -49,7 +49,7 @@ def test_quality_gates_configuration_management():
         assert resp_post_gates.status_code in (200, 201), f"POST gates returned {resp_post_gates.status_code}"
 
         resp_get_gates_after = requests.get(
-            f"{BASE_URL}/api/governance/gates/{project_id}",
+            f"{BASE_URL}/governance/gates/{project_id}",
             headers=HEADERS,
             timeout=TIMEOUT,
         )
@@ -59,7 +59,7 @@ def test_quality_gates_configuration_management():
         if created_project:
             try:
                 requests.delete(
-                    f"{BASE_URL}/api/projects/{created_project['id']}",
+                    f"{BASE_URL}/projects/{created_project['id']}",
                     headers=HEADERS,
                     timeout=TIMEOUT,
                 )

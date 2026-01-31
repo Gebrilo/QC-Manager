@@ -8,7 +8,7 @@ HEADERS = {
 TIMEOUT = 30
 
 def test_validate_governance_release_readiness_retrieval():
-    url = f"{BASE_URL}/api/governance/release-readiness"
+    url = f"{BASE_URL}/governance/release-readiness"
 
     try:
         response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)

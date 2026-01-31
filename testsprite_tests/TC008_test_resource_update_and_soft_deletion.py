@@ -19,7 +19,7 @@ def test_resource_update_and_soft_deletion():
     created_resource_id = None
     try:
         create_resp = requests.post(
-            f"{BASE_URL}/api/resources",
+            f"{BASE_URL}/resources",
             json=resource_data,
             headers=HEADERS,
             timeout=TIMEOUT,
@@ -35,7 +35,7 @@ def test_resource_update_and_soft_deletion():
         }
 
         patch_resp = requests.patch(
-            f"{BASE_URL}/api/resources/{created_resource_id}",
+            f"{BASE_URL}/resources/{created_resource_id}",
             json=update_data,
             headers=HEADERS,
             timeout=TIMEOUT,
@@ -45,14 +45,14 @@ def test_resource_update_and_soft_deletion():
         assert updated_resource.get("role") == "Senior QA Engineer", "Role not updated correctly"
 
         delete_resp = requests.delete(
-            f"{BASE_URL}/api/resources/{created_resource_id}",
+            f"{BASE_URL}/resources/{created_resource_id}",
             headers=HEADERS,
             timeout=TIMEOUT,
         )
         assert delete_resp.status_code == 200, f"Resource soft-deletion failed: {delete_resp.text}"
 
         list_resp = requests.get(
-            f"{BASE_URL}/api/resources",
+            f"{BASE_URL}/resources",
             headers=HEADERS,
             timeout=TIMEOUT,
         )
@@ -62,7 +62,7 @@ def test_resource_update_and_soft_deletion():
         if created_resource_id is not None:
             try:
                 requests.delete(
-                    f"{BASE_URL}/api/resources/{created_resource_id}",
+                    f"{BASE_URL}/resources/{created_resource_id}",
                     headers=HEADERS,
                     timeout=TIMEOUT,
                 )

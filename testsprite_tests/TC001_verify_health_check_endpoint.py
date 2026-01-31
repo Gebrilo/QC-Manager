@@ -2,7 +2,7 @@ import requests
 
 def test_verify_health_check_endpoint():
     base_url = "http://72.61.157.168"
-    url = f"{base_url}/api/health"
+    url = f"{base_url}/health"
     headers = {
         "Accept": "application/json",
         "Host": "api.gerbil.qc"

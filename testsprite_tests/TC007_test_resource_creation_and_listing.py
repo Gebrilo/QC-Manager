@@ -19,7 +19,7 @@ def test_resource_creation_and_listing():
     resource_id = None
     try:
         post_response = requests.post(
-            f"{BASE_URL}/api/resources",
+            f"{BASE_URL}/resources",
             json=resource_data,
             headers=HEADERS,
             timeout=TIMEOUT
@@ -31,7 +31,7 @@ def test_resource_creation_and_listing():
         assert resp_json.get("resource_name") == resource_data["resource_name"], "Resource name mismatch"
 
         get_response = requests.get(
-            f"{BASE_URL}/api/resources",
+            f"{BASE_URL}/resources",
             headers=HEADERS,
             timeout=TIMEOUT
         )
@@ -48,7 +48,7 @@ def test_resource_creation_and_listing():
     finally:
         if resource_id:
             del_response = requests.delete(
-                f"{BASE_URL}/api/resources/{resource_id}",
+                f"{BASE_URL}/resources/{resource_id}",
                 headers=HEADERS,
                 timeout=TIMEOUT
             )

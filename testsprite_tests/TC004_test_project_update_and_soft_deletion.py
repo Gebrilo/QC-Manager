@@ -1,4 +1,5 @@
 import requests
+import uuid
 
 BASE_URL = "http://72.61.157.168"
 TIMEOUT = 30
@@ -8,17 +9,18 @@ HEADERS = {
 }
 
 def test_project_update_and_soft_deletion():
-    project_url = f"{BASE_URL}/api/projects"
+    project_url = f"{BASE_URL}/projects"
     created_project_id = None
 
     try:
         new_project_data = {
+            "project_id": f"TC004-{uuid.uuid4().hex[:8]}",
             "project_name": "Test Project for Update and Delete",
-            "description": "Project created for testing PATCH and DELETE endpoints",
-            "status": "active"
+            "total_weight": 100,
+            "priority": "medium"
         }
         response = requests.post(project_url, json=new_project_data, headers=HEADERS, timeout=TIMEOUT)
-        assert response.status_code in [200, 201], f"Unexpected status code on project creation: {response.status_code}"
+        assert response.status_code in [200, 201], f"Unexpected status code on project creation: {response.status_code}: {response.text}"
         created_project = response.json()
         created_project_id = created_project.get("id")
         assert created_project_id is not None, "Created project ID is None"

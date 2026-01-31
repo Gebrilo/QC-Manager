@@ -1,7 +1,7 @@
 import requests
 
 BASE_URL = "http://72.61.157.168"
-TASKS_ENDPOINT = f"{BASE_URL}/api/tasks"
+TASKS_ENDPOINT = f"{BASE_URL}/tasks"
 TIMEOUT = 30
 HEADERS = {
     "Content-Type": "application/json",
@@ -13,7 +13,7 @@ def test_task_update_and_soft_deletion():
     project_id = None
     
     try:
-        projects_resp = requests.get(f"{BASE_URL}/api/projects", headers=HEADERS, timeout=TIMEOUT)
+        projects_resp = requests.get(f"{BASE_URL}/projects", headers=HEADERS, timeout=TIMEOUT)
         if projects_resp.status_code == 200 and projects_resp.json():
             project_id = projects_resp.json()[0].get("id")
 

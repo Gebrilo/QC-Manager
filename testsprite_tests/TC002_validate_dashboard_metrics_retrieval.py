@@ -9,7 +9,7 @@ HEADERS = {
 }
 
 def test_validate_dashboard_metrics_retrieval():
-    url = f"{BASE_URL}/api/dashboard"
+    url = f"{BASE_URL}/dashboard"
     try:
         start_time = time.time()
         response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
@@ -29,7 +29,7 @@ def test_validate_dashboard_metrics_retrieval():
             f"Response JSON does not contain any expected dashboard metric keys from {expected_keys}"
 
     except requests.RequestException as e:
-        assert False, f"Request to /api/dashboard failed: {e}"
+        assert False, f"Request to /dashboard failed: {e}"
     except ValueError:
         assert False, "Response is not valid JSON"
 

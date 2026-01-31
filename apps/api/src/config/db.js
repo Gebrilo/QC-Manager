@@ -25,10 +25,10 @@ const runMigrations = async () => {
         await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
         
         await client.query(`
-            CREATE TABLE IF NOT EXISTS project (
+            CREATE TABLE IF NOT EXISTS projects (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 project_id VARCHAR(50),
-                name VARCHAR(255) NOT NULL,
+                project_name VARCHAR(255) NOT NULL,
                 owner VARCHAR(255),
                 total_weight INTEGER,
                 priority VARCHAR(20),
@@ -64,11 +64,11 @@ const runMigrations = async () => {
         `);
         
         await client.query(`
-            CREATE TABLE IF NOT EXISTS task (
+            CREATE TABLE IF NOT EXISTS tasks (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 task_id VARCHAR(50),
                 project_id UUID,
-                name VARCHAR(255) NOT NULL,
+                task_name VARCHAR(255) NOT NULL,
                 description TEXT,
                 status VARCHAR(50) NOT NULL DEFAULT 'Backlog',
                 assignee VARCHAR(255),
@@ -141,7 +141,7 @@ const runMigrations = async () => {
             SELECT
                 p.id,
                 p.project_id,
-                p.name AS project_name,
+                p.project_name,
                 p.owner,
                 p.total_weight,
                 p.priority,
@@ -160,8 +160,8 @@ const runMigrations = async () => {
                 p.created_at,
                 p.updated_at,
                 p.deleted_at
-            FROM project p
-            LEFT JOIN task t ON p.id = t.project_id AND t.deleted_at IS NULL
+            FROM projects p
+            LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
             WHERE p.deleted_at IS NULL
             GROUP BY p.id
         `);
@@ -197,8 +197,8 @@ const runMigrations = async () => {
                 COUNT(DISTINCT p.id) AS total_projects,
                 (SELECT COUNT(*) FROM resources WHERE is_active = TRUE AND deleted_at IS NULL) AS active_resources,
                 CURRENT_TIMESTAMP AS calculated_at
-            FROM project p
-            LEFT JOIN task t ON p.id = t.project_id AND t.deleted_at IS NULL
+            FROM projects p
+            LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
             WHERE p.deleted_at IS NULL
         `);
         
