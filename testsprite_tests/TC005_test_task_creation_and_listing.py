@@ -11,7 +11,7 @@ HEADERS = {
 def test_task_creation_and_listing():
     task_id = None
     project_id = None
-    resource_id = None
+    created_project = False
     
     try:
         projects_resp = requests.get(f"{BASE_URL}/projects", headers=HEADERS, timeout=TIMEOUT)
@@ -20,27 +20,26 @@ def test_task_creation_and_listing():
         if projects and len(projects) > 0:
             project_id = projects[0].get("id")
         else:
-            project_payload = {"project_name": f"Test Project {uuid.uuid4()}", "status": "active"}
+            project_payload = {
+                "project_id": f"TC005-{uuid.uuid4().hex[:8]}",
+                "name": "Test Project for Tasks",
+                "total_weight": 3,
+                "priority": "High"
+            }
             create_proj_resp = requests.post(f"{BASE_URL}/projects", json=project_payload, headers=HEADERS, timeout=TIMEOUT)
-            assert create_proj_resp.status_code in [200, 201], f"Failed creating project: {create_proj_resp.status_code}"
+            assert create_proj_resp.status_code in [200, 201], f"Failed creating project: {create_proj_resp.status_code}: {create_proj_resp.text}"
             project_id = create_proj_resp.json().get("id")
-
-        resources_resp = requests.get(f"{BASE_URL}/resources", headers=HEADERS, timeout=TIMEOUT)
-        assert resources_resp.status_code == 200, f"Failed getting resources, status: {resources_resp.status_code}"
-        resources = resources_resp.json()
-        if resources and len(resources) > 0:
-            resource_id = resources[0].get("id")
+            created_project = True
 
         task_payload = {
-            "task_name": f"Test Task {uuid.uuid4()}",
+            "task_id": f"TSK-TC005-{uuid.uuid4().hex[:6].upper()}",
+            "task_name": f"Test Task {uuid.uuid4().hex[:8]}",
             "description": "Task created during automated test",
-            "status": "backlog",
-            "project_id": project_id,
-            "assigned_resource_id": resource_id,
-            "estimated_hrs": 10
+            "status": "Backlog",
+            "project_id": project_id
         }
         create_task_resp = requests.post(f"{BASE_URL}/tasks", json=task_payload, headers=HEADERS, timeout=TIMEOUT)
-        assert create_task_resp.status_code in [200, 201], f"Task creation failed with status: {create_task_resp.status_code}"
+        assert create_task_resp.status_code in [200, 201], f"Task creation failed with status: {create_task_resp.status_code}: {create_task_resp.text}"
         task_resp_json = create_task_resp.json()
         task_id = task_resp_json.get("id")
         assert task_id is not None, "Created task does not have an ID"
@@ -56,5 +55,7 @@ def test_task_creation_and_listing():
     finally:
         if task_id:
             requests.delete(f"{BASE_URL}/tasks/{task_id}", headers=HEADERS, timeout=TIMEOUT)
+        if created_project and project_id:
+            requests.delete(f"{BASE_URL}/projects/{project_id}", headers=HEADERS, timeout=TIMEOUT)
 
 test_task_creation_and_listing()

@@ -13,9 +13,9 @@ def test_project_creation_and_listing():
 
     new_project = {
         "project_id": f"TC003-{uuid.uuid4().hex[:8]}",
-        "project_name": "Test Project TC003",
-        "total_weight": 100,
-        "priority": "high"
+        "name": "Test Project TC003",
+        "total_weight": 3,
+        "priority": "High"
     }
 
     project_id = None

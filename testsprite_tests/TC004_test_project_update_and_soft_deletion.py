@@ -15,9 +15,9 @@ def test_project_update_and_soft_deletion():
     try:
         new_project_data = {
             "project_id": f"TC004-{uuid.uuid4().hex[:8]}",
-            "project_name": "Test Project for Update and Delete",
-            "total_weight": 100,
-            "priority": "medium"
+            "name": "Test Project for Update and Delete",
+            "total_weight": 3,
+            "priority": "Medium"
         }
         response = requests.post(project_url, json=new_project_data, headers=HEADERS, timeout=TIMEOUT)
         assert response.status_code in [200, 201], f"Unexpected status code on project creation: {response.status_code}: {response.text}"
