@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { fetchApi, projectsApi, resourcesApi } from '@/lib/api';
 import { Task } from '@/types';
 import { TaskTable } from '@/components/tasks/TaskTable';
@@ -21,6 +22,7 @@ interface Resource {
 const STATUS_OPTIONS = ['All', 'Backlog', 'In Progress', 'Done', 'Cancelled'];
 
 export default function TasksPage() {
+    const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
@@ -104,6 +106,12 @@ export default function TasksPage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Manage all tasks across projects.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => router.push('/task-history')}
+                        className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium transition-colors"
+                    >
+                        View Task History →
+                    </button>
                     <Link href="/tasks/create">
                         <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
                             + New Task
