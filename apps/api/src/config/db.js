@@ -290,10 +290,181 @@ const runMigrations = async () => {
             ON task_comments(task_id)
         `);
 
+        // =====================================================
+        // TULEAP INTEGRATION TABLES
+        // =====================================================
+
+        // Bugs table for Tuleap-synced defects
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bugs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                tuleap_artifact_id INTEGER NOT NULL UNIQUE,
+                tuleap_tracker_id INTEGER,
+                tuleap_url TEXT,
+                bug_id VARCHAR(50) NOT NULL,
+                title VARCHAR(500) NOT NULL,
+                description TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'Open',
+                severity VARCHAR(20) DEFAULT 'medium',
+                priority VARCHAR(20) DEFAULT 'medium',
+                bug_type VARCHAR(50),
+                component VARCHAR(100),
+                project_id UUID REFERENCES projects(id),
+                linked_test_case_ids UUID[],
+                linked_test_execution_ids UUID[],
+                reported_by VARCHAR(255),
+                assigned_to VARCHAR(255),
+                reported_date TIMESTAMP WITH TIME ZONE,
+                resolved_date TIMESTAMP WITH TIME ZONE,
+                last_sync_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                raw_tuleap_payload JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        // Bug Indexes
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_project_id ON bugs(project_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_status ON bugs(status) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_tuleap_artifact ON bugs(tuleap_artifact_id)`);
+
+        // Tuleap Sync Configuration
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tuleap_sync_config (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                tuleap_project_id INTEGER NOT NULL,
+                tuleap_tracker_id INTEGER NOT NULL,
+                tuleap_base_url TEXT,
+                tracker_type VARCHAR(20) NOT NULL CHECK (tracker_type IN ('test_case', 'bug', 'task')),
+                qc_project_id UUID REFERENCES projects(id),
+                field_mappings JSONB NOT NULL DEFAULT '{}',
+                status_mappings JSONB NOT NULL DEFAULT '{}',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(tuleap_project_id, tuleap_tracker_id)
+            )
+        `);
+
+        // Tuleap Webhook Log
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tuleap_webhook_log (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                tuleap_artifact_id INTEGER NOT NULL,
+                tuleap_tracker_id INTEGER,
+                artifact_type VARCHAR(20),
+                action VARCHAR(50) NOT NULL,
+                payload_hash VARCHAR(64) NOT NULL,
+                raw_payload JSONB,
+                processing_status VARCHAR(20) DEFAULT 'received',
+                processing_result TEXT,
+                error_message TEXT,
+                processed_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(tuleap_artifact_id, payload_hash)
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_webhook_log_artifact ON tuleap_webhook_log(tuleap_artifact_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_webhook_log_status ON tuleap_webhook_log(processing_status)`);
+
+        // Tuleap Task History
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tuleap_task_history (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                original_task_id UUID,
+                tuleap_artifact_id INTEGER NOT NULL,
+                tuleap_url TEXT,
+                task_name VARCHAR(500) NOT NULL,
+                notes TEXT,
+                status VARCHAR(50),
+                project_id UUID REFERENCES projects(id),
+                previous_resource_id UUID,
+                previous_resource_name VARCHAR(255),
+                new_assignee_name VARCHAR(255) NOT NULL,
+                action VARCHAR(50) NOT NULL CHECK (action IN ('reassigned_out', 'rejected_new')),
+                action_reason TEXT,
+                tuleap_last_modified TIMESTAMP WITH TIME ZONE,
+                raw_tuleap_payload JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_tuleap_artifact ON tuleap_task_history(tuleap_artifact_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_project ON tuleap_task_history(project_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_action ON tuleap_task_history(action)`);
+
+        // Add Tuleap columns to tasks table
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tuleap_artifact_id') THEN
+                    ALTER TABLE tasks ADD COLUMN tuleap_artifact_id INTEGER UNIQUE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tuleap_url') THEN
+                    ALTER TABLE tasks ADD COLUMN tuleap_url TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='synced_from_tuleap') THEN
+                    ALTER TABLE tasks ADD COLUMN synced_from_tuleap BOOLEAN DEFAULT FALSE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='last_tuleap_sync') THEN
+                    ALTER TABLE tasks ADD COLUMN last_tuleap_sync TIMESTAMP WITH TIME ZONE;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_tuleap_artifact ON tasks(tuleap_artifact_id) WHERE tuleap_artifact_id IS NOT NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_synced_from_tuleap ON tasks(synced_from_tuleap) WHERE synced_from_tuleap = TRUE`);
+
         await client.query(`DROP VIEW IF EXISTS v_dashboard_metrics CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_resources_with_utilization CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_projects_with_metrics CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_tasks_with_metrics CASCADE`);
+        await client.query(`DROP VIEW IF EXISTS v_bug_summary CASCADE`);
+        await client.query(`DROP VIEW IF EXISTS v_bug_summary_global CASCADE`);
+
+        // Bug Summary View
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_summary AS
+            SELECT
+                b.project_id,
+                p.project_name,
+                COUNT(b.id) AS total_bugs,
+                COUNT(b.id) FILTER (WHERE b.status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
+                COUNT(b.id) FILTER (WHERE b.status IN ('Resolved', 'Closed')) AS closed_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'critical') AS critical_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'high') AS high_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'medium') AS medium_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'low') AS low_bugs,
+                COUNT(b.id) FILTER (WHERE array_length(b.linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
+                COUNT(b.id) FILTER (WHERE b.linked_test_execution_ids IS NULL
+                    OR array_length(b.linked_test_execution_ids, 1) = 0) AS standalone_bugs,
+                MAX(b.reported_date) AS latest_bug_date
+            FROM bugs b
+            LEFT JOIN projects p ON b.project_id = p.id
+            WHERE b.deleted_at IS NULL
+            GROUP BY b.project_id, p.project_name
+        `);
+
+        // Global Bug Summary View
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_summary_global AS
+            SELECT
+                COUNT(id) AS total_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
+                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
+                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
+                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
+                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
+                COUNT(id) FILTER (WHERE array_length(linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
+                COUNT(id) FILTER (WHERE linked_test_execution_ids IS NULL
+                    OR array_length(linked_test_execution_ids, 1) = 0) AS standalone_bugs
+            FROM bugs
+            WHERE deleted_at IS NULL
+        `);
 
         await client.query(`
             CREATE OR REPLACE VIEW v_projects_with_metrics AS

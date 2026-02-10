@@ -8,7 +8,8 @@ import {
     RiskIndicatorsWidget,
     ReleaseReadinessWidget,
     TrendAnalysisWidget,
-    TestExecutionSummaryWidget
+    TestExecutionSummaryWidget,
+    BugSummaryWidget
 } from '../../src/components/governance';
 import { getDashboardSummary, getQualityRisks, getExecutionTrend } from '../../src/services/governanceApi';
 import type { DashboardSummary, QualityRisk, TrendData } from '../../src/types/governance';
@@ -98,6 +99,20 @@ export default function GovernanceDashboardPage() {
                         </button>
                     </div>
                     <TestExecutionSummaryWidget />
+                </section>
+
+                {/* Bug Summary Section (Tuleap Integration) */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Bug Summary</h2>
+                        <button
+                            onClick={() => router.push('/task-history')}
+                            className="text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                            View Task History →
+                        </button>
+                    </div>
+                    <BugSummaryWidget />
                 </section>
 
                 {/* 1. Summary Cards Section */}

@@ -10,3 +10,4 @@ export { TrendAnalysisWidget } from './TrendAnalysisWidget';
 export { QualityGateSettings } from './QualityGateSettings';
 export { ReleaseControl } from './ReleaseControl';
 export { TestExecutionSummaryWidget } from './TestExecutionSummaryWidget';
+export { BugSummaryWidget } from './BugSummaryWidget';

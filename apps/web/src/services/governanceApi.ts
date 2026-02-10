@@ -14,7 +14,10 @@ import type {
     ReadinessStatus,
     RiskLevel,
     HealthStatus,
-    TrendData
+    TrendData,
+    BugSummaryData,
+    Bug,
+    TaskHistory
 } from '../types/governance';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -176,6 +179,96 @@ export async function getExecutionTrend(projectId?: string): Promise<TrendData[]
 }
 
 // =====================================================
+// Bug Summary (Tuleap Integration)
+// =====================================================
+
+export async function getBugSummary(projectId?: string): Promise<BugSummaryData> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+
+        const url = `${API_BASE}/bugs/summary${params.toString() ? '?' + params.toString() : ''}`;
+        const response = await axios.get<GovernanceApiResponse<BugSummaryData>>(url);
+        return response.data.data;
+    } catch (error) {
+        console.warn('Bug Summary API failed', error);
+        return {
+            totals: {
+                total_bugs: 0,
+                open_bugs: 0,
+                closed_bugs: 0,
+                bugs_from_testing: 0,
+                standalone_bugs: 0
+            },
+            by_severity: {
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0
+            },
+            by_project: [],
+            recent_bugs: []
+        };
+    }
+}
+
+export async function getBugs(
+    projectId?: string,
+    status?: string,
+    severity?: string,
+    limit = 50,
+    offset = 0
+): Promise<{ bugs: Bug[]; total: number }> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+        if (status) params.append('status', status);
+        if (severity) params.append('severity', severity);
+        params.append('limit', limit.toString());
+        params.append('offset', offset.toString());
+
+        const url = `${API_BASE}/bugs?${params.toString()}`;
+        const response = await axios.get(url);
+        return {
+            bugs: response.data.data,
+            total: response.data.total
+        };
+    } catch (error) {
+        console.warn('Bugs API failed', error);
+        return { bugs: [], total: 0 };
+    }
+}
+
+export async function getBugsByProject(projectId: string): Promise<Bug[]> {
+    try {
+        const response = await axios.get<GovernanceApiResponse<Bug[]>>(
+            `${API_BASE}/bugs/by-project/${projectId}`
+        );
+        return response.data.data;
+    } catch (error) {
+        console.warn('Project Bugs API failed', error);
+        return [];
+    }
+}
+
+// =====================================================
+// Task History (Tuleap Integration)
+// =====================================================
+
+export async function getTaskHistory(projectId?: string): Promise<TaskHistory[]> {
+    try {
+        const url = projectId
+            ? `${API_BASE}/tuleap-webhook/task-history/${projectId}`
+            : `${API_BASE}/tuleap-webhook/task-history`;
+        const response = await axios.get<GovernanceApiResponse<TaskHistory[]>>(url);
+        return response.data.data;
+    } catch (error) {
+        console.warn('Task History API failed', error);
+        return [];
+    }
+}
+
+// =====================================================
 // Combined API Service Object
 // =====================================================
 
@@ -232,7 +325,15 @@ export const governanceApi = {
     submitApproval: async (data: any) => {
         const res = await axios.post<GovernanceApiResponse<any>>(`${API_BASE}/governance/approvals`, data);
         return res.data.data;
-    }
+    },
+
+    // Bug Summary (Tuleap Integration)
+    getBugSummary,
+    getBugs,
+    getBugsByProject,
+
+    // Task History (Tuleap Integration)
+    getTaskHistory
 };
 
 export default governanceApi;

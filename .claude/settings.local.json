@@ -59,7 +59,12 @@
       "Bash(docker volume rm:*)",
       "Bash(grep:*)",
       "WebFetch(domain:docs.tuleap.com)",
-      "WebFetch(domain:tuleap.telespazio.fr)"
+      "WebFetch(domain:tuleap.telespazio.fr)",
+      "Bash(docker volume:*)",
+      "Bash(ss:*)",
+      "Bash(cmd //c \"taskkill /F /PID 34148\")",
+      "Bash(cmd //c \"taskkill /F /PID 41632\")",
+      "Bash(docker rm:*)"
     ]
   }
 }

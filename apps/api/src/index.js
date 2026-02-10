@@ -30,6 +30,8 @@ apiRouter.use('/reports', require('./routes/reports'));
 apiRouter.use('/', require('./routes/testResults'));
 apiRouter.use('/testsprite', require('./routes/testspriteWebhook'));
 apiRouter.use('/governance', require('./routes/governance'));
+apiRouter.use('/bugs', require('./routes/bugs'));
+apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
 
 // Mount routes at both root and /api for compatibility
 app.use('/', apiRouter);

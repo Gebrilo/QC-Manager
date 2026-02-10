@@ -241,3 +241,132 @@ export function formatDate(dateString: string | null): string {
         day: 'numeric'
     });
 }
+
+// =====================================================
+// Bug Types (Tuleap Integration)
+// =====================================================
+
+export type BugSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type BugStatus = 'Open' | 'In Progress' | 'Reopened' | 'Resolved' | 'Closed';
+
+export interface Bug {
+    id: string;
+    bug_id: string;
+    title: string;
+    description?: string;
+    status: BugStatus;
+    severity: BugSeverity;
+    priority?: string;
+    bug_type?: string;
+    component?: string;
+    project_id?: string;
+    project_name?: string;
+    reported_by?: string;
+    assigned_to?: string;
+    reported_date: string | null;
+    resolved_date?: string | null;
+    tuleap_url?: string;
+    has_test_link: boolean;
+    linked_test_case_ids?: string[];
+    linked_test_execution_ids?: string[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface BugSummaryTotals {
+    total_bugs: number;
+    open_bugs: number;
+    closed_bugs: number;
+    bugs_from_testing: number;
+    standalone_bugs: number;
+}
+
+export interface BugSummarySeverity {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+}
+
+export interface BugSummaryByProject {
+    project_id: string;
+    project_name: string;
+    total_bugs: number;
+    open_bugs: number;
+    closed_bugs: number;
+    critical_bugs: number;
+    high_bugs: number;
+    medium_bugs: number;
+    low_bugs: number;
+    bugs_from_testing: number;
+    standalone_bugs: number;
+    latest_bug_date: string | null;
+}
+
+export interface BugSummaryData {
+    totals: BugSummaryTotals;
+    by_severity: BugSummarySeverity;
+    by_project: BugSummaryByProject[];
+    recent_bugs: Bug[];
+}
+
+// =====================================================
+// Bug Color Mappings
+// =====================================================
+
+export const BUG_SEVERITY_COLORS: Record<BugSeverity, string> = {
+    critical: 'bg-red-600 text-white',
+    high: 'bg-orange-500 text-white',
+    medium: 'bg-yellow-500 text-black',
+    low: 'bg-gray-400 text-white'
+};
+
+export const BUG_SEVERITY_BADGE_COLORS: Record<BugSeverity, string> = {
+    critical: 'bg-red-100 text-red-800 border-red-300',
+    high: 'bg-orange-100 text-orange-800 border-orange-300',
+    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    low: 'bg-gray-100 text-gray-800 border-gray-300'
+};
+
+export const BUG_STATUS_COLORS: Record<BugStatus, string> = {
+    'Open': 'bg-blue-100 text-blue-800',
+    'In Progress': 'bg-indigo-100 text-indigo-800',
+    'Reopened': 'bg-orange-100 text-orange-800',
+    'Resolved': 'bg-green-100 text-green-800',
+    'Closed': 'bg-gray-100 text-gray-800'
+};
+
+// =====================================================
+// Task History Types (Tuleap Integration)
+// =====================================================
+
+export type TaskHistoryAction = 'reassigned_out' | 'rejected_new';
+
+export interface TaskHistory {
+    id: string;
+    original_task_id?: string;
+    tuleap_artifact_id: number;
+    tuleap_url?: string;
+    task_name: string;
+    notes?: string;
+    status?: string;
+    project_id?: string;
+    project_name?: string;
+    previous_resource_id?: string;
+    previous_resource_name?: string;
+    new_assignee_name: string;
+    action: TaskHistoryAction;
+    action_reason?: string;
+    tuleap_last_modified?: string;
+    created_at: string;
+}
+
+export const TASK_HISTORY_ACTION_LABELS: Record<TaskHistoryAction, string> = {
+    'reassigned_out': 'Reassigned Out',
+    'rejected_new': 'Rejected (New)'
+};
+
+export const TASK_HISTORY_ACTION_COLORS: Record<TaskHistoryAction, string> = {
+    'reassigned_out': 'bg-orange-100 text-orange-800',
+    'rejected_new': 'bg-red-100 text-red-800'
+};
