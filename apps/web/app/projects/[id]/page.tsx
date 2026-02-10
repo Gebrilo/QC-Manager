@@ -38,6 +38,19 @@ export default function ProjectDetailPage() {
     if (isLoading) return <div className="p-10 text-center">Loading...</div>;
     if (!project) return <div className="p-10 text-center">Project not found</div>;
 
+    const handleDelete = async () => {
+        if (!confirm(`Are you sure you want to delete project "${project.project_name}"? This action will archive the project.`)) {
+            return;
+        }
+        try {
+            await fetchApi(`/projects/${project.id}`, { method: 'DELETE' });
+            alert('Project deleted successfully');
+            router.push('/projects');
+        } catch (err: any) {
+            alert(`Failed to delete project: ${err.message}`);
+        }
+    };
+
     const logo = getLogo(project.id);
     // Formula for completion status based on percentage
     const isCompleted = (project.overall_completion_pct || 0) >= 100;
@@ -52,7 +65,7 @@ export default function ProjectDetailPage() {
                     </Button>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                            {project.name}
+                            {project.project_name}
                             <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${isCompleted ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' :
                                 project.dynamic_status === 'At Risk' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
                                     'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
@@ -63,9 +76,18 @@ export default function ProjectDetailPage() {
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{project.project_id}</p>
                     </div>
                 </div>
-                <Link href={`/projects/${project.id}/edit`}>
-                    <Button variant="outline">Edit Project</Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link href={`/projects/${project.id}/edit`}>
+                        <Button variant="outline">Edit Project</Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        onClick={handleDelete}
+                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                    >
+                        Delete
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -75,10 +97,10 @@ export default function ProjectDetailPage() {
                         <div className="flex items-start gap-4 mb-4">
                             <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 shrink-0 border border-slate-200 dark:border-slate-700">
                                 {logo ? (
-                                    <img src={logo} alt={project.name} className="w-full h-full object-cover rounded-lg" />
+                                    <img src={logo} alt={project.project_name} className="w-full h-full object-cover rounded-lg" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold bg-white dark:bg-slate-900 rounded-lg">
-                                        {project.name.charAt(0)}
+                                        {project.project_name?.charAt(0) || '?'}
                                     </div>
                                 )}
                             </div>

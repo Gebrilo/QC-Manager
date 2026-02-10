@@ -74,10 +74,11 @@ flowchart TB
 | PostgreSQL | qc-postgres    | 5432          | (internal only)  |
 
 ### Key Database Tables
-- `project`, `task`, `app_user`, `audit_log`
-- `resource`, `test_case`, `test_execution`, `test_result`
-- `quality_gate`, `release_readiness` (governance)
+- `projects`, `tasks`, `resources`, `audit_log`
+- `test_cases`, `test_executions`, `test_results`
+- `quality_gates`, `release_approvals`
 - Database views for real-time dashboard metrics
+(Note: table names use plural form in API queries)
 
 ### External Dependencies
 - PostgreSQL 15 (required)
@@ -118,8 +119,9 @@ flowchart TB
 3. Reload proxy: `docker exec nginx-proxy nginx -s reload`
 
 ### Database Migrations
-1. Create numbered SQL file in `database/migrations/` (e.g., `008_feature.sql`)
-2. Migrations auto-run on container startup via docker-entrypoint-initdb.d
+1. Modify `apps/api/src/config/db.js` `runMigrations()` function.
+2. Migrations run automatically on API container startup.
+3. (Legacy) SQL files in `database/migrations/` are for reference only.
 
 ### Modifying CI/CD
 - Workflow: `.github/workflows/deploy.yml`

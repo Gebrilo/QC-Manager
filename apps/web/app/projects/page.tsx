@@ -55,12 +55,13 @@ export default function ProjectsPage() {
 
         tasks.forEach(t => {
             if (!t.project_id) return;
-            // Use Display ID (project_id) as key, assuming Tasks link via Display ID
+            // Tasks link via project UUID (p.id), not display ID (p.project_id)
 
             const current = stats.get(t.project_id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
 
-            const tEst = Number(t.total_est_hrs) || 0;
-            const tAct = Number(t.total_actual_hrs) || 0;
+            // Use R1+R2 hours if total_est_hrs not available from API
+            const tEst = Number(t.total_est_hrs) || (Number(t.r1_estimate_hrs || 0) + Number(t.r2_estimate_hrs || 0));
+            const tAct = Number(t.total_actual_hrs) || (Number(t.r1_actual_hrs || 0) + Number(t.r2_actual_hrs || 0));
 
             current.est += tEst;
             current.act += tAct;
@@ -74,8 +75,8 @@ export default function ProjectsPage() {
         });
 
         return projects.map(p => {
-            // Match Project Display ID (p.project_id)
-            const s = stats.get(p.project_id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
+            // Match using Project internal ID (p.id) since tasks store project UUID
+            const s = stats.get(p.id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
 
             // Formula: Completion % = Task Hrs Done / Task Hrs Est
             // Note: If no estimate, but work done? Context says IF(Est>0, Done/Est, 0)
@@ -162,17 +163,17 @@ export default function ProjectsPage() {
                                     <div className="flex items-start gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
                                         <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 shrink-0 border border-slate-200 dark:border-slate-700 overflow-hidden">
                                             {logo ? (
-                                                <img src={logo} alt={project.name} className="w-full h-full object-cover" />
+                                                <img src={logo} alt={project.project_name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold bg-white dark:bg-slate-900 rounded-lg text-2xl">
-                                                    {project.name.charAt(0)}
+                                                    {project.project_name?.charAt(0) || '?'}
                                                 </div>
                                             )}
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{project.name}</h3>
+                                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{project.project_name}</h3>
                                                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">{project.description || 'No description provided.'}</p>
                                                 </div>
                                                 <Badge variant={variant}>

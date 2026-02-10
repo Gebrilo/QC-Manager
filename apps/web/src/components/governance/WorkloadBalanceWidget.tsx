@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import type { WorkloadBalance } from '../../types/governance';
 import { getWorkloadBalance } from '../../services/governanceApi';
 
+import { InfoTooltip } from '../ui/Tooltip';
+
 interface Props {
     className?: string;
 }
@@ -31,11 +33,17 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
 
     return (
         <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 ${className}`}>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Workload Balance</h3>
+            <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Workload Balance</h3>
+                <InfoTooltip
+                    content="Compares the number of tasks vs test cases to identify under-tested areas. Balanced projects typically have at least 0.5 tests per task."
+                    position="top"
+                />
+            </div>
             <div className="space-y-4">
                 {data.map((item) => {
-                    const total = item.total_tasks || 0;
-                    const tested = item.total_tests || 0;
+                    const total = parseInt(String(item.total_tasks), 10) || 0;
+                    const tested = parseInt(String(item.total_tests), 10) || 0;
                     // Cap coverage visualization at 100% even if ratio > 100%
                     const ratio = total > 0 ? (tested / total) * 100 : 0;
                     const displayRatio = Math.min(ratio, 100);

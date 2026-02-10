@@ -1,0 +1,465 @@
+[
+  {
+    "id": "TC001",
+    "title": "Verify API JWT Authentication Enforcement",
+    "description": "Ensure that all API endpoints reject requests without a valid JWT token and accept requests with valid tokens.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send API request to /api/projects without JWT token"
+      },
+      {
+        "type": "assertion",
+        "description": "API should reject request with 401 Unauthorized"
+      },
+      {
+        "type": "action",
+        "description": "Send API request to /api/projects with invalid JWT token"
+      },
+      {
+        "type": "assertion",
+        "description": "API should reject request with 401 Unauthorized"
+      },
+      {
+        "type": "action",
+        "description": "Send API request to /api/projects with valid JWT token"
+      },
+      {
+        "type": "assertion",
+        "description": "API should accept request and respond with 200 OK or appropriate success response"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Create Project with Valid Data",
+    "description": "Test creating a new project with valid input data via POST /api/projects and verify success and audit logging.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/projects with valid project data payload"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response status 201 Created and response body contains created project details"
+      },
+      {
+        "type": "action",
+        "description": "Query audit logs for the project creation event"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit log should capture full before and after states reflecting the new project creation"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Reject Project Creation with Invalid Data",
+    "description": "Verify the API enforces input validation rules and rejects project creation requests with invalid or malformed data.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/projects with missing required fields"
+      },
+      {
+        "type": "assertion",
+        "description": "API should respond with 400 Bad Request and descriptive error message"
+      },
+      {
+        "type": "action",
+        "description": "Send POST request to /api/projects with invalid field formats (e.g., invalid dates)"
+      },
+      {
+        "type": "assertion",
+        "description": "API should respond with 400 Bad Request highlighting format errors"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Update Project Status with Valid Transitions",
+    "description": "Ensure updating a project status respects allowed status transition rules and updates data correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PATCH request to /api/projects/:id to change status from 'Planning' to 'In Progress'"
+      },
+      {
+        "type": "assertion",
+        "description": "API accepts the update and returns success with updated project data"
+      },
+      {
+        "type": "action",
+        "description": "Send PATCH request to /api/projects/:id with disallowed status transition"
+      },
+      {
+        "type": "assertion",
+        "description": "API rejects with 400 Bad Request and descriptive error message"
+      },
+      {
+        "type": "action",
+        "description": "Verify audit logs capture before and after states of the status update"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit logs contain detailed records of the status change"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Soft Delete a Project",
+    "description": "Verify that deleting a project marks it as deleted without physically removing data and audit log records the operation.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send DELETE request to /api/projects/:id for an existing project"
+      },
+      {
+        "type": "assertion",
+        "description": "Response status 200 OK indicates successful soft deletion"
+      },
+      {
+        "type": "action",
+        "description": "Fetch the project via GET /api/projects/:id"
+      },
+      {
+        "type": "assertion",
+        "description": "Project is marked as deleted but data is still present"
+      },
+      {
+        "type": "action",
+        "description": "Check audit logs for a delete action entry with correct before and after data capturing the deletion flag"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit log entry found with complete information"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Create Task with Resource Allocation Warning",
+    "description": "Verify that creating a task allocates resources and triggers warnings if allocation exceeds 80% capacity and prevents creation if above 100% without override.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a task assigning resources that cumulatively exceed 80% but less than or equal to 100% utilization"
+      },
+      {
+        "type": "assertion",
+        "description": "API warns about high resource utilization but allows task creation"
+      },
+      {
+        "type": "action",
+        "description": "Create a task assigning resources that cumulatively exceed 100% capacity without override flag"
+      },
+      {
+        "type": "assertion",
+        "description": "API rejects task creation with clear error about resource overallocation"
+      },
+      {
+        "type": "action",
+        "description": "Create a task assigning resources exceeding 100% capacity with override flag enabled"
+      },
+      {
+        "type": "assertion",
+        "description": "API accepts creation despite overallocation warning"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Fetch Dashboard Metrics Performance and Accuracy",
+    "description": "Ensure the dashboard metrics endpoint returns accurate aggregated data within 3 seconds under typical load.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Response time is under 3 seconds"
+      },
+      {
+        "type": "assertion",
+        "description": "Returned metrics data matches expected aggregated values based on test database state"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Configure and Retrieve Quality Gates for a Project",
+    "description": "Verify creation, update, and retrieval of quality gate configurations for a given project.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/governance/gates with valid quality gate configuration for a project"
+      },
+      {
+        "type": "assertion",
+        "description": "API returns success and persists the configuration"
+      },
+      {
+        "type": "action",
+        "description": "Send GET request to /api/governance/gates/:projectId to retrieve quality gates"
+      },
+      {
+        "type": "assertion",
+        "description": "Retrieved quality gates match the recently saved configuration"
+      },
+      {
+        "type": "action",
+        "description": "Send POST request with invalid quality gate parameters"
+      },
+      {
+        "type": "assertion",
+        "description": "API returns 400 Bad Request with validation error message"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Evaluate Quality Gate Pass/Fail Logic",
+    "description": "Test whether the system correctly evaluates quality gate pass or fail statuses based on configured thresholds.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Configure quality gates with defined pass/fail thresholds for a project"
+      },
+      {
+        "type": "action",
+        "description": "Trigger evaluation by querying release readiness or attempting release approval"
+      },
+      {
+        "type": "assertion",
+        "description": "System returns correct pass or fail result according to project data and gate configuration"
+      },
+      {
+        "type": "action",
+        "description": "Alter project data to cross thresholds to opposite state and re-evaluate"
+      },
+      {
+        "type": "assertion",
+        "description": "System updates evaluation status accordingly"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Submit Release Approval and Audit Trail",
+    "description": "Verify the process of submitting manual release approvals or rejections includes compulsory comments and audit logging.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/governance/approvals with approval action, project ID, and comment"
+      },
+      {
+        "type": "assertion",
+        "description": "API accepts approval submission and returns success"
+      },
+      {
+        "type": "action",
+        "description": "Verify audit logs contain entry for approval with full before/after states and comment"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit log correctly captures the approval event details"
+      },
+      {
+        "type": "action",
+        "description": "Send approval submission without required comment"
+      },
+      {
+        "type": "assertion",
+        "description": "API rejects submission with validation error"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Asynchronous Report Generation and Polling",
+    "description": "Verify the API for report generation accepts requests, processes asynchronously, supports polling status and provides downloadable URLs.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send request to generate a report in PDF format"
+      },
+      {
+        "type": "assertion",
+        "description": "API returns a job ID or token indicating asynchronous processing"
+      },
+      {
+        "type": "action",
+        "description": "Poll the report status endpoint until the report generation is complete"
+      },
+      {
+        "type": "assertion",
+        "description": "Eventually receive a completion status and a valid download URL for the report"
+      },
+      {
+        "type": "action",
+        "description": "Download the generated report using the provided URL"
+      },
+      {
+        "type": "assertion",
+        "description": "Report file opens and contains expected content"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Audit Log Completeness for CRUD and Governance Actions",
+    "description": "Verify that audit logs are created for all create, update, delete, and governance-related operations with before and after snapshots.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Perform create, update, and delete operations on projects, tasks, and resources"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit logs record entries for each operation with full before and after state details"
+      },
+      {
+        "type": "action",
+        "description": "Perform governance actions including quality gate updates and release approvals"
+      },
+      {
+        "type": "assertion",
+        "description": "Audit logs capture governance actions in detail"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Retrieve Governance Dashboard Summaries",
+    "description": "Validate retrieval of release readiness, quality risks, project health, and dashboard summary endpoints deliver correct aggregated data.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Call GET /api/governance/release-readiness"
+      },
+      {
+        "type": "assertion",
+        "description": "Response contains current release readiness data for all projects"
+      },
+      {
+        "type": "action",
+        "description": "Call GET /api/governance/quality-risks"
+      },
+      {
+        "type": "assertion",
+        "description": "Response contains quality risk assessments consistent with projects' data"
+      },
+      {
+        "type": "action",
+        "description": "Call GET /api/governance/project-health"
+      },
+      {
+        "type": "assertion",
+        "description": "Response provides a comprehensive project health summary"
+      },
+      {
+        "type": "action",
+        "description": "Call GET /api/governance/dashboard-summary"
+      },
+      {
+        "type": "assertion",
+        "description": "Response includes aggregated dashboard statistics"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Validate Task Status Transitions and Assignments",
+    "description": "Verify that tasks can be created and updated with valid status transitions and proper resource assignments, rejecting invalid data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a task with valid initial status and resource assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Task is created successfully with expected fields"
+      },
+      {
+        "type": "action",
+        "description": "Update task status in valid allowed transitions"
+      },
+      {
+        "type": "assertion",
+        "description": "Update succeeds and status changes correctly"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to update task status with invalid transitions"
+      },
+      {
+        "type": "assertion",
+        "description": "API rejects update with validation errors"
+      },
+      {
+        "type": "action",
+        "description": "Assign resources exceeding availability during task creation"
+      },
+      {
+        "type": "assertion",
+        "description": "API responds with appropriate warnings or errors depending on capacity"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Deployment Guide Reproducibility Verification",
+    "description": "Test following the provided deployment guides to successfully deploy the QC Manager system locally with Docker Compose and on Hostinger VPS.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Follow local deployment steps using Docker Compose"
+      },
+      {
+        "type": "assertion",
+        "description": "System deploys successfully with all services running and accessible"
+      },
+      {
+        "type": "action",
+        "description": "Follow Hostinger VPS deployment instructions"
+      },
+      {
+        "type": "assertion",
+        "description": "Application is accessible remotely with API and UI functioning correctly"
+      }
+    ]
+  }
+]

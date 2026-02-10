@@ -4,7 +4,7 @@ interface ProgressBarProps {
     value: number;
     max?: number;
     variant?: 'complete' | 'ontrack' | 'atrisk' | 'default' | 'notasks';
-    color?: string;
+    color?: string; // Tailwind CSS class like 'bg-green-500'
     className?: string;
 }
 
@@ -19,16 +19,14 @@ export function ProgressBar({ value, max = 100, variant = 'default', color, clas
         notasks: 'bg-slate-300',
     };
 
-    const barColor = color || colorClasses[variant];
+    // Use the provided color class or fall back to variant-based class
+    const barColorClass = color || colorClasses[variant] || colorClasses.default;
 
     return (
         <div className={`h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden ${className}`}>
             <div
-                className={`h-full ${color ? '' : colorClasses[variant]} transition-all duration-1000`}
-                style={{ 
-                    width: `${percentage}%`,
-                    ...(color ? { backgroundColor: color } : {})
-                }}
+                className={`h-full ${barColorClass} transition-all duration-1000`}
+                style={{ width: `${percentage}%` }}
             />
         </div>
     );

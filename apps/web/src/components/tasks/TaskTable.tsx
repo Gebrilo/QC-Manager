@@ -38,7 +38,10 @@ export function TaskTable({
     onPageChange,
 }: TaskTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+        expected_start_date: false,
+        actual_start_date: false,
+    });
     const { density } = useTheme();
 
     const columns = useMemo(
@@ -77,6 +80,30 @@ export function TaskTable({
                 id: 'status',
                 header: 'Status',
                 cell: (info) => <TaskStatusBadge status={info.getValue()} />,
+            }),
+            columnHelper.accessor('expected_start_date', {
+                id: 'expected_start_date',
+                header: 'Expected Start',
+                cell: (info) => (
+                    <span className="text-slate-600 dark:text-slate-400 text-xs">
+                        {info.getValue() ? new Date(info.getValue()!).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric'
+                        }) : '-'}
+                    </span>
+                ),
+            }),
+            columnHelper.accessor('actual_start_date', {
+                id: 'actual_start_date',
+                header: 'Actual Start',
+                cell: (info) => (
+                    <span className="text-slate-600 dark:text-slate-400 text-xs font-medium">
+                        {info.getValue() ? new Date(info.getValue()!).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric'
+                        }) : '-'}
+                    </span>
+                ),
             }),
             columnHelper.accessor('resource1_name', {
                 id: 'resource1_name',

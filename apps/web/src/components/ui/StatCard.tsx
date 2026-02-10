@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { InfoTooltip } from './Tooltip';
 
 interface StatCardProps {
     label?: string;
@@ -10,21 +11,25 @@ interface StatCardProps {
         isPositive: boolean;
     } | 'up' | 'down';
     icon?: React.ReactNode;
+    tooltip?: string;
 }
 
-export function StatCard({ label, title, value, subtitle, trend, icon }: StatCardProps) {
+export function StatCard({ label, title, value, subtitle, trend, icon, tooltip }: StatCardProps) {
     const displayLabel = label || title || '';
-    
-    const trendObj = typeof trend === 'string' 
+
+    const trendObj = typeof trend === 'string'
         ? { value: 0, isPositive: trend === 'up' }
         : trend;
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                    {displayLabel}
-                </span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        {displayLabel}
+                    </span>
+                    {tooltip && <InfoTooltip content={tooltip} position="right" />}
+                </div>
                 {icon && (
                     <div className="text-slate-400">
                         {icon}
@@ -47,3 +52,4 @@ export function StatCard({ label, title, value, subtitle, trend, icon }: StatCar
         </div>
     );
 }
+

@@ -135,7 +135,7 @@ function TestResultsContent() {
             >
               <option value="all">All Projects</option>
               {projects.map(project => (
-                <option key={project.id} value={project.id}>{project.name}</option>
+                <option key={project.id} value={project.id}>{project.project_name}</option>
               ))}
             </select>
           </div>

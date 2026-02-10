@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
+import { TaskCommentSection } from '@/components/tasks/TaskCommentSection';
 import Link from 'next/link';
 
 export default function TaskDetailPage() {
@@ -31,6 +32,20 @@ export default function TaskDetailPage() {
         }
         if (id) load();
     }, [id]);
+
+    const handleDelete = async () => {
+        if (!task) return;
+        if (!confirm(`Are you sure you want to delete task "${task.task_name}"? This will archive the task.`)) {
+            return;
+        }
+        try {
+            await fetchApi(`/tasks/${task.id}`, { method: 'DELETE' });
+            alert('Task deleted successfully');
+            router.push('/tasks');
+        } catch (err: any) {
+            alert(`Failed to delete task: ${err.message}`);
+        }
+    };
 
     const getStatusVariant = (status: string | undefined) => {
         switch (status) {
@@ -65,9 +80,18 @@ export default function TaskDetailPage() {
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{task.task_id} • {task.project_name || 'No Project'}</p>
                     </div>
                 </div>
-                <Link href={`/tasks/${task.id}/edit`}>
-                    <Button variant="outline">Edit Task</Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link href={`/tasks/${task.id}/edit`}>
+                        <Button variant="outline">Edit Task</Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        onClick={handleDelete}
+                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                    >
+                        Delete
+                    </Button>
+                </div>
             </div>
 
             {/* Content Grid */}
@@ -91,8 +115,8 @@ export default function TaskDetailPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-6">
-                                <DetailItem label="Estimated Hours" value={task.total_est_hrs?.toFixed(1) || '0.0'} />
-                                <DetailItem label="Actual Hours" value={task.total_actual_hrs?.toFixed(1) || '0.0'} />
+                                <DetailItem label="Estimated Hours" value={Number(task.total_est_hrs || 0).toFixed(1)} />
+                                <DetailItem label="Actual Hours" value={Number(task.total_actual_hrs || 0).toFixed(1)} />
                                 <DetailItem label="Progress" value={`${task.overall_completion_pct || 0}%`} />
                                 {/* Visual Progress */}
                                 <div className="col-span-2 mt-2">
@@ -148,11 +172,21 @@ export default function TaskDetailPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
+                                <DetailItem
+                                    label="Expected Start"
+                                    value={task.expected_start_date ? new Date(task.expected_start_date).toLocaleDateString() : '-'}
+                                />
+                                <DetailItem
+                                    label="Actual Start"
+                                    value={task.actual_start_date ? new Date(task.actual_start_date).toLocaleDateString() : '-'}
+                                />
                                 <DetailItem label="Deadline" value={task.deadline ? new Date(task.deadline).toLocaleDateString() : '-'} />
                                 <DetailItem label="Completed Date" value={task.completed_date ? new Date(task.completed_date).toLocaleDateString() : '-'} />
                             </div>
                         </CardContent>
                     </Card>
+
+                    <TaskCommentSection taskId={task.id} />
                 </div>
             </div>
         </div>

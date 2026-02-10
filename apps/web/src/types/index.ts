@@ -1,7 +1,8 @@
 export interface Project {
     id: string; // UUID
     project_id: string; // Display ID e.g. PRJ-001
-    name: string;
+    name?: string; // Legacy field, use project_name
+    project_name: string; // From API/database
     description?: string;
     priority: 'High' | 'Medium' | 'Low';
     total_weight: number;
@@ -20,12 +21,14 @@ export interface Project {
 
 export interface Resource {
     id: string;
-    name: string;
+    name?: string; // Legacy, use resource_name
+    resource_name: string;
     role?: string;
     weekly_capacity_hrs: number;
     email?: string;
     department?: string;
-    status: 'active' | 'inactive';
+    is_active: boolean;
+    status?: 'active' | 'inactive'; // Computed from is_active
 }
 
 export interface Task {
@@ -39,6 +42,8 @@ export interface Task {
 
     resource1_uuid?: string;
     resource2_uuid?: string;
+    resource1_id?: string; // Alias from API
+    resource2_id?: string; // Alias from API
 
     estimate_days?: number;
     r1_estimate_hrs?: number;
@@ -47,6 +52,8 @@ export interface Task {
     r2_actual_hrs?: number;
 
     deadline?: string;
+    expected_start_date?: string;
+    actual_start_date?: string;
     completed_date?: string;
     tags?: string[];
     notes?: string;
@@ -60,6 +67,16 @@ export interface Task {
     total_est_hrs?: number;
     total_actual_hrs?: number;
     overall_completion_pct?: number;
+    created_at?: string;
+}
+
+export interface TaskComment {
+    id: string;
+    task_id: string;
+    comment: string;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
 }
 
 // Test Results Management Types (Phase 1 - Simplified)

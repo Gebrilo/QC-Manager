@@ -1,7 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 const { z } = require('zod');
+const multer = require('multer');
+const XLSX = require('xlsx');
+
+// Configure multer for file upload (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    if (allowedTypes.includes(file.mimetype) ||
+      file.originalname.match(/\.(xlsx|xls|csv)$/)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel and CSV files are allowed'));
+    }
+  }
+});
 
 // Validation Schemas
 const testRunCreateSchema = z.object({
@@ -31,6 +52,89 @@ const testExecutionUpdateSchema = z.object({
   notes: z.string().optional(),
   duration_seconds: z.number().int().positive().optional().nullable(),
   defect_ids: z.array(z.string()).optional()
+});
+
+// ============================================================================
+// DASHBOARD SUMMARY - For Governance Dashboard
+// ============================================================================
+
+// GET /summary - Aggregate stats for dashboard
+router.get('/summary', async (req, res, next) => {
+  try {
+    const { project_id } = req.query;
+
+    let whereClause = 'WHERE tr.deleted_at IS NULL';
+    const params = [];
+
+    if (project_id) {
+      params.push(project_id);
+      whereClause += ` AND tr.project_id = $1`;
+    }
+
+    // Overall summary
+    const summaryResult = await pool.query(`
+      SELECT
+        COUNT(DISTINCT tr.id)::INTEGER as total_test_runs,
+        COUNT(te.id)::INTEGER as total_executions,
+        COALESCE(SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END), 0)::INTEGER as total_passed,
+        COALESCE(SUM(CASE WHEN te.status = 'fail' THEN 1 ELSE 0 END), 0)::INTEGER as total_failed,
+        COALESCE(SUM(CASE WHEN te.status = 'not_run' THEN 1 ELSE 0 END), 0)::INTEGER as total_not_run,
+        COALESCE(SUM(CASE WHEN te.status = 'blocked' THEN 1 ELSE 0 END), 0)::INTEGER as total_blocked,
+        COALESCE(SUM(CASE WHEN te.status = 'skipped' THEN 1 ELSE 0 END), 0)::INTEGER as total_skipped,
+        CASE 
+          WHEN COUNT(te.id) > 0
+          THEN ROUND((SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END)::NUMERIC / COUNT(te.id)) * 100, 2)
+          ELSE 0
+        END as overall_pass_rate,
+        MAX(tr.started_at) as last_execution_date
+      FROM test_run tr
+      LEFT JOIN test_execution te ON tr.id = te.test_run_id
+      ${whereClause}
+    `, params);
+
+    // Recent test runs
+    const recentRunsResult = await pool.query(`
+      SELECT
+        tr.id,
+        tr.run_id,
+        tr.name,
+        tr.status,
+        tr.started_at,
+        p.project_name,
+        COUNT(te.id)::INTEGER as total_cases,
+        COALESCE(SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END), 0)::INTEGER as passed,
+        COALESCE(SUM(CASE WHEN te.status = 'fail' THEN 1 ELSE 0 END), 0)::INTEGER as failed,
+        CASE 
+          WHEN COUNT(te.id) > 0
+          THEN ROUND((SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END)::NUMERIC / COUNT(te.id)) * 100, 2)
+          ELSE 0
+        END as pass_rate
+      FROM test_run tr
+      LEFT JOIN projects p ON tr.project_id = p.id
+      LEFT JOIN test_execution te ON tr.id = te.test_run_id
+      WHERE tr.deleted_at IS NULL
+      GROUP BY tr.id, tr.run_id, tr.name, tr.status, tr.started_at, p.project_name
+      ORDER BY tr.started_at DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      summary: summaryResult.rows[0] || {
+        total_test_runs: 0,
+        total_executions: 0,
+        total_passed: 0,
+        total_failed: 0,
+        total_not_run: 0,
+        total_blocked: 0,
+        total_skipped: 0,
+        overall_pass_rate: 0,
+        last_execution_date: null
+      },
+      recent_runs: recentRunsResult.rows
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================================
@@ -316,6 +420,56 @@ router.patch('/test-runs/:id', async (req, res, next) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /test-runs/:id - Soft delete test run
+router.delete('/test-runs/:id', async (req, res, next) => {
+  const client = await pool.connect();
+
+  try {
+    const { id } = req.params;
+
+    await client.query('BEGIN');
+
+    // Check if exists
+    const existingResult = await client.query(
+      'SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Test run not found' });
+    }
+
+    // Soft delete
+    await client.query(
+      'UPDATE test_run SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [id]
+    );
+
+    // Audit log
+    await client.query(
+      `INSERT INTO audit_log (action, entity_type, entity_uuid, user_email, change_summary)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        'delete',
+        'test_run',
+        id,
+        req.user?.email || 'system',
+        `Deleted test run: ${existingResult.rows[0].run_id}`
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ message: 'Test run deleted successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
   } finally {
     client.release();
@@ -674,6 +828,194 @@ router.post('/executions/bulk-import', async (req, res, next) => {
     next(error);
   } finally {
     client.release();
+  }
+});
+
+// ============================================================================
+// EXCEL UPLOAD - Import test results from Excel/CSV
+// ============================================================================
+
+// POST /upload-excel - Upload Excel file with test results
+router.post('/upload-excel', upload.single('file'), async (req, res, next) => {
+  const client = await pool.connect();
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { project_id, test_run_name } = req.body;
+    if (!project_id) {
+      return res.status(400).json({ error: 'project_id is required' });
+    }
+
+    // Parse Excel file
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+
+    if (data.length === 0) {
+      return res.status(400).json({ error: 'Excel file is empty or has no valid data' });
+    }
+
+    await client.query('BEGIN');
+
+    // Create a new test run for this upload
+    const idResult = await client.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(run_id FROM 5) AS INTEGER)), 0) + 1 AS next_id
+       FROM test_run
+       WHERE run_id ~ '^RUN-[0-9]+$'`
+    );
+    const nextId = idResult.rows[0].next_id;
+    const runId = `RUN-${String(nextId).padStart(4, '0')}`;
+
+    const testRunResult = await client.query(
+      `INSERT INTO test_run (run_id, name, description, project_id, status)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [
+        runId,
+        test_run_name || `Excel Import - ${new Date().toISOString().split('T')[0]}`,
+        `Imported from file: ${req.file.originalname}`,
+        project_id,
+        'completed'
+      ]
+    );
+
+    const testRun = testRunResult.rows[0];
+
+    // Process each row
+    const results = {
+      success: [],
+      errors: [],
+      summary: {
+        pass: 0,
+        fail: 0,
+        not_run: 0,
+        blocked: 0,
+        skipped: 0
+      }
+    };
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+
+      // Try to find test case ID or name columns (flexible column names)
+      const testCaseId = row['Test Case ID'] || row['test_case_id'] || row['ID'] || row['id'] || row['TestCaseID'];
+      const testCaseName = row['Test Case Name'] || row['test_case_name'] || row['Name'] || row['name'] || row['Title'] || row['title'];
+      const statusRaw = row['Status'] || row['status'] || row['Result'] || row['result'] || '';
+      const notes = row['Notes'] || row['notes'] || row['Comments'] || row['comments'] || '';
+
+      // Normalize status
+      const statusLower = String(statusRaw).toLowerCase().trim();
+      let status = 'not_run';
+      if (['pass', 'passed', 'success', 'ok'].includes(statusLower)) {
+        status = 'pass';
+        results.summary.pass++;
+      } else if (['fail', 'failed', 'failure', 'error'].includes(statusLower)) {
+        status = 'fail';
+        results.summary.fail++;
+      } else if (['blocked', 'block'].includes(statusLower)) {
+        status = 'blocked';
+        results.summary.blocked++;
+      } else if (['skipped', 'skip', 'rejected'].includes(statusLower)) {
+        status = 'skipped';
+        results.summary.skipped++;
+      } else if (['not run', 'not_run', 'not executed', 'not_executed', 'pending', ''].includes(statusLower)) {
+        status = 'not_run';
+        results.summary.not_run++;
+      }
+
+      try {
+        // Insert test execution record directly (without requiring test_case table)
+        await client.query(
+          `INSERT INTO test_execution (
+            test_run_id, test_case_id, status, notes
+          ) VALUES ($1, NULL, $2, $3)`,
+          [testRun.id, status, `${testCaseId ? '[' + testCaseId + '] ' : ''}${testCaseName || ''} - ${notes}`.trim()]
+        );
+
+        results.success.push({
+          row: i + 2, // +2 for 1-indexed and header row
+          test_case: testCaseId || testCaseName || `Row ${i + 2}`,
+          status
+        });
+      } catch (err) {
+        results.errors.push({
+          row: i + 2,
+          test_case: testCaseId || testCaseName || `Row ${i + 2}`,
+          error: err.message
+        });
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      message: 'Excel file processed successfully',
+      test_run: {
+        id: testRun.id,
+        run_id: testRun.run_id,
+        name: testRun.name
+      },
+      summary: {
+        total_rows: data.length,
+        imported: results.success.length,
+        errors: results.errors.length,
+        ...results.summary,
+        pass_rate: data.length > 0
+          ? ((results.summary.pass / data.length) * 100).toFixed(2) + '%'
+          : '0%'
+      },
+      details: results
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Excel upload error:', error);
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+// GET /recent-uploads - Get recent test run uploads
+router.get('/recent-uploads', async (req, res, next) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        tr.id,
+        tr.run_id,
+        tr.name,
+        tr.description,
+        tr.status,
+        tr.started_at,
+        p.project_name,
+        p.id as project_id,
+        COUNT(te.id)::INTEGER as total_cases,
+        COALESCE(SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END), 0)::INTEGER as passed,
+        COALESCE(SUM(CASE WHEN te.status = 'fail' THEN 1 ELSE 0 END), 0)::INTEGER as failed,
+        COALESCE(SUM(CASE WHEN te.status = 'not_run' THEN 1 ELSE 0 END), 0)::INTEGER as not_run,
+        COALESCE(SUM(CASE WHEN te.status = 'blocked' THEN 1 ELSE 0 END), 0)::INTEGER as blocked,
+        COALESCE(SUM(CASE WHEN te.status = 'skipped' THEN 1 ELSE 0 END), 0)::INTEGER as skipped,
+        CASE 
+          WHEN COUNT(te.id) > 0
+          THEN ROUND((SUM(CASE WHEN te.status = 'pass' THEN 1 ELSE 0 END)::NUMERIC / COUNT(te.id)) * 100, 2)
+          ELSE 0
+        END as pass_rate
+      FROM test_run tr
+      LEFT JOIN projects p ON tr.project_id = p.id
+      LEFT JOIN test_execution te ON tr.id = te.test_run_id
+      WHERE tr.deleted_at IS NULL
+      GROUP BY tr.id, tr.run_id, tr.name, tr.description, tr.status, tr.started_at, p.project_name, p.id
+      ORDER BY tr.started_at DESC
+      LIMIT 20
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
   }
 });
 

@@ -86,9 +86,9 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
             }
 
             onSuccess();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save project:', error);
-            alert('Failed to save project.');
+            alert(`Failed to save project: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -146,6 +146,8 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
                     <input
                         type="number"
                         name="total_weight"
+                        min="1"
+                        max="5"
                         value={formData.total_weight}
                         onChange={handleChange}
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 hover:border-slate-300 dark:hover:border-slate-700 transition-all outline-none"

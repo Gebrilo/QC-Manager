@@ -73,8 +73,8 @@ export function ResourceTable({
                 id: 'current_allocation_hrs',
                 header: 'Allocated',
                 cell: (info) => {
-                    const allocated = info.getValue() || 0;
-                    const capacity = info.row.original.weekly_capacity_hrs;
+                    const allocated = Number(info.getValue() || 0);
+                    const capacity = Number(info.row.original.weekly_capacity_hrs || 0);
                     return (
                         <div className="flex flex-col gap-1">
                             <span className="text-sm text-slate-900 dark:text-white">{allocated.toFixed(1)} hrs</span>
@@ -87,7 +87,7 @@ export function ResourceTable({
                 id: 'utilization_pct',
                 header: 'Utilization',
                 cell: (info) => {
-                    const utilization = info.getValue() || 0;
+                    const utilization = Number(info.getValue() || 0);
                     let color = 'bg-green-500';
                     if (utilization > 100) color = 'bg-red-500';
                     else if (utilization > 80) color = 'bg-yellow-500';
@@ -96,11 +96,10 @@ export function ResourceTable({
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                                 <ProgressBar value={Math.min(utilization, 100)} max={100} color={color} />
-                                <span className={`text-sm font-medium ${
-                                    utilization > 100 ? 'text-red-600 dark:text-red-400' :
-                                    utilization > 80 ? 'text-yellow-600 dark:text-yellow-400' :
-                                    'text-green-600 dark:text-green-400'
-                                }`}>
+                                <span className={`text-sm font-medium ${utilization > 100 ? 'text-red-600 dark:text-red-400' :
+                                        utilization > 80 ? 'text-yellow-600 dark:text-yellow-400' :
+                                            'text-green-600 dark:text-green-400'
+                                    }`}>
                                     {utilization.toFixed(0)}%
                                 </span>
                             </div>
@@ -128,8 +127,8 @@ export function ResourceTable({
                 cell: (info) => (
                     <div className="flex gap-2">
                         {onEdit && (
-                            <Button 
-                                variant="secondary" 
+                            <Button
+                                variant="secondary"
                                 size="sm"
                                 onClick={() => onEdit(info.row.original)}
                             >
@@ -137,8 +136,8 @@ export function ResourceTable({
                             </Button>
                         )}
                         {onDelete && (
-                            <Button 
-                                variant="destructive" 
+                            <Button
+                                variant="destructive"
                                 size="sm"
                                 onClick={() => onDelete(info.row.original)}
                             >

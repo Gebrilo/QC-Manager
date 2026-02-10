@@ -55,8 +55,14 @@ export function Header() {
                         <Link href="/projects" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                             Projects
                         </Link>
+                        <Link href="/resources" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                            Resources
+                        </Link>
                         <Link href="/governance" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                             Governance
+                        </Link>
+                        <Link href="/test-executions" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                            Test Runs
                         </Link>
                         <Link href="/reports" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                             Reports

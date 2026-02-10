@@ -1,123 +1,714 @@
 {
-  "projectName": "QC Manager",
-  "projectType": "fullstack",
-  "description": "Quality Control Management Tool with project tracking, task management, resource allocation, and governance dashboards",
-  "backend": {
-    "framework": "Express.js",
-    "language": "JavaScript",
-    "port": 3001,
-    "database": "PostgreSQL",
-    "routes": [
-      {
-        "path": "/api/health",
-        "methods": ["GET"],
-        "description": "Health check endpoint"
-      },
-      {
-        "path": "/api/dashboard",
-        "methods": ["GET"],
-        "description": "Dashboard metrics from v_dashboard_metrics view"
-      },
-      {
-        "path": "/api/projects",
-        "methods": ["GET", "POST"],
-        "description": "List all projects or create new project"
-      },
-      {
-        "path": "/api/projects/:id",
-        "methods": ["GET", "PATCH", "DELETE"],
-        "description": "Get, update, or soft-delete specific project"
-      },
-      {
-        "path": "/api/tasks",
-        "methods": ["GET", "POST"],
-        "description": "List all tasks or create new task"
-      },
-      {
-        "path": "/api/tasks/:id",
-        "methods": ["GET", "PATCH", "DELETE"],
-        "description": "Get, update, or soft-delete specific task"
-      },
-      {
-        "path": "/api/resources",
-        "methods": ["GET", "POST"],
-        "description": "List all resources with utilization or create new resource"
-      },
-      {
-        "path": "/api/resources/:id",
-        "methods": ["GET", "PATCH", "DELETE"],
-        "description": "Get, update, or soft-delete specific resource"
-      },
-      {
-        "path": "/api/governance/release-readiness",
-        "methods": ["GET"],
-        "description": "Get release readiness for all projects"
-      },
-      {
-        "path": "/api/governance/quality-risks",
-        "methods": ["GET"],
-        "description": "Get quality risk assessment for all projects"
-      },
-      {
-        "path": "/api/governance/project-health",
-        "methods": ["GET"],
-        "description": "Get comprehensive project health summary"
-      },
-      {
-        "path": "/api/governance/dashboard-summary",
-        "methods": ["GET"],
-        "description": "Get aggregated dashboard statistics"
-      },
-      {
-        "path": "/api/governance/gates/:projectId",
-        "methods": ["GET"],
-        "description": "Get quality gates configuration for a project"
-      },
-      {
-        "path": "/api/governance/gates",
-        "methods": ["POST"],
-        "description": "Create or update quality gates for a project"
-      },
-      {
-        "path": "/api/governance/approvals",
-        "methods": ["POST"],
-        "description": "Submit a release approval or rejection"
-      }
-    ]
-  },
-  "frontend": {
-    "framework": "Next.js 14",
-    "language": "TypeScript",
-    "port": 3000,
-    "pages": [
-      "/",
-      "/dashboard",
-      "/projects",
-      "/projects/[id]",
-      "/governance",
-      "/reports"
-    ],
-    "components": [
-      "Header",
-      "ProjectList",
-      "TaskList",
-      "ResourceList",
-      "DashboardMetrics",
-      "GovernanceDashboard",
-      "ThemeProvider"
-    ]
-  },
-  "authentication": "None (open API)",
-  "externalServices": [
+  "tech_stack": ["Node.js", "Express.js", "PostgreSQL", "Next.js", "React", "TypeScript", "Tailwind CSS"],
+  "features": [
     {
-      "name": "n8n",
-      "type": "workflow automation",
-      "port": 5678
+      "name": "Projects API",
+      "description": "CRUD operations for project management with audit logging",
+      "files": ["apps/api/src/routes/projects.js", "apps/api/src/schemas/project.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/projects": {
+            "get": {
+              "summary": "List all projects",
+              "responses": { "200": { "description": "Array of projects with metrics" } }
+            },
+            "post": {
+              "summary": "Create a new project",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["project_id", "name"],
+                      "properties": {
+                        "project_id": { "type": "string" },
+                        "name": { "type": "string", "maxLength": 100 },
+                        "description": { "type": "string" },
+                        "total_weight": { "type": "integer", "minimum": 1, "maximum": 5 },
+                        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+                        "start_date": { "type": "string", "format": "date" },
+                        "target_date": { "type": "string", "format": "date" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Project created" } }
+            }
+          },
+          "/projects/{id}": {
+            "get": {
+              "summary": "Get project by ID",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project details" }, "404": { "description": "Not found" } }
+            },
+            "patch": {
+              "summary": "Update project",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project updated" }, "404": { "description": "Not found" } }
+            },
+            "delete": {
+              "summary": "Soft delete project",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project deleted" }, "404": { "description": "Not found" } }
+            }
+          }
+        }
+      }
     },
     {
-      "name": "PostgreSQL",
-      "type": "database",
-      "port": 5432
+      "name": "Tasks API",
+      "description": "CRUD operations for task management with status transitions validation",
+      "files": ["apps/api/src/routes/tasks.js", "apps/api/src/schemas/task.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/tasks": {
+            "get": {
+              "summary": "List all tasks",
+              "responses": { "200": { "description": "Array of tasks with metrics" } }
+            },
+            "post": {
+              "summary": "Create a new task",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["task_id", "project_id", "task_name"],
+                      "properties": {
+                        "task_id": { "type": "string", "pattern": "^TSK-[A-Z0-9-]+$" },
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "task_name": { "type": "string", "maxLength": 200 },
+                        "status": { "type": "string", "enum": ["Backlog", "In Progress", "Done", "Cancelled"], "default": "Backlog" },
+                        "resource1_uuid": { "type": "string", "format": "uuid" },
+                        "resource2_uuid": { "type": "string", "format": "uuid" },
+                        "estimate_days": { "type": "number" },
+                        "deadline": { "type": "string", "format": "date" },
+                        "r1_estimate_hrs": { "type": "number", "default": 0 },
+                        "r1_actual_hrs": { "type": "number", "default": 0 },
+                        "r2_estimate_hrs": { "type": "number", "default": 0 },
+                        "r2_actual_hrs": { "type": "number", "default": 0 },
+                        "tags": { "type": "array", "items": { "type": "string" } },
+                        "notes": { "type": "string" },
+                        "completed_date": { "type": "string", "format": "date" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Task created" } }
+            }
+          },
+          "/tasks/{id}": {
+            "get": {
+              "summary": "Get task by ID",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Task details" }, "404": { "description": "Not found" } }
+            },
+            "patch": {
+              "summary": "Update task",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Task updated" }, "400": { "description": "Invalid status transition" }, "404": { "description": "Not found" } }
+            },
+            "delete": {
+              "summary": "Soft delete task",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Task deleted" }, "404": { "description": "Not found" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Resources API",
+      "description": "CRUD operations for team resource/member management",
+      "files": ["apps/api/src/routes/resources.js", "apps/api/src/schemas/resource.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/resources": {
+            "get": {
+              "summary": "List all resources with utilization",
+              "responses": { "200": { "description": "Array of resources" } }
+            },
+            "post": {
+              "summary": "Create a new resource",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["resource_name"],
+                      "properties": {
+                        "resource_name": { "type": "string", "maxLength": 100 },
+                        "weekly_capacity_hrs": { "type": "integer", "minimum": 1, "maximum": 80, "default": 40 },
+                        "email": { "type": "string", "format": "email" },
+                        "department": { "type": "string", "maxLength": 100 },
+                        "role": { "type": "string", "maxLength": 100 },
+                        "is_active": { "type": "boolean", "default": true }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Resource created" } }
+            }
+          },
+          "/resources/{id}": {
+            "get": {
+              "summary": "Get resource by ID",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Resource details" }, "404": { "description": "Not found" } }
+            },
+            "patch": {
+              "summary": "Update resource",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Resource updated" }, "404": { "description": "Not found" } }
+            },
+            "delete": {
+              "summary": "Soft delete resource",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Resource deleted" }, "404": { "description": "Not found" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Test Cases API",
+      "description": "CRUD operations for test case management with bulk import",
+      "files": ["apps/api/src/routes/testCases.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/test-cases": {
+            "get": {
+              "summary": "List test cases with filtering",
+              "parameters": [
+                { "name": "project_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+                { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["smoke", "regression", "e2e", "integration", "unit", "performance", "security", "other"] } },
+                { "name": "priority", "in": "query", "schema": { "type": "string", "enum": ["low", "medium", "high", "critical"] } },
+                { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["active", "archived", "draft", "deprecated"] } },
+                { "name": "search", "in": "query", "schema": { "type": "string" } },
+                { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 } },
+                { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+              ],
+              "responses": { "200": { "description": "Paginated test cases" } }
+            },
+            "post": {
+              "summary": "Create a new test case",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["title", "project_id"],
+                      "properties": {
+                        "title": { "type": "string", "maxLength": 500 },
+                        "description": { "type": "string" },
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "task_id": { "type": "string", "format": "uuid" },
+                        "category": { "type": "string", "enum": ["smoke", "regression", "e2e", "integration", "unit", "performance", "security", "other"], "default": "other" },
+                        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"], "default": "medium" },
+                        "tags": { "type": "array", "items": { "type": "string" } },
+                        "status": { "type": "string", "enum": ["active", "archived", "draft", "deprecated"], "default": "active" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Test case created" } }
+            }
+          },
+          "/test-cases/{id}": {
+            "get": {
+              "summary": "Get test case by ID with execution history",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Test case details" }, "404": { "description": "Not found" } }
+            },
+            "patch": {
+              "summary": "Update test case",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Test case updated" }, "404": { "description": "Not found" } }
+            },
+            "delete": {
+              "summary": "Soft delete (archive) test case",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "204": { "description": "Test case deleted" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/test-cases/bulk-import": {
+            "post": {
+              "summary": "Bulk import test cases",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["test_cases", "project_id"],
+                      "properties": {
+                        "test_cases": { "type": "array", "items": { "type": "object" } },
+                        "project_id": { "type": "string", "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Import results" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Test Executions API",
+      "description": "Test runs and execution management",
+      "files": ["apps/api/src/routes/testExecutions.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/test-executions/test-runs": {
+            "get": {
+              "summary": "List all test runs",
+              "parameters": [
+                { "name": "project_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+                { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["in_progress", "completed", "aborted"] } }
+              ],
+              "responses": { "200": { "description": "List of test runs with metrics" } }
+            },
+            "post": {
+              "summary": "Create a new test run",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["name", "project_id"],
+                      "properties": {
+                        "name": { "type": "string", "maxLength": 200 },
+                        "description": { "type": "string" },
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["in_progress", "completed", "aborted"], "default": "in_progress" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Test run created" } }
+            }
+          },
+          "/test-executions/test-runs/{id}": {
+            "get": {
+              "summary": "Get test run with executions",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Test run details" }, "404": { "description": "Not found" } }
+            },
+            "patch": {
+              "summary": "Update test run",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Test run updated" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/test-executions/executions": {
+            "get": {
+              "summary": "List executions with filters",
+              "responses": { "200": { "description": "List of executions" } }
+            },
+            "post": {
+              "summary": "Log single test execution",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["test_case_id", "test_run_id", "status"],
+                      "properties": {
+                        "test_case_id": { "type": "string", "format": "uuid" },
+                        "test_run_id": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["pass", "fail", "not_run", "blocked", "skipped"] },
+                        "notes": { "type": "string" },
+                        "duration_seconds": { "type": "integer" },
+                        "defect_ids": { "type": "array", "items": { "type": "string" } }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "201": { "description": "Execution logged" }, "409": { "description": "Duplicate execution" } }
+            }
+          },
+          "/test-executions/executions/{id}": {
+            "patch": {
+              "summary": "Update execution",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Execution updated" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/test-executions/executions/bulk-import": {
+            "post": {
+              "summary": "Bulk import execution results",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["executions", "test_run_id"],
+                      "properties": {
+                        "executions": { "type": "array", "items": { "type": "object" } },
+                        "test_run_id": { "type": "string", "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Import results" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Test Results API",
+      "description": "Test result uploads, history, trends, and metrics",
+      "files": ["apps/api/src/routes/testResults.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/test-results": {
+            "get": {
+              "summary": "List test results with filters",
+              "parameters": [
+                { "name": "project_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+                { "name": "test_case_id", "in": "query", "schema": { "type": "string" } },
+                { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["passed", "failed", "not_run", "blocked", "rejected"] } },
+                { "name": "from_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+                { "name": "to_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+                { "name": "latest_only", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } }
+              ],
+              "responses": { "200": { "description": "Paginated test results" } }
+            }
+          },
+          "/test-results/upload": {
+            "post": {
+              "summary": "Bulk upload test results",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["project_id", "results"],
+                      "properties": {
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "results": { "type": "array", "items": { "type": "object" } },
+                        "upload_date": { "type": "string", "format": "date" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Upload results" } }
+            }
+          },
+          "/test-results/project/{project_id}/metrics": {
+            "get": {
+              "summary": "Get project quality metrics",
+              "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Quality metrics" } }
+            }
+          },
+          "/test-results/project/{project_id}/trends": {
+            "get": {
+              "summary": "Get execution trends",
+              "parameters": [
+                { "name": "project_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "days", "in": "query", "schema": { "type": "integer", "default": 30 } }
+              ],
+              "responses": { "200": { "description": "Trend data" } }
+            }
+          },
+          "/test-results/test-case/{test_case_id}/history": {
+            "get": {
+              "summary": "Get test case history",
+              "parameters": [
+                { "name": "test_case_id", "in": "path", "required": true, "schema": { "type": "string" } },
+                { "name": "project_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
+              ],
+              "responses": { "200": { "description": "History data" } }
+            }
+          },
+          "/test-results/uploads": {
+            "get": {
+              "summary": "List upload batches",
+              "responses": { "200": { "description": "Upload batches" } }
+            }
+          },
+          "/test-results/{id}": {
+            "delete": {
+              "summary": "Soft delete test result",
+              "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Dashboard API",
+      "description": "Dashboard metrics and overview data",
+      "files": ["apps/api/src/routes/dashboard.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/dashboard": {
+            "get": {
+              "summary": "Get dashboard metrics",
+              "responses": { "200": { "description": "Dashboard metrics from v_dashboard_metrics view" } }
+            }
+          },
+          "/dashboard/metrics": {
+            "get": {
+              "summary": "Get dashboard metrics (alias)",
+              "responses": { "200": { "description": "Dashboard metrics" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Reports API",
+      "description": "Report generation with async job processing",
+      "files": ["apps/api/src/routes/reports.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/reports": {
+            "get": {
+              "summary": "List all report jobs",
+              "parameters": [
+                { "name": "user_email", "in": "query", "schema": { "type": "string" } },
+                { "name": "status", "in": "query", "schema": { "type": "string" } }
+              ],
+              "responses": { "200": { "description": "Paginated report jobs" } }
+            },
+            "post": {
+              "summary": "Generate report (async)",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["report_type"],
+                      "properties": {
+                        "report_type": { "type": "string", "enum": ["project_status", "resource_utilization", "task_export", "test_results", "dashboard"] },
+                        "format": { "type": "string", "enum": ["xlsx", "csv", "json", "pdf"], "default": "json" },
+                        "filters": { "type": "object" },
+                        "user_email": { "type": "string", "format": "email" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "202": { "description": "Report generation started" } }
+            }
+          },
+          "/reports/{job_id}": {
+            "get": {
+              "summary": "Check report status",
+              "parameters": [{ "name": "job_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Job status" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/reports/callback": {
+            "post": {
+              "summary": "n8n callback to update job status",
+              "responses": { "200": { "description": "Job updated" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Governance API",
+      "description": "Release readiness, quality risks, workload balance, project health, quality gates",
+      "files": ["apps/api/src/routes/governance.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/governance/release-readiness": {
+            "get": {
+              "summary": "Get release readiness for all or specific project",
+              "parameters": [
+                { "name": "project_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+                { "name": "status", "in": "query", "schema": { "type": "string" } }
+              ],
+              "responses": { "200": { "description": "Release readiness data" } }
+            }
+          },
+          "/governance/release-readiness/{projectId}": {
+            "get": {
+              "summary": "Get release readiness for specific project",
+              "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project readiness" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/governance/quality-risks": {
+            "get": {
+              "summary": "Get quality risk assessment",
+              "parameters": [{ "name": "risk_level", "in": "query", "schema": { "type": "string" } }],
+              "responses": { "200": { "description": "Quality risks data" } }
+            }
+          },
+          "/governance/quality-risks/{projectId}": {
+            "get": {
+              "summary": "Get quality risks for specific project",
+              "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project risks" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/governance/workload-balance": {
+            "get": {
+              "summary": "Get workload balance assessment",
+              "parameters": [{ "name": "balance_status", "in": "query", "schema": { "type": "string" } }],
+              "responses": { "200": { "description": "Workload balance data" } }
+            }
+          },
+          "/governance/project-health": {
+            "get": {
+              "summary": "Get comprehensive project health",
+              "parameters": [{ "name": "health_status", "in": "query", "schema": { "type": "string" } }],
+              "responses": { "200": { "description": "Project health data" } }
+            }
+          },
+          "/governance/project-health/{projectId}": {
+            "get": {
+              "summary": "Get health for specific project",
+              "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Project health" }, "404": { "description": "Not found" } }
+            }
+          },
+          "/governance/dashboard-summary": {
+            "get": {
+              "summary": "Get aggregated dashboard statistics",
+              "responses": { "200": { "description": "Dashboard summary" } }
+            }
+          },
+          "/governance/gates/{projectId}": {
+            "get": {
+              "summary": "Get quality gates for project",
+              "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Quality gates" } }
+            }
+          },
+          "/governance/gates": {
+            "post": {
+              "summary": "Create/update quality gates",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["project_id"],
+                      "properties": {
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "min_pass_rate": { "type": "number" },
+                        "max_critical_defects": { "type": "integer" },
+                        "min_test_coverage": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Gates saved" } }
+            }
+          },
+          "/governance/approvals": {
+            "post": {
+              "summary": "Submit release approval",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["project_id", "release_version", "status", "approver_name"],
+                      "properties": {
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "release_version": { "type": "string" },
+                        "status": { "type": "string" },
+                        "approver_name": { "type": "string" },
+                        "comments": { "type": "string" },
+                        "gate_snapshot": { "type": "object" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Approval submitted" } }
+            }
+          },
+          "/governance/approvals/{projectId}": {
+            "get": {
+              "summary": "Get approval history",
+              "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+              "responses": { "200": { "description": "Approval history" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Health Check API",
+      "description": "API health check endpoint",
+      "files": ["apps/api/src/index.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/health": {
+            "get": {
+              "summary": "Health check",
+              "responses": { "200": { "description": "API is healthy" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "TestSprite Webhook API",
+      "description": "TestSprite MCP integration webhook",
+      "files": ["apps/api/src/routes/testspriteWebhook.js", "apps/api/src/integrations/testsprite.js"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/testsprite/webhook": {
+            "post": {
+              "summary": "Receive TestSprite test results",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["project_id", "results"],
+                      "properties": {
+                        "project_id": { "type": "string", "format": "uuid" },
+                        "results": { "type": "object" },
+                        "metadata": { "type": "object" }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": { "200": { "description": "Results uploaded" } }
+            }
+          },
+          "/testsprite/status": {
+            "get": {
+              "summary": "TestSprite integration status",
+              "responses": { "200": { "description": "Integration status" } }
+            }
+          }
+        }
+      }
     }
   ]
 }

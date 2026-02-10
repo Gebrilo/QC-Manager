@@ -8,13 +8,16 @@ interface DonutChartProps {
 }
 
 export function DonutChart({ data, size = 160 }: DonutChartProps) {
-    const total = data.reduce((acc, item) => acc + item.value, 0);
+    const total = data.reduce((acc, item) => acc + Number(item.value), 0);
     // Use state for animation trigger
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Filter out zero-value segments for rendering
+    const nonZeroData = data.filter(item => item.value > 0);
 
     let cumulativeValue = 0;
     const center = size / 2;
@@ -36,10 +39,14 @@ export function DonutChart({ data, size = 160 }: DonutChartProps) {
                         className="text-slate-100 dark:text-slate-800"
                     />
                 ) : (
-                    data.map((item, index) => {
-                        const strokeDasharray = `${(item.value / total) * circumference} ${circumference}`;
+                    nonZeroData.map((item, index) => {
+                        const percentage = item.value / total;
+                        const strokeDasharray = `${percentage * circumference} ${circumference}`;
                         const strokeDashoffset = -(cumulativeValue / total) * circumference;
                         cumulativeValue += item.value;
+
+                        // Only use round linecap if segment is less than ~95% to avoid visual overlap
+                        const useRoundCap = percentage < 0.95;
 
                         return (
                             <circle
@@ -52,7 +59,7 @@ export function DonutChart({ data, size = 160 }: DonutChartProps) {
                                 strokeWidth={strokeWidth}
                                 strokeDasharray={strokeDasharray}
                                 strokeDashoffset={strokeDashoffset}
-                                strokeLinecap="round"
+                                strokeLinecap={useRoundCap ? 'round' : 'butt'}
                                 className={`transition-all duration-1000 ease-out ${mounted ? 'opacity-100' : 'opacity-0 stroke-dasharray-[0]'}`}
                                 style={{
                                     transitionDelay: `${index * 150}ms`,

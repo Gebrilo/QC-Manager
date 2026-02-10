@@ -41,7 +41,25 @@
       "Bash(copy \"D:\\\\Claude\\\\QC management tool\\\\qc-app\\\\QC_Database_Schema_Design.md\" \"D:\\\\Claude\\\\QC management tool\\\\organized_docs\\\\02_Architecture\\\\02_Database_Schema_Design.md\")",
       "Bash(copy \"D:\\\\Claude\\\\QC management tool\\\\qc-app\\\\QC_Backend_API_Design.md\" \"D:\\\\Claude\\\\QC management tool\\\\organized_docs\\\\02_Architecture\\\\04_Backend_API_Design.md\")",
       "Bash(cmd /c 'copy \"\"D:\\\\Claude\\\\QC management tool\\\\full_project_docs\\\\PRD.md\"\" \"\"D:\\\\Claude\\\\QC management tool\\\\organized_docs\\\\01_Requirements\\\\01_PRD.md\"\"')",
-      "Bash(cmd /c 'copy \"\"D:\\\\Claude\\\\QC management tool\\\\full_project_docs\\\\SRS_Master.md\"\" \"\"D:\\\\Claude\\\\QC management tool\\\\organized_docs\\\\01_Requirements\\\\02_SRS_Master.md\"\"')"
+      "Bash(cmd /c 'copy \"\"D:\\\\Claude\\\\QC management tool\\\\full_project_docs\\\\SRS_Master.md\"\" \"\"D:\\\\Claude\\\\QC management tool\\\\organized_docs\\\\01_Requirements\\\\02_SRS_Master.md\"\"')",
+      "Bash(docker network create:*)",
+      "Bash(cmd /c \"docker network create proxy\")",
+      "Bash(cmd /c \"docker info\")",
+      "Bash(cmd /c \"dir \"\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\"\"\")",
+      "Bash(cmd /c \"C:\\\\Windows\\\\System32\\\\where.exe /R \"\"C:\\\\Program Files\"\" docker.exe\")",
+      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" --version)",
+      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" network create proxy)",
+      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" compose up -d)",
+      "Bash(set \"PATH=%PATH%;C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\")",
+      "Bash(cmd /c \"dir \"\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\\"\"\")",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Docker/Docker/resources/bin\")",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:docs.tuleap.com)",
+      "WebFetch(domain:tuleap.telespazio.fr)"
     ]
   }
 }

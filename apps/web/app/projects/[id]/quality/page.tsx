@@ -9,24 +9,8 @@ import {
   QualityGateSettings,
   ReleaseControl
 } from '@/components/governance'; // We need to export TrendAnalysisWidget from index
-import { getProjectHealthSummary, getProjectReleaseReadiness } from '@/services/governanceApi';
-import { MOCK_PROJECTS } from '@/data/mockData';
+import { getProjectHealthSummary, getExecutionTrend } from '@/services/governanceApi';
 
-// Mock trend data generator - ideally this would come from API
-const generateMockTrendData = () => {
-  const data: { date: string; passRate: number; testsExecuted: number }[] = [];
-  const today = new Date();
-  for (let i = 14; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    data.push({
-      date: date.toISOString(),
-      passRate: 70 + Math.random() * 30, // Random between 70-100
-      testsExecuted: Math.floor(Math.random() * 50) + 10
-    });
-  }
-  return data;
-};
 
 export default function ProjectQualityDetailsPage() {
   const params = useParams();
@@ -35,33 +19,33 @@ export default function ProjectQualityDetailsPage() {
 
   // State for project data
   const [project, setProject] = useState<any | null>(null);
+  const [trendData, setTrendData] = useState<{ date: string; passRate: number; testsExecuted: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadProject() {
+    async function loadProjectData() {
       if (!projectId) return;
 
       try {
         setLoading(true);
-        // Use the API service which handles both real and mock data
-        // The service will look up by ID, and typically returns a ProjectHealth object
-        const data = await getProjectHealthSummary(projectId);
+        // Fetch project health and trend data in parallel
+        const [healthData, trendResult] = await Promise.all([
+          getProjectHealthSummary(projectId),
+          getExecutionTrend(projectId)
+        ]);
 
-        if (data) {
-          // Adapt ProjectHealth to the shape expected by the UI if needed
-          // The UI expects: name, status, description, etc.
-          // ProjectHealth has: project_name, project_status, etc.
-          // We map it here or ensure the UI uses the right fields.
-          // Let's create a compatible object.
+        if (healthData) {
           setProject({
-            ...data,
-            id: data.project_id,
-            name: data.project_name,
-            status: data.project_status,
-            description: `Project ${data.project_name} quality metrics and governance details.` // Mock description if missing from health object
+            ...healthData,
+            id: healthData.project_id,
+            name: healthData.project_name,
+            status: healthData.project_status,
+            description: `Project ${healthData.project_name} quality metrics and governance details.`
           });
         }
+
+        setTrendData(trendResult || []);
       } catch (err) {
         console.error("Failed to load project details:", err);
         setError("Failed to load project details");
@@ -70,7 +54,7 @@ export default function ProjectQualityDetailsPage() {
       }
     }
 
-    loadProject();
+    loadProjectData();
   }, [projectId]);
 
   if (!project && !loading) {
@@ -145,7 +129,7 @@ export default function ProjectQualityDetailsPage() {
             </div>
             {/* Trend Analysis */}
             <section>
-              <TrendAnalysisWidget data={generateMockTrendData()} title="Quality Trend (Last 14 Days)" />
+              <TrendAnalysisWidget data={trendData} title="Quality Trend (Last 14 Days)" />
             </section>
             {/* Detailed Metrics Table Placeholder */}
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">

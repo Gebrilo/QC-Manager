@@ -181,7 +181,7 @@ export default function UploadTestResultsPage() {
                 <option value="">-- Select a project --</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
-                    {project.name}
+                    {project.project_name}
                   </option>
                 ))}
               </select>

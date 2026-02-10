@@ -7,7 +7,8 @@ import {
     WorkloadBalanceWidget,
     RiskIndicatorsWidget,
     ReleaseReadinessWidget,
-    TrendAnalysisWidget
+    TrendAnalysisWidget,
+    TestExecutionSummaryWidget
 } from '../../src/components/governance';
 import { getDashboardSummary, getQualityRisks, getExecutionTrend } from '../../src/services/governanceApi';
 import type { DashboardSummary, QualityRisk, TrendData } from '../../src/types/governance';
@@ -63,6 +64,16 @@ export default function GovernanceDashboardPage() {
                                 Refresh Data
                             </button>
                             <button
+                                onClick={() => router.push('/settings')}
+                                className="px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Settings
+                            </button>
+                            <button
                                 onClick={() => router.push('/reports')}
                                 className="px-3 py-2 bg-indigo-600 rounded-md text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
                             >
@@ -74,6 +85,20 @@ export default function GovernanceDashboardPage() {
             </div>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+                {/* Test Execution Summary Section */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Test Execution Summary</h2>
+                        <button
+                            onClick={() => router.push('/reports?tab=executions')}
+                            className="text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                            View All Test Runs →
+                        </button>
+                    </div>
+                    <TestExecutionSummaryWidget />
+                </section>
 
                 {/* 1. Summary Cards Section */}
                 {summary && (

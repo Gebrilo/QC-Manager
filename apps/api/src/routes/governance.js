@@ -271,10 +271,42 @@ router.get('/workload-balance', async (req, res) => {
 
         const result = await pool.query(query, params);
 
+        // Transform data to ensure correct types and balance_status
+        const transformedData = result.rows.map(row => {
+            const totalTasks = parseInt(row.total_tasks, 10) || 0;
+            const totalTests = parseInt(row.total_tests, 10) || 0;
+
+            // Recalculate balance_status based on actual values
+            let balanceStatus = row.balance_status;
+            if (totalTasks === 0) {
+                balanceStatus = 'NO_TASKS';
+            } else if (totalTests === 0) {
+                balanceStatus = 'NO_TESTS';
+            } else {
+                const ratio = totalTests / totalTasks;
+                if (ratio >= 2) {
+                    balanceStatus = 'OVER_TESTED';
+                } else if (ratio >= 0.5) {
+                    balanceStatus = 'BALANCED';
+                } else {
+                    balanceStatus = 'UNDER_TESTED';
+                }
+            }
+
+            return {
+                project_id: row.project_id,
+                project_name: row.project_name,
+                total_tasks: totalTasks,
+                total_tests: totalTests,
+                tests_per_task_ratio: row.tests_per_task_ratio,
+                balance_status: balanceStatus
+            };
+        });
+
         res.json({
             success: true,
-            count: result.rows.length,
-            data: result.rows
+            count: transformedData.length,
+            data: transformedData
         });
     } catch (error) {
         console.error('Error fetching workload balance:', error);
@@ -565,12 +597,233 @@ router.get('/approvals/:projectId', async (req, res) => {
 });
 
 // =====================================================
-// Trend Analysis (Mock for now, as DB view implementation is complex)
+// GET /governance/execution-trend
+// Get daily pass rate trend for last 30 days
 // =====================================================
 router.get('/execution-trend', async (req, res) => {
-    // Return empty to trigger mock on frontend, or implement simple query if execution_history exists
-    // For now, let frontend handle mock if API returns 404 or empty
-    res.status(404).json({ success: false, message: 'Not implemented' });
+    try {
+        const { project_id } = req.query;
+
+        let query = `
+            WITH date_series AS (
+                SELECT generate_series(
+                    CURRENT_DATE - INTERVAL '29 days',
+                    CURRENT_DATE,
+                    INTERVAL '1 day'
+                )::DATE AS date
+            ),
+            daily_stats AS (
+                SELECT 
+                    DATE(tr.started_at) AS execution_date,
+                    ${project_id ? 'tr.project_id,' : ''}
+                    SUM(
+                        COALESCE((
+                            SELECT COUNT(*) FROM test_execution te 
+                            WHERE te.test_run_id = tr.id AND te.status = 'pass'
+                        ), 0)
+                    ) AS passed_count,
+                    SUM(
+                        COALESCE((
+                            SELECT COUNT(*) FROM test_execution te 
+                            WHERE te.test_run_id = tr.id
+                        ), 0)
+                    ) AS total_tests
+                FROM test_run tr
+                WHERE tr.deleted_at IS NULL
+                    AND tr.started_at >= CURRENT_DATE - INTERVAL '30 days'
+                    ${project_id ? 'AND tr.project_id = $1' : ''}
+                GROUP BY DATE(tr.started_at)${project_id ? ', tr.project_id' : ''}
+            )
+            SELECT 
+                ds.date,
+                COALESCE(
+                    CASE 
+                        WHEN dst.total_tests > 0 
+                        THEN ROUND((dst.passed_count::NUMERIC / dst.total_tests) * 100, 2)
+                        ELSE NULL
+                    END,
+                    NULL
+                ) AS pass_rate,
+                COALESCE(dst.total_tests, 0) AS total_tests,
+                COALESCE(dst.passed_count, 0) AS passed_count
+            FROM date_series ds
+            LEFT JOIN daily_stats dst ON ds.date = dst.execution_date
+            ORDER BY ds.date ASC
+        `;
+
+        const params = project_id ? [project_id] : [];
+        const result = await pool.query(query, params);
+
+        // Transform for frontend compatibility
+        const trendData = result.rows.map(row => ({
+            date: row.date,
+            passRate: row.pass_rate !== null ? parseFloat(row.pass_rate) : null,
+            totalTests: parseInt(row.total_tests, 10),
+            passedCount: parseInt(row.passed_count, 10)
+        }));
+
+        res.json({
+            success: true,
+            count: trendData.length,
+            data: trendData
+        });
+    } catch (error) {
+        console.error('Error fetching execution trend:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch execution trend',
+            message: error.message
+        });
+    }
+});
+
+// =====================================================
+// GET /governance/global-settings
+// Get global quality gate settings
+// =====================================================
+router.get('/global-settings', async (req, res) => {
+    try {
+        // Ensure table exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS governance_settings (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                min_pass_rate_green NUMERIC(5,2) DEFAULT 95.0,
+                max_not_run_green NUMERIC(5,2) DEFAULT 5.0,
+                max_days_stale_green INTEGER DEFAULT 3,
+                max_failing_tests_green INTEGER DEFAULT 0,
+                min_pass_rate_amber NUMERIC(5,2) DEFAULT 80.0,
+                max_not_run_amber NUMERIC(5,2) DEFAULT 15.0,
+                max_days_stale_amber INTEGER DEFAULT 7,
+                low_pass_rate_trigger NUMERIC(5,2) DEFAULT 80.0,
+                high_not_run_trigger NUMERIC(5,2) DEFAULT 20.0,
+                stale_tests_trigger INTEGER DEFAULT 14,
+                high_failure_count_trigger INTEGER DEFAULT 10,
+                declining_trend_trigger NUMERIC(5,2) DEFAULT 10.0,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT single_row CHECK (id = 1)
+            )
+        `);
+
+        const result = await pool.query(
+            'SELECT * FROM governance_settings WHERE id = 1'
+        );
+
+        if (result.rows.length === 0) {
+            // Return defaults
+            return res.json({
+                success: true,
+                data: {
+                    min_pass_rate_green: 95.0,
+                    max_not_run_green: 5.0,
+                    max_days_stale_green: 3,
+                    max_failing_tests_green: 0,
+                    min_pass_rate_amber: 80.0,
+                    max_not_run_amber: 15.0,
+                    max_days_stale_amber: 7,
+                    low_pass_rate_trigger: 80.0,
+                    high_not_run_trigger: 20.0,
+                    stale_tests_trigger: 14,
+                    high_failure_count_trigger: 10,
+                    declining_trend_trigger: 10.0,
+                    is_default: true
+                }
+            });
+        }
+
+        res.json({
+            success: true,
+            data: { ...result.rows[0], is_default: false }
+        });
+    } catch (error) {
+        console.error('Error fetching global settings:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch settings' });
+    }
+});
+
+// =====================================================
+// POST /governance/global-settings
+// Save global quality gate settings
+// =====================================================
+router.post('/global-settings', async (req, res) => {
+    try {
+        const settings = req.body;
+
+        // Create table if not exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS governance_settings (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                min_pass_rate_green NUMERIC(5,2) DEFAULT 95.0,
+                max_not_run_green NUMERIC(5,2) DEFAULT 5.0,
+                max_days_stale_green INTEGER DEFAULT 3,
+                max_failing_tests_green INTEGER DEFAULT 0,
+                min_pass_rate_amber NUMERIC(5,2) DEFAULT 80.0,
+                max_not_run_amber NUMERIC(5,2) DEFAULT 15.0,
+                max_days_stale_amber INTEGER DEFAULT 7,
+                low_pass_rate_trigger NUMERIC(5,2) DEFAULT 80.0,
+                high_not_run_trigger NUMERIC(5,2) DEFAULT 20.0,
+                stale_tests_trigger INTEGER DEFAULT 14,
+                high_failure_count_trigger INTEGER DEFAULT 10,
+                declining_trend_trigger NUMERIC(5,2) DEFAULT 10.0,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT single_row CHECK (id = 1)
+            )
+        `);
+
+        const result = await pool.query(`
+            INSERT INTO governance_settings (
+                id,
+                min_pass_rate_green,
+                max_not_run_green,
+                max_days_stale_green,
+                max_failing_tests_green,
+                min_pass_rate_amber,
+                max_not_run_amber,
+                max_days_stale_amber,
+                low_pass_rate_trigger,
+                high_not_run_trigger,
+                stale_tests_trigger,
+                high_failure_count_trigger,
+                declining_trend_trigger,
+                updated_at
+            ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                min_pass_rate_green = EXCLUDED.min_pass_rate_green,
+                max_not_run_green = EXCLUDED.max_not_run_green,
+                max_days_stale_green = EXCLUDED.max_days_stale_green,
+                max_failing_tests_green = EXCLUDED.max_failing_tests_green,
+                min_pass_rate_amber = EXCLUDED.min_pass_rate_amber,
+                max_not_run_amber = EXCLUDED.max_not_run_amber,
+                max_days_stale_amber = EXCLUDED.max_days_stale_amber,
+                low_pass_rate_trigger = EXCLUDED.low_pass_rate_trigger,
+                high_not_run_trigger = EXCLUDED.high_not_run_trigger,
+                stale_tests_trigger = EXCLUDED.stale_tests_trigger,
+                high_failure_count_trigger = EXCLUDED.high_failure_count_trigger,
+                declining_trend_trigger = EXCLUDED.declining_trend_trigger,
+                updated_at = NOW()
+            RETURNING *
+        `, [
+            settings.min_pass_rate_green,
+            settings.max_not_run_green,
+            settings.max_days_stale_green,
+            settings.max_failing_tests_green,
+            settings.min_pass_rate_amber,
+            settings.max_not_run_amber,
+            settings.max_days_stale_amber,
+            settings.low_pass_rate_trigger,
+            settings.high_not_run_trigger,
+            settings.stale_tests_trigger,
+            settings.high_failure_count_trigger,
+            settings.declining_trend_trigger
+        ]);
+
+        res.json({
+            success: true,
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error saving global settings:', error);
+        res.status(500).json({ success: false, error: 'Failed to save settings' });
+    }
 });
 
 module.exports = router;

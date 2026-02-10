@@ -98,9 +98,10 @@ router.post('/', async (req, res, next) => {
                 estimate_days,
                 r1_estimate_hrs, r1_actual_hrs,
                 r2_estimate_hrs, r2_actual_hrs,
-                deadline, tags, notes, completed_date
+                deadline, tags, notes, completed_date,
+                expected_start_date, actual_start_date
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
             ) RETURNING *
         `;
 
@@ -110,7 +111,8 @@ router.post('/', async (req, res, next) => {
             data.estimate_days,
             data.r1_estimate_hrs, data.r1_actual_hrs,
             data.r2_estimate_hrs, data.r2_actual_hrs,
-            data.deadline, data.tags, notes, data.completed_date
+            data.deadline, data.tags, notes, data.completed_date,
+            data.expected_start_date || null, data.actual_start_date || null
         ];
 
         const result = await db.query(query, values);
@@ -140,8 +142,8 @@ router.patch('/:id', async (req, res, next) => {
         // Validate status transition if status is being changed
         if (data.status && data.status !== original.status) {
             const validation = validateStatusTransition(
-                original.status, 
-                data.status, 
+                original.status,
+                data.status,
                 {
                     completed_date: data.completed_date || original.completed_date,
                     r1_actual_hrs: data.r1_actual_hrs !== undefined ? data.r1_actual_hrs : original.r1_actual_hrs,
@@ -150,9 +152,9 @@ router.patch('/:id', async (req, res, next) => {
             );
 
             if (!validation.valid) {
-                return res.status(400).json({ 
-                    error: 'Invalid status transition', 
-                    message: validation.error 
+                return res.status(400).json({
+                    error: 'Invalid status transition',
+                    message: validation.error
                 });
             }
         }
@@ -177,7 +179,9 @@ router.patch('/:id', async (req, res, next) => {
             deadline: 'deadline',
             tags: 'tags',
             notes: 'notes',
-            completed_date: 'completed_date'
+            completed_date: 'completed_date',
+            expected_start_date: 'expected_start_date',
+            actual_start_date: 'actual_start_date'
         };
 
         for (const [key, value] of Object.entries(data)) {
@@ -244,15 +248,88 @@ router.delete('/:id', async (req, res, next) => {
 
         // Audit log
         await auditLog('tasks', id, 'DELETE', deleted, original);
-        
+
         // Trigger n8n workflow
         triggerWorkflow('task-deleted', deleted);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: `Task '${deleted.task_name}' has been deleted`,
             data: deleted
         });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// =====================================================
+// TASK COMMENTS ENDPOINTS
+// =====================================================
+
+// GET comments for a task
+router.get('/:id/comments', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.query(
+            `SELECT * FROM task_comments 
+             WHERE task_id = $1 
+             ORDER BY created_at DESC`,
+            [id]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST add comment to task
+router.post('/:id/comments', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { comment } = req.body;
+
+        if (!comment || comment.trim().length === 0) {
+            return res.status(400).json({ error: 'Comment cannot be empty' });
+        }
+
+        // Verify task exists
+        const taskCheck = await db.query('SELECT id FROM tasks WHERE id = $1', [id]);
+        if (taskCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const result = await db.query(
+            `INSERT INTO task_comments (task_id, comment, created_by)
+             VALUES ($1, $2, $3)
+             RETURNING *`,
+            [id, comment.trim(), req.user?.email || 'system']
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE a comment
+router.delete('/:taskId/comments/:commentId', async (req, res, next) => {
+    try {
+        const { taskId, commentId } = req.params;
+
+        const result = await db.query(
+            `DELETE FROM task_comments 
+             WHERE id = $1 AND task_id = $2
+             RETURNING *`,
+            [commentId, taskId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        res.json({ success: true, message: 'Comment deleted' });
     } catch (err) {
         next(err);
     }

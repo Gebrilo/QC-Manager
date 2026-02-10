@@ -18,6 +18,15 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        // Handle Zod validation errors with details
+        if (errorData.details && Array.isArray(errorData.details)) {
+            const validationMessages = errorData.details.map((d: any) =>
+                `${d.path?.join('.') || 'Field'}: ${d.message}`
+            ).join(', ');
+            throw new Error(`${errorData.error || 'Validation Error'}: ${validationMessages}`);
+        }
+
         throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
     }
 
@@ -81,6 +90,8 @@ export interface Task {
     total_actual_hrs?: number;
     overall_completion_pct?: number;
     deadline?: string;
+    expected_start_date?: string;
+    actual_start_date?: string;
     completed_date?: string;
     tags?: string[];
     notes?: string;
@@ -103,6 +114,15 @@ export interface Resource {
     backlog_tasks_count?: number;
     created_at?: string;
     updated_at?: string;
+}
+
+export interface TaskComment {
+    id: string;
+    task_id: string;
+    comment: string;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface DashboardMetrics {
@@ -144,21 +164,21 @@ export interface ReportJob {
 
 export const projectsApi = {
     list: () => fetchApi<Project[]>('/projects'),
-    
+
     get: (id: string) => fetchApi<Project>(`/projects/${id}`),
-    
-    create: (data: Partial<Project>) => 
+
+    create: (data: Partial<Project>) =>
         fetchApi<Project>('/projects', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    
+
     update: (id: string, data: Partial<Project>) =>
         fetchApi<Project>(`/projects/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
-    
+
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string }>(`/projects/${id}`, {
             method: 'DELETE',
@@ -171,23 +191,43 @@ export const projectsApi = {
 
 export const tasksApi = {
     list: () => fetchApi<Task[]>('/tasks'),
-    
+
     get: (id: string) => fetchApi<Task>(`/tasks/${id}`),
-    
-    create: (data: Partial<Task>) => 
+
+    create: (data: Partial<Task>) =>
         fetchApi<Task>('/tasks', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    
+
     update: (id: string, data: Partial<Task>) =>
         fetchApi<Task>(`/tasks/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
-    
+
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string }>(`/tasks/${id}`, {
+            method: 'DELETE',
+        }),
+};
+
+// ============================================================================
+// API Client - Task Comments
+// ============================================================================
+
+export const taskCommentsApi = {
+    list: (taskId: string) =>
+        fetchApi<TaskComment[]>(`/tasks/${taskId}/comments`),
+
+    create: (taskId: string, comment: string) =>
+        fetchApi<TaskComment>(`/tasks/${taskId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ comment }),
+        }),
+
+    delete: (taskId: string, commentId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/comments/${commentId}`, {
             method: 'DELETE',
         }),
 };
@@ -198,21 +238,21 @@ export const tasksApi = {
 
 export const resourcesApi = {
     list: () => fetchApi<Resource[]>('/resources'),
-    
+
     get: (id: string) => fetchApi<Resource>(`/resources/${id}`),
-    
-    create: (data: Partial<Resource>) => 
+
+    create: (data: Partial<Resource>) =>
         fetchApi<Resource>('/resources', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    
+
     update: (id: string, data: Partial<Resource>) =>
         fetchApi<Resource>(`/resources/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
-    
+
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string }>(`/resources/${id}`, {
             method: 'DELETE',
@@ -258,10 +298,10 @@ export const reportsApi = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    
+
     getStatus: (jobId: string) =>
         fetchApi<{ success: boolean; data: ReportJob }>(`/reports/${jobId}`),
-    
+
     list: (params?: { user_email?: string; status?: string; limit?: number; offset?: number }) => {
         const query = new URLSearchParams(params as any).toString();
         return fetchApi<{ success: boolean; data: ReportJob[] }>(`/reports${query ? `?${query}` : ''}`);
@@ -289,21 +329,21 @@ export const testCasesApi = {
         const query = new URLSearchParams(params as any).toString();
         return fetchApi(`/test-cases${query ? `?${query}` : ''}`);
     },
-    
+
     get: (id: string) => fetchApi(`/test-cases/${id}`),
-    
-    create: (data: any) => 
+
+    create: (data: any) =>
         fetchApi('/test-cases', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    
+
     update: (id: string, data: any) =>
         fetchApi(`/test-cases/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
-    
+
     delete: (id: string) =>
         fetchApi(`/test-cases/${id}`, { method: 'DELETE' }),
 };

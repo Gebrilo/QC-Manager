@@ -120,11 +120,11 @@ export function FilterBar() {
     const activeViewName = savedViews.find(v => v.id === activeViewId)?.name || 'Custom';
 
     return (
-        <div className="flex flex-col gap-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col gap-3 mb-4 animate-in fade-in slide-in-from-top-4 duration-500">
             {/* Main Bar */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all duration-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 transition-all duration-300">
                 {/* Left: Views & Search */}
-                <div className="flex items-center gap-4 w-full sm:w-auto flex-1">
+                <div className="flex items-center gap-3 flex-1">
                     {/* View Selector */}
                     <div className="relative shrink-0">
                         <button
@@ -176,10 +176,10 @@ export function FilterBar() {
                         )}
                     </div>
 
-                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+                    <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
 
                     {/* Search */}
-                    <div className="relative flex-1 max-w-md">
+                    <div className="relative flex-1 min-w-0">
                         <input
                             id="task-search-input"
                             type="text"
@@ -195,7 +195,7 @@ export function FilterBar() {
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <div className="flex items-center gap-2 shrink-0">
                     {/* Add Filter Button */}
                     <div className="relative">
                         <button

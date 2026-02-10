@@ -43,12 +43,12 @@ router.post('/', async (req, res, next) => {
 
         const result = await db.query(
             `INSERT INTO projects (
-                project_id, project_name, total_weight, priority, start_date, target_date
-            ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+                project_id, project_name, description, total_weight, priority, start_date, target_date
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [
                 data.project_id,
-                data.name, // Schema maps this to project_name
-                // data.description, // Not in DB
+                data.name,
+                data.description || null,
                 data.total_weight,
                 data.priority,
                 data.start_date,
@@ -82,11 +82,11 @@ router.patch('/:id', async (req, res, next) => {
         // Map client fields to DB fields
         const dbFields = {};
         if (validatedData.name) dbFields.project_name = validatedData.name;
+        if (validatedData.description !== undefined) dbFields.description = validatedData.description;
         if (validatedData.total_weight) dbFields.total_weight = validatedData.total_weight;
         if (validatedData.priority) dbFields.priority = validatedData.priority;
         if (validatedData.start_date) dbFields.start_date = validatedData.start_date;
         if (validatedData.target_date) dbFields.target_date = validatedData.target_date;
-        // description is ignored
 
         const keys = Object.keys(dbFields);
         if (keys.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
@@ -135,6 +135,20 @@ router.delete('/:id', async (req, res, next) => {
             return res.status(400).json({ error: 'Project already deleted' });
         }
 
+        // Check if project has any tasks assigned
+        const tasksResult = await db.query(
+            'SELECT COUNT(*) as count FROM tasks WHERE project_id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+        const taskCount = parseInt(tasksResult.rows[0].count, 10);
+
+        if (taskCount > 0) {
+            return res.status(400).json({
+                error: `Cannot delete project. ${taskCount} task(s) are still assigned to this project. Please delete or reassign tasks first.`,
+                taskCount: taskCount
+            });
+        }
+
         // Soft delete: set deleted_at
         const result = await db.query(
             `UPDATE projects 
@@ -149,12 +163,12 @@ router.delete('/:id', async (req, res, next) => {
 
         // Audit log
         await auditLog('projects', id, 'DELETE', deleted, original);
-        
+
         // Trigger n8n workflow
         triggerWorkflow('project-deleted', deleted);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: `Project '${deleted.project_name}' has been deleted`,
             data: deleted
         });

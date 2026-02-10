@@ -14,6 +14,8 @@ const baseTaskSchema = z.object({
 
     estimate_days: z.number().positive().optional(),
     deadline: z.string().date().optional(),
+    expected_start_date: z.string().date().optional(),
+    actual_start_date: z.string().date().optional(),
 
     // Hours (usually 0 on create, but allow setting)
     r1_estimate_hrs: z.number().min(0).default(0),

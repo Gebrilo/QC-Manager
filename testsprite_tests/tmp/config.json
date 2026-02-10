@@ -1,17 +1,16 @@
 {
   "status": "commited",
-  "type": "backend",
+  "type": "frontend",
   "scope": "codebase",
-  "localEndpoint": "http://localhost:3001",
-  "backendAuthType": "public",
+  "localEndpoint": "http://localhost:3000",
   "executionArgs": {
-    "projectName": "QC-Manager",
+    "projectName": "QC management tool",
     "projectPath": "D:\\Claude\\QC management tool",
     "testIds": [],
-    "additionalInstruction": "Run tests against the deployed VPS API at http://72.61.157.168. The API endpoints are accessible at http://72.61.157.168/api/health, http://72.61.157.168/api/dashboard, etc. since the reverse proxy routes to the backend.",
+    "additionalInstruction": "Focus on testing frontend pages: dashboard, projects, tasks, resources, test-cases, test-results, governance, reports. Test page rendering, navigation, and basic functionality.",
     "envs": {
       "API_KEY": "sk-user-7azIwWORjnhpFnIrxd7z04nBAVU_BPottX8UTi0lF_awoB5coGMCVlDLLJWZ2OmUMuBklyJzb2484mvvb-1n8wZSAx8Q4aTepdhFw0JdzpqISxGfpBpjd5qRaJSDREquC2E"
     }
   },
-  "proxy": "http://d0b6820e-c3dd-4d0f-93c0-5074ec32228b:V1ARUtNnxj8p4w86KrGHVwXB63GhWn1F@tun.testsprite.com:8080"
+  "proxy": "http://104ea686-f3d7-4908-aec4-53414fa9e780:Mh3w7sqHl6L9teeqjVNguLciQZZKdyVb@tun.testsprite.com:8080"
 }

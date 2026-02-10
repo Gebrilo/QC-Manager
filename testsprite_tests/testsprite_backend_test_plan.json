@@ -1,52 +1,52 @@
 [
   {
     "id": "TC001",
-    "title": "verify health check endpoint",
-    "description": "Test the /api/health GET endpoint to ensure it returns a successful response indicating the service is running."
+    "title": "verify_jwt_authentication_enforcement",
+    "description": "Test that all API endpoints enforce JWT-based authentication and reject unauthorized requests with appropriate error messages."
   },
   {
     "id": "TC002",
-    "title": "validate dashboard metrics retrieval",
-    "description": "Test the /api/dashboard GET endpoint to verify it returns accurate and timely aggregated metrics from the v_dashboard_metrics view within 3 seconds."
+    "title": "validate_project_creation_and_update",
+    "description": "Test project creation and update endpoints to ensure input data is validated against required formats and status transition rules, rejecting invalid data with clear error messages."
   },
   {
     "id": "TC003",
-    "title": "test project creation and listing",
-    "description": "Test the /api/projects POST and GET endpoints to ensure projects can be created with valid data and listed correctly, enforcing input validation and audit logging."
+    "title": "validate_task_creation_and_status_transitions",
+    "description": "Test task creation and update endpoints to verify detailed tracking, status transitions, and resource assignments are correctly handled and validated."
   },
   {
     "id": "TC004",
-    "title": "test project update and soft deletion",
-    "description": "Test the /api/projects/:id PATCH and DELETE endpoints to verify projects can be updated with valid status transitions and soft-deleted, with audit logs capturing before and after states."
+    "title": "test_resource_allocation_and_utilization_warnings",
+    "description": "Test resource creation and update endpoints to ensure utilization metrics are monitored, warnings are triggered when allocation exceeds 80%, and task creation is prevented above 100% without override."
   },
   {
     "id": "TC005",
-    "title": "test task creation and listing",
-    "description": "Test the /api/tasks POST and GET endpoints to ensure tasks can be created with proper resource allocation checks and listed with accurate status and assignment details."
+    "title": "verify_quality_gates_configuration_and_evaluation",
+    "description": "Test quality gates configuration endpoints to ensure gates are correctly created, updated, and evaluated against configured thresholds, triggering appropriate approval workflows."
   },
   {
     "id": "TC006",
-    "title": "test task update and soft deletion",
-    "description": "Test the /api/tasks/:id PATCH and DELETE endpoints to verify tasks can be updated with valid status transitions and soft-deleted, enforcing resource utilization limits and audit logging."
+    "title": "test_release_approval_submission_and_audit_logging",
+    "description": "Test release approval submission endpoint to verify approvals and rejections are recorded with compulsory comments and complete audit trails."
   },
   {
     "id": "TC007",
-    "title": "test resource creation and listing",
-    "description": "Test the /api/resources POST and GET endpoints to ensure resources can be created with utilization metrics and listed correctly, supporting capacity monitoring."
+    "title": "validate_audit_logging_for_crud_operations",
+    "description": "Test that all CRUD operations on projects, tasks, and resources capture complete before and after states in audit logs."
   },
   {
     "id": "TC008",
-    "title": "test resource update and soft deletion",
-    "description": "Test the /api/resources/:id PATCH and DELETE endpoints to verify resources can be updated and soft-deleted, with audit logs capturing changes and utilization updates."
+    "title": "test_dashboard_metrics_loading_and_accuracy",
+    "description": "Test dashboard metrics endpoint to ensure data loads within 3 seconds under typical loads and reflects accurate aggregated data from database views."
   },
   {
     "id": "TC009",
-    "title": "validate governance release readiness retrieval",
-    "description": "Test the /api/governance/release-readiness GET endpoint to ensure it returns accurate release readiness status for all projects based on quality gates."
+    "title": "test_report_generation_and_polling_endpoints",
+    "description": "Test report generation endpoints to verify asynchronous report creation, polling for completion, and download URL retrieval for multiple formats."
   },
   {
     "id": "TC010",
-    "title": "test quality gates configuration management",
-    "description": "Test the /api/governance/gates/:projectId GET and /api/governance/gates POST endpoints to verify quality gates can be retrieved, created, and updated with correct validation and audit logging."
+    "title": "verify_deployment_guides_for_docker_and_hostinger",
+    "description": "Test deployment procedures using Docker Compose and Hostinger VPS instructions to ensure reproducible local and production deployments."
   }
 ]
