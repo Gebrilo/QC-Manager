@@ -44,7 +44,7 @@ services:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=qc-postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}
+      - DB_POSTGRESDB_DATABASE=${N8N_POSTGRES_DB:-n8n_db}
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
       - VIRTUAL_HOST=n8n.gerbil.qc
