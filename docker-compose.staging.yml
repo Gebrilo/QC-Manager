@@ -1,34 +1,14 @@
 # =============================================================================
-# QC Management Tool - Production Docker Compose
+# QC Management Tool - Staging Docker Compose
 # =============================================================================
 #
-# Architecture:
-#   Traefik (external) -> web (3000), api (3001)
-#   api -> postgres (app database)
-#   api -> n8n (external, via qc-shared-network)
+# Usage:
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
 #
 # Prerequisites:
 #   1. docker network create qc-shared-network
 #   2. External Traefik connected to qc-shared-network
-#   3. External n8n connected to qc-shared-network
-#   4. Copy .env.production.example to .env and configure all values
-#   5. Ensure API and Web images are built and pushed to Docker Hub
-#
-# Common Operations:
-#   Start:            docker compose -f docker-compose.prod.yml up -d
-#   Stop:             docker compose -f docker-compose.prod.yml down
-#   View logs:        docker compose -f docker-compose.prod.yml logs -f [service]
-#   Restart service:  docker compose -f docker-compose.prod.yml restart <service>
-#   Rebuild after pull:
-#     git pull origin main
-#     docker compose -f docker-compose.prod.yml pull
-#     docker compose -f docker-compose.prod.yml up -d --force-recreate
-#     docker image prune -f
-#
-# Wipe app database (destructive!):
-#     docker compose -f docker-compose.prod.yml down
-#     docker volume rm qc_postgres_data
-#     docker compose -f docker-compose.prod.yml up -d
+#   3. Copy .env.staging.example to .env.staging and configure
 # =============================================================================
 
 services:
@@ -38,7 +18,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: qc-postgres
+    container_name: qc-staging-postgres
     restart: unless-stopped
     shm_size: '256mb'
     environment:
@@ -46,10 +26,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - qc_postgres_data:/var/lib/postgresql/data
+      - qc_postgres_data_staging:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d:ro
     networks:
-      - qc-internal
+      - qc-staging-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 30s
@@ -63,28 +43,28 @@ services:
 
   api:
     image: ${DOCKER_HUB_USERNAME}/qc-api:latest
-    container_name: qc-api
+    container_name: qc-staging-api
     restart: unless-stopped
     environment:
       - PORT=3001
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@qc-postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@qc-staging-postgres:5432/${POSTGRES_DB}
       - JWT_SECRET=${JWT_SECRET}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
       - CORS_ORIGIN=${CORS_ORIGIN}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qc-api.rule=Host(`${API_DOMAIN}`)"
-      - "traefik.http.routers.qc-api.entrypoints=websecure"
-      - "traefik.http.routers.qc-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.qc-api.loadbalancer.server.port=3001"
-      - "traefik.http.routers.qc-api-http.rule=Host(`${API_DOMAIN}`)"
-      - "traefik.http.routers.qc-api-http.entrypoints=web"
-      - "traefik.http.routers.qc-api-http.middlewares=https-redirect"
+      - "traefik.http.routers.qc-staging-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.qc-staging-api.entrypoints=websecure"
+      - "traefik.http.routers.qc-staging-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.qc-staging-api.loadbalancer.server.port=3001"
+      - "traefik.http.routers.qc-staging-api-http.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.qc-staging-api-http.entrypoints=web"
+      - "traefik.http.routers.qc-staging-api-http.middlewares=https-redirect"
       - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
     networks:
       - qc-shared-network
-      - qc-internal
+      - qc-staging-internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,19 +77,19 @@ services:
 
   web:
     image: ${DOCKER_HUB_USERNAME}/qc-web:latest
-    container_name: qc-web
+    container_name: qc-staging-web
     restart: unless-stopped
     environment:
       - NODE_ENV=production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qc-web.rule=Host(`${WEB_DOMAIN}`)"
-      - "traefik.http.routers.qc-web.entrypoints=websecure"
-      - "traefik.http.routers.qc-web.tls.certresolver=letsencrypt"
-      - "traefik.http.services.qc-web.loadbalancer.server.port=3000"
-      - "traefik.http.routers.qc-web-http.rule=Host(`${WEB_DOMAIN}`)"
-      - "traefik.http.routers.qc-web-http.entrypoints=web"
-      - "traefik.http.routers.qc-web-http.middlewares=https-redirect"
+      - "traefik.http.routers.qc-staging-web.rule=Host(`${WEB_DOMAIN}`)"
+      - "traefik.http.routers.qc-staging-web.entrypoints=websecure"
+      - "traefik.http.routers.qc-staging-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.qc-staging-web.loadbalancer.server.port=3000"
+      - "traefik.http.routers.qc-staging-web-http.rule=Host(`${WEB_DOMAIN}`)"
+      - "traefik.http.routers.qc-staging-web-http.entrypoints=web"
+      - "traefik.http.routers.qc-staging-web-http.middlewares=https-redirect"
     networks:
       - qc-shared-network
     depends_on:
@@ -127,31 +107,31 @@ services:
 
   backup:
     image: postgres:15-alpine
-    container_name: qc-backup
+    container_name: qc-staging-backup
     restart: unless-stopped
     environment:
-      POSTGRES_HOST: qc-postgres
+      POSTGRES_HOST: qc-staging-postgres
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       PGPASSWORD: ${POSTGRES_PASSWORD}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-3}
     volumes:
       - ./backup/backup.sh:/backup.sh:ro
-      - ${BACKUP_PATH:-./backups}:/backups
+      - ${BACKUP_PATH:-./backups-staging}:/backups
     networks:
-      - qc-internal
+      - qc-staging-internal
     depends_on:
       postgres:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "Backup scheduler started. Running nightly at 2:00 AM."
+        echo "Staging backup scheduler started. Running nightly at 3:00 AM."
         while true; do
           CURRENT_HOUR=$$(date +%H)
           CURRENT_MIN=$$(date +%M)
-          if [ "$$CURRENT_HOUR" = "02" ] && [ "$$CURRENT_MIN" = "00" ]; then
+          if [ "$$CURRENT_HOUR" = "03" ] && [ "$$CURRENT_MIN" = "00" ]; then
             /bin/sh /backup.sh
           fi
           sleep 60
@@ -166,8 +146,8 @@ services:
 # VOLUMES
 # =============================================================================
 volumes:
-  qc_postgres_data:
-    name: qc_postgres_data
+  qc_postgres_data_staging:
+    name: qc_postgres_data_staging
 
 # =============================================================================
 # NETWORKS
@@ -175,6 +155,6 @@ volumes:
 networks:
   qc-shared-network:
     external: true
-  qc-internal:
+  qc-staging-internal:
     driver: bridge
     internal: true

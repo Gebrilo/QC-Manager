@@ -15,7 +15,12 @@ const PORT = process.env.PORT || 3001;
 runMigrations().catch(err => console.error('Migration failed:', err));
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+}));
 app.use(express.json());
 
 // Create API router for all routes (supports both / and /api prefixes)
