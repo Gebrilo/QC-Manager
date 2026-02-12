@@ -1,85 +1,112 @@
-# QC Management Tool - Production Compose
-# Uses external 'proxy' network for reverse proxy routing
+# =============================================================================
+# QC Management Tool - Production Docker Compose
+# =============================================================================
+#
+# Architecture:
+#   nginx (port 80, 5678) -> web (3000), api (3001), n8n (5678)
+#   api -> postgres (app database)
+#   n8n -> n8n-postgres (isolated n8n database)
 #
 # Prerequisites:
-#   docker network create proxy
-#   Start reverse-proxy stack first
+#   1. Copy .env.production.example to .env and configure all values
+#   2. Ensure API and Web images are built and pushed to Docker Hub
 #
-# Usage:
-#   docker compose -f docker-compose.prod.yml up -d
+# Common Operations:
+#   Start:            docker compose -f docker-compose.prod.yml up -d
+#   Stop:             docker compose -f docker-compose.prod.yml down
+#   View logs:        docker compose -f docker-compose.prod.yml logs -f [service]
+#   Restart service:  docker compose -f docker-compose.prod.yml restart <service>
+#   Rebuild after pull:
+#     git pull origin main
+#     docker compose -f docker-compose.prod.yml pull
+#     docker compose -f docker-compose.prod.yml up -d --force-recreate
+#     docker image prune -f
+#
+# Wipe ALL data (destructive!):
+#     docker compose -f docker-compose.prod.yml down -v
+#     (this removes all database volumes and n8n data)
+#
+# Wipe only app database:
+#     docker compose -f docker-compose.prod.yml down
+#     docker volume rm qc-management-tool_qc_postgres_data
+#     docker compose -f docker-compose.prod.yml up -d
+#
+# Wipe only n8n database:
+#     docker compose -f docker-compose.prod.yml down
+#     docker volume rm qc-management-tool_n8n_postgres_data
+#     docker compose -f docker-compose.prod.yml up -d
+#
+# Full rebuild from scratch:
+#     docker compose -f docker-compose.prod.yml down -v --rmi all
+#     docker compose -f docker-compose.prod.yml pull
+#     docker compose -f docker-compose.prod.yml up -d
+# =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # DATABASES
+  # ---------------------------------------------------------------------------
+
+  # Main application database (used by api service)
   postgres:
-    image: postgres:17
+    image: postgres:15-alpine
     container_name: qc-postgres
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Wind@123}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
+      - qc_postgres_data:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
 
-  n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
-    container_name: qc-n8n
-    restart: always
+  # Dedicated n8n database (completely isolated from the app database)
+  n8n-postgres:
+    image: postgres:15-alpine
+    container_name: qc-n8n-postgres
+    restart: unless-stopped
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
-      - N8N_HOST=n8n.gerbil.qc
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://n8n.gerbil.qc
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=qc-postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${N8N_POSTGRES_DB:-n8n_db}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-Wind@123}
-      - VIRTUAL_HOST=n8n.gerbil.qc
-      - VIRTUAL_PORT=5678
+      POSTGRES_USER: ${N8N_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${N8N_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${N8N_POSTGRES_DB}
     volumes:
-      - n8n_data:/home/node/.n8n
+      - n8n_postgres_data:/var/lib/postgresql/data
     networks:
-      - proxy
       - internal
-    depends_on:
-      postgres:
-        condition: service_healthy
-    expose:
-      - "5678"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION SERVICES
+  # ---------------------------------------------------------------------------
 
   api:
-    image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-api:latest
+    image: ${DOCKER_HUB_USERNAME}/qc-api:latest
     container_name: qc-api
-    restart: always
+    restart: unless-stopped
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-Wind@123}@qc-postgres:5432/${POSTGRES_DB:-postgres}
-      - JWT_SECRET=${JWT_SECRET:-defaultsecret}
-      - N8N_WEBHOOK_URL=http://qc-n8n:5678/webhook
       - NODE_ENV=production
-      - VIRTUAL_HOST=api.gerbil.qc
-      - VIRTUAL_PORT=3001
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@qc-postgres:5432/${POSTGRES_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - N8N_WEBHOOK_URL=http://qc-n8n:5678/webhook
     networks:
-      - proxy
+      - backend
       - internal
     depends_on:
       postgres:
         condition: service_healthy
-    expose:
-      - "3001"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
@@ -88,25 +115,83 @@ services:
       start_period: 30s
 
   web:
-    image: ${DOCKER_HUB_USERNAME:?DOCKER_HUB_USERNAME is required}/qc-web:latest
+    image: ${DOCKER_HUB_USERNAME}/qc-web:latest
     container_name: qc-web
-    restart: always
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - VIRTUAL_HOST=app.gerbil.qc,gerbil.qc
-      - VIRTUAL_PORT=3000
     networks:
-      - proxy
+      - backend
     depends_on:
       - api
-    expose:
-      - "3000"
-volumes:
-  postgres_data:
-  n8n_data:
 
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: qc-n8n
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=qc-n8n-postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${N8N_POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${N8N_POSTGRES_PASSWORD}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - backend
+      - internal
+    depends_on:
+      n8n-postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # REVERSE PROXY
+  # ---------------------------------------------------------------------------
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: qc-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5678:5678"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - backend
+    depends_on:
+      - web
+      - api
+      - n8n
+
+# =============================================================================
+# VOLUMES - persistent named volumes for all stateful data
+# =============================================================================
+volumes:
+  qc_postgres_data:
+    name: qc_postgres_data
+  n8n_postgres_data:
+    name: n8n_postgres_data
+  n8n_data:
+    name: n8n_data
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+# backend:  nginx <-> app services communication
+# internal: database access only (no outbound internet)
+# =============================================================================
 networks:
-  proxy:
-    external: true
+  backend:
+    driver: bridge
   internal:
     driver: bridge
+    internal: true

@@ -82,13 +82,15 @@ jobs:
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          N8N_POSTGRES_PASSWORD: ${{ secrets.N8N_POSTGRES_PASSWORD }}
           N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_BASIC_AUTH_PASSWORD
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_POSTGRES_PASSWORD,N8N_BASIC_AUTH_PASSWORD,N8N_WEBHOOK_URL
           script_stop: true
           script: |
             set -euo pipefail
@@ -98,7 +100,7 @@ jobs:
 
             echo "=== Checking deployment directory ==="
             if [ ! -d "$DEPLOY_DIR" ]; then
-              echo "Directory does not exist. Cloning repository..."
+              echo "Cloning repository..."
               sudo mkdir -p "$DEPLOY_DIR"
               sudo chown $USER:$USER "$DEPLOY_DIR"
               git clone "$REPO_URL" "$DEPLOY_DIR"
@@ -110,37 +112,41 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            echo "=== Creating .env file ==="
-            echo "DOCKER_HUB_USERNAME='${DOCKER_HUB_USERNAME}'" > .env
-            echo "JWT_SECRET='${JWT_SECRET}'" >> .env
-            echo "POSTGRES_USER='admin'" >> .env
-            echo "POSTGRES_PASSWORD='${POSTGRES_PASSWORD:-Wind@123}'" >> .env
-            echo "POSTGRES_DB='postgres'" >> .env
-            echo "N8N_BASIC_AUTH_PASSWORD='${N8N_BASIC_AUTH_PASSWORD:-admin}'" >> .env
+            echo "=== Writing .env ==="
+            cat > .env << ENVEOF
+            DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}
+            POSTGRES_USER=qc_admin
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            POSTGRES_DB=qc_app
+            N8N_POSTGRES_USER=n8n_admin
+            N8N_POSTGRES_PASSWORD=${N8N_POSTGRES_PASSWORD}
+            N8N_POSTGRES_DB=n8n_db
+            JWT_SECRET=${JWT_SECRET}
+            N8N_BASIC_AUTH_USER=admin
+            N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+            N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+            ENVEOF
+            sed -i 's/^            //' .env
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
 
-            echo "=== Creating proxy network (if not exists) ==="
-            docker network create proxy 2>/dev/null || true
-
-            echo "=== Starting reverse proxy ==="
-            cd "$DEPLOY_DIR/reverse-proxy"
-            docker compose up -d
+            echo "=== Stopping old reverse-proxy if running ==="
+            if [ -f "$DEPLOY_DIR/reverse-proxy/docker-compose.yml" ]; then
+              cd "$DEPLOY_DIR/reverse-proxy"
+              docker compose down 2>/dev/null || true
+              cd "$DEPLOY_DIR"
+            fi
 
             echo "=== Pulling app images ==="
-            cd "$DEPLOY_DIR"
             docker compose -f docker-compose.prod.yml pull
 
-            echo "=== Deploying app containers ==="
+            echo "=== Deploying ==="
             docker compose -f docker-compose.prod.yml up -d --force-recreate
 
             echo "=== Cleanup ==="
             docker image prune -f
+            docker network prune -f 2>/dev/null || true
 
             echo "=== Deployment complete ==="
             docker compose -f docker-compose.prod.yml ps
-            echo ""
-            echo "=== Reverse proxy status ==="
-            cd "$DEPLOY_DIR/reverse-proxy"
-            docker compose ps
