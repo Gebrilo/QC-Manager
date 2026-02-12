@@ -4,23 +4,24 @@ A comprehensive Quality Control Project Management System designed to streamline
 
 ## Features
 
-- **Dashboard**: Real-time metrics with task completion, resource utilization, project health
-- **Project Management**: Full CRUD with soft delete, status tracking, timeline management
-- **Task Management**: Kanban-style workflow (Backlog → In Progress → Done/Cancelled)
+- **Dashboard**: Real-time metrics for projects, tasks, resources, testing, and governance
+- **Project Management**: Full CRUD with soft delete and status lifecycle (active, completed, on_hold, cancelled)
+- **Task Management**: Status workflow (pending → in_progress → completed/failed/blocked) with validation
 - **Resource Management**: Capacity planning, allocation tracking, utilization metrics
 - **Test Management**: Test cases, executions, results tracking with pass/fail metrics
-- **Governance**: Quality gates, release readiness, trend analysis
+- **Governance**: Quality gates, release approvals, trend analysis
 - **Reports**: Async report generation (Excel, CSV, JSON, PDF) via n8n
-- **Automation**: n8n integration for workflows and notifications
+- **Automation**: n8n workflows and webhooks
 
 ## Technology Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, TanStack Table |
-| Backend | Node.js 18, Express.js, Zod validation |
-| Database | PostgreSQL 15 with views for real-time metrics |
-| Automation | n8n for async operations |
+| Frontend | Next.js 14.0.0, React 18, TypeScript 5.9, Tailwind CSS 3.3, TanStack Table, Recharts, React Hook Form |
+| Backend | Node.js 18, Express 4.18, Zod 3.22, Multer, pg |
+| Database | PostgreSQL 15.6 with views for real-time metrics |
+| Automation | n8n 1.29.0 for async operations |
+| Reverse Proxy | Nginx 1.25 |
 | Container | Docker & Docker Compose |
 
 ## Quick Start
