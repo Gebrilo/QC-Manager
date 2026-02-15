@@ -5,6 +5,7 @@ import { resourcesApi, type Resource } from '@/lib/api';
 import { ResourceTable } from '@/components/resources/ResourceTable';
 import { ResourceForm } from '@/components/resources/ResourceForm';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function ResourcesPage() {
     const [resources, setResources] = useState<Resource[]>([]);
@@ -12,6 +13,11 @@ export default function ResourcesPage() {
     const [filter, setFilter] = useState('');
     const [showDialog, setShowDialog] = useState(false);
     const [editingResource, setEditingResource] = useState<Resource | null>(null);
+    const { hasPermission } = useAuth();
+
+    const canCreate = hasPermission('action:resources:create');
+    const canEdit = hasPermission('action:resources:edit');
+    const canDelete = hasPermission('action:resources:delete');
 
     const loadResources = async () => {
         try {
@@ -83,12 +89,14 @@ export default function ResourcesPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button
-                        onClick={handleAddNew}
-                        className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none"
-                    >
-                        + New Resource
-                    </Button>
+                    {canCreate && (
+                        <Button
+                            onClick={handleAddNew}
+                            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none"
+                        >
+                            + New Resource
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -122,8 +130,8 @@ export default function ResourcesPage() {
             <ResourceTable
                 resources={filteredResources}
                 isLoading={isLoading}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
+                onEdit={canEdit ? handleEdit : undefined}
+                onDelete={canDelete ? handleDelete : undefined}
             />
 
             {/* Add/Edit Dialog */}

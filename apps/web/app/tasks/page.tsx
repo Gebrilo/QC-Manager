@@ -7,6 +7,7 @@ import { Task } from '@/types';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface Project {
     id: string;
@@ -23,6 +24,7 @@ const STATUS_OPTIONS = ['All', 'Backlog', 'In Progress', 'Done', 'Cancelled'];
 
 export default function TasksPage() {
     const router = useRouter();
+    const { hasPermission } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
@@ -112,11 +114,13 @@ export default function TasksPage() {
                     >
                         View Task History →
                     </button>
-                    <Link href="/tasks/create">
-                        <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
-                            + New Task
-                        </Button>
-                    </Link>
+                    {hasPermission('action:tasks:create') && (
+                        <Link href="/tasks/create">
+                            <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
+                                + New Task
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             </div>
 

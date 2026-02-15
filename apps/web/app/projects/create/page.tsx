@@ -1,15 +1,26 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProjectForm from '@/components/projects/ProjectForm';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function CreateProjectPage() {
     const router = useRouter();
+    const { hasPermission, loading: authLoading } = useAuth();
+
+    useEffect(() => {
+        if (!authLoading && !hasPermission('action:projects:create')) {
+            router.replace('/projects');
+        }
+    }, [authLoading, hasPermission, router]);
 
     const handleSuccess = () => {
         router.push('/projects');
         router.refresh();
     };
+
+    if (authLoading || !hasPermission('action:projects:create')) return null;
 
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">

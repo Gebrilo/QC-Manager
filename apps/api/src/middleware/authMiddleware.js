@@ -57,4 +57,32 @@ function optionalAuth(req, res, next) {
     next();
 }
 
-module.exports = { requireAuth, requireRole, optionalAuth };
+/**
+ * Middleware: Check if user has a specific permission
+ * @param {string} permissionKey - Required permission key
+ */
+function requirePermission(permissionKey) {
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+        // Admins bypass all permission checks
+        if (req.user.role === 'admin') {
+            return next();
+        }
+        try {
+            const result = await db.query(
+                'SELECT granted FROM user_permissions WHERE user_id = $1 AND permission_key = $2',
+                [req.user.id, permissionKey]
+            );
+            if (result.rows.length === 0 || !result.rows[0].granted) {
+                return res.status(403).json({ error: 'You do not have permission to perform this action' });
+            }
+            next();
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+
+module.exports = { requireAuth, requireRole, requirePermission, optionalAuth };

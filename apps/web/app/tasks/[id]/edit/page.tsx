@@ -5,18 +5,25 @@ import { useParams, useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import { Task, Project, Resource } from '@/types';
 import { TaskForm } from '@/components/tasks/TaskForm';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function EditTaskPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
+    const { hasPermission, loading: authLoading } = useAuth();
     const [data, setData] = useState<{ task: Task; projects: Project[]; resources: Resource[] } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!authLoading && !hasPermission('action:tasks:edit')) {
+            router.replace(`/tasks/${id}`);
+        }
+    }, [authLoading, hasPermission, router, id]);
+
+    useEffect(() => {
         async function load() {
             try {
-                // Fetch all required data in parallel
                 const [taskData, projectsData, resourcesData] = await Promise.all([
                     fetchApi<Task>(`/tasks/${id}`),
                     fetchApi<Project[]>('/projects'),
@@ -32,6 +39,7 @@ export default function EditTaskPage() {
         if (id) load();
     }, [id]);
 
+    if (authLoading || !hasPermission('action:tasks:edit')) return null;
     if (isLoading) return <div className="p-10 text-center">Loading...</div>;
     if (!data) return <div className="p-10 text-center">Task not found</div>;
 

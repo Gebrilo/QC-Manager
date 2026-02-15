@@ -5,19 +5,25 @@ import { useParams, useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import ProjectForm from '@/components/projects/ProjectForm';
 import { Project } from '@/types';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function EditProjectPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
+    const { hasPermission, loading: authLoading } = useAuth();
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!authLoading && !hasPermission('action:projects:edit')) {
+            router.replace(`/projects/${id}`);
+        }
+    }, [authLoading, hasPermission, router, id]);
+
+    useEffect(() => {
         async function load() {
             try {
-                // Fetching single project from the LIST or ID?
-                // Backend "GET /projects" returns ALL. "GET /projects/:id" returns ONE.
                 const data = await fetchApi<Project>(`/projects/${id}`);
                 setProject(data);
             } catch (err) {
@@ -34,6 +40,7 @@ export default function EditProjectPage() {
         router.refresh();
     };
 
+    if (authLoading || !hasPermission('action:projects:edit')) return null;
     if (isLoading) return <div className="p-10 text-center">Loading...</div>;
     if (!project) return <div className="p-10 text-center">Project not found</div>;
 

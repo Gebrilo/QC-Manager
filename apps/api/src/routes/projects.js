@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { createProjectSchema, updateProjectSchema } = require('../schemas/project');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // GET all projects (from View)
 router.get('/', async (req, res, next) => {
@@ -36,7 +37,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST create project
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('action:projects:create'), async (req, res, next) => {
     try {
         // Validation
         const data = createProjectSchema.parse(req.body);
@@ -71,7 +72,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PATCH update project
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('action:projects:edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = req.body;
@@ -119,7 +120,7 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 // DELETE soft delete project
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('action:projects:delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 

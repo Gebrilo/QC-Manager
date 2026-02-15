@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // Status transition validation
 const VALID_TRANSITIONS = {
@@ -83,7 +84,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST create task
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('action:tasks:create'), async (req, res, next) => {
     try {
         const data = createTaskSchema.parse(req.body);
 
@@ -129,7 +130,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT/PATCH update task
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateTaskSchema.parse(req.body);
@@ -217,7 +218,7 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 // DELETE soft delete task
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 

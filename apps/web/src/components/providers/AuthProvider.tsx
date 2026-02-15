@@ -109,9 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const result = await res.json();
         setUser(result.user);
-        setPermissions([]);
         setToken(result.token);
         localStorage.setItem('auth_token', result.token);
+
+        // Fetch permissions via /me to get the actual default permissions
+        try {
+            const meRes = await fetch(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${result.token}` },
+            });
+            if (meRes.ok) {
+                const meData = await meRes.json();
+                setPermissions(meData.permissions || []);
+            }
+        } catch {
+            setPermissions([]);
+        }
+
         router.push('/');
     }, [router]);
 

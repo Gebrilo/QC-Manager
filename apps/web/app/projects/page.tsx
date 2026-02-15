@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import Link from 'next/link';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface ProjectStats {
     taskHrsEst: number;
@@ -25,6 +26,7 @@ export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { hasPermission } = useAuth();
 
     useEffect(() => {
         async function load() {
@@ -126,9 +128,11 @@ export default function ProjectsPage() {
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Projects Registry</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Overview of all active portfolios and their health.</p>
                 </div>
-                <Link href="/projects/create">
-                    <Button>+ New Project</Button>
-                </Link>
+                {hasPermission('action:projects:create') && (
+                    <Link href="/projects/create">
+                        <Button>+ New Project</Button>
+                    </Link>
+                )}
             </div>
 
             {isLoading ? (

@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { createResourceSchema, updateResourceSchema } = require('../schemas/resource');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // GET all resources with utilization metrics (from view)
 router.get('/', async (req, res, next) => {
@@ -28,11 +29,11 @@ router.get('/:id', async (req, res, next) => {
             FROM v_resources_with_utilization 
             WHERE id = $1
         `, [id]);
-        
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Resource not found' });
         }
-        
+
         res.json(result.rows[0]);
     } catch (err) {
         next(err);
@@ -40,7 +41,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST create resource
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('action:resources:create'), async (req, res, next) => {
     try {
         // Validate with Zod
         const data = createResourceSchema.parse(req.body);
@@ -51,10 +52,10 @@ router.post('/', async (req, res, next) => {
             ) VALUES ($1, $2, $3, $4, $5, $6) 
             RETURNING *`,
             [
-                data.resource_name, 
-                data.weekly_capacity_hrs, 
-                data.email || null, 
-                data.department || null, 
+                data.resource_name,
+                data.weekly_capacity_hrs,
+                data.email || null,
+                data.department || null,
                 data.role || null,
                 data.is_active
             ]
@@ -64,7 +65,7 @@ router.post('/', async (req, res, next) => {
 
         // Audit log
         await auditLog('resources', resource.id, 'CREATE', resource, null);
-        
+
         // Trigger n8n workflow
         triggerWorkflow('resource-created', resource);
 
@@ -80,7 +81,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PATCH update resource
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('action:resources:edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateResourceSchema.parse(req.body);
@@ -135,7 +136,7 @@ router.patch('/:id', async (req, res, next) => {
 
         // Audit log
         await auditLog('resources', id, 'UPDATE', updated, original);
-        
+
         // Trigger n8n workflow
         triggerWorkflow('resource-updated', updated);
 
@@ -151,7 +152,7 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 // DELETE soft delete resource
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('action:resources:delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -182,12 +183,12 @@ router.delete('/:id', async (req, res, next) => {
 
         // Audit log
         await auditLog('resources', id, 'DELETE', deleted, original);
-        
+
         // Trigger n8n workflow
         triggerWorkflow('resource-deleted', deleted);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: `Resource '${deleted.resource_name}' has been deleted`,
             data: deleted
         });

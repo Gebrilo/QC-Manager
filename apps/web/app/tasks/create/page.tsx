@@ -1,15 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { fetchApi } from '@/lib/api';
 import { Project, Resource } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function CreateTaskPage() {
+    const router = useRouter();
+    const { hasPermission, loading: authLoading } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!authLoading && !hasPermission('action:tasks:create')) {
+            router.replace('/tasks');
+        }
+    }, [authLoading, hasPermission, router]);
 
     useEffect(() => {
         async function loadData() {
@@ -29,6 +39,7 @@ export default function CreateTaskPage() {
         loadData();
     }, []);
 
+    if (authLoading || !hasPermission('action:tasks:create')) return null;
     if (isLoading) return <div className="flex justify-center p-8"><Spinner size="lg" /></div>;
 
     return (
