@@ -1,0 +1,374 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../src/components/providers/AuthProvider';
+import { useRouter } from 'next/navigation';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface UserRecord {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    role: 'admin' | 'manager' | 'user' | 'viewer';
+    active: boolean;
+    created_at: string;
+    last_login: string | null;
+}
+
+interface Permission {
+    permission_key: string;
+    granted: boolean;
+}
+
+const ROLE_COLORS: Record<string, string> = {
+    admin: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+    manager: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    user: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+    viewer: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+};
+
+const ALL_PERMISSIONS = [
+    { key: 'page:dashboard', label: 'Dashboard', group: 'Pages' },
+    { key: 'page:tasks', label: 'Tasks', group: 'Pages' },
+    { key: 'page:projects', label: 'Projects', group: 'Pages' },
+    { key: 'page:resources', label: 'Resources', group: 'Pages' },
+    { key: 'page:governance', label: 'Governance', group: 'Pages' },
+    { key: 'page:test-executions', label: 'Test Runs', group: 'Pages' },
+    { key: 'page:reports', label: 'Reports', group: 'Pages' },
+    { key: 'page:users', label: 'User Management', group: 'Pages' },
+    { key: 'action:tasks:create', label: 'Create Tasks', group: 'Task Actions' },
+    { key: 'action:tasks:edit', label: 'Edit Tasks', group: 'Task Actions' },
+    { key: 'action:tasks:delete', label: 'Delete Tasks', group: 'Task Actions' },
+    { key: 'action:projects:create', label: 'Create Projects', group: 'Project Actions' },
+    { key: 'action:projects:edit', label: 'Edit Projects', group: 'Project Actions' },
+    { key: 'action:projects:delete', label: 'Delete Projects', group: 'Project Actions' },
+    { key: 'action:resources:create', label: 'Create Resources', group: 'Resource Actions' },
+    { key: 'action:resources:edit', label: 'Edit Resources', group: 'Resource Actions' },
+    { key: 'action:resources:delete', label: 'Delete Resources', group: 'Resource Actions' },
+    { key: 'action:reports:generate', label: 'Generate Reports', group: 'Report Actions' },
+];
+
+export default function UsersPage() {
+    const { user: currentUser, token, isAdmin } = useAuth();
+    const router = useRouter();
+    const [users, setUsers] = useState<UserRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [expandedUser, setExpandedUser] = useState<string | null>(null);
+    const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({});
+    const [saving, setSaving] = useState<string | null>(null);
+
+    // Redirect non-admins
+    useEffect(() => {
+        if (!isAdmin && currentUser) {
+            router.push('/');
+        }
+    }, [isAdmin, currentUser, router]);
+
+    const fetchUsers = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/users`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Failed to load users');
+            const data = await res.json();
+            setUsers(data);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        if (token && isAdmin) fetchUsers();
+    }, [token, isAdmin, fetchUsers]);
+
+    const fetchPermissions = async (userId: string) => {
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}/permissions`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Failed to load permissions');
+            const data: Permission[] = await res.json();
+            setUserPermissions(prev => ({
+                ...prev,
+                [userId]: data.filter(p => p.granted).map(p => p.permission_key),
+            }));
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const toggleExpand = (userId: string) => {
+        if (expandedUser === userId) {
+            setExpandedUser(null);
+        } else {
+            setExpandedUser(userId);
+            if (!userPermissions[userId]) {
+                fetchPermissions(userId);
+            }
+        }
+    };
+
+    const handleRoleChange = async (userId: string, newRole: string) => {
+        setSaving(userId);
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ role: newRole }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to update role');
+            }
+            // Refresh
+            await fetchUsers();
+            // Refresh permissions for this user
+            await fetchPermissions(userId);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const handleToggleActive = async (userId: string, active: boolean) => {
+        setSaving(userId);
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ active }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to update status');
+            }
+            await fetchUsers();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const handlePermissionToggle = async (userId: string, permKey: string) => {
+        const current = userPermissions[userId] || [];
+        const updated = current.includes(permKey)
+            ? current.filter(p => p !== permKey)
+            : [...current, permKey];
+
+        // Optimistic update
+        setUserPermissions(prev => ({ ...prev, [userId]: updated }));
+
+        setSaving(userId);
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}/permissions`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ permissions: updated }),
+            });
+            if (!res.ok) throw new Error('Failed to update permissions');
+        } catch (err: any) {
+            setError(err.message);
+            // Revert
+            setUserPermissions(prev => ({ ...prev, [userId]: current }));
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    if (!isAdmin) return null;
+
+    const formatDate = (d: string | null) => {
+        if (!d) return 'Never';
+        return new Date(d).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+    };
+
+    // Group permissions by category
+    const permissionGroups = ALL_PERMISSIONS.reduce<Record<string, typeof ALL_PERMISSIONS>>((acc, p) => {
+        if (!acc[p.group]) acc[p.group] = [];
+        acc[p.group].push(p);
+        return acc;
+    }, {});
+
+    return (
+        <div className="space-y-6 px-4 sm:px-0">
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Management</h1>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">Manage user accounts, roles, and permissions</p>
+            </div>
+
+            {error && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-4 py-3 text-rose-600 dark:text-rose-400 text-sm">
+                    {error}
+                    <button onClick={() => setError('')} className="ml-2 font-medium underline">Dismiss</button>
+                </div>
+            )}
+
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <svg className="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {users.map(u => (
+                        <div
+                            key={u.id}
+                            className={`bg-white dark:bg-slate-900 border rounded-xl transition-all ${expandedUser === u.id
+                                    ? 'border-indigo-300 dark:border-indigo-700 shadow-lg shadow-indigo-500/5'
+                                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                }`}
+                        >
+                            {/* User Row */}
+                            <div
+                                className="flex items-center gap-4 p-4 cursor-pointer"
+                                onClick={() => toggleExpand(u.id)}
+                            >
+                                {/* Avatar */}
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${u.active
+                                        ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600'
+                                    }`}>
+                                    {u.name.charAt(0).toUpperCase()}
+                                </div>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`font-medium text-sm ${u.active ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-600 line-through'}`}>
+                                            {u.name}
+                                        </span>
+                                        {u.id === currentUser?.id && (
+                                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                                                You
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{u.email}</p>
+                                </div>
+
+                                {/* Phone */}
+                                <div className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 w-32 truncate">
+                                    {u.phone || '—'}
+                                </div>
+
+                                {/* Role Badge */}
+                                <select
+                                    value={u.role}
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleRoleChange(u.id, e.target.value);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    disabled={u.id === currentUser?.id || saving === u.id}
+                                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${ROLE_COLORS[u.role]}`}
+                                >
+                                    <option value="admin">Admin</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="user">User</option>
+                                    <option value="viewer">Viewer</option>
+                                </select>
+
+                                {/* Active Toggle */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleActive(u.id, !u.active);
+                                    }}
+                                    disabled={u.id === currentUser?.id || saving === u.id}
+                                    className={`relative w-10 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${u.active ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        }`}
+                                    title={u.active ? 'Active' : 'Inactive'}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${u.active ? 'translate-x-4' : 'translate-x-0'
+                                        }`} />
+                                </button>
+
+                                {/* Last login */}
+                                <div className="hidden lg:block text-xs text-slate-400 dark:text-slate-500 w-36 text-right">
+                                    {formatDate(u.last_login)}
+                                </div>
+
+                                {/* Expand Arrow */}
+                                <svg
+                                    className={`w-4 h-4 text-slate-400 transition-transform ${expandedUser === u.id ? 'rotate-180' : ''}`}
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+
+                            {/* Expanded Permissions */}
+                            {expandedUser === u.id && (
+                                <div className="border-t border-slate-200 dark:border-slate-800 p-4">
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Permissions</h3>
+
+                                    {!userPermissions[u.id] ? (
+                                        <div className="flex items-center justify-center py-4">
+                                            <svg className="animate-spin h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            {Object.entries(permissionGroups).map(([group, perms]) => (
+                                                <div key={group} className="space-y-2">
+                                                    <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{group}</h4>
+                                                    <div className="space-y-1">
+                                                        {perms.map(perm => (
+                                                            <label
+                                                                key={perm.key}
+                                                                className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={userPermissions[u.id]?.includes(perm.key) || false}
+                                                                    onChange={() => handlePermissionToggle(u.id, perm.key)}
+                                                                    disabled={saving === u.id}
+                                                                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500/50"
+                                                                />
+                                                                <span className="text-sm text-slate-700 dark:text-slate-300">{perm.label}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {users.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+                            <p className="text-lg font-medium">No users found</p>
+                            <p className="text-sm mt-1">Users will appear here once they register</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

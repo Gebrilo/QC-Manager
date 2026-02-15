@@ -3,32 +3,37 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../providers/ThemeProvider';
+import { useAuth } from '../providers/AuthProvider';
 
 export function Header() {
     const { theme, toggleTheme } = useTheme();
-    const [userName, setUserName] = useState('John Doe');
-    const [userAvatar, setUserAvatar] = useState('');
+    const { user, logout, isAdmin, hasPermission } = useAuth();
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
 
     useEffect(() => {
-        const updatePrefs = () => {
-            setUserName(localStorage.getItem('user-name') || 'John Doe');
-            setUserAvatar(localStorage.getItem('user-avatar') || '');
-        };
-
-        updatePrefs();
-        window.addEventListener('user-prefs-updated', updatePrefs);
-
-        // Listener for the FilterBar theme toggle shortcut
         const handleToggle = () => toggleTheme();
         window.addEventListener('qc-toggle-theme', handleToggle);
-
-        return () => {
-            window.removeEventListener('user-prefs-updated', updatePrefs);
-            window.removeEventListener('qc-toggle-theme', handleToggle);
-        };
+        return () => window.removeEventListener('qc-toggle-theme', handleToggle);
     }, [toggleTheme]);
 
-    const userInitial = userName.charAt(0).toUpperCase();
+    if (!user) return null;
+
+    const navLinks = [
+        { href: '/', label: 'Dashboard', permission: 'page:dashboard' },
+        { href: '/tasks', label: 'Tasks', permission: 'page:tasks' },
+        { href: '/projects', label: 'Projects', permission: 'page:projects' },
+        { href: '/resources', label: 'Resources', permission: 'page:resources' },
+        { href: '/governance', label: 'Governance', permission: 'page:governance' },
+        { href: '/test-executions', label: 'Test Runs', permission: 'page:test-executions' },
+        { href: '/reports', label: 'Reports', permission: 'page:reports' },
+    ];
+
+    // Only show "Users" to admins
+    if (isAdmin) {
+        navLinks.push({ href: '/users', label: 'Users', permission: 'page:users' });
+    }
+
+    const userInitial = user.name?.charAt(0).toUpperCase() || 'U';
 
     return (
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 transition-colors duration-300">
@@ -46,31 +51,22 @@ export function Header() {
 
                     {/* Desktop Navigation */}
                     <nav className="hidden md:flex items-center gap-1">
-                        <Link href="/" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Dashboard
-                        </Link>
-                        <Link href="/tasks" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Tasks
-                        </Link>
-                        <Link href="/projects" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Projects
-                        </Link>
-                        <Link href="/resources" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Resources
-                        </Link>
-                        <Link href="/governance" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Governance
-                        </Link>
-                        <Link href="/test-executions" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Test Runs
-                        </Link>
-                        <Link href="/reports" className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                            Reports
-                        </Link>
+                        {navLinks
+                            .filter(link => hasPermission(link.permission))
+                            .map(link => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                                >
+                                    {link.label}
+                                </Link>
+                            ))}
                     </nav>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
+                        {/* Theme Toggle */}
                         <button
                             onClick={toggleTheme}
                             className="p-2 rounded-full text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
@@ -88,20 +84,64 @@ export function Header() {
 
                         <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block"></div>
 
-                        <Link href="/preferences" className="flex items-center gap-2 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-all group">
-                            <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-xs overflow-hidden">
-                                {userAvatar ? (
-                                    <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                        {/* User Info */}
+                        <div className="flex items-center gap-2">
+                            <Link href="/preferences" className="flex items-center gap-2 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-all group">
+                                <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-xs">
+                                    {userInitial}
+                                </div>
+                                <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                    {user.name}
+                                </span>
+                            </Link>
+
+                            {/* Logout */}
+                            <button
+                                onClick={logout}
+                                className="p-2 rounded-full text-slate-400 hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all focus:outline-none"
+                                title="Sign out"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Mobile Menu Toggle */}
+                        <button
+                            onClick={() => setShowMobileMenu(!showMobileMenu)}
+                            className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {showMobileMenu ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 ) : (
-                                    userInitial
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                 )}
-                            </div>
-                            <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                                {userName}
-                            </span>
-                        </Link>
+                            </svg>
+                        </button>
                     </div>
                 </div>
+
+                {/* Mobile Menu */}
+                {showMobileMenu && (
+                    <nav className="md:hidden py-4 border-t border-slate-200 dark:border-slate-800">
+                        <div className="flex flex-col gap-1">
+                            {navLinks
+                                .filter(link => hasPermission(link.permission))
+                                .map(link => (
+                                    <Link
+                                        key={link.href}
+                                        href={link.href}
+                                        onClick={() => setShowMobileMenu(false)}
+                                        className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                                    >
+                                        {link.label}
+                                    </Link>
+                                ))}
+                        </div>
+                    </nav>
+                )}
             </div>
         </header>
     );

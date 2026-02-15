@@ -612,6 +612,52 @@ const runMigrations = async () => {
             WHERE t.deleted_at IS NULL
         `);
 
+        // =====================================================
+        // AUTH & USER MANAGEMENT TABLES
+        // =====================================================
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS app_user (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                email VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                phone VARCHAR(20),
+                role VARCHAR(50) NOT NULL DEFAULT 'viewer',
+                active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP WITH TIME ZONE,
+                CONSTRAINT valid_role CHECK (role IN ('admin', 'manager', 'user', 'viewer'))
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_app_user_email ON app_user(email)`);
+
+        // Add phone column if migrating from older schema
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='phone') THEN
+                    ALTER TABLE app_user ADD COLUMN phone VARCHAR(20);
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_permissions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                permission_key VARCHAR(100) NOT NULL,
+                granted BOOLEAN DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, permission_key)
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id)`);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

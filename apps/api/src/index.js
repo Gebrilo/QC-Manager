@@ -35,6 +35,8 @@ apiRouter.use('/reports', require('./routes/reports'));
 apiRouter.use('/', require('./routes/testResults'));
 apiRouter.use('/testsprite', require('./routes/testspriteWebhook'));
 apiRouter.use('/governance', require('./routes/governance'));
+apiRouter.use('/auth', require('./routes/auth'));
+apiRouter.use('/users', require('./routes/users'));
 apiRouter.use('/bugs', require('./routes/bugs'));
 apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
 

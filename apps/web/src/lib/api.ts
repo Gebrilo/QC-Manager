@@ -6,10 +6,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-    const headers = {
+    // Get auth token if available
+    let authToken: string | null = null;
+    if (typeof window !== 'undefined') {
+        authToken = localStorage.getItem('auth_token');
+    }
+
+    const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...(options.headers as Record<string, string>),
     };
+
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
 
     const response = await fetch(url, {
         ...options,
