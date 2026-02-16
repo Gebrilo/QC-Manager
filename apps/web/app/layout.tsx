@@ -4,7 +4,9 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '../src/components/providers/ThemeProvider';
 import { AuthProvider } from '../src/components/providers/AuthProvider';
+import { RouteGuard } from '../src/components/providers/RouteGuard';
 import { Header } from '../src/components/layout/Header';
+import { ActivationBanner } from '../src/components/ui/ActivationBanner';
 import { usePathname } from 'next/navigation';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -24,17 +26,19 @@ export default function RootLayout({
             <body className={inter.className}>
                 <ThemeProvider>
                     <AuthProvider>
-                        {isAuthPage ? (
-                            // Auth pages render full-screen without header/nav
-                            children
-                        ) : (
-                            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-                                <Header />
-                                <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                                    {children}
-                                </main>
-                            </div>
-                        )}
+                        <RouteGuard>
+                            {isAuthPage ? (
+                                children
+                            ) : (
+                                <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+                                    <Header />
+                                    <ActivationBanner />
+                                    <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+                                        {children}
+                                    </main>
+                                </div>
+                            )}
+                        </RouteGuard>
                     </AuthProvider>
                 </ThemeProvider>
             </body>

@@ -628,11 +628,49 @@ const runMigrations = async () => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP WITH TIME ZONE,
-                CONSTRAINT valid_role CHECK (role IN ('admin', 'manager', 'user', 'viewer'))
+                CONSTRAINT valid_role CHECK (role IN ('admin', 'manager', 'user', 'viewer', 'contributor'))
             )
         `);
 
         await client.query(`CREATE INDEX IF NOT EXISTS idx_app_user_email ON app_user(email)`);
+
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='activated') THEN
+                    ALTER TABLE app_user ADD COLUMN activated BOOLEAN DEFAULT false;
+                    UPDATE app_user SET activated = true WHERE activated IS NULL;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`
+            DO $$
+            BEGIN
+                ALTER TABLE app_user DROP CONSTRAINT IF EXISTS valid_role;
+                ALTER TABLE app_user ADD CONSTRAINT valid_role CHECK (role IN ('admin', 'manager', 'user', 'viewer', 'contributor'));
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END $$;
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS personal_tasks (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                priority VARCHAR(20) DEFAULT 'medium',
+                due_date DATE,
+                completed_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT valid_personal_status CHECK (status IN ('pending', 'in_progress', 'done', 'cancelled')),
+                CONSTRAINT valid_personal_priority CHECK (priority IN ('low', 'medium', 'high'))
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_personal_tasks_user_id ON personal_tasks(user_id)`);
 
         // Add phone column if migrating from older schema
         await client.query(`

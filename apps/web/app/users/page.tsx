@@ -11,8 +11,9 @@ interface UserRecord {
     name: string;
     email: string;
     phone: string | null;
-    role: 'admin' | 'manager' | 'user' | 'viewer';
+    role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
     active: boolean;
+    activated: boolean;
     created_at: string;
     last_login: string | null;
 }
@@ -25,6 +26,7 @@ interface Permission {
 const ROLE_COLORS: Record<string, string> = {
     admin: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800',
     manager: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    contributor: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800',
     user: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
     viewer: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
 };
@@ -59,13 +61,6 @@ export default function UsersPage() {
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
     const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState<string | null>(null);
-
-    // Redirect non-admins
-    useEffect(() => {
-        if (!isAdmin && currentUser) {
-            router.push('/');
-        }
-    }, [isAdmin, currentUser, router]);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -139,16 +134,20 @@ export default function UsersPage() {
         }
     };
 
-    const handleToggleActive = async (userId: string, active: boolean) => {
+    const handleToggleActive = async (userId: string, active: boolean, activate?: boolean) => {
         setSaving(userId);
         try {
+            const body: Record<string, any> = { active };
+            if (activate) {
+                body.activated = true;
+            }
             const res = await fetch(`${API_URL}/users/${userId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ active }),
+                body: JSON.stringify(body),
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -190,8 +189,6 @@ export default function UsersPage() {
             setSaving(null);
         }
     };
-
-    if (!isAdmin) return null;
 
     const formatDate = (d: string | null) => {
         if (!d) return 'Never';
@@ -285,9 +282,29 @@ export default function UsersPage() {
                                 >
                                     <option value="admin">Admin</option>
                                     <option value="manager">Manager</option>
+                                    <option value="contributor">Contributor</option>
                                     <option value="user">User</option>
                                     <option value="viewer">Viewer</option>
                                 </select>
+
+                                {/* Activated Toggle */}
+                                {!u.activated && u.id !== currentUser?.id && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleActive(u.id, !u.active, true);
+                                        }}
+                                        disabled={saving === u.id}
+                                        className="text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+                                    >
+                                        Activate
+                                    </button>
+                                )}
+                                {u.activated && (
+                                    <span className="text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
+                                        Activated
+                                    </span>
+                                )}
 
                                 {/* Active Toggle */}
                                 <button

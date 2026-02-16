@@ -10,7 +10,9 @@ interface User {
     name: string;
     email: string;
     phone?: string;
-    role: 'admin' | 'manager' | 'user' | 'viewer';
+    role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
+    activated: boolean;
+    onboarding_completed?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +25,7 @@ interface AuthContextType {
     logout: () => void;
     hasPermission: (key: string) => boolean;
     isAdmin: boolean;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,43 +40,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
 
-    // Initialize from localStorage
+    const fetchCurrentUser = useCallback(async (authToken: string) => {
+        try {
+            const res = await fetch(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${authToken}` },
+            });
+            if (!res.ok) throw new Error('Invalid token');
+            const data = await res.json();
+            setUser({
+                ...data.user,
+                activated: data.user.activated ?? true,
+            });
+            setPermissions(data.permissions || []);
+            return true;
+        } catch {
+            localStorage.removeItem('auth_token');
+            setToken(null);
+            setUser(null);
+            setPermissions([]);
+            return false;
+        }
+    }, []);
+
     useEffect(() => {
         const storedToken = localStorage.getItem('auth_token');
         if (storedToken) {
             setToken(storedToken);
-            // Fetch current user
-            fetch(`${API_URL}/auth/me`, {
-                headers: { Authorization: `Bearer ${storedToken}` },
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error('Invalid token');
-                    return res.json();
-                })
-                .then(data => {
-                    setUser(data.user);
-                    setPermissions(data.permissions || []);
-                    setLoading(false);
-                })
-                .catch(() => {
-                    // Token invalid, clear it
-                    localStorage.removeItem('auth_token');
-                    setToken(null);
-                    setUser(null);
-                    setPermissions([]);
-                    setLoading(false);
-                });
+            fetchCurrentUser(storedToken).finally(() => setLoading(false));
         } else {
             setLoading(false);
         }
-    }, []);
+    }, [fetchCurrentUser]);
 
-    // Redirect to login if not authenticated and on a protected route
     useEffect(() => {
         if (!loading && !user && !PUBLIC_PATHS.includes(pathname || '')) {
             router.push('/login');
         }
     }, [loading, user, pathname, router]);
+
+    const refreshUser = useCallback(async () => {
+        const currentToken = token || localStorage.getItem('auth_token');
+        if (currentToken) {
+            await fetchCurrentUser(currentToken);
+        }
+    }, [token, fetchCurrentUser]);
 
     const login = useCallback(async (email: string, password: string) => {
         const res = await fetch(`${API_URL}/auth/login`, {
@@ -88,11 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const data = await res.json();
-        setUser(data.user);
+        setUser({
+            ...data.user,
+            activated: data.user.activated ?? true,
+        });
         setPermissions(data.permissions || []);
         setToken(data.token);
         localStorage.setItem('auth_token', data.token);
-        router.push('/');
+
+        if (data.user.activated) {
+            router.push('/dashboard');
+        } else {
+            router.push('/my-tasks');
+        }
     }, [router]);
 
     const register = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
@@ -108,24 +126,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const result = await res.json();
-        setUser(result.user);
+        setUser({
+            ...result.user,
+            activated: result.user.activated ?? false,
+        });
+        setPermissions(result.permissions || []);
         setToken(result.token);
         localStorage.setItem('auth_token', result.token);
 
-        // Fetch permissions via /me to get the actual default permissions
-        try {
-            const meRes = await fetch(`${API_URL}/auth/me`, {
-                headers: { Authorization: `Bearer ${result.token}` },
-            });
-            if (meRes.ok) {
-                const meData = await meRes.json();
-                setPermissions(meData.permissions || []);
-            }
-        } catch {
-            setPermissions([]);
+        if (result.user.activated) {
+            router.push('/dashboard');
+        } else {
+            router.push('/my-tasks');
         }
-
-        router.push('/');
     }, [router]);
 
     const logout = useCallback(() => {
@@ -144,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAdmin = user?.role === 'admin';
 
     return (
-        <AuthContext.Provider value={{ user, permissions, token, loading, login, register, logout, hasPermission, isAdmin }}>
+        <AuthContext.Provider value={{ user, permissions, token, loading, login, register, logout, hasPermission, isAdmin, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

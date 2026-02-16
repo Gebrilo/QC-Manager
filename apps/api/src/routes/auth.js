@@ -8,10 +8,6 @@ const { requireAuth } = require('../middleware/authMiddleware');
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
 const JWT_EXPIRES_IN = '7d';
 
-// ============================================================================
-// Simple password hashing using Node.js built-in crypto (no bcrypt needed)
-// ============================================================================
-
 function hashPassword(password) {
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
@@ -24,46 +20,56 @@ function verifyPassword(password, storedHash) {
     return hash === testHash;
 }
 
-// ============================================================================
-// Default permissions by role
-// ============================================================================
-
 const DEFAULT_PERMISSIONS = {
     admin: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports', 'page:users',
+        'page:my-tasks',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit', 'action:projects:delete',
         'action:resources:create', 'action:resources:edit', 'action:resources:delete',
         'action:reports:generate',
+        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
     manager: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports',
+        'page:my-tasks',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit',
         'action:resources:create', 'action:resources:edit',
         'action:reports:generate',
+        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
     user: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
+        'page:my-tasks',
         'action:tasks:create', 'action:tasks:edit',
         'action:reports:generate',
+        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
     viewer: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
+        'page:my-tasks',
+        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+    ],
+    contributor: [
+        'page:dashboard', 'page:tasks', 'page:my-tasks',
+        'action:tasks:edit',
+        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
 };
 
+const INACTIVE_PERMISSIONS = [
+    'page:my-tasks',
+    'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+];
+
 async function setDefaultPermissions(userId, role) {
     const permissions = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.viewer;
-
-    // Clear existing permissions
     await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
-
-    // Insert new permissions
     for (const perm of permissions) {
         await db.query(
             `INSERT INTO user_permissions (user_id, permission_key, granted) 
@@ -74,15 +80,22 @@ async function setDefaultPermissions(userId, role) {
     }
 }
 
-// ============================================================================
-// POST /auth/register
-// ============================================================================
+async function setInactivePermissions(userId) {
+    await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+    for (const perm of INACTIVE_PERMISSIONS) {
+        await db.query(
+            `INSERT INTO user_permissions (user_id, permission_key, granted) 
+             VALUES ($1, $2, true) 
+             ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
+            [userId, perm]
+        );
+    }
+}
 
 router.post('/register', async (req, res, next) => {
     try {
         const { name, email, password, phone } = req.body;
 
-        // Validation
         if (!name || !email || !password) {
             return res.status(400).json({ error: 'Name, email, and password are required' });
         }
@@ -90,54 +103,56 @@ router.post('/register', async (req, res, next) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        // Check if email already exists
         const existing = await db.query('SELECT id FROM app_user WHERE email = $1', [email.toLowerCase()]);
         if (existing.rows.length > 0) {
             return res.status(409).json({ error: 'Email already registered' });
         }
 
-        // Check if this is the first user (make them admin)
         const userCount = await db.query('SELECT COUNT(*) as count FROM app_user');
         const isFirstUser = parseInt(userCount.rows[0].count) === 0;
         const role = isFirstUser ? 'admin' : 'viewer';
+        const activated = isFirstUser;
 
-        // Hash password and create user
         const passwordHash = hashPassword(password);
 
         const result = await db.query(
-            `INSERT INTO app_user (name, email, password_hash, phone, role, active) 
-             VALUES ($1, $2, $3, $4, $5, true) 
-             RETURNING id, name, email, phone, role, active, created_at`,
-            [name, email.toLowerCase(), passwordHash, phone || null, role]
+            `INSERT INTO app_user (name, email, password_hash, phone, role, active, activated) 
+             VALUES ($1, $2, $3, $4, $5, true, $6) 
+             RETURNING id, name, email, phone, role, active, activated, created_at`,
+            [name, email.toLowerCase(), passwordHash, phone || null, role, activated]
         );
 
         const user = result.rows[0];
 
-        // Set default permissions
-        await setDefaultPermissions(user.id, user.role);
+        if (activated) {
+            await setDefaultPermissions(user.id, user.role);
+        } else {
+            await setInactivePermissions(user.id);
+        }
 
-        // Generate JWT
         const token = jwt.sign(
             { id: user.id, email: user.email, name: user.name, role: user.role },
             JWT_SECRET,
             { expiresIn: JWT_EXPIRES_IN }
         );
 
-        // Update last_login
         await db.query('UPDATE app_user SET last_login = NOW() WHERE id = $1', [user.id]);
 
+        const permsResult = await db.query(
+            'SELECT permission_key FROM user_permissions WHERE user_id = $1 AND granted = true',
+            [user.id]
+        );
+        const permissions = permsResult.rows.map(p => p.permission_key);
+
         res.status(201).json({
-            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, activated: user.activated },
+            permissions,
             token,
         });
     } catch (err) {
         next(err);
     }
 });
-
-// ============================================================================
-// POST /auth/login
-// ============================================================================
 
 router.post('/login', async (req, res, next) => {
     try {
@@ -147,7 +162,6 @@ router.post('/login', async (req, res, next) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Find user
         const result = await db.query(
             'SELECT * FROM app_user WHERE email = $1',
             [email.toLowerCase()]
@@ -159,27 +173,22 @@ router.post('/login', async (req, res, next) => {
 
         const user = result.rows[0];
 
-        // Check if active
         if (!user.active) {
             return res.status(403).json({ error: 'Account is deactivated. Contact an administrator.' });
         }
 
-        // Verify password
         if (!verifyPassword(password, user.password_hash)) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Generate JWT
         const token = jwt.sign(
             { id: user.id, email: user.email, name: user.name, role: user.role },
             JWT_SECRET,
             { expiresIn: JWT_EXPIRES_IN }
         );
 
-        // Update last_login
         await db.query('UPDATE app_user SET last_login = NOW() WHERE id = $1', [user.id]);
 
-        // Fetch permissions
         const permsResult = await db.query(
             'SELECT permission_key, granted FROM user_permissions WHERE user_id = $1',
             [user.id]
@@ -189,7 +198,7 @@ router.post('/login', async (req, res, next) => {
             .map(p => p.permission_key);
 
         res.json({
-            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, activated: user.activated },
             permissions,
             token,
         });
@@ -198,14 +207,10 @@ router.post('/login', async (req, res, next) => {
     }
 });
 
-// ============================================================================
-// GET /auth/me
-// ============================================================================
-
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
         const result = await db.query(
-            'SELECT id, name, email, phone, role, active, created_at, last_login FROM app_user WHERE id = $1',
+            'SELECT id, name, email, phone, role, active, activated, created_at, last_login FROM app_user WHERE id = $1',
             [req.user.id]
         );
 
@@ -215,7 +220,6 @@ router.get('/me', requireAuth, async (req, res, next) => {
 
         const user = result.rows[0];
 
-        // Fetch permissions
         const permsResult = await db.query(
             'SELECT permission_key, granted FROM user_permissions WHERE user_id = $1',
             [user.id]
@@ -231,3 +235,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.DEFAULT_PERMISSIONS = DEFAULT_PERMISSIONS;
+module.exports.INACTIVE_PERMISSIONS = INACTIVE_PERMISSIONS;
+module.exports.setDefaultPermissions = setDefaultPermissions;
+module.exports.setInactivePermissions = setInactivePermissions;
