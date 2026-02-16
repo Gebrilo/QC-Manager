@@ -1,3 +1,5 @@
+import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog } from 'lucide-react';
+
 export interface RouteConfig {
     path: string;
     label: string;
@@ -6,6 +8,7 @@ export interface RouteConfig {
     requiresActivation?: boolean;
     showInNavbar?: boolean;
     navOrder?: number;
+    icon?: LucideIcon;
     onboardingStep?: number;
     onboardingGroup?: string;
 }
@@ -15,28 +18,28 @@ const PUBLIC_PATHS = ['/login', '/register'];
 const ROUTES: RouteConfig[] = [
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Register' },
-    { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1 },
-    { path: '/dashboard', label: 'Dashboard', permission: 'page:dashboard', requiresActivation: true, showInNavbar: true, navOrder: 2 },
-    { path: '/tasks', label: 'Tasks', permission: 'page:tasks', requiresActivation: true, showInNavbar: true, navOrder: 3 },
+    { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
+    { path: '/dashboard', label: 'Dashboard', permission: 'page:dashboard', requiresActivation: true, showInNavbar: true, navOrder: 2, icon: LayoutDashboard },
+    { path: '/tasks', label: 'Tasks', permission: 'page:tasks', requiresActivation: true, showInNavbar: true, navOrder: 3, icon: ListTodo },
     { path: '/tasks/create', label: 'Create Task', permission: 'page:tasks', requiresActivation: true },
     { path: '/tasks/[id]', label: 'Task Details', permission: 'page:tasks', requiresActivation: true },
     { path: '/tasks/[id]/edit', label: 'Edit Task', permission: 'page:tasks', requiresActivation: true },
-    { path: '/projects', label: 'Projects', permission: 'page:projects', requiresActivation: true, showInNavbar: true, navOrder: 4 },
+    { path: '/projects', label: 'Projects', permission: 'page:projects', requiresActivation: true, showInNavbar: true, navOrder: 4, icon: FolderKanban },
     { path: '/projects/create', label: 'Create Project', permission: 'page:projects', requiresActivation: true },
     { path: '/projects/[id]', label: 'Project Details', permission: 'page:projects', requiresActivation: true },
     { path: '/projects/[id]/edit', label: 'Edit Project', permission: 'page:projects', requiresActivation: true },
     { path: '/projects/[id]/quality', label: 'Project Quality', permission: 'page:projects', requiresActivation: true },
-    { path: '/resources', label: 'Resources', permission: 'page:resources', requiresActivation: true, showInNavbar: true, navOrder: 5 },
+    { path: '/resources', label: 'Resources', permission: 'page:resources', requiresActivation: true, showInNavbar: true, navOrder: 5, icon: Users },
     { path: '/resources/create', label: 'Create Resource', permission: 'page:resources', requiresActivation: true },
-    { path: '/governance', label: 'Governance', permission: 'page:governance', requiresActivation: true, showInNavbar: true, navOrder: 6 },
-    { path: '/test-executions', label: 'Test Runs', permission: 'page:test-executions', requiresActivation: true, showInNavbar: true, navOrder: 7 },
+    { path: '/governance', label: 'Governance', permission: 'page:governance', requiresActivation: true, showInNavbar: true, navOrder: 6, icon: ShieldCheck },
+    { path: '/test-executions', label: 'Test Runs', permission: 'page:test-executions', requiresActivation: true, showInNavbar: true, navOrder: 7, icon: FlaskConical },
     { path: '/test-cases', label: 'Test Cases', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results', label: 'Test Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results/upload', label: 'Upload Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/task-history', label: 'Task History', permission: 'page:tasks', requiresActivation: true },
-    { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8 },
+    { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8, icon: BarChart3 },
     { path: '/settings', label: 'Settings', adminOnly: true, requiresActivation: true },
-    { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9 },
+    { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9, icon: UserCog },
     { path: '/preferences', label: 'Preferences', requiresActivation: false },
     { path: '/test', label: 'Test', requiresActivation: false },
 ];

@@ -5,7 +5,9 @@ import './globals.css';
 import { ThemeProvider } from '../src/components/providers/ThemeProvider';
 import { AuthProvider } from '../src/components/providers/AuthProvider';
 import { RouteGuard } from '../src/components/providers/RouteGuard';
-import { Header } from '../src/components/layout/Header';
+import { SidebarProvider } from '../src/components/providers/SidebarProvider';
+import { Sidebar } from '../src/components/layout/Sidebar';
+import { TopBar } from '../src/components/layout/TopBar';
 import { ActivationBanner } from '../src/components/ui/ActivationBanner';
 import { usePathname } from 'next/navigation';
 
@@ -27,17 +29,24 @@ export default function RootLayout({
                 <ThemeProvider>
                     <AuthProvider>
                         <RouteGuard>
-                            {isAuthPage ? (
-                                children
-                            ) : (
-                                <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-                                    <Header />
-                                    <ActivationBanner />
-                                    <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                                        {children}
-                                    </main>
-                                </div>
-                            )}
+                            <SidebarProvider>
+                                {isAuthPage ? (
+                                    children
+                                ) : (
+                                    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+                                        <Sidebar />
+                                        <div className="flex-1 flex flex-col min-w-0">
+                                            <TopBar />
+                                            <ActivationBanner />
+                                            <main className="flex-1 overflow-y-auto">
+                                                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                                                    {children}
+                                                </div>
+                                            </main>
+                                        </div>
+                                    </div>
+                                )}
+                            </SidebarProvider>
                         </RouteGuard>
                     </AuthProvider>
                 </ThemeProvider>
