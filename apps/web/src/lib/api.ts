@@ -359,6 +359,36 @@ export const testCasesApi = {
 };
 
 // ============================================================================
+// API Client - Notifications
+// ============================================================================
+
+export interface AppNotification {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    read: boolean;
+    metadata: Record<string, any>;
+    created_at: string;
+}
+
+export const notificationsApi = {
+    list: (unreadOnly = false, limit = 20) =>
+        fetchApi<{ notifications: AppNotification[]; unread_count: number }>(
+            `/notifications?unread_only=${unreadOnly}&limit=${limit}`
+        ),
+
+    markRead: (id: string) =>
+        fetchApi<AppNotification>(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+    markAllRead: () =>
+        fetchApi<{ success: boolean }>('/notifications/read-all', { method: 'PATCH' }),
+
+    delete: (id: string) =>
+        fetchApi<void>(`/notifications/${id}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
 // Health Check
 // ============================================================================
 

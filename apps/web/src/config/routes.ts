@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History } from 'lucide-react';
 
 export interface RouteConfig {
     path: string;
@@ -36,7 +36,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/test-cases', label: 'Test Cases', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results', label: 'Test Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results/upload', label: 'Upload Results', permission: 'page:test-executions', requiresActivation: true },
-    { path: '/task-history', label: 'Task History', permission: 'page:tasks', requiresActivation: true },
+    { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },
     { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8, icon: BarChart3 },
     { path: '/settings', label: 'Settings', adminOnly: true, requiresActivation: true },
     { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9, icon: UserCog },

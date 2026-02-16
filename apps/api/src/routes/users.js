@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
+const { createNotification } = require('./notifications');
 
 router.use(requireAuth, requireRole('admin'));
 
@@ -81,6 +82,17 @@ router.patch('/:id', async (req, res, next) => {
         }
 
         res.json(updatedUser);
+
+        // Notify user if they were just activated
+        if (activated && updatedUser.activated) {
+            createNotification(
+                id,
+                'user_activated',
+                'Account Activated',
+                'Your account has been activated. You now have full access to the platform.',
+                {}
+            );
+        }
     } catch (err) {
         next(err);
     }
@@ -130,6 +142,30 @@ router.put('/:id/permissions', async (req, res, next) => {
         );
 
         res.json(result.rows);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        if (id === req.user.id) {
+            return res.status(400).json({ error: 'Cannot delete yourself' });
+        }
+
+        const userCheck = await db.query('SELECT id, name, email FROM app_user WHERE id = $1', [id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Delete permissions first
+        await db.query('DELETE FROM user_permissions WHERE user_id = $1', [id]);
+        // Delete the user
+        await db.query('DELETE FROM app_user WHERE id = $1', [id]);
+
+        res.status(204).send();
     } catch (err) {
         next(err);
     }

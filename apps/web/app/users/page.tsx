@@ -61,6 +61,8 @@ export default function UsersPage() {
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
     const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState<string | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState<UserRecord | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -190,6 +192,26 @@ export default function UsersPage() {
         }
     };
 
+    const handleDeleteUser = async (userId: string) => {
+        setDeleting(true);
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to delete user');
+            }
+            setDeleteConfirm(null);
+            await fetchUsers();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const formatDate = (d: string | null) => {
         if (!d) return 'Never';
         return new Date(d).toLocaleDateString('en-US', {
@@ -232,8 +254,8 @@ export default function UsersPage() {
                         <div
                             key={u.id}
                             className={`bg-white dark:bg-slate-900 border rounded-xl transition-all ${expandedUser === u.id
-                                    ? 'border-indigo-300 dark:border-indigo-700 shadow-lg shadow-indigo-500/5'
-                                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                ? 'border-indigo-300 dark:border-indigo-700 shadow-lg shadow-indigo-500/5'
+                                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                                 }`}
                         >
                             {/* User Row */}
@@ -243,8 +265,8 @@ export default function UsersPage() {
                             >
                                 {/* Avatar */}
                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${u.active
-                                        ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600'
+                                    ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600'
                                     }`}>
                                     {u.name.charAt(0).toUpperCase()}
                                 </div>
@@ -326,6 +348,22 @@ export default function UsersPage() {
                                     {formatDate(u.last_login)}
                                 </div>
 
+                                {/* Delete Button */}
+                                {u.id !== currentUser?.id && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDeleteConfirm(u);
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                                        title="Delete user permanently"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                )}
+
                                 {/* Expand Arrow */}
                                 <svg
                                     className={`w-4 h-4 text-slate-400 transition-transform ${expandedUser === u.id ? 'rotate-180' : ''}`}
@@ -384,6 +422,52 @@ export default function UsersPage() {
                             <p className="text-sm mt-1">Users will appear here once they register</p>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Delete User</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                            Are you sure you want to permanently delete <strong>{deleteConfirm.name}</strong> ({deleteConfirm.email})? All their data and permissions will be removed.
+                        </p>
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                disabled={deleting}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteUser(deleteConfirm.id)}
+                                disabled={deleting}
+                                className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {deleting ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Deleting...
+                                    </>
+                                ) : 'Delete Permanently'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

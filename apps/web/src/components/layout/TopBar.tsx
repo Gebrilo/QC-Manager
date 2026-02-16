@@ -6,6 +6,7 @@ import { useAuth } from '../providers/AuthProvider';
 import { useSidebar } from '../providers/SidebarProvider';
 import { getLandingPage } from '../../config/routes';
 import { Menu, Moon, Sun, LogOut } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export function TopBar() {
     const { theme, toggleTheme } = useTheme();
@@ -48,6 +49,8 @@ export function TopBar() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                    <NotificationBell />
+
                     <button
                         onClick={toggleTheme}
                         className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { notifyAdmins } = require('./notifications');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
 const JWT_EXPIRES_IN = '7d';
@@ -24,7 +25,7 @@ const DEFAULT_PERMISSIONS = {
     admin: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-        'page:my-tasks',
+        'page:my-tasks', 'page:task-history',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit', 'action:projects:delete',
         'action:resources:create', 'action:resources:edit', 'action:resources:delete',
@@ -34,7 +35,7 @@ const DEFAULT_PERMISSIONS = {
     manager: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports',
-        'page:my-tasks',
+        'page:my-tasks', 'page:task-history',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit',
         'action:resources:create', 'action:resources:edit',
@@ -149,6 +150,14 @@ router.post('/register', async (req, res, next) => {
             permissions,
             token,
         });
+
+        // Notify admins about new registration (fire-and-forget)
+        notifyAdmins(
+            'user_registered',
+            'New User Registered',
+            `${user.name} (${user.email}) has registered and is awaiting activation.`,
+            { user_id: user.id, user_name: user.name, user_email: user.email }
+        );
     } catch (err) {
         next(err);
     }
