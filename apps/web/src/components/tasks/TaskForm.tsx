@@ -134,14 +134,21 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
     };
 
     const projectOptions = projects.map(p => ({ value: p.id, label: `${p.project_id} - ${p.project_name || 'Unnamed'}` }));
-    const resourceOptions = resources.map(r => ({ value: r.id, label: r.resource_name || r.name || 'Unnamed' }));
+    const activeResources = resources.filter(r => r.is_active !== false);
+    const resourceOptions = activeResources.map(r => {
+        const util = r.utilization_pct != null ? ` (${Number(r.utilization_pct).toFixed(0)}% utilized)` : '';
+        return { value: r.id, label: `${r.resource_name || r.name || 'Unnamed'}${util}` };
+    });
 
     // Filter out resource 1 from resource 2 options
     const resource2Options = [
         { value: '', label: '-- None --' },
-        ...resources
+        ...activeResources
             .filter(r => r.id !== resource1Value)
-            .map(r => ({ value: r.id, label: r.resource_name || r.name || 'Unnamed' }))
+            .map(r => {
+                const util = r.utilization_pct != null ? ` (${Number(r.utilization_pct).toFixed(0)}% utilized)` : '';
+                return { value: r.id, label: `${r.resource_name || r.name || 'Unnamed'}${util}` };
+            })
     ];
 
     return (

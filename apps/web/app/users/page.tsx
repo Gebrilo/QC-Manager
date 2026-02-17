@@ -18,6 +18,12 @@ interface UserRecord {
     last_login: string | null;
 }
 
+interface LinkedResource {
+    user_id: string;
+    resource_id: string;
+    resource_name: string;
+}
+
 interface Permission {
     permission_key: string;
     granted: boolean;
@@ -63,6 +69,27 @@ export default function UsersPage() {
     const [saving, setSaving] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<UserRecord | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [linkedResources, setLinkedResources] = useState<Record<string, LinkedResource>>({});
+    const [convertTarget, setConvertTarget] = useState<UserRecord | null>(null);
+    const [converting, setConverting] = useState(false);
+    const [convertForm, setConvertForm] = useState({ weekly_capacity_hrs: 40, department: '', role: '' });
+
+    const fetchResources = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/resources`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const linked: Record<string, LinkedResource> = {};
+            (data.data || data).forEach((r: any) => {
+                if (r.user_id) {
+                    linked[r.user_id] = { user_id: r.user_id, resource_id: r.id, resource_name: r.resource_name };
+                }
+            });
+            setLinkedResources(linked);
+        } catch { /* non-critical */ }
+    }, [token]);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -80,8 +107,11 @@ export default function UsersPage() {
     }, [token]);
 
     useEffect(() => {
-        if (token && isAdmin) fetchUsers();
-    }, [token, isAdmin, fetchUsers]);
+        if (token && isAdmin) {
+            fetchUsers();
+            fetchResources();
+        }
+    }, [token, isAdmin, fetchUsers, fetchResources]);
 
     const fetchPermissions = async (userId: string) => {
         try {
@@ -209,6 +239,35 @@ export default function UsersPage() {
             setError(err.message);
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleConvertToResource = async (userId: string) => {
+        setConverting(true);
+        try {
+            const res = await fetch(`${API_URL}/users/${userId}/convert-to-resource`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    weekly_capacity_hrs: convertForm.weekly_capacity_hrs,
+                    department: convertForm.department || undefined,
+                    role: convertForm.role || undefined,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to convert user to resource');
+            }
+            setConvertTarget(null);
+            setConvertForm({ weekly_capacity_hrs: 40, department: '', role: '' });
+            await fetchResources();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setConverting(false);
         }
     };
 
@@ -348,6 +407,31 @@ export default function UsersPage() {
                                     {formatDate(u.last_login)}
                                 </div>
 
+                                {/* Convert to Resource / Resource Badge */}
+                                {linkedResources[u.id] ? (
+                                    <span
+                                        className="text-[10px] font-medium px-2 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 flex items-center gap-1"
+                                        title={`Linked to resource: ${linkedResources[u.id].resource_name}`}
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Resource
+                                    </span>
+                                ) : u.activated && u.id !== currentUser?.id ? (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setConvertTarget(u);
+                                            setConvertForm({ weekly_capacity_hrs: 40, department: '', role: '' });
+                                        }}
+                                        className="text-[10px] font-medium px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                                        title="Convert this user into an assignable resource"
+                                    >
+                                        + Resource
+                                    </button>
+                                ) : null}
+
                                 {/* Delete Button */}
                                 {u.id !== currentUser?.id && (
                                     <button
@@ -465,6 +549,85 @@ export default function UsersPage() {
                                         Deleting...
                                     </>
                                 ) : 'Delete Permanently'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Convert to Resource Dialog */}
+            {convertTarget && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConvertTarget(null)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Convert to Resource</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">{convertTarget.name} ({convertTarget.email})</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                            This will create a resource record linked to this user, making them assignable to tasks.
+                        </p>
+                        <div className="space-y-3 mb-6">
+                            <div>
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Weekly Capacity (hrs)</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={80}
+                                    value={convertForm.weekly_capacity_hrs}
+                                    onChange={(e) => setConvertForm(f => ({ ...f, weekly_capacity_hrs: parseInt(e.target.value) || 40 }))}
+                                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Department (optional)</label>
+                                <input
+                                    type="text"
+                                    value={convertForm.department}
+                                    onChange={(e) => setConvertForm(f => ({ ...f, department: e.target.value }))}
+                                    placeholder="e.g. QA, Engineering"
+                                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role (optional)</label>
+                                <input
+                                    type="text"
+                                    value={convertForm.role}
+                                    onChange={(e) => setConvertForm(f => ({ ...f, role: e.target.value }))}
+                                    placeholder="e.g. QC Engineer, Lead"
+                                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setConvertTarget(null)}
+                                disabled={converting}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleConvertToResource(convertTarget.id)}
+                                disabled={converting}
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {converting ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Converting...
+                                    </>
+                                ) : 'Convert to Resource'}
                             </button>
                         </div>
                     </div>

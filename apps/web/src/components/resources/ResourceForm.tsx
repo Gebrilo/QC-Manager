@@ -30,6 +30,7 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
     const [error, setError] = useState<string | null>(null);
 
     const isEdit = !!resource;
+    const isLinkedUser = !!resource?.user_id;
 
     const {
         register,
@@ -51,18 +52,24 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
         setIsSubmitting(true);
         setError(null);
         try {
-            const payload = {
-                resource_name: data.resource_name,
+            const payload: Record<string, any> = {
                 weekly_capacity_hrs: Number(data.weekly_capacity_hrs),
-                email: data.email || undefined,
                 department: data.department || undefined,
                 role: data.role || undefined,
                 is_active: data.is_active
             };
 
+            // Don't send name/email for user-linked resources (synced from user)
+            if (!isLinkedUser) {
+                payload.resource_name = data.resource_name;
+                payload.email = data.email || undefined;
+            }
+
             if (isEdit && resource) {
                 await resourcesApi.update(resource.id, payload);
             } else {
+                payload.resource_name = data.resource_name;
+                payload.email = data.email || undefined;
                 await resourcesApi.create(payload);
             }
 
@@ -85,6 +92,15 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
                 </div>
             )}
 
+            {isLinkedUser && (
+                <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl px-4 py-3 text-teal-700 dark:text-teal-400 text-sm flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    Linked to a user account. Name and email are synced automatically.
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                     <Input
@@ -92,8 +108,9 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
                         {...register('resource_name')}
                         error={errors.resource_name?.message}
                         placeholder="e.g. John Doe"
-                        className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        className={`bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 ${isLinkedUser ? 'opacity-60 cursor-not-allowed' : ''}`}
                         required
+                        disabled={isLinkedUser}
                     />
                 </div>
 
@@ -103,7 +120,8 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
                     {...register('email')}
                     error={errors.email?.message}
                     placeholder="email@example.com"
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    className={`bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 ${isLinkedUser ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    disabled={isLinkedUser}
                 />
 
                 <Input
@@ -151,18 +169,18 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                <Button 
-                    type="button" 
-                    variant="outline" 
+                <Button
+                    type="button"
+                    variant="outline"
                     onClick={onCancel}
                     disabled={isSubmitting}
                     className="w-24 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                 >
                     Cancel
                 </Button>
-                <Button 
-                    type="submit" 
-                    disabled={isSubmitting} 
+                <Button
+                    type="submit"
+                    disabled={isSubmitting}
                     className="w-36 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 border-none"
                 >
                     {isSubmitting ? (

@@ -45,6 +45,11 @@ export function ResourceTable({
                         {!info.row.original.is_active && (
                             <Badge variant="secondary">Inactive</Badge>
                         )}
+                        {info.row.original.user_id && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+                                Linked
+                            </span>
+                        )}
                     </div>
                 ),
             }),
@@ -97,8 +102,8 @@ export function ResourceTable({
                             <div className="flex items-center gap-2">
                                 <ProgressBar value={Math.min(utilization, 100)} max={100} color={color} />
                                 <span className={`text-sm font-medium ${utilization > 100 ? 'text-red-600 dark:text-red-400' :
-                                        utilization > 80 ? 'text-yellow-600 dark:text-yellow-400' :
-                                            'text-green-600 dark:text-green-400'
+                                    utilization > 80 ? 'text-yellow-600 dark:text-yellow-400' :
+                                        'text-green-600 dark:text-green-400'
                                     }`}>
                                     {utilization.toFixed(0)}%
                                 </span>

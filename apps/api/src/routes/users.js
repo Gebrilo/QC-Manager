@@ -147,6 +147,69 @@ router.put('/:id/permissions', async (req, res, next) => {
     }
 });
 
+router.post('/:id/convert-to-resource', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { weekly_capacity_hrs, department, role } = req.body;
+
+        // Validate user exists and is activated
+        const userCheck = await db.query(
+            'SELECT id, name, email, activated FROM app_user WHERE id = $1',
+            [id]
+        );
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = userCheck.rows[0];
+        if (!user.activated) {
+            return res.status(400).json({ error: 'User must be activated before converting to a resource' });
+        }
+
+        // Check for existing linked resource
+        const existingResource = await db.query(
+            'SELECT id, resource_name FROM resources WHERE user_id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+        if (existingResource.rows.length > 0) {
+            return res.status(409).json({
+                error: 'User is already linked to a resource',
+                resource_id: existingResource.rows[0].id,
+                resource_name: existingResource.rows[0].resource_name
+            });
+        }
+
+        // Create the resource record
+        const result = await db.query(
+            `INSERT INTO resources (
+                resource_name, user_id, email, weekly_capacity_hrs, department, role, is_active, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+            RETURNING *`,
+            [
+                user.name,
+                id,
+                user.email,
+                weekly_capacity_hrs || 40,
+                department || null,
+                role || null,
+                req.user?.email || 'system'
+            ]
+        );
+
+        const resource = result.rows[0];
+
+        // Return with utilization metrics from view
+        const viewResult = await db.query(
+            'SELECT * FROM v_resources_with_utilization WHERE id = $1',
+            [resource.id]
+        );
+
+        res.status(201).json(viewResult.rows[0] || resource);
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.delete('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;

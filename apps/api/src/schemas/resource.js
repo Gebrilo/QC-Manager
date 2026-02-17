@@ -2,6 +2,7 @@ const { z } = require('zod');
 
 const createResourceSchema = z.object({
     resource_name: z.string().min(1, 'Name is required').max(100),
+    user_id: z.string().uuid().optional().nullable(),
     weekly_capacity_hrs: z.number().int().min(1).max(80).default(40),
     email: z.string().email().optional().nullable(),
     department: z.string().max(100).optional(),

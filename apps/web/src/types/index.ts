@@ -23,12 +23,19 @@ export interface Resource {
     id: string;
     name?: string; // Legacy, use resource_name
     resource_name: string;
+    user_id?: string;
     role?: string;
     weekly_capacity_hrs: number;
     email?: string;
     department?: string;
     is_active: boolean;
     status?: 'active' | 'inactive'; // Computed from is_active
+    // View fields from v_resources_with_utilization
+    current_allocation_hrs?: number;
+    utilization_pct?: number;
+    available_hrs?: number;
+    active_tasks_count?: number;
+    backlog_tasks_count?: number;
 }
 
 export interface Task {

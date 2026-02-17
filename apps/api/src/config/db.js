@@ -49,6 +49,7 @@ const runMigrations = async () => {
             CREATE TABLE IF NOT EXISTS resources (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 resource_name VARCHAR(100) NOT NULL,
+                user_id UUID,
                 weekly_capacity_hrs INTEGER NOT NULL DEFAULT 40,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 email VARCHAR(255),
@@ -62,6 +63,17 @@ const runMigrations = async () => {
                 deleted_by VARCHAR(255)
             )
         `);
+
+        // Add user_id column to resources if not exists (links to app_user)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resources' AND column_name='user_id') THEN
+                    ALTER TABLE resources ADD COLUMN user_id UUID;
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_user_id_active ON resources(user_id) WHERE deleted_at IS NULL AND user_id IS NOT NULL`);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS tasks (
@@ -501,6 +513,7 @@ const runMigrations = async () => {
             SELECT
                 r.id,
                 r.resource_name,
+                r.user_id,
                 r.weekly_capacity_hrs,
                 r.is_active,
                 r.email,

@@ -112,6 +112,7 @@ export interface Task {
 export interface Resource {
     id: string;
     resource_name: string;
+    user_id?: string;
     weekly_capacity_hrs: number;
     is_active: boolean;
     email?: string;
