@@ -4,7 +4,12 @@ const db = require('../config/db');
 const { createResourceSchema, updateResourceSchema } = require('../schemas/resource');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireRole } = require('../middleware/authMiddleware');
+const { computeTaskTimeline } = require('../utils/workingDays');
+
+// ========================================
+// Resource Analytics Dashboard
+// ========================================
 
 // GET all resources with utilization metrics (from view)
 router.get('/', async (req, res, next) => {
@@ -15,6 +20,109 @@ router.get('/', async (req, res, next) => {
             ORDER BY resource_name ASC
         `);
         res.json(result.rows);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET resource analytics dashboard (admin/manager only)
+router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Profile + utilization from view
+        const profileResult = await db.query(`
+            SELECT * FROM v_resources_with_utilization WHERE id = $1
+        `, [id]);
+
+        if (profileResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Resource not found' });
+        }
+        const resource = profileResult.rows[0];
+
+        // 2. Current week actuals (Monday–Sunday ISO week)
+        const weekActualsResult = await db.query(`
+            SELECT
+                COALESCE(SUM(
+                    CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_actual_hrs, 0) ELSE 0 END +
+                    CASE WHEN t.resource2_id = $1 THEN COALESCE(t.r2_actual_hrs, 0) ELSE 0 END
+                ), 0) AS current_week_actual_hrs
+            FROM tasks t
+            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+              AND t.deleted_at IS NULL
+              AND t.status IN ('In Progress', 'Done')
+              AND t.updated_at >= date_trunc('week', CURRENT_DATE)
+              AND t.updated_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+        `, [id]);
+
+        // 3. Backlog: total estimated hours for incomplete tasks
+        const backlogResult = await db.query(`
+            SELECT
+                COALESCE(SUM(
+                    CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_estimate_hrs, 0) ELSE 0 END +
+                    CASE WHEN t.resource2_id = $1 THEN COALESCE(t.r2_estimate_hrs, 0) ELSE 0 END
+                ), 0) AS backlog_hrs
+            FROM tasks t
+            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+              AND t.deleted_at IS NULL
+              AND t.status IN ('Backlog', 'In Progress')
+        `, [id]);
+
+        // 4. Assigned tasks list with timeline date fields
+        const tasksResult = await db.query(`
+            SELECT t.id, t.task_id, t.task_name, t.status, t.priority,
+                   p.project_name,
+                   CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_estimate_hrs, 0) ELSE COALESCE(t.r2_estimate_hrs, 0) END AS estimate_hrs,
+                   CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_actual_hrs, 0) ELSE COALESCE(t.r2_actual_hrs, 0) END AS actual_hrs,
+                   CASE WHEN t.resource1_id = $1 THEN 'Primary' ELSE 'Secondary' END AS assignment_role,
+                   t.expected_start_date,
+                   t.actual_start_date,
+                   t.completed_date,
+                   t.deadline,
+                   t.estimate_days
+            FROM tasks t
+            LEFT JOIN projects p ON t.project_id = p.id
+            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+              AND t.deleted_at IS NULL
+            ORDER BY 
+                CASE t.status WHEN 'In Progress' THEN 1 WHEN 'Backlog' THEN 2 WHEN 'Done' THEN 3 ELSE 4 END,
+                t.created_at DESC
+        `, [id]);
+
+        // 5. Compute timeline metrics per task
+        const now = new Date();
+        const timelineSummary = { on_track: 0, at_risk: 0, overdue: 0, completed_early: 0 };
+
+        const enrichedTasks = tasksResult.rows.map(task => {
+            const timeline = computeTaskTimeline(task, now);
+            if (timeline.health_status && timelineSummary[timeline.health_status] !== undefined) {
+                timelineSummary[timeline.health_status]++;
+            }
+            return { ...task, ...timeline };
+        });
+
+        res.json({
+            profile: {
+                id: resource.id,
+                resource_name: resource.resource_name,
+                email: resource.email,
+                department: resource.department,
+                role: resource.role,
+                is_active: resource.is_active,
+                user_id: resource.user_id,
+            },
+            utilization: {
+                weekly_capacity_hrs: Number(resource.weekly_capacity_hrs),
+                current_allocation_hrs: Number(resource.current_allocation_hrs || 0),
+                utilization_pct: Number(resource.utilization_pct || 0),
+                active_tasks_count: Number(resource.active_tasks_count || 0),
+                backlog_tasks_count: Number(resource.backlog_tasks_count || 0),
+            },
+            current_week_actual_hrs: Number(weekActualsResult.rows[0]?.current_week_actual_hrs || 0),
+            backlog_hrs: Number(backlogResult.rows[0]?.backlog_hrs || 0),
+            timeline_summary: timelineSummary,
+            tasks: enrichedTasks,
+        });
     } catch (err) {
         next(err);
     }

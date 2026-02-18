@@ -709,6 +709,16 @@ const runMigrations = async () => {
 
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id)`);
 
+        // Custom roles table for RBAC management
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS custom_roles (
+                name VARCHAR(50) PRIMARY KEY,
+                permissions TEXT[] NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(255)
+            )
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

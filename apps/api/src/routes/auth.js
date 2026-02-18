@@ -25,7 +25,7 @@ const DEFAULT_PERMISSIONS = {
     admin: [
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-        'page:my-tasks', 'page:task-history',
+        'page:my-tasks', 'page:task-history', 'page:roles',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit', 'action:projects:delete',
         'action:resources:create', 'action:resources:edit', 'action:resources:delete',
@@ -69,7 +69,18 @@ const INACTIVE_PERMISSIONS = [
 ];
 
 async function setDefaultPermissions(userId, role) {
-    const permissions = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.viewer;
+    let permissions = DEFAULT_PERMISSIONS[role];
+
+    // If not a built-in role, check custom_roles table
+    if (!permissions) {
+        try {
+            const result = await db.query('SELECT permissions FROM custom_roles WHERE name = $1', [role]);
+            permissions = result.rows.length > 0 ? result.rows[0].permissions : DEFAULT_PERMISSIONS.viewer;
+        } catch {
+            permissions = DEFAULT_PERMISSIONS.viewer;
+        }
+    }
+
     await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
     for (const perm of permissions) {
         await db.query(

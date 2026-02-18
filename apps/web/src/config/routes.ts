@@ -31,6 +31,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/projects/[id]/quality', label: 'Project Quality', permission: 'page:projects', requiresActivation: true },
     { path: '/resources', label: 'Resources', permission: 'page:resources', requiresActivation: true, showInNavbar: true, navOrder: 5, icon: Users },
     { path: '/resources/create', label: 'Create Resource', permission: 'page:resources', requiresActivation: true },
+    { path: '/resources/[id]', label: 'Resource Dashboard', permission: 'page:resources', requiresActivation: true },
     { path: '/governance', label: 'Governance', permission: 'page:governance', requiresActivation: true, showInNavbar: true, navOrder: 6, icon: ShieldCheck },
     { path: '/test-executions', label: 'Test Runs', permission: 'page:test-executions', requiresActivation: true, showInNavbar: true, navOrder: 7, icon: FlaskConical },
     { path: '/test-cases', label: 'Test Cases', permission: 'page:test-executions', requiresActivation: true },
@@ -39,7 +40,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },
     { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8, icon: BarChart3 },
     { path: '/settings', label: 'Settings', adminOnly: true, requiresActivation: true },
-    { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9, icon: UserCog },
+    { path: '/settings/roles', label: 'Roles & Permissions', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
+    { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/preferences', label: 'Preferences', requiresActivation: false },
     { path: '/test', label: 'Test', requiresActivation: false },
 ];

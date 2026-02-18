@@ -4,7 +4,19 @@ const db = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
+
+/**
+ * Helper: Get the resource ID linked to the current user.
+ * Returns null if the user has no linked resource.
+ */
+async function getUserResourceId(userId) {
+    const result = await db.query(
+        'SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL AND is_active = true LIMIT 1',
+        [userId]
+    );
+    return result.rows.length > 0 ? result.rows[0].id : null;
+}
 
 // Status transition validation
 const VALID_TRANSITIONS = {
@@ -49,13 +61,36 @@ function validateStatusTransition(currentStatus, newStatus, data) {
     return { valid: true };
 }
 
-// GET all tasks (joined/view)
-router.get('/', async (req, res, next) => {
+// GET all tasks (joined/view) — filtered by role
+router.get('/', optionalAuth, async (req, res, next) => {
     try {
+        const role = req.user?.role;
+        // Admins and managers see all tasks
+        if (role === 'admin' || role === 'manager') {
+            const result = await db.query(`
+                SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC
+            `);
+            return res.json(result.rows);
+        }
+
+        // Standard users: filter by their linked resource
+        if (req.user?.id) {
+            const resourceId = await getUserResourceId(req.user.id);
+            if (resourceId) {
+                const result = await db.query(`
+                    SELECT * FROM v_tasks_with_metrics
+                    WHERE resource1_id = $1 OR resource2_id = $1
+                    ORDER BY created_at DESC
+                `, [resourceId]);
+                return res.json(result.rows);
+            }
+            // User has no linked resource — return empty
+            return res.json([]);
+        }
+
+        // Unauthenticated fallback — return all (backward compat)
         const result = await db.query(`
-            SELECT *
-            FROM v_tasks_with_metrics 
-            ORDER BY created_at DESC
+            SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC
         `);
         res.json(result.rows);
     } catch (err) {
@@ -63,21 +98,37 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// GET single task by ID
-router.get('/:id', async (req, res, next) => {
+// GET single task by ID — with access check
+router.get('/:id', optionalAuth, async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`
-            SELECT *
-            FROM v_tasks_with_metrics 
-            WHERE id = $1
+            SELECT * FROM v_tasks_with_metrics WHERE id = $1
         `, [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        res.json(result.rows[0]);
+        const task = result.rows[0];
+        const role = req.user?.role;
+
+        // Admins/managers can see any task
+        if (role === 'admin' || role === 'manager') {
+            return res.json(task);
+        }
+
+        // Standard users: verify they are assigned to this task
+        if (req.user?.id) {
+            const resourceId = await getUserResourceId(req.user.id);
+            if (resourceId && (task.resource1_id === resourceId || task.resource2_id === resourceId)) {
+                return res.json(task);
+            }
+            return res.status(403).json({ error: 'You do not have access to this task' });
+        }
+
+        // Unauthenticated fallback
+        res.json(task);
     } catch (err) {
         next(err);
     }

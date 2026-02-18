@@ -35,10 +35,10 @@ export default function RootLayout({
                                 ) : (
                                     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
                                         <Sidebar />
-                                        <div className="flex-1 flex flex-col min-w-0">
+                                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                             <TopBar />
                                             <ActivationBanner />
-                                            <main className="flex-1 overflow-y-auto">
+                                            <main className="flex-1 min-h-0 overflow-y-auto">
                                                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                                                     {children}
                                                 </div>

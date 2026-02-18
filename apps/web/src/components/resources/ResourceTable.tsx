@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/components/providers/AuthProvider';
+import Link from 'next/link';
 
 interface ResourceTableProps {
     resources: Resource[];
@@ -31,6 +33,8 @@ export function ResourceTable({
     onDelete,
 }: ResourceTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
+    const { user } = useAuth();
+    const canViewDashboard = user?.role === 'admin' || user?.role === 'manager';
 
     const columns = useMemo(
         () => [
@@ -131,6 +135,14 @@ export function ResourceTable({
                 header: 'Actions',
                 cell: (info) => (
                     <div className="flex gap-2">
+                        {canViewDashboard && (
+                            <Link
+                                href={`/resources/${info.row.original.id}`}
+                                className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors border border-indigo-200 dark:border-indigo-800"
+                            >
+                                Dashboard
+                            </Link>
+                        )}
                         {onEdit && (
                             <Button
                                 variant="secondary"
