@@ -277,10 +277,10 @@ sleep 15
 docker compose -f "$COMPOSE_FILE" ps
 
 # --- API health check ---
-log "Checking API health (http://localhost:3001/health)..."
+log "Checking API health (https://${API_DOMAIN}/health)..."
 API_OK=false
 for i in 1 2 3 4 5; do
-  if curl -sf http://localhost:3001/health -o /dev/null; then
+  if curl -sfk https://${API_DOMAIN}/health -o /dev/null; then
     API_OK=true
     break
   fi
@@ -297,10 +297,10 @@ else
 fi
 
 # --- Web health check ---
-log "Checking web app (http://localhost:3000)..."
+log "Checking web app (https://${WEB_DOMAIN})..."
 WEB_OK=false
 for i in 1 2 3; do
-  if curl -sf http://localhost:3000 -o /dev/null; then
+  if curl -sfk https://${WEB_DOMAIN} -o /dev/null; then
     WEB_OK=true
     break
   fi
