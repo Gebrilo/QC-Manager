@@ -729,6 +729,23 @@ const runMigrations = async () => {
             )
         `);
 
+        // Notifications table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS notification (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                type VARCHAR(100) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT,
+                read BOOLEAN NOT NULL DEFAULT false,
+                metadata JSONB DEFAULT '{}',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_notification_user_id ON notification(user_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_notification_user_unread ON notification(user_id, read) WHERE read = false`);
+
         // =====================================================
         // EMPLOYEE JOURNEYS / ONBOARDING QUEST SYSTEM
         // =====================================================
