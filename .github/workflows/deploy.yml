@@ -67,7 +67,7 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
 
   # ===========================================================================
   # PRODUCTION DEPLOY (main branch)
@@ -104,7 +104,7 @@ jobs:
             REPO_URL="https://github.com/Gebrilo/QC-Manager.git"
 
             echo "=== Checking deployment directory ==="
-            if [ ! -d "$DEPLOY_DIR" ]; then
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
               echo "Cloning repository..."
               sudo mkdir -p "$DEPLOY_DIR"
               sudo chown $USER:$USER "$DEPLOY_DIR"
@@ -124,20 +124,19 @@ jobs:
             mkdir -p "$DEPLOY_DIR/backups"
 
             echo "=== Writing .env ==="
-            cat > .env << ENVEOF
-            DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}
-            WEB_DOMAIN=${WEB_DOMAIN}
-            API_DOMAIN=${API_DOMAIN}
-            POSTGRES_USER=qc_admin
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            POSTGRES_DB=qc_app
-            JWT_SECRET=${JWT_SECRET}
-            CORS_ORIGIN=${CORS_ORIGIN}
-            N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
-            BACKUP_PATH=./backups
-            BACKUP_RETENTION_DAYS=7
-            ENVEOF
-            sed -i 's/^            //' .env
+            {
+              echo "DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}"
+              echo "WEB_DOMAIN=${WEB_DOMAIN}"
+              echo "API_DOMAIN=${API_DOMAIN}"
+              echo "POSTGRES_USER=qc_admin"
+              echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+              echo "POSTGRES_DB=qc_app"
+              echo "JWT_SECRET=${JWT_SECRET}"
+              echo "CORS_ORIGIN=${CORS_ORIGIN}"
+              echo "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
+              echo "BACKUP_PATH=./backups"
+              echo "BACKUP_RETENTION_DAYS=7"
+            } > .env
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
@@ -189,7 +188,7 @@ jobs:
             REPO_URL="https://github.com/Gebrilo/QC-Manager.git"
 
             echo "=== Checking deployment directory ==="
-            if [ ! -d "$DEPLOY_DIR" ]; then
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
               echo "Cloning repository..."
               sudo mkdir -p "$DEPLOY_DIR"
               sudo chown $USER:$USER "$DEPLOY_DIR"
@@ -209,20 +208,19 @@ jobs:
             mkdir -p "$DEPLOY_DIR/backups-staging"
 
             echo "=== Writing .env.staging ==="
-            cat > .env.staging << ENVEOF
-            DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}
-            WEB_DOMAIN=${WEB_DOMAIN}
-            API_DOMAIN=${API_DOMAIN}
-            POSTGRES_USER=qc_staging_admin
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            POSTGRES_DB=qc_staging_app
-            JWT_SECRET=${JWT_SECRET}
-            CORS_ORIGIN=${CORS_ORIGIN}
-            N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
-            BACKUP_PATH=./backups-staging
-            BACKUP_RETENTION_DAYS=3
-            ENVEOF
-            sed -i 's/^            //' .env.staging
+            {
+              echo "DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}"
+              echo "WEB_DOMAIN=${WEB_DOMAIN}"
+              echo "API_DOMAIN=${API_DOMAIN}"
+              echo "POSTGRES_USER=qc_staging_admin"
+              echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+              echo "POSTGRES_DB=qc_staging_app"
+              echo "JWT_SECRET=${JWT_SECRET}"
+              echo "CORS_ORIGIN=${CORS_ORIGIN}"
+              echo "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
+              echo "BACKUP_PATH=./backups-staging"
+              echo "BACKUP_RETENTION_DAYS=3"
+            } > .env.staging
 
             echo "=== Docker login ==="
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
