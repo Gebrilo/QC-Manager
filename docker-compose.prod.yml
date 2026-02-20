@@ -74,6 +74,7 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN}
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=qc-shared-network"
       - "traefik.http.routers.qc-api.rule=Host(`${API_DOMAIN}`)"
       - "traefik.http.routers.qc-api.entrypoints=websecure"
       - "traefik.http.routers.qc-api.tls.certresolver=letsencrypt"
