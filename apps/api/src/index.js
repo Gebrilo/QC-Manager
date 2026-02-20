@@ -42,6 +42,8 @@ apiRouter.use('/bugs', require('./routes/bugs'));
 apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
 apiRouter.use('/my-tasks', require('./routes/personalTasks'));
 apiRouter.use('/roles', require('./routes/roles'));
+apiRouter.use('/journeys', require('./routes/journeys'));
+apiRouter.use('/my-journeys', require('./routes/myJourneys'));
 
 // Mount routes at both root and /api for compatibility
 app.use('/', apiRouter);

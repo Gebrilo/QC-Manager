@@ -83,7 +83,7 @@ router.patch('/:id', async (req, res, next) => {
 
         res.json(updatedUser);
 
-        // Notify user if they were just activated
+        // Notify user if they were just activated + auto-assign journeys
         if (activated && updatedUser.activated) {
             createNotification(
                 id,
@@ -92,6 +92,15 @@ router.patch('/:id', async (req, res, next) => {
                 'Your account has been activated. You now have full access to the platform.',
                 {}
             );
+
+            // Auto-assign active journeys with auto_assign_on_activation
+            db.query(
+                `INSERT INTO user_journey_assignments (user_id, journey_id)
+                 SELECT $1, j.id FROM journeys j
+                 WHERE j.auto_assign_on_activation = true AND j.is_active = true AND j.deleted_at IS NULL
+                 ON CONFLICT (user_id, journey_id) DO NOTHING`,
+                [id]
+            ).catch(err => console.error('Journey auto-assignment error:', err.message));
         }
     } catch (err) {
         next(err);

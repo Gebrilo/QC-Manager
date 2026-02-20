@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map } from 'lucide-react';
 
 export interface RouteConfig {
     path: string;
@@ -19,6 +19,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Register' },
     { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
+    { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map },
+    { path: '/journeys/[id]', label: 'Journey Details', permission: 'page:my-tasks', requiresActivation: false },
     { path: '/dashboard', label: 'Dashboard', permission: 'page:dashboard', requiresActivation: true, showInNavbar: true, navOrder: 2, icon: LayoutDashboard },
     { path: '/tasks', label: 'Tasks', permission: 'page:tasks', requiresActivation: true, showInNavbar: true, navOrder: 3, icon: ListTodo },
     { path: '/tasks/create', label: 'Create Task', permission: 'page:tasks', requiresActivation: true },
@@ -40,6 +42,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },
     { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8, icon: BarChart3 },
     { path: '/settings', label: 'Settings', adminOnly: true, requiresActivation: true },
+    { path: '/settings/journeys', label: 'Manage Journeys', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9.5, icon: Map },
+    { path: '/settings/journeys/[id]', label: 'Edit Journey', adminOnly: true, requiresActivation: true },
     { path: '/settings/roles', label: 'Roles & Permissions', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
     { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/preferences', label: 'Preferences', requiresActivation: false },

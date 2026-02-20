@@ -666,6 +666,16 @@ const runMigrations = async () => {
             END $$;
         `);
 
+        // Add onboarding_completed column for journey tracking
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='onboarding_completed') THEN
+                    ALTER TABLE app_user ADD COLUMN onboarding_completed BOOLEAN DEFAULT false;
+                END IF;
+            END $$;
+        `);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS personal_tasks (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -718,6 +728,203 @@ const runMigrations = async () => {
                 created_by VARCHAR(255)
             )
         `);
+
+        // =====================================================
+        // EMPLOYEE JOURNEYS / ONBOARDING QUEST SYSTEM
+        // =====================================================
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS journeys (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                slug VARCHAR(100) UNIQUE NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT true,
+                auto_assign_on_activation BOOLEAN DEFAULT true,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS journey_chapters (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                journey_id UUID NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+                slug VARCHAR(100) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                sort_order INTEGER DEFAULT 0,
+                is_mandatory BOOLEAN DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(journey_id, slug)
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS journey_quests (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                chapter_id UUID NOT NULL REFERENCES journey_chapters(id) ON DELETE CASCADE,
+                slug VARCHAR(100) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                sort_order INTEGER DEFAULT 0,
+                is_mandatory BOOLEAN DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(chapter_id, slug)
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS journey_tasks (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                quest_id UUID NOT NULL REFERENCES journey_quests(id) ON DELETE CASCADE,
+                slug VARCHAR(100) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                instructions TEXT,
+                validation_type VARCHAR(30) NOT NULL DEFAULT 'checkbox',
+                validation_config JSONB DEFAULT '{}',
+                sort_order INTEGER DEFAULT 0,
+                is_mandatory BOOLEAN DEFAULT true,
+                estimated_minutes INTEGER,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(quest_id, slug)
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_journey_assignments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                journey_id UUID NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+                assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP WITH TIME ZONE,
+                completed_at TIMESTAMP WITH TIME ZONE,
+                status VARCHAR(20) DEFAULT 'assigned',
+                UNIQUE(user_id, journey_id)
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_task_completions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                task_id UUID NOT NULL REFERENCES journey_tasks(id) ON DELETE CASCADE,
+                completed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                validation_data JSONB DEFAULT '{}',
+                UNIQUE(user_id, task_id)
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_chapters_journey ON journey_chapters(journey_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_quests_chapter ON journey_quests(chapter_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_tasks_quest ON journey_tasks(quest_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_journey_assignments_user ON user_journey_assignments(user_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_task_completions_user ON user_task_completions(user_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_task_completions_task ON user_task_completions(task_id)`);
+
+        // Seed: Day-One Essentials & Orientation journey
+        await client.query(`
+            INSERT INTO journeys (slug, title, description, is_active, auto_assign_on_activation, sort_order)
+            VALUES (
+                'day-one-essentials',
+                'Day-One Essentials & Orientation',
+                'Welcome to QC Manager! This journey will guide you through setting up your account, understanding our QC processes, and getting to know your team.',
+                true, true, 1
+            )
+            ON CONFLICT (slug) DO NOTHING
+        `);
+
+        // Seed chapters, quests, and tasks for the Day-One journey
+        const journeyResult = await client.query(`SELECT id FROM journeys WHERE slug = 'day-one-essentials'`);
+        if (journeyResult.rows.length > 0) {
+            const journeyId = journeyResult.rows[0].id;
+
+            // Chapter 1: Welcome & Account Setup (mandatory)
+            await client.query(`
+                INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory)
+                VALUES ($1, 'welcome-account-setup', 'Welcome & Account Setup', 'Get started by setting up your profile and exploring the platform.', 1, true)
+                ON CONFLICT (journey_id, slug) DO NOTHING
+            `, [journeyId]);
+
+            // Chapter 2: QC Processes Overview (mandatory)
+            await client.query(`
+                INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory)
+                VALUES ($1, 'qc-processes', 'QC Processes Overview', 'Learn about task management and test execution workflows.', 2, true)
+                ON CONFLICT (journey_id, slug) DO NOTHING
+            `, [journeyId]);
+
+            // Chapter 3: Team & Communication (mandatory)
+            await client.query(`
+                INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory)
+                VALUES ($1, 'team-communication', 'Team & Communication', 'Get to know your team and learn how to use reports.', 3, true)
+                ON CONFLICT (journey_id, slug) DO NOTHING
+            `, [journeyId]);
+
+            // Chapter 4: Advanced Topics (optional)
+            await client.query(`
+                INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory)
+                VALUES ($1, 'advanced-topics', 'Advanced Topics', 'Explore governance and quality gates for deeper understanding.', 4, false)
+                ON CONFLICT (journey_id, slug) DO NOTHING
+            `, [journeyId]);
+
+            // Seed quests and tasks per chapter
+            const chapters = await client.query(`SELECT id, slug FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [journeyId]);
+
+            for (const ch of chapters.rows) {
+                if (ch.slug === 'welcome-account-setup') {
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'setup-profile', 'Set Up Your Profile', 'Complete your profile to help your team recognize you.', 1, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'explore-platform', 'Explore the Platform', 'Take a quick tour of the main pages.', 2, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+
+                    const quests = await client.query(`SELECT id, slug FROM journey_quests WHERE chapter_id = $1 ORDER BY sort_order`, [ch.id]);
+                    for (const q of quests.rows) {
+                        if (q.slug === 'setup-profile') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, validation_type, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'upload-avatar', 'Upload Your Avatar', 'Add a profile picture so your team can recognize you.', 'checkbox', 1, true, 2), ($1, 'fill-bio', 'Write a Short Bio', 'Tell your team a bit about yourself.', 'text_acknowledge', 2, true, 5), ($1, 'notification-prefs', 'Set Notification Preferences', 'Configure how you want to receive notifications.', 'checkbox', 3, true, 2) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        } else if (q.slug === 'explore-platform') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, validation_type, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'visit-dashboard', 'Visit the Dashboard', 'Navigate to the Dashboard and review the metrics overview.', 'checkbox', 1, true, 3), ($1, 'view-project', 'View a Project', 'Open any project to see how project details are organized.', 'checkbox', 2, true, 3), ($1, 'check-my-tasks', 'Check My Tasks Page', 'Visit the My Tasks page to manage your personal tasks.', 'checkbox', 3, true, 2) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        }
+                    }
+                } else if (ch.slug === 'qc-processes') {
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'task-lifecycle', 'Understand the Task Lifecycle', 'Learn how tasks move through different statuses.', 1, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'test-execution', 'Learn Test Execution', 'Understand how test runs and results work.', 2, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+
+                    const quests = await client.query(`SELECT id, slug FROM journey_quests WHERE chapter_id = $1 ORDER BY sort_order`, [ch.id]);
+                    for (const q of quests.rows) {
+                        if (q.slug === 'task-lifecycle') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, instructions, validation_type, validation_config, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'read-task-flow', 'Read Task Status Flow', 'Understand how tasks progress through statuses.', 'Tasks follow: **Backlog** → **In Progress** → **Done**. Tasks can also be **Cancelled**.', 'text_acknowledge', '{"min_text_length": 10, "prompt": "Describe the task statuses in your own words:"}', 1, true, 5), ($1, 'review-sample-task', 'Review a Sample Task', 'Open any task and review its details.', 'checkbox', '{}', 2, true, 5) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        } else if (q.slug === 'test-execution') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, instructions, validation_type, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'read-test-docs', 'Read Test Execution Overview', 'Learn about test runs and how results are tracked.', 'Test runs track individual test case results: **Passed**, **Failed**, **Blocked**, or **Not Executed**.', 'text_acknowledge', 1, true, 5), ($1, 'view-test-runs', 'View Test Runs Page', 'Navigate to the Test Runs page.', 'checkbox', 2, true, 3) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        }
+                    }
+                } else if (ch.slug === 'team-communication') {
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'meet-team', 'Meet Your Team', 'Get familiar with the team structure.', 1, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'reporting-basics', 'Reporting Basics', 'Learn about the different report types.', 2, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+
+                    const quests = await client.query(`SELECT id, slug FROM journey_quests WHERE chapter_id = $1 ORDER BY sort_order`, [ch.id]);
+                    for (const q of quests.rows) {
+                        if (q.slug === 'meet-team') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, validation_type, validation_config, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'review-resources', 'Review Team Resources', 'Visit the Resources page to see your team members.', 'checkbox', '{}', 1, true, 3), ($1, 'identify-manager', 'Identify Your Manager', 'Find out who your direct manager is.', 'text_acknowledge', '{"min_text_length": 2, "prompt": "Who is your manager?"}', 2, true, 2) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        } else if (q.slug === 'reporting-basics') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, validation_type, validation_config, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'understand-reports', 'Understand Report Types', 'Learn about the different report types you can generate.', 'multi_checkbox', '{"items": ["Project Status Report", "Resource Utilization Report", "Task Export Report"]}', 1, true, 5) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        }
+                    }
+                } else if (ch.slug === 'advanced-topics') {
+                    await client.query(`INSERT INTO journey_quests (chapter_id, slug, title, description, sort_order, is_mandatory) VALUES ($1, 'governance-quality', 'Governance & Quality Gates', 'Explore advanced quality management features.', 1, true) ON CONFLICT (chapter_id, slug) DO NOTHING`, [ch.id]);
+
+                    const quests = await client.query(`SELECT id, slug FROM journey_quests WHERE chapter_id = $1 ORDER BY sort_order`, [ch.id]);
+                    for (const q of quests.rows) {
+                        if (q.slug === 'governance-quality') {
+                            await client.query(`INSERT INTO journey_tasks (quest_id, slug, title, description, instructions, validation_type, sort_order, is_mandatory, estimated_minutes) VALUES ($1, 'read-governance', 'Read About Governance', 'Understand quality gates and release approvals.', 'Quality gates define minimum criteria for releases: pass rates, critical defects, and test coverage thresholds.', 'text_acknowledge', 1, true, 5), ($1, 'explore-governance', 'Explore Governance Dashboard', 'Visit the Governance page and explore the metrics.', 'checkbox', 2, true, 3) ON CONFLICT (quest_id, slug) DO NOTHING`, [q.id]);
+                        }
+                    }
+                }
+            }
+        }
 
         console.log('Database migrations completed successfully');
     } catch (err) {

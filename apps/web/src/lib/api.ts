@@ -396,3 +396,217 @@ export const notificationsApi = {
 export const healthApi = {
     check: () => fetchApi<{ status: string; timestamp: string }>('/health'),
 };
+
+// ============================================================================
+// Type Definitions - Journeys
+// ============================================================================
+
+export interface JourneyTask {
+    id: string;
+    quest_id: string;
+    slug: string;
+    title: string;
+    description?: string;
+    instructions?: string;
+    validation_type: 'checkbox' | 'multi_checkbox' | 'text_acknowledge' | 'link_visit' | 'file_upload';
+    validation_config: Record<string, any>;
+    sort_order: number;
+    is_mandatory: boolean;
+    estimated_minutes?: number;
+    created_at: string;
+    updated_at: string;
+    // Progress fields (employee view)
+    is_completed?: boolean;
+    completion?: { id: string; completed_at: string; validation_data: Record<string, any> } | null;
+}
+
+export interface QuestProgress {
+    total: number;
+    completed: number;
+    mandatory_total: number;
+    mandatory_completed: number;
+    is_complete: boolean;
+}
+
+export interface JourneyQuest {
+    id: string;
+    chapter_id: string;
+    slug: string;
+    title: string;
+    description?: string;
+    sort_order: number;
+    is_mandatory: boolean;
+    tasks: JourneyTask[];
+    progress?: QuestProgress;
+}
+
+export interface ChapterProgress {
+    total_quests: number;
+    completed_quests: number;
+    mandatory_total: number;
+    mandatory_completed: number;
+    is_complete: boolean;
+}
+
+export interface JourneyChapter {
+    id: string;
+    journey_id: string;
+    slug: string;
+    title: string;
+    description?: string;
+    sort_order: number;
+    is_mandatory: boolean;
+    quests: JourneyQuest[];
+    progress?: ChapterProgress;
+}
+
+export interface Journey {
+    id: string;
+    slug: string;
+    title: string;
+    description?: string;
+    is_active: boolean;
+    auto_assign_on_activation: boolean;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    chapter_count?: number;
+    quest_count?: number;
+    task_count?: number;
+}
+
+export interface JourneyFull extends Journey {
+    chapters: JourneyChapter[];
+}
+
+export interface JourneyProgressSummary {
+    total_tasks: number;
+    mandatory_tasks: number;
+    completed_tasks: number;
+    mandatory_completed: number;
+    completion_pct: number;
+}
+
+export interface AssignedJourney {
+    id: string;
+    user_id: string;
+    journey_id: string;
+    slug: string;
+    title: string;
+    description?: string;
+    sort_order: number;
+    assigned_at: string;
+    started_at?: string;
+    completed_at?: string;
+    status: 'assigned' | 'in_progress' | 'completed';
+    progress: JourneyProgressSummary;
+}
+
+export interface JourneyWithProgress extends AssignedJourney {
+    chapters: JourneyChapter[];
+}
+
+// ============================================================================
+// API Client - Journeys (Admin)
+// ============================================================================
+
+export const journeysApi = {
+    list: () => fetchApi<Journey[]>('/journeys'),
+
+    get: (id: string) => fetchApi<JourneyFull>(`/journeys/${id}`),
+
+    create: (data: Partial<Journey>) =>
+        fetchApi<Journey>('/journeys', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    update: (id: string, data: Partial<Journey>) =>
+        fetchApi<Journey>(`/journeys/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    delete: (id: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/journeys/${id}`, {
+            method: 'DELETE',
+        }),
+
+    createChapter: (journeyId: string, data: Partial<JourneyChapter>) =>
+        fetchApi<JourneyChapter>(`/journeys/${journeyId}/chapters`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    updateChapter: (id: string, data: Partial<JourneyChapter>) =>
+        fetchApi<JourneyChapter>(`/journeys/chapters/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    deleteChapter: (id: string) =>
+        fetchApi<{ success: boolean }>(`/journeys/chapters/${id}`, {
+            method: 'DELETE',
+        }),
+
+    createQuest: (chapterId: string, data: Partial<JourneyQuest>) =>
+        fetchApi<JourneyQuest>(`/journeys/chapters/${chapterId}/quests`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    updateQuest: (id: string, data: Partial<JourneyQuest>) =>
+        fetchApi<JourneyQuest>(`/journeys/quests/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    deleteQuest: (id: string) =>
+        fetchApi<{ success: boolean }>(`/journeys/quests/${id}`, {
+            method: 'DELETE',
+        }),
+
+    createTask: (questId: string, data: Partial<JourneyTask>) =>
+        fetchApi<JourneyTask>(`/journeys/quests/${questId}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    updateTask: (id: string, data: Partial<JourneyTask>) =>
+        fetchApi<JourneyTask>(`/journeys/tasks/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    deleteTask: (id: string) =>
+        fetchApi<{ success: boolean }>(`/journeys/tasks/${id}`, {
+            method: 'DELETE',
+        }),
+
+    assignToUser: (journeyId: string, userId: string) =>
+        fetchApi(`/journeys/${journeyId}/assign/${userId}`, {
+            method: 'POST',
+        }),
+};
+
+// ============================================================================
+// API Client - My Journeys (Employee)
+// ============================================================================
+
+export const myJourneysApi = {
+    list: () => fetchApi<AssignedJourney[]>('/my-journeys'),
+
+    get: (journeyId: string) => fetchApi<JourneyWithProgress>(`/my-journeys/${journeyId}`),
+
+    completeTask: (journeyId: string, taskId: string, validationData: Record<string, any> = {}) =>
+        fetchApi(`/my-journeys/${journeyId}/tasks/${taskId}/complete`, {
+            method: 'POST',
+            body: JSON.stringify({ validation_data: validationData }),
+        }),
+
+    uncompleteTask: (journeyId: string, taskId: string) =>
+        fetchApi(`/my-journeys/${journeyId}/tasks/${taskId}/complete`, {
+            method: 'DELETE',
+        }),
+};

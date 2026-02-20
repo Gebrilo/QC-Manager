@@ -230,7 +230,7 @@ router.post('/login', async (req, res, next) => {
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
         const result = await db.query(
-            'SELECT id, name, email, phone, role, active, activated, created_at, last_login FROM app_user WHERE id = $1',
+            'SELECT id, name, email, phone, role, active, activated, onboarding_completed, created_at, last_login FROM app_user WHERE id = $1',
             [req.user.id]
         );
 
