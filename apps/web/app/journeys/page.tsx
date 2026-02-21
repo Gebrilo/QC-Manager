@@ -78,9 +78,14 @@ export default function JourneysPage() {
                         <div className="mt-4">
                             <div className="flex items-center justify-between text-sm mb-1.5">
                                 <span className="text-slate-500 dark:text-slate-400">Progress</span>
-                                <span className="font-medium text-slate-700 dark:text-slate-300">
-                                    {journey.progress.mandatory_completed}/{journey.progress.mandatory_tasks} tasks
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    {(journey.total_xp || 0) > 0 && (
+                                        <span className="text-xs font-medium text-violet-600 dark:text-violet-400">{journey.total_xp} XP</span>
+                                    )}
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                                        {journey.progress.mandatory_completed}/{journey.progress.mandatory_tasks} tasks
+                                    </span>
+                                </div>
                             </div>
                             <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                 <div

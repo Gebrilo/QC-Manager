@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const dotenv = require('dotenv');
 
 // Load env FIRST before any other imports that use env vars
@@ -44,6 +45,10 @@ apiRouter.use('/my-tasks', require('./routes/personalTasks'));
 apiRouter.use('/roles', require('./routes/roles'));
 apiRouter.use('/journeys', require('./routes/journeys'));
 apiRouter.use('/my-journeys', require('./routes/myJourneys'));
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Mount routes at both root and /api for compatibility
 app.use('/', apiRouter);

@@ -17,6 +17,7 @@ const createChapterSchema = z.object({
     description: z.string().optional(),
     sort_order: z.number().int().min(0).default(0),
     is_mandatory: z.boolean().default(true),
+    xp_reward: z.number().int().min(0).default(0),
 });
 
 const updateChapterSchema = createChapterSchema.partial();
