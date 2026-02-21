@@ -83,6 +83,8 @@ services:
       - "traefik.http.routers.qc-api-http.entrypoints=web"
       - "traefik.http.routers.qc-api-http.middlewares=https-redirect"
       - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+    volumes:
+      - ./uploads:/app/uploads
     networks:
       - qc-shared-network
       - qc-internal
