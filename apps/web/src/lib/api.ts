@@ -456,8 +456,10 @@ export interface JourneyChapter {
     description?: string;
     sort_order: number;
     is_mandatory: boolean;
+    xp_reward: number;
     quests: JourneyQuest[];
     progress?: ChapterProgress;
+    is_locked?: boolean;
 }
 
 export interface Journey {
@@ -500,11 +502,38 @@ export interface AssignedJourney {
     started_at?: string;
     completed_at?: string;
     status: 'assigned' | 'in_progress' | 'completed';
+    total_xp: number;
     progress: JourneyProgressSummary;
 }
 
 export interface JourneyWithProgress extends AssignedJourney {
     chapters: JourneyChapter[];
+}
+
+export interface JourneyAssignment {
+    id: string;
+    user_id: string;
+    journey_id: string;
+    assigned_at: string;
+    started_at?: string;
+    completed_at?: string;
+    status: string;
+    total_xp: number;
+    name: string;
+    email: string;
+    role: string;
+    active: boolean;
+}
+
+export interface JourneyTaskAttachment {
+    id: string;
+    task_id: string;
+    user_id: string;
+    filename: string;
+    original_name: string;
+    mime_type: string;
+    size_bytes: number;
+    uploaded_at: string;
 }
 
 // ============================================================================
@@ -588,6 +617,14 @@ export const journeysApi = {
         fetchApi(`/journeys/${journeyId}/assign/${userId}`, {
             method: 'POST',
         }),
+
+    unassignUser: (journeyId: string, userId: string) =>
+        fetchApi(`/journeys/${journeyId}/assign/${userId}`, {
+            method: 'DELETE',
+        }),
+
+    getAssignments: (journeyId: string) =>
+        fetchApi<JourneyAssignment[]>(`/journeys/${journeyId}/assignments`),
 };
 
 // ============================================================================
@@ -609,4 +646,33 @@ export const myJourneysApi = {
         fetchApi(`/my-journeys/${journeyId}/tasks/${taskId}/complete`, {
             method: 'DELETE',
         }),
+
+    uploadFile: async (journeyId: string, taskId: string, file: File): Promise<JourneyTaskAttachment> => {
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/my-journeys/${journeyId}/tasks/${taskId}/upload`;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        let authToken: string | null = null;
+        if (typeof window !== 'undefined') {
+            authToken = localStorage.getItem('auth_token');
+        }
+
+        const headers: Record<string, string> = {};
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Upload failed: ${response.status}`);
+        }
+
+        return response.json();
+    },
 };

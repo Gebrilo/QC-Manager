@@ -133,9 +133,9 @@ router.post('/:journeyId/chapters', requireAuth, requireRole('admin', 'manager')
         const { journeyId } = req.params;
         const data = createChapterSchema.parse(req.body);
         const result = await db.query(
-            `INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [journeyId, data.slug, data.title, data.description, data.sort_order, data.is_mandatory]
+            `INSERT INTO journey_chapters (journey_id, slug, title, description, sort_order, is_mandatory, xp_reward)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [journeyId, data.slug, data.title, data.description, data.sort_order, data.is_mandatory, data.xp_reward]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) { next(err); }
@@ -280,6 +280,45 @@ router.post('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'),
             return res.json({ message: 'Journey already assigned' });
         }
         res.status(201).json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// DELETE /journeys/:id/assign/:userId — Unassign journey from user
+router.delete('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { id, userId } = req.params;
+        const result = await db.query(
+            `DELETE FROM user_journey_assignments WHERE user_id = $1 AND journey_id = $2 RETURNING *`,
+            [userId, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Assignment not found' });
+        }
+        // Also delete task completions for this user in this journey
+        await db.query(`
+            DELETE FROM user_task_completions WHERE user_id = $1 AND task_id IN (
+                SELECT jt.id FROM journey_tasks jt
+                JOIN journey_quests jq ON jt.quest_id = jq.id
+                JOIN journey_chapters jc ON jq.chapter_id = jc.id
+                WHERE jc.journey_id = $2
+            )
+        `, [userId, id]);
+        res.json({ success: true, message: 'Journey unassigned' });
+    } catch (err) { next(err); }
+});
+
+// GET /journeys/:id/assignments — List assigned users for a journey
+router.get('/:id/assignments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query(`
+            SELECT uja.*, u.name, u.email, u.role, u.active
+            FROM user_journey_assignments uja
+            JOIN app_user u ON uja.user_id = u.id
+            WHERE uja.journey_id = $1
+            ORDER BY uja.assigned_at DESC
+        `, [id]);
+        res.json(result.rows);
     } catch (err) { next(err); }
 });
 

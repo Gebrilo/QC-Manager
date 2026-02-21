@@ -774,6 +774,7 @@ const runMigrations = async () => {
                 description TEXT,
                 sort_order INTEGER DEFAULT 0,
                 is_mandatory BOOLEAN DEFAULT true,
+                xp_reward INTEGER DEFAULT 0,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(journey_id, slug)
@@ -823,6 +824,7 @@ const runMigrations = async () => {
                 started_at TIMESTAMP WITH TIME ZONE,
                 completed_at TIMESTAMP WITH TIME ZONE,
                 status VARCHAR(20) DEFAULT 'assigned',
+                total_xp INTEGER DEFAULT 0,
                 UNIQUE(user_id, journey_id)
             )
         `);
@@ -838,12 +840,31 @@ const runMigrations = async () => {
             )
         `);
 
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS journey_task_attachments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id UUID NOT NULL REFERENCES journey_tasks(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                filename VARCHAR(500) NOT NULL,
+                original_name VARCHAR(500) NOT NULL,
+                mime_type VARCHAR(100),
+                size_bytes INTEGER,
+                uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Migrations for existing databases
+        await client.query(`ALTER TABLE journey_chapters ADD COLUMN IF NOT EXISTS xp_reward INTEGER DEFAULT 0`);
+        await client.query(`ALTER TABLE user_journey_assignments ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0`);
+
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_chapters_journey ON journey_chapters(journey_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_quests_chapter ON journey_quests(chapter_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_tasks_quest ON journey_tasks(quest_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_journey_assignments_user ON user_journey_assignments(user_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_task_completions_user ON user_task_completions(user_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_task_completions_task ON user_task_completions(task_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_task_attachments_task ON journey_task_attachments(task_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_task_attachments_user ON journey_task_attachments(user_id)`);
 
         // Seed: Day-One Essentials & Orientation journey
         await client.query(`
