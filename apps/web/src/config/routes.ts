@@ -42,6 +42,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },
     { path: '/reports', label: 'Reports', permission: 'page:reports', requiresActivation: true, showInNavbar: true, navOrder: 8, icon: BarChart3 },
     { path: '/settings', label: 'Settings', adminOnly: true, requiresActivation: true },
+    { path: '/settings/teams', label: 'Teams', permission: 'page:teams', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9.3, icon: Users2 },
     { path: '/settings/journeys', label: 'Manage Journeys', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9.5, icon: Map },
     { path: '/settings/journeys/[id]', label: 'Edit Journey', adminOnly: true, requiresActivation: true },
     { path: '/settings/roles', label: 'Roles & Permissions', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 10, icon: ShieldCheck },

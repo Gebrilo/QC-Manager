@@ -706,6 +706,50 @@ const runMigrations = async () => {
             END $$;
         `);
 
+        // =====================================================
+        // TEAM-BASED ACCESS CONTROL TABLES
+        // =====================================================
+
+        // Teams table: each team has one manager and multiple members
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS teams (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                manager_id UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(255),
+                deleted_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_teams_manager_id ON teams(manager_id) WHERE deleted_at IS NULL`);
+
+        // Add team_id to app_user (a user belongs to one team)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='team_id') THEN
+                    ALTER TABLE app_user ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_app_user_team_id ON app_user(team_id)`);
+
+        // Add team_id to projects (a project belongs to one team)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='team_id') THEN
+                    ALTER TABLE projects ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_projects_team_id ON projects(team_id)`);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS personal_tasks (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

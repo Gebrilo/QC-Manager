@@ -5,6 +5,7 @@ const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
+const { getManagerTeamId } = require('../middleware/teamAccess');
 
 /**
  * Helper: Get the resource ID linked to the current user.
@@ -27,12 +28,8 @@ const VALID_TRANSITIONS = {
 };
 
 function validateStatusTransition(currentStatus, newStatus, data) {
-    // If status hasn't changed, no validation needed
-    if (currentStatus === newStatus) {
-        return { valid: true };
-    }
+    if (currentStatus === newStatus) return { valid: true };
 
-    // Check if transition is allowed
     const allowedTransitions = VALID_TRANSITIONS[currentStatus];
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
         return {
@@ -41,35 +38,62 @@ function validateStatusTransition(currentStatus, newStatus, data) {
         };
     }
 
-    // Special validation for Done status
     if (newStatus === 'Done') {
         if (!data.completed_date) {
-            return {
-                valid: false,
-                error: 'completed_date is required when marking task as Done'
-            };
+            return { valid: false, error: 'completed_date is required when marking task as Done' };
         }
         const totalActualHrs = (data.r1_actual_hrs || 0) + (data.r2_actual_hrs || 0);
         if (totalActualHrs <= 0) {
-            return {
-                valid: false,
-                error: 'Task must have actual hours recorded before marking as Done'
-            };
+            return { valid: false, error: 'Task must have actual hours recorded before marking as Done' };
         }
     }
 
     return { valid: true };
 }
 
-// GET all tasks (joined/view) — filtered by role
+/**
+ * Build team-scoped SQL clause for tasks.
+ * Tasks are scoped via their project's team_id.
+ * Returns { join, clause, params }.
+ */
+async function buildTaskTeamFilter(user) {
+    if (user.role === 'admin') {
+        return { join: '', clause: '', params: [] };
+    }
+    if (user.role === 'manager') {
+        const teamId = await getManagerTeamId(user.id);
+        if (!teamId) {
+            return { join: '', clause: 'AND 1=0', params: [] };
+        }
+        return {
+            join: 'JOIN projects _p ON _p.id = v.project_id',
+            clause: 'AND _p.team_id = $1 AND _p.deleted_at IS NULL',
+            params: [teamId],
+        };
+    }
+    return { join: '', clause: '', params: [] };
+}
+
+// GET all tasks — filtered by team for managers, by resource for regular users
 router.get('/', optionalAuth, async (req, res, next) => {
     try {
         const role = req.user?.role;
-        // Admins and managers see all tasks
-        if (role === 'admin' || role === 'manager') {
+
+        if (role === 'admin') {
+            const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
+            return res.json(result.rows);
+        }
+
+        if (role === 'manager') {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) return res.json([]); // No team assigned
+
             const result = await db.query(`
-                SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC
-            `);
+                SELECT v.* FROM v_tasks_with_metrics v
+                JOIN projects p ON p.id = v.project_id
+                WHERE p.team_id = $1 AND p.deleted_at IS NULL
+                ORDER BY v.created_at DESC
+            `, [teamId]);
             return res.json(result.rows);
         }
 
@@ -84,27 +108,22 @@ router.get('/', optionalAuth, async (req, res, next) => {
                 `, [resourceId]);
                 return res.json(result.rows);
             }
-            // User has no linked resource — return empty
             return res.json([]);
         }
 
-        // Unauthenticated fallback — return all (backward compat)
-        const result = await db.query(`
-            SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC
-        `);
+        // Unauthenticated fallback
+        const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
         res.json(result.rows);
     } catch (err) {
         next(err);
     }
 });
 
-// GET single task by ID — with access check
+// GET single task by ID — enforce team scope for managers
 router.get('/:id', optionalAuth, async (req, res, next) => {
     try {
         const { id } = req.params;
-        const result = await db.query(`
-            SELECT * FROM v_tasks_with_metrics WHERE id = $1
-        `, [id]);
+        const result = await db.query(`SELECT * FROM v_tasks_with_metrics WHERE id = $1`, [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Task not found' });
@@ -113,8 +132,20 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
         const task = result.rows[0];
         const role = req.user?.role;
 
-        // Admins/managers can see any task
-        if (role === 'admin' || role === 'manager') {
+        if (role === 'admin') return res.json(task);
+
+        if (role === 'manager') {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
+
+            // Verify task's project belongs to manager's team
+            const projCheck = await db.query(
+                `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
+                [task.project_id, teamId]
+            );
+            if (projCheck.rows.length === 0) {
+                return res.status(403).json({ error: 'You do not have access to this task' });
+            }
             return res.json(task);
         }
 
@@ -127,22 +158,64 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
             return res.status(403).json({ error: 'You do not have access to this task' });
         }
 
-        // Unauthenticated fallback
         res.json(task);
     } catch (err) {
         next(err);
     }
 });
 
-// POST create task
+// POST create task — validate project and assignees belong to manager's team
 router.post('/', requireAuth, requirePermission('action:tasks:create'), async (req, res, next) => {
     try {
         const data = createTaskSchema.parse(req.body);
 
-        // Map description to notes if provided and notes is empty, or just append
+        // Team-scope validation for managers
+        if (req.user.role === 'manager') {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) {
+                return res.status(403).json({ error: 'You are not assigned to a team' });
+            }
+
+            // Verify project belongs to manager's team
+            if (data.project_id) {
+                const projCheck = await db.query(
+                    `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
+                    [data.project_id, teamId]
+                );
+                if (projCheck.rows.length === 0) {
+                    return res.status(403).json({ error: 'Project does not belong to your team' });
+                }
+            }
+
+            // Verify resource1 belongs to manager's team (via user_id → app_user.team_id)
+            if (data.resource1_uuid) {
+                const r1Check = await db.query(
+                    `SELECT r.id FROM resources r
+                     JOIN app_user u ON r.user_id = u.id
+                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
+                    [data.resource1_uuid, teamId]
+                );
+                if (r1Check.rows.length === 0) {
+                    return res.status(403).json({ error: 'Resource 1 does not belong to your team' });
+                }
+            }
+
+            // Verify resource2 belongs to manager's team
+            if (data.resource2_uuid) {
+                const r2Check = await db.query(
+                    `SELECT r.id FROM resources r
+                     JOIN app_user u ON r.user_id = u.id
+                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
+                    [data.resource2_uuid, teamId]
+                );
+                if (r2Check.rows.length === 0) {
+                    return res.status(403).json({ error: 'Resource 2 does not belong to your team' });
+                }
+            }
+        }
+
         const notes = data.notes || data.description || null;
 
-        // Insert
         const query = `
             INSERT INTO tasks (
                 task_id, project_id, task_name, status,
@@ -170,7 +243,6 @@ router.post('/', requireAuth, requirePermission('action:tasks:create'), async (r
         const result = await db.query(query, values);
         const task = result.rows[0];
 
-        // Audit (New Signature)
         await auditLog('tasks', task.id, 'CREATE', task, null);
         triggerWorkflow('task-created', task);
 
@@ -180,18 +252,68 @@ router.post('/', requireAuth, requirePermission('action:tasks:create'), async (r
     }
 });
 
-// PUT/PATCH update task
+// PATCH update task — enforce team scope and re-validate assignments
 router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateTaskSchema.parse(req.body);
 
-        // Fetch original to compare
         const originalRes = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
         if (originalRes.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
         const original = originalRes.rows[0];
 
-        // Validate status transition if status is being changed
+        // Enforce team scope for managers
+        if (req.user.role === 'manager') {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
+
+            const projCheck = await db.query(
+                `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
+                [original.project_id, teamId]
+            );
+            if (projCheck.rows.length === 0) {
+                return res.status(403).json({ error: 'You do not have access to this task' });
+            }
+
+            // Validate that any new project_id belongs to manager's team
+            if (data.project_id && data.project_id !== original.project_id) {
+                const newProjCheck = await db.query(
+                    `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
+                    [data.project_id, teamId]
+                );
+                if (newProjCheck.rows.length === 0) {
+                    return res.status(403).json({ error: 'Target project does not belong to your team' });
+                }
+            }
+
+            // Validate resource1 reassignment
+            if (data.resource1_uuid && data.resource1_uuid !== original.resource1_id) {
+                const r1Check = await db.query(
+                    `SELECT r.id FROM resources r
+                     JOIN app_user u ON r.user_id = u.id
+                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
+                    [data.resource1_uuid, teamId]
+                );
+                if (r1Check.rows.length === 0) {
+                    return res.status(403).json({ error: 'Resource 1 does not belong to your team' });
+                }
+            }
+
+            // Validate resource2 reassignment
+            if (data.resource2_uuid && data.resource2_uuid !== original.resource2_id) {
+                const r2Check = await db.query(
+                    `SELECT r.id FROM resources r
+                     JOIN app_user u ON r.user_id = u.id
+                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
+                    [data.resource2_uuid, teamId]
+                );
+                if (r2Check.rows.length === 0) {
+                    return res.status(403).json({ error: 'Resource 2 does not belong to your team' });
+                }
+            }
+        }
+
+        // Status transition check
         if (data.status && data.status !== original.status) {
             const validation = validateStatusTransition(
                 original.status,
@@ -202,12 +324,8 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
                     r2_actual_hrs: data.r2_actual_hrs !== undefined ? data.r2_actual_hrs : original.r2_actual_hrs
                 }
             );
-
             if (!validation.valid) {
-                return res.status(400).json({
-                    error: 'Invalid status transition',
-                    message: validation.error
-                });
+                return res.status(400).json({ error: 'Invalid status transition', message: validation.error });
             }
         }
 
@@ -216,11 +334,9 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
         const values = [];
         let idx = 1;
 
-        // Map Zod keys to DB columns
         const keyMap = {
             task_name: 'task_name',
             status: 'status',
-            // priority: removed as not in DB
             resource1_uuid: 'resource1_id',
             resource2_uuid: 'resource2_id',
             estimate_days: 'estimate_days',
@@ -238,7 +354,6 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
 
         for (const [key, value] of Object.entries(data)) {
             if (key === 'description' && !data.notes) {
-                // Map description to notes if notes is not also being updated
                 fields.push(`notes = $${idx++}`);
                 values.push(value);
             } else if (key in keyMap) {
@@ -256,11 +371,9 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
         const result = await db.query(query, values);
         const updated = result.rows[0];
 
-        // Audit (New Signature)
         await auditLog('tasks', id, 'UPDATE', updated, original);
         triggerWorkflow('task-updated', updated);
 
-        // Return View result
         const viewResult = await db.query('SELECT * FROM v_tasks_with_metrics WHERE id = $1', [id]);
         res.json(viewResult.rows[0]);
     } catch (err) {
@@ -268,40 +381,43 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
     }
 });
 
-// DELETE soft delete task
+// DELETE soft delete task — enforce team scope
 router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        // Fetch original for audit
         const originalRes = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
         if (originalRes.rows.length === 0) {
             return res.status(404).json({ error: 'Task not found' });
         }
         const original = originalRes.rows[0];
 
-        // Check if already deleted
+        // Enforce team scope for managers
+        if (req.user.role === 'manager') {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
+
+            const projCheck = await db.query(
+                `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
+                [original.project_id, teamId]
+            );
+            if (projCheck.rows.length === 0) {
+                return res.status(403).json({ error: 'You do not have access to this task' });
+            }
+        }
+
         if (original.deleted_at) {
             return res.status(400).json({ error: 'Task already deleted' });
         }
 
-        // Soft delete: set deleted_at and status to 'Cancelled'
         const result = await db.query(
-            `UPDATE tasks 
-             SET deleted_at = NOW(),
-                 status = 'Cancelled',
-                 updated_at = NOW()
-             WHERE id = $1 
-             RETURNING *`,
+            `UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW()
+             WHERE id = $1 RETURNING *`,
             [id]
         );
 
         const deleted = result.rows[0];
-
-        // Audit log
         await auditLog('tasks', id, 'DELETE', deleted, original);
-
-        // Trigger n8n workflow
         triggerWorkflow('task-deleted', deleted);
 
         res.json({
@@ -322,14 +438,10 @@ router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), asy
 router.get('/:id/comments', async (req, res, next) => {
     try {
         const { id } = req.params;
-
         const result = await db.query(
-            `SELECT * FROM task_comments 
-             WHERE task_id = $1 
-             ORDER BY created_at DESC`,
+            `SELECT * FROM task_comments WHERE task_id = $1 ORDER BY created_at DESC`,
             [id]
         );
-
         res.json(result.rows);
     } catch (err) {
         next(err);
@@ -346,16 +458,13 @@ router.post('/:id/comments', async (req, res, next) => {
             return res.status(400).json({ error: 'Comment cannot be empty' });
         }
 
-        // Verify task exists
         const taskCheck = await db.query('SELECT id FROM tasks WHERE id = $1', [id]);
         if (taskCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
         const result = await db.query(
-            `INSERT INTO task_comments (task_id, comment, created_by)
-             VALUES ($1, $2, $3)
-             RETURNING *`,
+            `INSERT INTO task_comments (task_id, comment, created_by) VALUES ($1, $2, $3) RETURNING *`,
             [id, comment.trim(), req.user?.email || 'system']
         );
 
@@ -371,9 +480,7 @@ router.delete('/:taskId/comments/:commentId', async (req, res, next) => {
         const { taskId, commentId } = req.params;
 
         const result = await db.query(
-            `DELETE FROM task_comments 
-             WHERE id = $1 AND task_id = $2
-             RETURNING *`,
+            `DELETE FROM task_comments WHERE id = $1 AND task_id = $2 RETURNING *`,
             [commentId, taskId]
         );
 

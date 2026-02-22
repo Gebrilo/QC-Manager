@@ -10,9 +10,15 @@ router.use(requireAuth, requireRole('admin'));
 router.get('/', async (req, res, next) => {
     try {
         const result = await db.query(`
-            SELECT id, name, email, phone, role, active, activated, created_at, updated_at, last_login
-            FROM app_user 
-            ORDER BY created_at DESC
+            SELECT u.id, u.name, u.email, u.phone, u.role, u.active, u.activated,
+                   u.created_at, u.updated_at, u.last_login,
+                   u.manager_id, u.team_id,
+                   t.name AS team_name,
+                   m.name AS manager_name
+            FROM app_user u
+            LEFT JOIN teams t ON t.id = u.team_id AND t.deleted_at IS NULL
+            LEFT JOIN app_user m ON m.id = u.manager_id
+            ORDER BY u.created_at DESC
         `);
         res.json(result.rows);
     } catch (err) {
@@ -23,7 +29,7 @@ router.get('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { role, active, activated } = req.body;
+        const { role, active, activated, manager_id } = req.body;
 
         if (id === req.user.id && role && role !== 'admin') {
             return res.status(400).json({ error: 'Cannot demote yourself' });
@@ -55,6 +61,21 @@ router.patch('/:id', async (req, res, next) => {
             values.push(activated);
         }
 
+        // Allow admin to set manager_id (links user to a manager for legacy hierarchy)
+        if (manager_id !== undefined) {
+            if (manager_id) {
+                const managerCheck = await db.query(
+                    `SELECT id FROM app_user WHERE id = $1`,
+                    [manager_id]
+                );
+                if (managerCheck.rows.length === 0) {
+                    return res.status(400).json({ error: 'Manager user not found' });
+                }
+            }
+            fields.push(`manager_id = $${idx++}`);
+            values.push(manager_id || null);
+        }
+
         if (fields.length === 0) {
             return res.status(400).json({ error: 'No valid fields to update' });
         }
@@ -63,8 +84,8 @@ router.patch('/:id', async (req, res, next) => {
         values.push(id);
 
         const result = await db.query(
-            `UPDATE app_user SET ${fields.join(', ')} WHERE id = $${idx} 
-             RETURNING id, name, email, phone, role, active, activated, created_at, updated_at, last_login`,
+            `UPDATE app_user SET ${fields.join(', ')} WHERE id = $${idx}
+             RETURNING id, name, email, phone, role, active, activated, manager_id, team_id, created_at, updated_at, last_login`,
             values
         );
 
