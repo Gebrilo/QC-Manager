@@ -64,7 +64,16 @@
       "Bash(ss:*)",
       "Bash(cmd //c \"taskkill /F /PID 34148\")",
       "Bash(cmd //c \"taskkill /F /PID 41632\")",
-      "Bash(docker rm:*)"
+      "Bash(docker rm:*)",
+      "Bash(cmd /c \"dir /b \"\"D:\\\\Claude\\\\QC management tool\\\\.claude\\\\worktrees\\\\fervent-proskuriakova\\\\apps\\\\web\\\\src\"\"\")",
+      "Bash(cmd /c \"dir /b /s \"\"D:\\\\Claude\\\\QC management tool\\\\.claude\\\\worktrees\\\\fervent-proskuriakova\\\\apps\\\\web\\\\src\\\\pages\"\" 2>&1 | head -20\")",
+      "Bash(cmd /c \"dir /b /s \"\"D:\\\\Claude\\\\QC management tool\\\\.claude\\\\worktrees\\\\fervent-proskuriakova\\\\apps\\\\web\\\\src\"\" | findstr \"\".tsx\"\" | head -20\")",
+      "Bash(cmd /c \"dir \"\"D:\\\\Claude\\\\QC management tool\\\\.claude\\\\worktrees\\\\fervent-proskuriakova\\\\apps\\\\web\\\\src\"\" /s /b 2>&1\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(command -v gh:*)"
     ]
   }
 }
