@@ -1,3 +1,53 @@
+// ──────────────────────────────────────────────
+// Team-Based Access Control Types
+// ──────────────────────────────────────────────
+
+export interface Team {
+    id: string;
+    name: string;
+    description?: string;
+    manager_id?: string;
+    manager_name?: string;
+    manager_email?: string;
+    member_count?: number;
+    project_count?: number;
+    created_at?: string;
+    updated_at?: string;
+    members?: TeamMember[];
+    projects?: TeamProject[];
+}
+
+export interface TeamMember {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    active: boolean;
+    activated: boolean;
+    team_id?: string;
+}
+
+export interface TeamProject {
+    id: string;
+    project_id: string;
+    project_name: string;
+    status: string;
+    priority?: string;
+    start_date?: string;
+    target_date?: string;
+}
+
+export interface TeamSummary {
+    team_id?: string;
+    team_name: string;
+    member_count: number;
+    project_count: number;
+    task_count: number;
+    total_xp: number;
+}
+
+// ──────────────────────────────────────────────
+
 export interface Project {
     id: string; // UUID
     project_id: string; // Display ID e.g. PRJ-001
@@ -9,6 +59,7 @@ export interface Project {
     start_date?: string;
     target_date?: string;
     status: 'active' | 'archived' | 'deleted';
+    team_id?: string; // Team this project belongs to
     // Aggregated fields from View
     tasks_total_count?: number;
     tasks_done_count?: number;

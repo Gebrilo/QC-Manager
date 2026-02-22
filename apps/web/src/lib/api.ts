@@ -709,3 +709,105 @@ export const myJourneysApi = {
         return response.json();
     },
 };
+
+// ============================================================================
+// Teams API
+// ============================================================================
+
+export interface TeamApiMember {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    active: boolean;
+    activated: boolean;
+    team_id?: string;
+}
+
+export interface TeamApiProject {
+    id: string;
+    project_id: string;
+    project_name: string;
+    status: string;
+    priority?: string;
+    start_date?: string;
+    target_date?: string;
+}
+
+export interface TeamApi {
+    id: string;
+    name: string;
+    description?: string;
+    manager_id?: string;
+    manager_name?: string;
+    manager_email?: string;
+    member_count?: number;
+    project_count?: number;
+    created_at?: string;
+    updated_at?: string;
+    members?: TeamApiMember[];
+    projects?: TeamApiProject[];
+}
+
+export interface TeamSummaryApi {
+    team_id?: string;
+    team_name: string;
+    member_count: number;
+    project_count: number;
+    task_count: number;
+    total_xp: number;
+}
+
+export const teamsApi = {
+    // Admin: list all teams
+    list: () => fetchApi<TeamApi[]>('/teams'),
+
+    // Admin: create a team
+    create: (data: { name: string; description?: string; manager_id?: string }) =>
+        fetchApi<TeamApi>('/teams', { method: 'POST', body: JSON.stringify(data) }),
+
+    // Admin: get one team with members and projects
+    get: (id: string) => fetchApi<TeamApi>(`/teams/${id}`),
+
+    // Admin: update team
+    update: (id: string, data: { name?: string; description?: string; manager_id?: string | null }) =>
+        fetchApi<TeamApi>(`/teams/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    // Admin: delete team
+    delete: (id: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/teams/${id}`, { method: 'DELETE' }),
+
+    // Admin: add member to team
+    addMember: (teamId: string, userId: string) =>
+        fetchApi<{ success: boolean; message: string }>(
+            `/teams/${teamId}/members`,
+            { method: 'POST', body: JSON.stringify({ user_id: userId }) }
+        ),
+
+    // Admin: remove member from team
+    removeMember: (teamId: string, userId: string) =>
+        fetchApi<{ success: boolean; message: string }>(
+            `/teams/${teamId}/members/${userId}`,
+            { method: 'DELETE' }
+        ),
+
+    // Admin: assign project to team
+    assignProject: (teamId: string, projectId: string) =>
+        fetchApi<{ success: boolean; message: string }>(
+            `/teams/${teamId}/projects`,
+            { method: 'POST', body: JSON.stringify({ project_id: projectId }) }
+        ),
+
+    // Admin: unassign project from team
+    unassignProject: (teamId: string, projectId: string) =>
+        fetchApi<{ success: boolean; message: string }>(
+            `/teams/${teamId}/projects/${projectId}`,
+            { method: 'DELETE' }
+        ),
+
+    // Manager: get own team
+    getMine: () => fetchApi<TeamApi>('/teams/mine'),
+
+    // Manager: get team summary
+    getSummary: () => fetchApi<TeamSummaryApi>('/manager/summary'),
+};
