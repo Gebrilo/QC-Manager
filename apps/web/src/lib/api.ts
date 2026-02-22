@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// NEXT_PUBLIC_API_URL is baked at build time. If the build arg was missing,
+// it collapses to "https://" (truthy but invalid). Guard against that here.
+const _rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = _rawApiUrl.length > 8 ? _rawApiUrl : 'https://api.gebrils.cloud';
 
 /**
  * Generic API fetch wrapper
@@ -681,7 +684,7 @@ export const myJourneysApi = {
         }),
 
     uploadFile: async (journeyId: string, taskId: string, file: File): Promise<JourneyTaskAttachment> => {
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/my-journeys/${journeyId}/tasks/${taskId}/upload`;
+        const url = `${API_URL}/my-journeys/${journeyId}/tasks/${taskId}/upload`;
         const formData = new FormData();
         formData.append('file', file);
 
