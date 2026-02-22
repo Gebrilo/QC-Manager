@@ -928,8 +928,11 @@ const runMigrations = async () => {
         `);
 
         // Migrations for existing databases
+        await client.query(`ALTER TABLE journeys ADD COLUMN IF NOT EXISTS next_journey_id UUID REFERENCES journeys(id) ON DELETE SET NULL`);
+        await client.query(`ALTER TABLE journeys ADD COLUMN IF NOT EXISTS required_xp INTEGER NOT NULL DEFAULT 0`);
         await client.query(`ALTER TABLE journey_chapters ADD COLUMN IF NOT EXISTS xp_reward INTEGER DEFAULT 0`);
         await client.query(`ALTER TABLE user_journey_assignments ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_next_journey ON journeys(next_journey_id)`);
 
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_chapters_journey ON journey_chapters(journey_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_quests_chapter ON journey_quests(chapter_id)`);
