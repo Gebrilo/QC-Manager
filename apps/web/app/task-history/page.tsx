@@ -43,10 +43,10 @@ export default function TaskHistoryPage() {
             if (!historyRes.ok) throw new Error('Failed to fetch task history');
 
             const historyData = await historyRes.json();
-            const projectsData = await projectsRes.json();
+            const projectsData = projectsRes.ok ? await projectsRes.json() : [];
 
             setHistory(historyData.data || []);
-            setProjects(projectsData.data || projectsData || []);
+            setProjects(Array.isArray(projectsData) ? projectsData : (projectsData.data ?? []));
         } catch (err: any) {
             console.error('Error loading task history:', err);
             setError(err.message);
