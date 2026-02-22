@@ -1,17 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // All manager endpoints require authentication + the view_team_progress permission
 router.use(requireAuth);
-
-const requirePermission = (perm) => (req, res, next) => {
-    const userPerms = req.user?.permissions || [];
-    const isAdmin = req.user?.role === 'admin';
-    if (isAdmin || userPerms.includes(perm)) return next();
-    return res.status(403).json({ error: 'Insufficient permissions' });
-};
 
 // GET /manager/team — List all direct reports of the current user
 router.get('/team', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {

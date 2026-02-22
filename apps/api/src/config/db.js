@@ -676,6 +676,36 @@ const runMigrations = async () => {
             END $$;
         `);
 
+        // Add display_name column for customisable display
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='display_name') THEN
+                    ALTER TABLE app_user ADD COLUMN display_name VARCHAR(100);
+                END IF;
+            END $$;
+        `);
+
+        // Add preferences JSONB column for per-user UI settings
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='preferences') THEN
+                    ALTER TABLE app_user ADD COLUMN preferences JSONB DEFAULT '{}'::jsonb NOT NULL;
+                END IF;
+            END $$;
+        `);
+
+        // Add manager_id for team hierarchy (Team Journeys feature)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='manager_id') THEN
+                    ALTER TABLE app_user ADD COLUMN manager_id UUID REFERENCES app_user(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        `);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS personal_tasks (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
