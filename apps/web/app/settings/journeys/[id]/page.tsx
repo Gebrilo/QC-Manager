@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { journeysApi, fetchApi, JourneyFull, JourneyChapter, JourneyQuest, JourneyTask, JourneyAssignment } from '../../../../src/lib/api';
+import { useAuth } from '../../../../src/components/providers/AuthProvider';
 
 interface SimpleUser {
     id: string;
@@ -15,6 +16,7 @@ interface SimpleUser {
 export default function AdminJourneyEditorPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
+    const { isAdmin } = useAuth();
     const [journey, setJourney] = useState<JourneyFull | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -193,7 +195,7 @@ export default function AdminJourneyEditorPage() {
 
             {/* Assign Users Section */}
             <div className="mt-8">
-                <AssignUsersSection journeyId={id} />
+                <AssignUsersSection journeyId={id} isAdmin={isAdmin} />
             </div>
         </div>
     );
@@ -729,7 +731,7 @@ function AddTaskButton({ questId, onCreated }: { questId: string; onCreated: () 
 }
 
 // --- Assign Users Section ---
-function AssignUsersSection({ journeyId }: { journeyId: string }) {
+function AssignUsersSection({ journeyId, isAdmin }: { journeyId: string; isAdmin: boolean }) {
     const [users, setUsers] = useState<SimpleUser[]>([]);
     const [assignments, setAssignments] = useState<JourneyAssignment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -738,8 +740,10 @@ function AssignUsersSection({ journeyId }: { journeyId: string }) {
 
     const loadData = useCallback(async () => {
         try {
+            // Admins can see all users; managers can only see their team members
+            const usersEndpoint = isAdmin ? '/users' : '/manager/team';
             const [usersData, assignmentsData] = await Promise.all([
-                fetchApi<SimpleUser[]>('/users'),
+                fetchApi<SimpleUser[]>(usersEndpoint),
                 journeysApi.getAssignments(journeyId),
             ]);
             setUsers(usersData);
@@ -749,7 +753,7 @@ function AssignUsersSection({ journeyId }: { journeyId: string }) {
         } finally {
             setIsLoading(false);
         }
-    }, [journeyId]);
+    }, [journeyId, isAdmin]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
