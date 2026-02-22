@@ -7,17 +7,11 @@ import {
     TASK_HISTORY_ACTION_LABELS,
     TASK_HISTORY_ACTION_COLORS
 } from '../../src/types/governance';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface Project {
-    id: string;
-    project_name: string;
-}
+import { fetchApi, projectsApi } from '../../src/lib/api';
 
 export default function TaskHistoryPage() {
     const [history, setHistory] = useState<TaskHistory[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [projects, setProjects] = useState<{ id: string; project_name: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -35,18 +29,13 @@ export default function TaskHistoryPage() {
             setIsLoading(true);
             setError(null);
 
-            const [historyRes, projectsRes] = await Promise.all([
-                fetch(`${API_BASE}/tuleap-webhook/task-history`),
-                fetch(`${API_BASE}/projects`)
+            const [historyData, projectsData] = await Promise.all([
+                fetchApi<{ data: TaskHistory[] }>('/tuleap-webhook/task-history'),
+                projectsApi.list().catch(() => []),
             ]);
 
-            if (!historyRes.ok) throw new Error('Failed to fetch task history');
-
-            const historyData = await historyRes.json();
-            const projectsData = projectsRes.ok ? await projectsRes.json() : [];
-
             setHistory(historyData.data || []);
-            setProjects(Array.isArray(projectsData) ? projectsData : (projectsData.data ?? []));
+            setProjects(Array.isArray(projectsData) ? projectsData : []);
         } catch (err: any) {
             console.error('Error loading task history:', err);
             setError(err.message);
