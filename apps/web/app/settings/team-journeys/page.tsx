@@ -98,7 +98,7 @@ export default function TeamJourneysPage() {
                                 <h2 className="font-semibold text-slate-900 dark:text-white text-sm">Direct Reports ({team.length})</h2>
                             </div>
                             {team.length === 0 ? (
-                                <div className="p-8 text-center text-slate-400 text-sm">No direct reports found. Make sure manager_id is set for your team.</div>
+                                <div className="p-8 text-center text-slate-400 text-sm">No team members found. Ask an admin to assign users to your team.</div>
                             ) : (
                                 <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {team.map(member => (

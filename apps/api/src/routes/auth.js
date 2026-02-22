@@ -43,6 +43,7 @@ const DEFAULT_PERMISSIONS = {
         'page:governance', 'page:test-executions', 'page:reports',
         'page:my-tasks', 'page:task-history',
         'action:journeys:view_team_progress',
+        'action:journeys:assign',
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
         'action:projects:create', 'action:projects:edit',
         'action:resources:create', 'action:resources:edit',
