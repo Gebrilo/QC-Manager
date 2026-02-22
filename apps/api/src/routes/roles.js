@@ -8,12 +8,15 @@ const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const ALL_PERMISSIONS = [
     'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
     'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-    'page:my-tasks', 'page:task-history', 'page:roles',
+    'page:my-tasks', 'page:task-history', 'page:roles', 'page:journeys',
     'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
     'action:projects:create', 'action:projects:edit', 'action:projects:delete',
     'action:resources:create', 'action:resources:edit', 'action:resources:delete',
     'action:reports:generate',
     'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+    'action:journeys:assign',
+    'action:journeys:view_assigned',
+    'action:journeys:view_team_progress',
 ];
 
 // Protected built-in roles that cannot be deleted

@@ -16,7 +16,8 @@ export function TopBar() {
     if (!user) return null;
 
     const logoHref = getLandingPage(user);
-    const userInitial = user.name?.charAt(0).toUpperCase() || 'U';
+    const displayName = user.display_name || user.name;
+    const userInitial = displayName?.charAt(0).toUpperCase() || 'U';
 
     const handleHamburger = () => {
         if (window.innerWidth < 768) {
@@ -73,7 +74,7 @@ export function TopBar() {
                             {userInitial}
                         </div>
                         <span className="hidden sm:inline text-[13px] font-medium text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
-                            {user.name}
+                            {displayName}
                         </span>
                     </Link>
 

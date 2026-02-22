@@ -75,9 +75,9 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res, 
     try {
         const data = createJourneySchema.parse(req.body);
         const result = await db.query(
-            `INSERT INTO journeys (slug, title, description, is_active, auto_assign_on_activation, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [data.slug, data.title, data.description, data.is_active, data.auto_assign_on_activation, data.sort_order]
+            `INSERT INTO journeys (slug, title, description, is_active, auto_assign_on_activation, sort_order, next_journey_id, required_xp)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [data.slug, data.title, data.description, data.is_active, data.auto_assign_on_activation, data.sort_order, data.next_journey_id ?? null, data.required_xp ?? 0]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) { next(err); }
@@ -319,6 +319,60 @@ router.get('/:id/assignments', requireAuth, requireRole('admin', 'manager'), asy
             ORDER BY uja.assigned_at DESC
         `, [id]);
         res.json(result.rows);
+    } catch (err) { next(err); }
+});
+
+// GET /journeys/user/:userId/progress — Manager/admin view of all assigned journeys for a user
+router.get('/user/:userId/progress', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+
+        const assignments = await db.query(`
+            SELECT uja.*, j.slug, j.title, j.description, j.sort_order, j.next_journey_id, j.required_xp
+            FROM user_journey_assignments uja
+            JOIN journeys j ON uja.journey_id = j.id
+            WHERE uja.user_id = $1 AND j.deleted_at IS NULL
+            ORDER BY j.sort_order
+        `, [userId]);
+
+        const journeys = [];
+        for (const a of assignments.rows) {
+            const totalResult = await db.query(`
+                SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE jt.is_mandatory) AS mandatory
+                FROM journey_tasks jt
+                JOIN journey_quests jq ON jt.quest_id = jq.id
+                JOIN journey_chapters jc ON jq.chapter_id = jc.id
+                WHERE jc.journey_id = $1
+            `, [a.journey_id]);
+
+            const completedResult = await db.query(`
+                SELECT COUNT(*) AS completed,
+                    COUNT(*) FILTER (WHERE jt.is_mandatory) AS mandatory_completed
+                FROM user_task_completions utc
+                JOIN journey_tasks jt ON utc.task_id = jt.id
+                JOIN journey_quests jq ON jt.quest_id = jq.id
+                JOIN journey_chapters jc ON jq.chapter_id = jc.id
+                WHERE jc.journey_id = $1 AND utc.user_id = $2
+            `, [a.journey_id, userId]);
+
+            const total = parseInt(totalResult.rows[0].total) || 0;
+            const mandatory = parseInt(totalResult.rows[0].mandatory) || 0;
+            const completed = parseInt(completedResult.rows[0].completed) || 0;
+            const mandatoryCompleted = parseInt(completedResult.rows[0].mandatory_completed) || 0;
+
+            journeys.push({
+                ...a,
+                progress: {
+                    total_tasks: total,
+                    mandatory_tasks: mandatory,
+                    completed_tasks: completed,
+                    mandatory_completed: mandatoryCompleted,
+                    completion_pct: mandatory > 0 ? Math.round((mandatoryCompleted / mandatory) * 100) : 0,
+                },
+            });
+        }
+
+        res.json(journeys);
     } catch (err) { next(err); }
 });
 

@@ -1,24 +1,54 @@
+# Dependencies — reinstalled inside the container
 node_modules
+
+# Previous builds
 .next
+
+# Version control
 .git
 .gitignore
+
+# Environment files — secrets must never be baked into images
 .env
 .env.*
-.DS_Store
+
+# Logs
 *.log
 npm-debug.log*
+
+# Documentation (not needed at runtime)
 *.md
 README*
 LICENSE
+COMPONENT_GUIDE.md
+DESIGN_SYSTEM.md
+
+# Tests & E2E
 tests/
 __tests__/
 coverage/
-.github/
-.vscode/
-.idea/
+e2e/
+playwright-report/
+test-results/
+playwright.config.ts
 *.test.js
 *.test.ts
 *.spec.js
 *.spec.ts
+
+# Editor & IDE
+.github/
+.vscode/
+.idea/
+.claude/
+
+# Docker meta (avoid recursive copies)
 Dockerfile
 docker-compose*
+
+# Build artifacts (regenerated)
+tsconfig.tsbuildinfo
+
+# OS artifacts
+.DS_Store
+Thumbs.db

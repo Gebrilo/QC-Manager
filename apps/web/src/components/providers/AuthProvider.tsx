@@ -8,11 +8,18 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface User {
     id: string;
     name: string;
+    display_name?: string | null;
     email: string;
     phone?: string;
     role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
     activated: boolean;
     onboarding_completed?: boolean;
+    preferences?: {
+        theme?: string;
+        display_density?: string;
+        default_page?: string;
+        [key: string]: any;
+    };
 }
 
 interface AuthContextType {
@@ -47,6 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             if (!res.ok) throw new Error('Invalid token');
             const data = await res.json();
+            const userPref = data.user.preferences;
+            if (userPref?.theme && userPref.theme !== 'system') {
+                localStorage.setItem('theme', userPref.theme);
+                if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }
+            if (userPref?.display_density) {
+                localStorage.setItem('density', userPref.display_density);
+            }
+
             setUser({
                 ...data.user,
                 activated: data.user.activated ?? true,
@@ -98,6 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const data = await res.json();
+        const userPref = data.user.preferences;
+        if (userPref?.theme && userPref.theme !== 'system') {
+            localStorage.setItem('theme', userPref.theme);
+            if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+        }
+        if (userPref?.display_density) {
+            localStorage.setItem('density', userPref.display_density);
+        }
+
         setUser({
             ...data.user,
             activated: data.user.activated ?? true,
@@ -107,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('auth_token', data.token);
 
         if (data.user.activated) {
-            router.push('/dashboard');
+            router.push(userPref?.default_page || '/dashboard');
         } else {
             router.push('/my-tasks');
         }
@@ -126,6 +153,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const result = await res.json();
+        const userPref = result.user.preferences;
+        if (userPref?.theme && userPref.theme !== 'system') {
+            localStorage.setItem('theme', userPref.theme);
+            if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+        }
+        if (userPref?.display_density) {
+            localStorage.setItem('density', userPref.display_density);
+        }
+
         setUser({
             ...result.user,
             activated: result.user.activated ?? false,
@@ -135,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('auth_token', result.token);
 
         if (result.user.activated) {
-            router.push('/dashboard');
+            router.push(userPref?.default_page || '/dashboard');
         } else {
             router.push('/my-tasks');
         }

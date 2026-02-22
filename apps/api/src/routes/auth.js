@@ -230,7 +230,7 @@ router.post('/login', async (req, res, next) => {
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
         const result = await db.query(
-            'SELECT id, name, email, phone, role, active, activated, onboarding_completed, created_at, last_login FROM app_user WHERE id = $1',
+            'SELECT id, name, display_name, email, phone, role, active, activated, onboarding_completed, preferences, created_at, last_login FROM app_user WHERE id = $1',
             [req.user.id]
         );
 
@@ -252,6 +252,78 @@ router.get('/me', requireAuth, async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+});
+
+// PATCH /auth/profile — Update display name and UI preferences
+router.patch('/profile', requireAuth, async (req, res, next) => {
+    try {
+        const { display_name, preferences } = req.body;
+        const updates = [];
+        const values = [];
+        let idx = 1;
+
+        if (display_name !== undefined) {
+            if (typeof display_name !== 'string' || display_name.length > 100) {
+                return res.status(400).json({ error: 'display_name must be a string up to 100 characters' });
+            }
+            updates.push(`display_name = $${idx++}`);
+            values.push(display_name.trim() || null);
+        }
+
+        if (preferences !== undefined) {
+            if (typeof preferences !== 'object' || Array.isArray(preferences)) {
+                return res.status(400).json({ error: 'preferences must be an object' });
+            }
+            // Merge with existing preferences rather than overwriting
+            updates.push(`preferences = preferences || $${idx++}`);
+            values.push(JSON.stringify(preferences));
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'Nothing to update' });
+        }
+
+        updates.push(`updated_at = NOW()`);
+        values.push(req.user.id);
+
+        const result = await db.query(
+            `UPDATE app_user SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, name, display_name, email, role, preferences`,
+            values
+        );
+
+        res.json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// POST /auth/change-password — Verify current password then update
+router.post('/change-password', requireAuth, async (req, res, next) => {
+    try {
+        const { current_password, new_password } = req.body;
+
+        if (!current_password || !new_password) {
+            return res.status(400).json({ error: 'current_password and new_password are required' });
+        }
+        if (new_password.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+
+        const result = await db.query('SELECT password_hash FROM app_user WHERE id = $1', [req.user.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (!verifyPassword(current_password, result.rows[0].password_hash)) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        const newHash = hashPassword(new_password);
+        await db.query(
+            'UPDATE app_user SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+            [newHash, req.user.id]
+        );
+
+        res.json({ success: true, message: 'Password updated successfully' });
+    } catch (err) { next(err); }
 });
 
 module.exports = router;

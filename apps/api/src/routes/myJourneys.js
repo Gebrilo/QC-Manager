@@ -61,18 +61,31 @@ function computeEarnedXp(chaptersWithProgress) {
     return total;
 }
 
-// GET /my-journeys — List assigned journeys with progress summary
+// GET /my-journeys — List assigned journeys with progress summary and lock status
 router.get('/', async (req, res, next) => {
     try {
         const userId = req.user.id;
 
         const assignments = await db.query(`
-            SELECT uja.*, j.slug, j.title, j.description, j.sort_order
+            SELECT uja.*, j.slug, j.title, j.description, j.sort_order, j.next_journey_id, j.required_xp
             FROM user_journey_assignments uja
             JOIN journeys j ON uja.journey_id = j.id
             WHERE uja.user_id = $1 AND j.deleted_at IS NULL
             ORDER BY j.sort_order
         `, [userId]);
+
+        // Compute total XP across all journeys for this user
+        const xpResult = await db.query(
+            `SELECT COALESCE(SUM(total_xp), 0) AS total_xp FROM user_journey_assignments WHERE user_id = $1`,
+            [userId]
+        );
+        const totalXp = parseInt(xpResult.rows[0].total_xp) || 0;
+
+        // Build a map of journey_id -> status for prerequisite checks
+        const statusMap = {};
+        for (const a of assignments.rows) {
+            statusMap[a.journey_id] = a.status;
+        }
 
         // Compute progress for each journey
         const journeys = [];
@@ -100,8 +113,35 @@ router.get('/', async (req, res, next) => {
             const completed = parseInt(completedResult.rows[0].completed) || 0;
             const mandatoryCompleted = parseInt(completedResult.rows[0].mandatory_completed) || 0;
 
+            // Journey-level locking: find if any other journey has next_journey_id = this journey
+            const prerequisiteResult = await db.query(`
+                SELECT uja.journey_id, uja.status
+                FROM journeys j
+                JOIN user_journey_assignments uja ON uja.journey_id = j.id
+                WHERE j.next_journey_id = $1 AND uja.user_id = $2
+                LIMIT 1
+            `, [a.journey_id, userId]);
+
+            let is_locked = false;
+            let lock_reason = null;
+
+            if (prerequisiteResult.rows.length > 0) {
+                const prereq = prerequisiteResult.rows[0];
+                if (prereq.status !== 'completed') {
+                    is_locked = true;
+                    lock_reason = 'Complete the previous journey first';
+                }
+            }
+
+            if (!is_locked && (a.required_xp || 0) > 0 && totalXp < (a.required_xp || 0)) {
+                is_locked = true;
+                lock_reason = `Requires ${a.required_xp} XP (you have ${totalXp})`;
+            }
+
             journeys.push({
                 ...a,
+                is_locked,
+                lock_reason,
                 progress: {
                     total_tasks: total,
                     mandatory_tasks: mandatory,
@@ -363,6 +403,29 @@ router.post('/:journeyId/tasks/:taskId/complete', async (req, res, next) => {
                 [userId, journeyId]
             );
 
+            // Auto-unlock: if this journey has a next_journey_id, assign it if the user meets required_xp
+            const nextJourneyRes = await db.query(
+                `SELECT next_journey_id, required_xp FROM journeys WHERE id = $1`,
+                [journeyId]
+            );
+            const { next_journey_id, required_xp } = nextJourneyRes.rows[0] || {};
+            if (next_journey_id) {
+                const updatedXpRes = await db.query(
+                    `SELECT COALESCE(SUM(total_xp), 0) AS total_xp FROM user_journey_assignments WHERE user_id = $1`,
+                    [userId]
+                );
+                const updatedTotalXp = parseInt(updatedXpRes.rows[0].total_xp) || 0;
+
+                if (updatedTotalXp >= (required_xp || 0)) {
+                    await db.query(
+                        `INSERT INTO user_journey_assignments (user_id, journey_id)
+                         VALUES ($1, $2)
+                         ON CONFLICT (user_id, journey_id) DO NOTHING`,
+                        [userId, next_journey_id]
+                    );
+                }
+            }
+
             // Check if all auto-assigned journeys are complete -> set onboarding_completed
             const incompleteJourneys = await db.query(`
                 SELECT COUNT(*) AS cnt FROM user_journey_assignments uja
@@ -377,6 +440,7 @@ router.post('/:journeyId/tasks/:taskId/complete', async (req, res, next) => {
                 );
             }
         }
+
 
         res.json(result.rows[0]);
     } catch (err) { next(err); }

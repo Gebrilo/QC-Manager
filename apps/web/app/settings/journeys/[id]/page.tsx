@@ -19,7 +19,8 @@ export default function AdminJourneyEditorPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editingJourney, setEditingJourney] = useState(false);
-    const [journeyForm, setJourneyForm] = useState({ title: '', slug: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0 });
+    const [journeyForm, setJourneyForm] = useState({ title: '', slug: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0, next_journey_id: '' as string, required_xp: 0 });
+    const [allJourneys, setAllJourneys] = useState<{ id: string; title: string }[]>([]);
 
     const loadJourney = useCallback(async () => {
         try {
@@ -32,7 +33,12 @@ export default function AdminJourneyEditorPage() {
                 is_active: data.is_active,
                 auto_assign_on_activation: data.auto_assign_on_activation,
                 sort_order: data.sort_order,
+                next_journey_id: data.next_journey_id || '',
+                required_xp: data.required_xp || 0,
             });
+            // Load all journeys for the dropdown (excluding current)
+            const all = await journeysApi.list();
+            setAllJourneys(all.filter(j => j.id !== data.id).map(j => ({ id: j.id, title: j.title })));
         } catch (err) {
             console.error('Failed to load journey:', err);
         } finally {
@@ -131,21 +137,39 @@ export default function AdminJourneyEditorPage() {
                                     <span className="text-sm text-slate-700 dark:text-slate-300">Auto-assign</span>
                                 </label>
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Next Journey (unlocks after this one)</label>
+                                <select value={journeyForm.next_journey_id} onChange={(e) => setJourneyForm({ ...journeyForm, next_journey_id: e.target.value })}
+                                    className="w-full h-9 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                                    <option value="">— None —</option>
+                                    {allJourneys.map(j => (
+                                        <option key={j.id} value={j.id}>{j.title}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Required XP to unlock</label>
+                                <input type="number" min={0} value={journeyForm.required_xp} onChange={(e) => setJourneyForm({ ...journeyForm, required_xp: parseInt(e.target.value) || 0 })}
+                                    className="w-full h-9 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                            </div>
                             <div className="flex justify-end sm:col-span-2">
-                                <button onClick={handleUpdateJourney} disabled={saving}
+                                <button onClick={() => journeysApi.update(id, { ...journeyForm, next_journey_id: journeyForm.next_journey_id || null }).then(() => { setEditingJourney(false); loadJourney(); }).catch((e: any) => alert(e.message))} disabled={saving}
                                     className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">
                                     {saving ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
                             <code className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-xs">{journey.slug}</code>
                             <span>{journey.is_active ? 'Active' : 'Inactive'}</span>
                             <span>{journey.auto_assign_on_activation ? 'Auto-assign: Yes' : 'Auto-assign: No'}</span>
+                            {journey.next_journey_id && <span className="text-indigo-500">→ Next Journey set</span>}
+                            {(journey.required_xp || 0) > 0 && <span className="text-violet-500">Requires {journey.required_xp} XP</span>}
                             {journey.description && <span className="truncate max-w-xs">{journey.description}</span>}
                         </div>
                     )}
+
                 </div>
             </div>
 
@@ -589,6 +613,11 @@ function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => v
                         <input type="number" value={form.estimated_minutes || ''} onChange={(e) => setForm({ ...form, estimated_minutes: parseInt(e.target.value) || undefined })}
                             placeholder="Min" className="h-8 w-16 border border-slate-200 dark:border-slate-700 rounded-lg px-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
                         <span className="text-xs text-slate-400">minutes</span>
+                        <div className="flex items-center gap-1">
+                            <label className="text-xs text-slate-500">Order:</label>
+                            <input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
+                                className="h-8 w-16 border border-slate-200 dark:border-slate-700 rounded-lg px-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                        </div>
                     </div>
                     <div className="sm:col-span-2">
                         <ValidationConfigEditor type={form.validation_type} config={form.validation_config} onChange={(vc) => setForm({ ...form, validation_config: vc })} />
@@ -613,6 +642,7 @@ function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => v
                 <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">{task.validation_type}</span>
                 {!task.is_mandatory && <span className="text-xs text-amber-500">Optional</span>}
                 {task.estimated_minutes && <span className="text-xs text-slate-400">~{task.estimated_minutes}m</span>}
+                <span className="text-xs text-slate-400">Order: {task.sort_order}</span>
             </div>
             <div className="flex items-center gap-2 ml-2">
                 <button onClick={() => setEditing(true)} className="text-xs text-indigo-500 hover:text-indigo-700">Edit</button>
@@ -678,6 +708,11 @@ function AddTaskButton({ questId, onCreated }: { questId: string; onCreated: () 
                     <input type="number" value={form.estimated_minutes || ''} onChange={(e) => setForm({ ...form, estimated_minutes: parseInt(e.target.value) || undefined })}
                         placeholder="Min" className="h-8 w-16 border border-slate-200 dark:border-slate-700 rounded-lg px-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
                     <span className="text-xs text-slate-400">minutes</span>
+                    <div className="flex items-center gap-1">
+                        <label className="text-xs text-slate-500">Order:</label>
+                        <input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
+                            className="h-8 w-16 border border-slate-200 dark:border-slate-700 rounded-lg px-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                    </div>
                 </div>
                 <div className="sm:col-span-2">
                     <ValidationConfigEditor type={form.validation_type} config={form.validation_config} onChange={(vc) => setForm({ ...form, validation_config: vc })} />

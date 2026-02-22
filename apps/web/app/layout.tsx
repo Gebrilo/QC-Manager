@@ -10,10 +10,43 @@ import { Sidebar } from '../src/components/layout/Sidebar';
 import { TopBar } from '../src/components/layout/TopBar';
 import { ActivationBanner } from '../src/components/ui/ActivationBanner';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 
 const AUTH_PAGES = ['/login', '/register'];
+
+const PAGE_TITLES: Record<string, string> = {
+    '/': 'Dashboard',
+    '/my-tasks': 'My Tasks',
+    '/projects': 'Projects',
+    '/tasks': 'Tasks',
+    '/resources': 'Resources',
+    '/governance': 'Governance',
+    '/settings': 'Settings',
+    '/reports': 'Reports',
+    '/login': 'Login',
+    '/register': 'Register',
+    '/preferences': 'Preferences',
+    '/users': 'User Management',
+    '/journeys': 'Journeys',
+    '/test-cases': 'Test Cases',
+    '/test-executions': 'Test Executions',
+    '/test-results': 'Test Results',
+    '/task-history': 'Task History',
+};
+
+const getPageTitle = (pathname: string | null) => {
+    if (!pathname) return 'QC Manager';
+    if (PAGE_TITLES[pathname]) return `QC Manager - ${PAGE_TITLES[pathname]}`;
+
+    const baseRoute = '/' + pathname.split('/')[1];
+    if (PAGE_TITLES[baseRoute]) {
+        return `QC Manager - ${PAGE_TITLES[baseRoute]}`;
+    }
+
+    return 'QC Manager';
+};
 
 export default function RootLayout({
     children,
@@ -23,8 +56,16 @@ export default function RootLayout({
     const pathname = usePathname();
     const isAuthPage = AUTH_PAGES.includes(pathname || '');
 
+    // useEffect(() => {
+    //     document.title = getPageTitle(pathname);
+    // }, [pathname]);
+
     return (
         <html lang="en" suppressHydrationWarning>
+            <head>
+                <title>{getPageTitle(pathname)}</title>
+                <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+            </head>
             <body className={inter.className}>
                 <ThemeProvider>
                     <AuthProvider>

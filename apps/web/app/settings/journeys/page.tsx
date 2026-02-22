@@ -8,7 +8,7 @@ export default function AdminJourneysPage() {
     const [journeys, setJourneys] = useState<Journey[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [formData, setFormData] = useState({ slug: '', title: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0 });
+    const [formData, setFormData] = useState({ slug: '', title: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0, next_journey_id: '' as string, required_xp: 0 });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const router = useRouter();
@@ -34,9 +34,9 @@ export default function AdminJourneysPage() {
         setSaving(true);
         setError('');
         try {
-            await journeysApi.create(formData);
+            await journeysApi.create({ ...formData, next_journey_id: formData.next_journey_id || null });
             setShowCreate(false);
-            setFormData({ slug: '', title: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0 });
+            setFormData({ slug: '', title: '', description: '', is_active: true, auto_assign_on_activation: true, sort_order: 0, next_journey_id: '', required_xp: 0 });
             loadJourneys();
         } catch (err: any) {
             setError(err.message || 'Failed to create journey');
@@ -184,11 +184,10 @@ export default function AdminJourneysPage() {
                                 <td className="px-4 py-3 text-center text-sm text-slate-600 dark:text-slate-400">{journey.chapter_count || 0}</td>
                                 <td className="px-4 py-3 text-center text-sm text-slate-600 dark:text-slate-400">{journey.task_count || 0}</td>
                                 <td className="px-4 py-3 text-center">
-                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                        journey.is_active
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${journey.is_active
                                             ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
                                             : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                                    }`}>
+                                        }`}>
                                         {journey.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>

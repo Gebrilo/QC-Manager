@@ -53,58 +53,83 @@ export default function JourneysPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {journeys.map((journey) => (
-                    <button
-                        key={journey.id}
-                        onClick={() => router.push(`/journeys/${journey.journey_id}`)}
-                        className="text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-                    >
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center">
-                                <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                                </svg>
-                            </div>
-                            <StatusBadge status={journey.status} />
-                        </div>
-
-                        <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                            {journey.title}
-                        </h3>
-                        {journey.description && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{journey.description}</p>
-                        )}
-
-                        <div className="mt-4">
-                            <div className="flex items-center justify-between text-sm mb-1.5">
-                                <span className="text-slate-500 dark:text-slate-400">Progress</span>
-                                <div className="flex items-center gap-2">
-                                    {(journey.total_xp || 0) > 0 && (
-                                        <span className="text-xs font-medium text-violet-600 dark:text-violet-400">{journey.total_xp} XP</span>
-                                    )}
-                                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                                        {journey.progress.mandatory_completed}/{journey.progress.mandatory_tasks} tasks
-                                    </span>
+                {journeys.map((journey) => {
+                    const isLocked = journey.is_locked;
+                    return (
+                        <button
+                            key={journey.id}
+                            onClick={() => !isLocked && router.push(`/journeys/${journey.journey_id}`)}
+                            disabled={isLocked}
+                            className={`text-left bg-white dark:bg-slate-900 border rounded-xl p-5 transition-all group relative
+                                ${isLocked
+                                    ? 'border-slate-200 dark:border-slate-800 opacity-60 cursor-not-allowed'
+                                    : 'border-slate-200 dark:border-slate-800 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 cursor-pointer'
+                                }`}
+                        >
+                            {isLocked && (
+                                <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+                                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Locked</span>
                                 </div>
+                            )}
+                            <div className="flex items-start justify-between mb-3">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isLocked ? 'bg-slate-100 dark:bg-slate-800' : 'bg-indigo-50 dark:bg-indigo-950'}`}>
+                                    <svg className={`w-5 h-5 ${isLocked ? 'text-slate-400' : 'text-indigo-600 dark:text-indigo-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                    </svg>
+                                </div>
+                                {!isLocked && <StatusBadge status={journey.status} />}
                             </div>
-                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full rounded-full transition-all ${
-                                        journey.progress.completion_pct === 100
-                                            ? 'bg-emerald-500'
-                                            : 'bg-indigo-500'
-                                    }`}
-                                    style={{ width: `${journey.progress.completion_pct}%` }}
-                                />
-                            </div>
-                            <p className="text-xs text-slate-400 mt-1">{journey.progress.completion_pct}% complete</p>
-                        </div>
-                    </button>
-                ))}
+
+                            <h3 className={`font-semibold transition-colors ${isLocked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400'}`}>
+                                {journey.title}
+                            </h3>
+                            {journey.description && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{journey.description}</p>
+                            )}
+
+                            {isLocked ? (
+                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 flex items-center gap-1">
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {journey.lock_reason}
+                                </p>
+                            ) : (
+                                <div className="mt-4">
+                                    <div className="flex items-center justify-between text-sm mb-1.5">
+                                        <span className="text-slate-500 dark:text-slate-400">Progress</span>
+                                        <div className="flex items-center gap-2">
+                                            {(journey.total_xp || 0) > 0 && (
+                                                <span className="text-xs font-medium text-violet-600 dark:text-violet-400">{journey.total_xp} XP</span>
+                                            )}
+                                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                                                {journey.progress.mandatory_completed}/{journey.progress.mandatory_tasks} tasks
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full transition-all ${journey.progress.completion_pct === 100
+                                                    ? 'bg-emerald-500'
+                                                    : 'bg-indigo-500'
+                                                }`}
+                                            style={{ width: `${journey.progress.completion_pct}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">{journey.progress.completion_pct}% complete</p>
+                                </div>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );
 }
+
 
 function StatusBadge({ status }: { status: string }) {
     const config = {

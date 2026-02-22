@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'system';
 type Density = 'comfortable' | 'compact';
 
 interface ThemeContextType {
@@ -10,6 +10,7 @@ interface ThemeContextType {
     density: Density;
     toggleTheme: () => void;
     toggleDensity: () => void;
+    setTheme: (theme: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -36,7 +37,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
-        root.classList.add(theme);
+
+        if (theme === 'system') {
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                root.classList.add('dark');
+            }
+        } else {
+            root.classList.add(theme);
+        }
+
         localStorage.setItem('theme', theme);
     }, [theme]);
 
@@ -45,7 +54,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }, [density]);
 
     const toggleTheme = () => {
-        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+        setTheme((prev) => {
+            if (prev === 'light') return 'dark';
+            if (prev === 'dark') return 'system';
+            return 'light';
+        });
     };
 
     const toggleDensity = () => {
@@ -53,15 +66,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <ThemeContext.Provider value={{ theme, density, toggleTheme, toggleDensity }}>
+        <ThemeContext.Provider value={{ theme, density, toggleTheme, toggleDensity, setTheme }}>
             <script
                 dangerouslySetInnerHTML={{
                     __html: `
                         try {
-                            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                                document.documentElement.classList.add('dark')
+                            var t = localStorage.getItem('theme');
+                            if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                                document.documentElement.classList.add('dark');
                             } else {
-                                document.documentElement.classList.remove('dark')
+                                document.documentElement.classList.remove('dark');
                             }
                         } catch (_) {}
                     `,

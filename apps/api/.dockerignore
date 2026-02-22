@@ -1,22 +1,45 @@
+# Dependencies — reinstalled inside the container
 node_modules
+
+# Version control
 .git
 .gitignore
+
+# Environment files — secrets must never be baked into images
 .env
 .env.*
-.DS_Store
+
+# Logs
 *.log
 npm-debug.log*
+api-server.log
+server.log
+
+# Documentation (not needed at runtime)
 *.md
 README*
 LICENSE
+
+# Tests
 tests/
 __tests__/
 coverage/
+*.test.js
+*.spec.js
+
+# Editor & IDE
 .github/
 .vscode/
 .idea/
-*.test.js
-*.spec.js
+.claude/
+
+# Docker meta (avoid recursive copies)
 Dockerfile
 docker-compose*
+
+# Project scripts (not needed inside container)
 scripts/
+
+# OS artifacts
+.DS_Store
+Thumbs.db

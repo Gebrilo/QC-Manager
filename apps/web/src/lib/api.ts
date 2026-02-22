@@ -398,6 +398,33 @@ export const healthApi = {
 };
 
 // ============================================================================
+// User Profile & Preferences
+// ============================================================================
+
+export interface UserPreferences {
+    theme?: 'light' | 'dark' | 'system';
+    quick_nav_visible?: boolean;
+    default_page?: string;
+    notification_frequency?: 'immediate' | 'daily' | 'weekly';
+    display_density?: 'compact' | 'comfortable';
+    timezone?: string;
+    language?: string;
+    show_profile_to_team?: boolean;
+}
+
+export const profileApi = {
+    update: (data: { display_name?: string; preferences?: Partial<UserPreferences> }) =>
+        fetchApi<{ id: string; name: string; display_name: string | null; email: string; preferences: UserPreferences }>(
+            '/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }
+        ),
+
+    changePassword: (data: { current_password: string; new_password: string }) =>
+        fetchApi<{ success: boolean; message: string }>(
+            '/auth/change-password', { method: 'POST', body: JSON.stringify(data) }
+        ),
+};
+
+// ============================================================================
 // Type Definitions - Journeys
 // ============================================================================
 
@@ -470,6 +497,8 @@ export interface Journey {
     is_active: boolean;
     auto_assign_on_activation: boolean;
     sort_order: number;
+    next_journey_id?: string | null;
+    required_xp: number;
     created_at: string;
     updated_at: string;
     deleted_at?: string;
@@ -498,11 +527,15 @@ export interface AssignedJourney {
     title: string;
     description?: string;
     sort_order: number;
+    next_journey_id?: string | null;
+    required_xp: number;
     assigned_at: string;
     started_at?: string;
     completed_at?: string;
     status: 'assigned' | 'in_progress' | 'completed';
     total_xp: number;
+    is_locked: boolean;
+    lock_reason?: string | null;
     progress: JourneyProgressSummary;
 }
 

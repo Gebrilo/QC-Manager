@@ -7,6 +7,8 @@ const createJourneySchema = z.object({
     is_active: z.boolean().default(true),
     auto_assign_on_activation: z.boolean().default(true),
     sort_order: z.number().int().min(0).default(0),
+    next_journey_id: z.string().uuid().nullable().optional(),
+    required_xp: z.number().int().min(0).default(0),
 });
 
 const updateJourneySchema = createJourneySchema.partial();
