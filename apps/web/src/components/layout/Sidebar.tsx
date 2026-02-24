@@ -8,7 +8,7 @@ import { getNavbarRoutes, getLandingPage } from '../../config/routes';
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 
 export function Sidebar() {
-    const { user, isAdmin, hasPermission } = useAuth();
+    const { user, permissions, isAdmin, hasPermission } = useAuth();
     const { isExpanded, isMobileOpen, toggleExpanded, closeMobile } = useSidebar();
     const pathname = usePathname();
 
@@ -21,7 +21,7 @@ export function Sidebar() {
         return true;
     });
 
-    const logoHref = getLandingPage(user);
+    const logoHref = getLandingPage(user, permissions);
 
     const isActive = (path: string) => {
         if (pathname === path) return true;

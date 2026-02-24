@@ -174,9 +174,19 @@ export default function PreferencesPage() {
                     <PrefField label="Default Landing Page">
                         <select value={prefs.default_page} onChange={e => setPrefs({ ...prefs, default_page: e.target.value })} className={inputCls}>
                             <option value="/dashboard">Dashboard</option>
-                            <option value="/journeys">My Journeys</option>
                             <option value="/my-tasks">My Tasks</option>
+                            <option value="/journeys">My Journeys</option>
+                            <option value="/tasks">Tasks</option>
+                            <option value="/projects">Projects</option>
+                            <option value="/resources">Resources</option>
+                            <option value="/governance">Governance</option>
+                            <option value="/test-executions">Test Runs</option>
+                            <option value="/reports">Reports</option>
+                            <option value="/task-history">Task History</option>
                         </select>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                            Page you&apos;ll be redirected to after login. Falls back to Dashboard if you lack permission.
+                        </p>
                     </PrefField>
 
                     <PrefField label="Display Density">

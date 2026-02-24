@@ -6,7 +6,7 @@ import { useAuth } from './AuthProvider';
 import { getRouteConfig, isPublicRoute, getLandingPage } from '../../config/routes';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-    const { user, loading, hasPermission, isAdmin } = useAuth();
+    const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
@@ -26,7 +26,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         // If no route config exists, require authentication only (already checked above)
         if (!route) return;
 
-        const landing = getLandingPage(user);
+        // Permission-validated landing page based on user preferences
+        const landing = getLandingPage(user, permissions);
 
         if (route.requiresActivation && !user.activated) {
             router.replace('/my-tasks');
@@ -42,7 +43,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             router.replace(landing);
             return;
         }
-    }, [loading, user, pathname, router, hasPermission, isAdmin]);
+    }, [loading, user, permissions, pathname, router, hasPermission, isAdmin]);
 
     if (loading) {
         return (

@@ -10,12 +10,12 @@ import { NotificationBell } from './NotificationBell';
 
 export function TopBar() {
     const { theme, toggleTheme } = useTheme();
-    const { user, logout } = useAuth();
+    const { user, permissions, logout } = useAuth();
     const { toggleExpanded, toggleMobile } = useSidebar();
 
     if (!user) return null;
 
-    const logoHref = getLandingPage(user);
+    const logoHref = getLandingPage(user, permissions);
     const displayName = user.display_name || user.name;
     const userInitial = displayName?.charAt(0).toUpperCase() || 'U';
 

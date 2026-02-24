@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getLandingPage } from '../../config/routes';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -125,19 +126,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('density', userPref.display_density);
         }
 
-        setUser({
+        const loggedInUser = {
             ...data.user,
             activated: data.user.activated ?? true,
-        });
-        setPermissions(data.permissions || []);
+        };
+        const userPerms = data.permissions || [];
+
+        setUser(loggedInUser);
+        setPermissions(userPerms);
         setToken(data.token);
         localStorage.setItem('auth_token', data.token);
 
-        if (data.user.activated) {
-            router.push(userPref?.default_page || '/dashboard');
-        } else {
-            router.push('/my-tasks');
-        }
+        // Use getLandingPage for permission-validated redirect
+        const landing = getLandingPage(loggedInUser, userPerms);
+        router.push(landing);
     }, [router]);
 
     const register = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
@@ -163,19 +165,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('density', userPref.display_density);
         }
 
-        setUser({
+        const registeredUser = {
             ...result.user,
             activated: result.user.activated ?? false,
-        });
-        setPermissions(result.permissions || []);
+        };
+        const userPerms = result.permissions || [];
+
+        setUser(registeredUser);
+        setPermissions(userPerms);
         setToken(result.token);
         localStorage.setItem('auth_token', result.token);
 
-        if (result.user.activated) {
-            router.push(userPref?.default_page || '/dashboard');
-        } else {
-            router.push('/my-tasks');
-        }
+        // Use getLandingPage for permission-validated redirect
+        const landing = getLandingPage(registeredUser, userPerms);
+        router.push(landing);
     }, [router]);
 
     const logout = useCallback(() => {

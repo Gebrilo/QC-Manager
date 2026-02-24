@@ -229,7 +229,11 @@ router.post('/register', async (req, res, next) => {
         const permissions = permsResult.rows.map(p => p.permission_key);
 
         res.status(201).json({
-            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, activated: user.activated },
+            user: {
+                id: user.id, name: user.name, email: user.email, phone: user.phone,
+                role: user.role, activated: user.activated,
+                preferences: {},
+            },
             permissions,
             token,
         });
@@ -290,7 +294,11 @@ router.post('/login', async (req, res, next) => {
             .map(p => p.permission_key);
 
         res.json({
-            user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, activated: user.activated },
+            user: {
+                id: user.id, name: user.name, email: user.email, phone: user.phone,
+                role: user.role, activated: user.activated,
+                preferences: user.preferences || {},
+            },
             permissions,
             token,
         });

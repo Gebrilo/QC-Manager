@@ -81,12 +81,53 @@ export function isPublicRoute(pathname: string): boolean {
 
 interface UserForLanding {
     activated: boolean;
+    role?: string;
+    preferences?: {
+        default_page?: string;
+        [key: string]: any;
+    };
 }
 
-export function getLandingPage(user: UserForLanding | null): string {
+/**
+ * Returns the user's preferred landing page with permission validation.
+ * Falls back to /dashboard if the preferred page is invalid, doesn't exist,
+ * or the user lacks permission.
+ *
+ * @param user - User object with activation status and preferences
+ * @param permissions - Array of permission keys the user has (optional, needed for validation)
+ */
+export function getLandingPage(user: UserForLanding | null, permissions?: string[]): string {
     if (!user) return '/login';
     if (!user.activated) return '/my-tasks';
-    return '/dashboard';
+
+    const preferredPage = user.preferences?.default_page;
+
+    // If no preference set, default to /dashboard
+    if (!preferredPage || preferredPage === '/dashboard') return '/dashboard';
+
+    // Validate the preferred page exists in our route config
+    const route = getRouteConfig(preferredPage);
+    if (!route) return '/dashboard';
+
+    // Check if route requires activation (user is already activated at this point)
+    if (route.requiresActivation === false) {
+        // Non-activation routes are always accessible — allow it
+        return preferredPage;
+    }
+
+    // Check admin-only routes
+    if (route.adminOnly && user.role !== 'admin') {
+        return '/dashboard';
+    }
+
+    // Check permission if required
+    if (route.permission && permissions) {
+        // Admins bypass all permission checks
+        if (user.role === 'admin') return preferredPage;
+        if (!permissions.includes(route.permission)) return '/dashboard';
+    }
+
+    return preferredPage;
 }
 
 export { ROUTES, PUBLIC_PATHS };
