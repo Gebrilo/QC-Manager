@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchApi, profileApi, UserPreferences } from '../../src/lib/api';
 import { useTheme } from '../../src/components/providers/ThemeProvider';
+import { useAuth } from '../../src/components/providers/AuthProvider';
+import { getRouteConfig } from '../../src/config/routes';
 
 interface UserProfile {
     id: string;
@@ -27,10 +29,42 @@ const DEFAULT_PREFS: Required<UserPreferences> = {
 const inputCls = 'w-full h-9 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50';
 const btnPrimary = 'px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50';
 
+// All possible landing page options with their route paths and labels
+const LANDING_PAGE_OPTIONS = [
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/my-tasks', label: 'My Tasks' },
+    { path: '/journeys', label: 'My Journeys' },
+    { path: '/tasks', label: 'Tasks' },
+    { path: '/projects', label: 'Projects' },
+    { path: '/resources', label: 'Resources' },
+    { path: '/governance', label: 'Governance' },
+    { path: '/test-executions', label: 'Test Runs' },
+    { path: '/reports', label: 'Reports' },
+    { path: '/task-history', label: 'Task History' },
+];
+
 export default function PreferencesPage() {
     const { setTheme } = useTheme();
+    const { user: authUser, permissions, hasPermission, isAdmin } = useAuth();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Filter landing page options to only show pages the user can access
+    const allowedLandingPages = useMemo(() => {
+        return LANDING_PAGE_OPTIONS.filter(opt => {
+            const route = getRouteConfig(opt.path);
+            if (!route) return false;
+            // Admins can see all pages
+            if (isAdmin) return true;
+            // Check admin-only restriction
+            if (route.adminOnly) return false;
+            // Check activation requirement
+            if (route.requiresActivation && !authUser?.activated) return false;
+            // Check permission
+            if (route.permission && !hasPermission(route.permission)) return false;
+            return true;
+        });
+    }, [authUser, permissions, isAdmin, hasPermission]);
 
     const [displayName, setDisplayName] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
@@ -54,6 +88,15 @@ export default function PreferencesPage() {
             .catch(console.error)
             .finally(() => setLoading(false));
     }, []);
+
+    // If the saved default_page is no longer accessible, reset to /dashboard
+    useEffect(() => {
+        if (loading) return;
+        const allowed = allowedLandingPages.map(o => o.path);
+        if (prefs.default_page && !allowed.includes(prefs.default_page)) {
+            setPrefs(p => ({ ...p, default_page: '/dashboard' }));
+        }
+    }, [allowedLandingPages, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const saveProfile = async () => {
         setProfileSaving(true);
@@ -173,19 +216,12 @@ export default function PreferencesPage() {
 
                     <PrefField label="Default Landing Page">
                         <select value={prefs.default_page} onChange={e => setPrefs({ ...prefs, default_page: e.target.value })} className={inputCls}>
-                            <option value="/dashboard">Dashboard</option>
-                            <option value="/my-tasks">My Tasks</option>
-                            <option value="/journeys">My Journeys</option>
-                            <option value="/tasks">Tasks</option>
-                            <option value="/projects">Projects</option>
-                            <option value="/resources">Resources</option>
-                            <option value="/governance">Governance</option>
-                            <option value="/test-executions">Test Runs</option>
-                            <option value="/reports">Reports</option>
-                            <option value="/task-history">Task History</option>
+                            {allowedLandingPages.map(opt => (
+                                <option key={opt.path} value={opt.path}>{opt.label}</option>
+                            ))}
                         </select>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                            Page you&apos;ll be redirected to after login. Falls back to Dashboard if you lack permission.
+                            Page you&apos;ll be redirected to after login. Only pages you have access to are shown.
                         </p>
                     </PrefField>
 
