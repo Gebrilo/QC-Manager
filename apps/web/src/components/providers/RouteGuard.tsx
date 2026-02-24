@@ -15,12 +15,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         if (isPublicRoute(pathname || '')) return;
 
+        // All non-public routes require authentication
         if (!user) {
             router.replace('/login');
             return;
         }
 
         const route = getRouteConfig(pathname || '');
+
+        // If no route config exists, require authentication only (already checked above)
         if (!route) return;
 
         const landing = getLandingPage(user);
@@ -59,6 +62,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         return <>{children}</>;
     }
 
+    // Block rendering for unauthenticated users on protected routes
     if (!user) return null;
 
     const route = getRouteConfig(pathname || '');

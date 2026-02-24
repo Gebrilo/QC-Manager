@@ -14,7 +14,8 @@ interface SimpleUser {
 }
 
 export default function AdminJourneyEditorPage() {
-    const { id } = useParams<{ id: string }>();
+    const params = useParams();
+    const id = params?.id as string;
     const router = useRouter();
     const { isAdmin } = useAuth();
     const [journey, setJourney] = useState<JourneyFull | null>(null);

@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { z } = require('zod');
 const { triggerWorkflow } = require('../utils/n8n');
 const { v4: uuidv4 } = require('uuid');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // Validation schema for report generation
 const generateReportSchema = z.object({
@@ -19,7 +20,7 @@ const generateReportSchema = z.object({
 });
 
 // POST /reports - Generate report (returns job_id)
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('action:reports:generate'), async (req, res, next) => {
     try {
         // Validate request
         const data = generateReportSchema.parse(req.body);
@@ -70,7 +71,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // GET /reports/:job_id - Check report status
-router.get('/:job_id', async (req, res, next) => {
+router.get('/:job_id', requireAuth, requirePermission('page:reports'), async (req, res, next) => {
     try {
         const { job_id } = req.params;
 
@@ -138,7 +139,7 @@ router.post('/callback', async (req, res, next) => {
 });
 
 // GET /reports - List all report jobs (with pagination)
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('page:reports'), async (req, res, next) => {
     try {
         const { user_email, status, limit = 50, offset = 0 } = req.query;
 

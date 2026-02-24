@@ -40,9 +40,13 @@ router.patch('/:id', async (req, res, next) => {
         let idx = 1;
 
         if (role !== undefined) {
-            const validRoles = ['admin', 'manager', 'user', 'viewer', 'contributor'];
-            if (!validRoles.includes(role)) {
-                return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+            const builtInRoles = ['admin', 'manager', 'user', 'viewer', 'contributor'];
+            if (!builtInRoles.includes(role)) {
+                // Check if it's a valid custom role
+                const customRoleCheck = await db.query('SELECT name FROM custom_roles WHERE name = $1', [role]);
+                if (customRoleCheck.rows.length === 0) {
+                    return res.status(400).json({ error: `Invalid role '${role}'. Must be a built-in role (${builtInRoles.join(', ')}) or a valid custom role.` });
+                }
             }
             fields.push(`role = $${idx++}`);
             values.push(role);
@@ -157,13 +161,29 @@ router.put('/:id/permissions', async (req, res, next) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        await db.query('DELETE FROM user_permissions WHERE user_id = $1', [id]);
+        // Import ALL_PERMISSIONS from roles.js to know the full set of valid permission keys
+        const { ALL_PERMISSIONS } = require('./roles');
 
-        for (const perm of permissions) {
-            await db.query(
-                `INSERT INTO user_permissions (user_id, permission_key, granted) VALUES ($1, $2, true)`,
-                [id, perm]
-            );
+        // Instead of wiping all permissions, only update the ones included in ALL_PERMISSIONS.
+        // This prevents the frontend (which may know a subset) from accidentally wiping unknown keys.
+        const permissionsToGrant = new Set(permissions);
+
+        for (const permKey of ALL_PERMISSIONS) {
+            if (permissionsToGrant.has(permKey)) {
+                // Grant this permission
+                await db.query(
+                    `INSERT INTO user_permissions (user_id, permission_key, granted)
+                     VALUES ($1, $2, true)
+                     ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
+                    [id, permKey]
+                );
+            } else {
+                // Revoke this permission (delete the row)
+                await db.query(
+                    `DELETE FROM user_permissions WHERE user_id = $1 AND permission_key = $2`,
+                    [id, permKey]
+                );
+            }
         }
 
         const result = await db.query(

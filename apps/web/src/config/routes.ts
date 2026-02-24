@@ -48,8 +48,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/settings/roles', label: 'Roles & Permissions', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
     { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/settings/team-journeys', label: 'Team Journeys', permission: 'action:journeys:view_team_progress', requiresActivation: true, showInNavbar: true, navOrder: 9.8, icon: Users2 },
-    { path: '/preferences', label: 'Preferences', requiresActivation: false, showInNavbar: true, navOrder: 12, icon: Settings2 },
-    { path: '/test', label: 'Test', requiresActivation: false },
+    { path: '/settings/team-journeys/[userId]', label: 'Team Member Journey', permission: 'action:journeys:view_team_progress', requiresActivation: true },
+    { path: '/preferences', label: 'Preferences', requiresActivation: false },
 ];
 
 function pathToRegex(routePath: string): RegExp {

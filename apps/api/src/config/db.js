@@ -484,6 +484,7 @@ const runMigrations = async () => {
                 p.id,
                 p.project_id,
                 p.project_name,
+                p.team_id,
                 p.owner,
                 p.total_weight,
                 p.priority,
@@ -692,6 +693,16 @@ const runMigrations = async () => {
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='preferences') THEN
                     ALTER TABLE app_user ADD COLUMN preferences JSONB DEFAULT '{}'::jsonb NOT NULL;
+                END IF;
+            END $$;
+        `);
+
+        // Add probation_completed column for the Resource Allocation feature
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='probation_completed') THEN
+                    ALTER TABLE app_user ADD COLUMN probation_completed BOOLEAN DEFAULT false;
                 END IF;
             END $$;
         `);

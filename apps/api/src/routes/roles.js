@@ -6,17 +6,38 @@ const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 
 // All system permission keys
 const ALL_PERMISSIONS = [
+    // Page permissions
     'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
     'page:governance', 'page:test-executions', 'page:reports', 'page:users',
     'page:my-tasks', 'page:task-history', 'page:roles', 'page:journeys',
+    'page:teams', 'page:bugs',
+    // Task actions
     'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
+    // Project actions
     'action:projects:create', 'action:projects:edit', 'action:projects:delete',
+    // Resource actions
     'action:resources:create', 'action:resources:edit', 'action:resources:delete',
+    // Report actions
     'action:reports:generate',
+    // Personal task actions
     'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+    // Journey actions
     'action:journeys:assign',
     'action:journeys:view_assigned',
     'action:journeys:view_team_progress',
+    // Team actions
+    'action:teams:manage',
+    'action:teams:view',
+    // Test case actions
+    'action:test-cases:create', 'action:test-cases:edit', 'action:test-cases:delete',
+    // Test execution actions
+    'action:test-executions:create', 'action:test-executions:edit', 'action:test-executions:delete',
+    // Test result actions
+    'action:test-results:upload', 'action:test-results:delete',
+    // Bug actions
+    'action:bugs:create', 'action:bugs:edit', 'action:bugs:delete',
+    // Governance actions
+    'action:governance:manage_gates', 'action:governance:approve_release',
 ];
 
 // Protected built-in roles that cannot be deleted
@@ -25,25 +46,34 @@ const BUILT_IN_ROLES = ['admin', 'manager', 'user', 'viewer', 'contributor'];
 // GET all roles with their permissions
 router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
     try {
-        // Get custom roles from database
+        // Get all roles from custom_roles table (includes both custom roles AND built-in overrides)
         const customResult = await db.query('SELECT * FROM custom_roles ORDER BY created_at ASC');
-        const customRoles = customResult.rows;
+        const customRolesMap = new Map();
+        for (const cr of customResult.rows) {
+            customRolesMap.set(cr.name, cr);
+        }
 
         // Merge built-in and custom roles
         const roles = [];
 
-        // Built-in roles
-        for (const [roleName, perms] of Object.entries(DEFAULT_PERMISSIONS)) {
+        // Built-in roles — use DB override if admin has customized, otherwise hardcoded defaults
+        for (const [roleName, defaultPerms] of Object.entries(DEFAULT_PERMISSIONS)) {
+            const dbOverride = customRolesMap.get(roleName);
             roles.push({
                 name: roleName,
-                permissions: perms,
+                permissions: dbOverride && Array.isArray(dbOverride.permissions) && dbOverride.permissions.length > 0
+                    ? dbOverride.permissions
+                    : defaultPerms,
                 is_builtin: true,
                 is_protected: roleName === 'admin',
+                is_customized: !!dbOverride,
             });
+            // Remove from map so it doesn't appear again as a custom role
+            customRolesMap.delete(roleName);
         }
 
-        // Custom roles
-        for (const cr of customRoles) {
+        // Remaining custom roles (not built-in overrides)
+        for (const [, cr] of customRolesMap) {
             roles.push({
                 name: cr.name,
                 permissions: cr.permissions || [],
@@ -131,7 +161,22 @@ router.patch('/:roleName', requireAuth, requireRole('admin'), async (req, res, n
         // Check if it's a built-in role or custom role
         const isBuiltIn = BUILT_IN_ROLES.includes(roleName);
 
-        if (!isBuiltIn) {
+        if (isBuiltIn) {
+            // For built-in roles, persist the override in custom_roles table
+            // so setDefaultPermissions() can pick it up for new users
+            const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
+            if (existing.rows.length > 0) {
+                await db.query(
+                    'UPDATE custom_roles SET permissions = $1 WHERE name = $2',
+                    [validPerms, roleName]
+                );
+            } else {
+                await db.query(
+                    'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
+                    [roleName, validPerms, req.user?.email || 'system']
+                );
+            }
+        } else {
             // For custom roles, update the custom_roles table
             const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
             if (existing.rows.length === 0) {
@@ -200,3 +245,5 @@ router.delete('/:roleName', requireAuth, requireRole('admin'), async (req, res, 
 });
 
 module.exports = router;
+module.exports.ALL_PERMISSIONS = ALL_PERMISSIONS;
+module.exports.BUILT_IN_ROLES = BUILT_IN_ROLES;

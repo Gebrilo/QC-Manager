@@ -12,7 +12,7 @@ const { computeTaskTimeline } = require('../utils/workingDays');
 // ========================================
 
 // GET all resources with utilization metrics (from view)
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('page:resources'), async (req, res, next) => {
     try {
         const result = await db.query(`
             SELECT * 
@@ -129,7 +129,7 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
 });
 
 // GET single resource with utilization (from view)
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('page:resources'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`

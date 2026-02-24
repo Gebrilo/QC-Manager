@@ -8,12 +8,13 @@ const router = express.Router();
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // =====================================================
 // GET /bugs/summary
 // Get aggregated bug statistics for dashboard
 // =====================================================
-router.get('/summary', async (req, res) => {
+router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { project_id } = req.query;
 
@@ -101,7 +102,7 @@ router.get('/summary', async (req, res) => {
 // GET /bugs
 // List bugs with filters
 // =====================================================
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { project_id, status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
 
@@ -187,7 +188,7 @@ router.get('/', async (req, res) => {
 // GET /bugs/:id
 // Get single bug by ID
 // =====================================================
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -227,7 +228,7 @@ router.get('/:id', async (req, res) => {
 // GET /bugs/by-project/:projectId
 // Get bugs for a specific project
 // =====================================================
-router.get('/by-project/:projectId', async (req, res) => {
+router.get('/by-project/:projectId', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -262,7 +263,7 @@ router.get('/by-project/:projectId', async (req, res) => {
 // POST /bugs
 // Create a new bug (internal use / testing)
 // =====================================================
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requirePermission('action:bugs:create'), async (req, res) => {
     try {
         const {
             tuleap_artifact_id,
@@ -343,7 +344,7 @@ router.post('/', async (req, res) => {
 // PATCH /bugs/:id
 // Update a bug
 // =====================================================
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -408,7 +409,7 @@ router.patch('/:id', async (req, res) => {
 // DELETE /bugs/:id
 // Soft delete a bug
 // =====================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('action:bugs:delete'), async (req, res) => {
     try {
         const { id } = req.params;
 

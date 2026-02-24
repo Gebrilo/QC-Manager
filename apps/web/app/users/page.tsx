@@ -11,7 +11,7 @@ interface UserRecord {
     name: string;
     email: string;
     phone: string | null;
-    role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
+    role: string;
     active: boolean;
     activated: boolean;
     created_at: string;
@@ -38,6 +38,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const ALL_PERMISSIONS = [
+    // Page permissions
     { key: 'page:dashboard', label: 'Dashboard', group: 'Pages' },
     { key: 'page:tasks', label: 'Tasks', group: 'Pages' },
     { key: 'page:projects', label: 'Projects', group: 'Pages' },
@@ -46,16 +47,55 @@ const ALL_PERMISSIONS = [
     { key: 'page:test-executions', label: 'Test Runs', group: 'Pages' },
     { key: 'page:reports', label: 'Reports', group: 'Pages' },
     { key: 'page:users', label: 'User Management', group: 'Pages' },
+    { key: 'page:my-tasks', label: 'My Tasks', group: 'Pages' },
+    { key: 'page:task-history', label: 'Task History', group: 'Pages' },
+    { key: 'page:roles', label: 'Roles & Permissions', group: 'Pages' },
+    { key: 'page:journeys', label: 'Journeys', group: 'Pages' },
+    { key: 'page:teams', label: 'Teams', group: 'Pages' },
+    { key: 'page:bugs', label: 'Bugs', group: 'Pages' },
+    // Task actions
     { key: 'action:tasks:create', label: 'Create Tasks', group: 'Task Actions' },
     { key: 'action:tasks:edit', label: 'Edit Tasks', group: 'Task Actions' },
     { key: 'action:tasks:delete', label: 'Delete Tasks', group: 'Task Actions' },
+    // Project actions
     { key: 'action:projects:create', label: 'Create Projects', group: 'Project Actions' },
     { key: 'action:projects:edit', label: 'Edit Projects', group: 'Project Actions' },
     { key: 'action:projects:delete', label: 'Delete Projects', group: 'Project Actions' },
+    // Resource actions
     { key: 'action:resources:create', label: 'Create Resources', group: 'Resource Actions' },
     { key: 'action:resources:edit', label: 'Edit Resources', group: 'Resource Actions' },
     { key: 'action:resources:delete', label: 'Delete Resources', group: 'Resource Actions' },
+    // Report actions
     { key: 'action:reports:generate', label: 'Generate Reports', group: 'Report Actions' },
+    // Personal task actions
+    { key: 'action:my-tasks:create', label: 'Create Personal Tasks', group: 'Personal Task Actions' },
+    { key: 'action:my-tasks:edit', label: 'Edit Personal Tasks', group: 'Personal Task Actions' },
+    { key: 'action:my-tasks:delete', label: 'Delete Personal Tasks', group: 'Personal Task Actions' },
+    // Journey actions
+    { key: 'action:journeys:assign', label: 'Assign Journeys', group: 'Journey Actions' },
+    { key: 'action:journeys:view_assigned', label: 'View Assigned Journeys', group: 'Journey Actions' },
+    { key: 'action:journeys:view_team_progress', label: 'View Team Progress', group: 'Journey Actions' },
+    // Team actions
+    { key: 'action:teams:manage', label: 'Manage Teams', group: 'Team Actions' },
+    { key: 'action:teams:view', label: 'View Teams', group: 'Team Actions' },
+    // Test case actions
+    { key: 'action:test-cases:create', label: 'Create Test Cases', group: 'Test Case Actions' },
+    { key: 'action:test-cases:edit', label: 'Edit Test Cases', group: 'Test Case Actions' },
+    { key: 'action:test-cases:delete', label: 'Delete Test Cases', group: 'Test Case Actions' },
+    // Test execution actions
+    { key: 'action:test-executions:create', label: 'Create Test Executions', group: 'Test Execution Actions' },
+    { key: 'action:test-executions:edit', label: 'Edit Test Executions', group: 'Test Execution Actions' },
+    { key: 'action:test-executions:delete', label: 'Delete Test Executions', group: 'Test Execution Actions' },
+    // Test result actions
+    { key: 'action:test-results:upload', label: 'Upload Test Results', group: 'Test Result Actions' },
+    { key: 'action:test-results:delete', label: 'Delete Test Results', group: 'Test Result Actions' },
+    // Bug actions
+    { key: 'action:bugs:create', label: 'Create Bugs', group: 'Bug Actions' },
+    { key: 'action:bugs:edit', label: 'Edit Bugs', group: 'Bug Actions' },
+    { key: 'action:bugs:delete', label: 'Delete Bugs', group: 'Bug Actions' },
+    // Governance actions
+    { key: 'action:governance:manage_gates', label: 'Manage Gates', group: 'Governance Actions' },
+    { key: 'action:governance:approve_release', label: 'Approve Release', group: 'Governance Actions' },
 ];
 
 export default function UsersPage() {
@@ -73,6 +113,24 @@ export default function UsersPage() {
     const [convertTarget, setConvertTarget] = useState<UserRecord | null>(null);
     const [converting, setConverting] = useState(false);
     const [convertForm, setConvertForm] = useState({ weekly_capacity_hrs: 40, department: '', role: '' });
+    const [availableRoles, setAvailableRoles] = useState<{ name: string; is_builtin: boolean }[]>([
+        { name: 'admin', is_builtin: true },
+        { name: 'manager', is_builtin: true },
+        { name: 'contributor', is_builtin: true },
+        { name: 'user', is_builtin: true },
+        { name: 'viewer', is_builtin: true },
+    ]);
+
+    const fetchRoles = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/roles`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            setAvailableRoles(data.map((r: any) => ({ name: r.name, is_builtin: r.is_builtin })));
+        } catch { /* non-critical — falls back to hardcoded built-in roles */ }
+    }, [token]);
 
     const fetchResources = useCallback(async () => {
         try {
@@ -110,8 +168,9 @@ export default function UsersPage() {
         if (token && isAdmin) {
             fetchUsers();
             fetchResources();
+            fetchRoles();
         }
-    }, [token, isAdmin, fetchUsers, fetchResources]);
+    }, [token, isAdmin, fetchUsers, fetchResources, fetchRoles]);
 
     const fetchPermissions = async (userId: string) => {
         try {
@@ -359,13 +418,13 @@ export default function UsersPage() {
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                     disabled={u.id === currentUser?.id || saving === u.id}
-                                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${ROLE_COLORS[u.role]}`}
+                                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${ROLE_COLORS[u.role] || 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'}`}
                                 >
-                                    <option value="admin">Admin</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="contributor">Contributor</option>
-                                    <option value="user">User</option>
-                                    <option value="viewer">Viewer</option>
+                                    {availableRoles.map(r => (
+                                        <option key={r.name} value={r.name}>
+                                            {r.name.charAt(0).toUpperCase() + r.name.slice(1).replace(/_/g, ' ')}
+                                        </option>
+                                    ))}
                                 </select>
 
                                 {/* Activated Toggle */}

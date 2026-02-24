@@ -23,51 +23,103 @@ function verifyPassword(password, storedHash) {
 
 const DEFAULT_PERMISSIONS = {
     admin: [
+        // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports', 'page:users',
         'page:my-tasks', 'page:task-history', 'page:roles',
-        'page:journeys', 'page:teams',
+        'page:journeys', 'page:teams', 'page:bugs',
+        // Journey actions
         'action:journeys:assign',
         'action:journeys:view_assigned',
         'action:journeys:view_team_progress',
+        // Task actions
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
+        // Project actions
         'action:projects:create', 'action:projects:edit', 'action:projects:delete',
+        // Resource actions
         'action:resources:create', 'action:resources:edit', 'action:resources:delete',
+        // Report actions
         'action:reports:generate',
+        // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
-        'action:teams:manage',
-        'action:teams:view',
+        // Team actions
+        'action:teams:manage', 'action:teams:view',
+        // Test case actions
+        'action:test-cases:create', 'action:test-cases:edit', 'action:test-cases:delete',
+        // Test execution actions
+        'action:test-executions:create', 'action:test-executions:edit', 'action:test-executions:delete',
+        // Test result actions
+        'action:test-results:upload', 'action:test-results:delete',
+        // Bug actions
+        'action:bugs:create', 'action:bugs:edit', 'action:bugs:delete',
+        // Governance actions
+        'action:governance:manage_gates', 'action:governance:approve_release',
     ],
     manager: [
+        // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports',
-        'page:my-tasks', 'page:task-history',
+        'page:my-tasks', 'page:task-history', 'page:bugs',
+        // Journey actions
         'action:journeys:view_team_progress',
         'action:journeys:assign',
+        // Task actions
         'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
+        // Project actions
         'action:projects:create', 'action:projects:edit',
+        // Resource actions
         'action:resources:create', 'action:resources:edit',
+        // Report actions
         'action:reports:generate',
+        // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+        // Team actions
         'action:teams:view',
+        // Test case actions
+        'action:test-cases:create', 'action:test-cases:edit',
+        // Test execution actions
+        'action:test-executions:create', 'action:test-executions:edit',
+        // Test result actions
+        'action:test-results:upload',
+        // Bug actions
+        'action:bugs:create', 'action:bugs:edit',
+        // Governance actions
+        'action:governance:approve_release',
     ],
     user: [
+        // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
         'page:my-tasks',
+        // Task actions
         'action:tasks:create', 'action:tasks:edit',
+        // Report actions
         'action:reports:generate',
+        // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+        // Test case actions
+        'action:test-cases:create', 'action:test-cases:edit',
+        // Test execution actions
+        'action:test-executions:create',
+        // Test result actions
+        'action:test-results:upload',
+        // Bug actions
+        'action:bugs:create',
     ],
     viewer: [
+        // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
         'page:my-tasks',
+        // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
     contributor: [
+        // Pages
         'page:dashboard', 'page:tasks', 'page:my-tasks',
+        // Task actions
         'action:tasks:edit',
+        // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
 };
@@ -78,23 +130,34 @@ const INACTIVE_PERMISSIONS = [
 ];
 
 async function setDefaultPermissions(userId, role) {
-    let permissions = DEFAULT_PERMISSIONS[role];
+    let permissions;
 
-    // If not a built-in role, check custom_roles table
-    if (!permissions) {
-        try {
-            const result = await db.query('SELECT permissions FROM custom_roles WHERE name = $1', [role]);
-            permissions = result.rows.length > 0 ? result.rows[0].permissions : DEFAULT_PERMISSIONS.viewer;
-        } catch {
-            permissions = DEFAULT_PERMISSIONS.viewer;
+    // Always check custom_roles table first — it stores both custom role definitions
+    // AND admin-customized overrides for built-in roles (saved when admin edits role permissions)
+    try {
+        const result = await db.query('SELECT permissions FROM custom_roles WHERE name = $1', [role]);
+        if (result.rows.length > 0 && Array.isArray(result.rows[0].permissions) && result.rows[0].permissions.length > 0) {
+            permissions = result.rows[0].permissions;
         }
+    } catch {
+        // DB error — fall through to defaults
+    }
+
+    // Fall back to hardcoded defaults if no DB override found
+    if (!permissions) {
+        permissions = DEFAULT_PERMISSIONS[role];
+    }
+
+    // Final fallback for unknown roles with no DB entry
+    if (!permissions) {
+        permissions = DEFAULT_PERMISSIONS.viewer;
     }
 
     await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
     for (const perm of permissions) {
         await db.query(
-            `INSERT INTO user_permissions (user_id, permission_key, granted) 
-             VALUES ($1, $2, true) 
+            `INSERT INTO user_permissions (user_id, permission_key, granted)
+             VALUES ($1, $2, true)
              ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
             [userId, perm]
         );

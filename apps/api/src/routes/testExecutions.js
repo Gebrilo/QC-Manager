@@ -4,6 +4,7 @@ const { pool } = require('../config/db');
 const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // Configure multer for file upload (memory storage)
 const upload = multer({
@@ -59,7 +60,7 @@ const testExecutionUpdateSchema = z.object({
 // ============================================================================
 
 // GET /summary - Aggregate stats for dashboard
-router.get('/summary', async (req, res, next) => {
+router.get('/summary', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const { project_id } = req.query;
 
@@ -142,7 +143,7 @@ router.get('/summary', async (req, res, next) => {
 // ============================================================================
 
 // GET /test-runs - List all test runs
-router.get('/test-runs', async (req, res, next) => {
+router.get('/test-runs', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const { project_id, status, limit = 50, offset = 0 } = req.query;
 
@@ -206,7 +207,7 @@ router.get('/test-runs', async (req, res, next) => {
 });
 
 // GET /test-runs/:id - Get single test run with executions
-router.get('/test-runs/:id', async (req, res, next) => {
+router.get('/test-runs/:id', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -273,7 +274,7 @@ router.get('/test-runs/:id', async (req, res, next) => {
 });
 
 // POST /test-runs - Create new test run
-router.post('/test-runs', async (req, res, next) => {
+router.post('/test-runs', requireAuth, requirePermission('action:test-executions:create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -335,7 +336,7 @@ router.post('/test-runs', async (req, res, next) => {
 });
 
 // PATCH /test-runs/:id - Update test run
-router.patch('/test-runs/:id', async (req, res, next) => {
+router.patch('/test-runs/:id', requireAuth, requirePermission('action:test-executions:edit'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -427,7 +428,7 @@ router.patch('/test-runs/:id', async (req, res, next) => {
 });
 
 // DELETE /test-runs/:id - Soft delete test run
-router.delete('/test-runs/:id', async (req, res, next) => {
+router.delete('/test-runs/:id', requireAuth, requirePermission('action:test-executions:delete'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -481,7 +482,7 @@ router.delete('/test-runs/:id', async (req, res, next) => {
 // ============================================================================
 
 // GET /executions - List executions (with filters)
-router.get('/executions', async (req, res, next) => {
+router.get('/executions', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const { test_run_id, test_case_id, status, limit = 100, offset = 0 } = req.query;
 
@@ -541,7 +542,7 @@ router.get('/executions', async (req, res, next) => {
 });
 
 // POST /executions - Log single test execution
-router.post('/executions', async (req, res, next) => {
+router.post('/executions', requireAuth, requirePermission('action:test-executions:create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -615,7 +616,7 @@ router.post('/executions', async (req, res, next) => {
 });
 
 // PATCH /executions/:id - Update execution
-router.patch('/executions/:id', async (req, res, next) => {
+router.patch('/executions/:id', requireAuth, requirePermission('action:test-executions:edit'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -708,7 +709,7 @@ router.patch('/executions/:id', async (req, res, next) => {
 });
 
 // POST /executions/bulk-import - Bulk import execution results
-router.post('/executions/bulk-import', async (req, res, next) => {
+router.post('/executions/bulk-import', requireAuth, requirePermission('action:test-executions:create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -836,7 +837,7 @@ router.post('/executions/bulk-import', async (req, res, next) => {
 // ============================================================================
 
 // POST /upload-excel - Upload Excel file with test results
-router.post('/upload-excel', upload.single('file'), async (req, res, next) => {
+router.post('/upload-excel', requireAuth, requirePermission('action:test-executions:create'), upload.single('file'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -981,7 +982,7 @@ router.post('/upload-excel', upload.single('file'), async (req, res, next) => {
 });
 
 // GET /recent-uploads - Get recent test run uploads
-router.get('/recent-uploads', async (req, res, next) => {
+router.get('/recent-uploads', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const result = await pool.query(`
       SELECT 

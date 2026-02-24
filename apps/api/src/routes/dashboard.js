@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { optionalAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 
 const EMPTY_METRICS = {
@@ -60,7 +60,7 @@ async function getTeamMetrics(teamId) {
 }
 
 // GET dashboard metrics — scoped by team for managers
-router.get('/', optionalAuth, async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('page:dashboard'), async (req, res, next) => {
     try {
         // Manager: scope metrics to their team
         if (req.user?.role === 'manager') {
@@ -79,7 +79,7 @@ router.get('/', optionalAuth, async (req, res, next) => {
 });
 
 // GET /metrics (alias) — same scoping logic
-router.get('/metrics', optionalAuth, async (req, res, next) => {
+router.get('/metrics', requireAuth, requirePermission('page:dashboard'), async (req, res, next) => {
     try {
         if (req.user?.role === 'manager') {
             const teamId = await getManagerTeamId(req.user.id);

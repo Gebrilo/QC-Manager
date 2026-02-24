@@ -7,7 +7,8 @@ import { myJourneysApi, JourneyWithProgress, JourneyChapter, JourneyQuest, Journ
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function JourneyDetailPage() {
-    const { id } = useParams<{ id: string }>();
+    const params = useParams();
+    const id = params?.id as string;
     const router = useRouter();
     const [journey, setJourney] = useState<JourneyWithProgress | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -154,26 +155,23 @@ function ChapterSection({
     const isLocked = chapter.is_locked;
 
     return (
-        <div className={`bg-white dark:bg-slate-900 border rounded-xl overflow-hidden ${
-            isLocked
+        <div className={`bg-white dark:bg-slate-900 border rounded-xl overflow-hidden ${isLocked
                 ? 'border-slate-200 dark:border-slate-800 opacity-60'
                 : 'border-slate-200 dark:border-slate-800'
-        }`}>
+            }`}>
             <button
                 onClick={onToggle}
                 disabled={isLocked}
-                className={`w-full flex items-center justify-between p-4 transition-colors ${
-                    isLocked ? 'cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                }`}
+                className={`w-full flex items-center justify-between p-4 transition-colors ${isLocked ? 'cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    }`}
             >
                 <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isLocked
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isLocked
                             ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600'
                             : isComplete
                                 ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                    }`}>
+                        }`}>
                         {isLocked ? (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -193,11 +191,10 @@ function ChapterSection({
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">Optional</span>
                             )}
                             {(chapter.xp_reward || 0) > 0 && (
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                                    isComplete
+                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${isComplete
                                         ? 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                                }`}>
+                                    }`}>
                                     {isComplete ? '+' : ''}{chapter.xp_reward} XP
                                 </span>
                             )}

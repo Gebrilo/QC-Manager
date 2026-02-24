@@ -75,7 +75,7 @@ async function buildTaskTeamFilter(user) {
 }
 
 // GET all tasks — filtered by team for managers, by resource for regular users
-router.get('/', optionalAuth, async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
     try {
         const role = req.user?.role;
 
@@ -120,7 +120,7 @@ router.get('/', optionalAuth, async (req, res, next) => {
 });
 
 // GET single task by ID — enforce team scope for managers
-router.get('/:id', optionalAuth, async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`SELECT * FROM v_tasks_with_metrics WHERE id = $1`, [id]);
@@ -435,7 +435,7 @@ router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), asy
 // =====================================================
 
 // GET comments for a task
-router.get('/:id/comments', async (req, res, next) => {
+router.get('/:id/comments', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(
@@ -449,7 +449,7 @@ router.get('/:id/comments', async (req, res, next) => {
 });
 
 // POST add comment to task
-router.post('/:id/comments', async (req, res, next) => {
+router.post('/:id/comments', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { comment } = req.body;
@@ -475,7 +475,7 @@ router.post('/:id/comments', async (req, res, next) => {
 });
 
 // DELETE a comment
-router.delete('/:taskId/comments/:commentId', async (req, res, next) => {
+router.delete('/:taskId/comments/:commentId', requireAuth, requirePermission('action:tasks:delete'), async (req, res, next) => {
     try {
         const { taskId, commentId } = req.params;
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { z } = require('zod');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // Validation Schemas
 const testCaseCreateSchema = z.object({
@@ -20,7 +21,7 @@ const testCaseUpdateSchema = testCaseCreateSchema.partial().extend({
 });
 
 // GET /test-cases - List all test cases with filtering
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const {
       project_id,
@@ -126,7 +127,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /test-cases/:id - Get single test case
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -170,7 +171,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /test-cases - Create new test case
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -238,7 +239,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PATCH /test-cases/:id - Update test case
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('action:test-cases:edit'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -326,7 +327,7 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 // DELETE /test-cases/:id - Soft delete (archive) test case
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('action:test-cases:delete'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -373,7 +374,7 @@ router.delete('/:id', async (req, res, next) => {
 });
 
 // POST /test-cases/bulk-import - Bulk import from Excel/CSV data
-router.post('/bulk-import', async (req, res, next) => {
+router.post('/bulk-import', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {

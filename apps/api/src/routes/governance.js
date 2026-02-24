@@ -7,12 +7,13 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const pool = db.pool;
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
 // =====================================================
 // GET /governance/release-readiness
 // Get release readiness for all projects or specific project
 // =====================================================
-router.get('/release-readiness', async (req, res) => {
+router.get('/release-readiness', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { project_id, status } = req.query;
 
@@ -80,7 +81,7 @@ router.get('/release-readiness', async (req, res) => {
 // GET /governance/release-readiness/:projectId
 // Get release readiness for a specific project
 // =====================================================
-router.get('/release-readiness/:projectId', async (req, res) => {
+router.get('/release-readiness/:projectId', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -135,7 +136,7 @@ router.get('/release-readiness/:projectId', async (req, res) => {
 // GET /governance/quality-risks
 // Get quality risk assessment for all projects
 // =====================================================
-router.get('/quality-risks', async (req, res) => {
+router.get('/quality-risks', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { risk_level } = req.query;
 
@@ -191,7 +192,7 @@ router.get('/quality-risks', async (req, res) => {
 // GET /governance/quality-risks/:projectId
 // Get quality risk assessment for a specific project
 // =====================================================
-router.get('/quality-risks/:projectId', async (req, res) => {
+router.get('/quality-risks/:projectId', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -243,7 +244,7 @@ router.get('/quality-risks/:projectId', async (req, res) => {
 // GET /governance/workload-balance
 // Get workload balance assessment for all projects
 // =====================================================
-router.get('/workload-balance', async (req, res) => {
+router.get('/workload-balance', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { balance_status } = req.query;
 
@@ -322,7 +323,7 @@ router.get('/workload-balance', async (req, res) => {
 // GET /governance/project-health
 // Get comprehensive project health summary
 // =====================================================
-router.get('/project-health', async (req, res) => {
+router.get('/project-health', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { health_status } = req.query;
 
@@ -391,7 +392,7 @@ router.get('/project-health', async (req, res) => {
 // GET /governance/project-health/:projectId
 // Get comprehensive health summary for a specific project
 // =====================================================
-router.get('/project-health/:projectId', async (req, res) => {
+router.get('/project-health/:projectId', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -448,7 +449,7 @@ router.get('/project-health/:projectId', async (req, res) => {
 // GET /governance/dashboard-summary
 // Get aggregated dashboard statistics
 // =====================================================
-router.get('/dashboard-summary', async (req, res) => {
+router.get('/dashboard-summary', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const summaryQuery = `
             WITH stats AS (
@@ -487,7 +488,7 @@ router.get('/dashboard-summary', async (req, res) => {
 // GET /governance/gates/:projectId
 // Get quality gates configuration for a project
 // =====================================================
-router.get('/gates/:projectId', async (req, res) => {
+router.get('/gates/:projectId', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { projectId } = req.params;
         const result = await pool.query(
@@ -523,7 +524,7 @@ router.get('/gates/:projectId', async (req, res) => {
 // POST /governance/gates
 // Create or update quality gates for a project
 // =====================================================
-router.post('/gates', async (req, res) => {
+router.post('/gates', requireAuth, requirePermission('action:governance:manage_gates'), async (req, res) => {
     try {
         const { project_id, min_pass_rate, max_critical_defects, min_test_coverage } = req.body;
 
@@ -553,7 +554,7 @@ router.post('/gates', async (req, res) => {
 // POST /governance/approvals
 // Submit a release approval or rejection
 // =====================================================
-router.post('/approvals', async (req, res) => {
+router.post('/approvals', requireAuth, requirePermission('action:governance:approve_release'), async (req, res) => {
     try {
         const { project_id, release_version, status, approver_name, comments, gate_snapshot } = req.body;
 
@@ -578,7 +579,7 @@ router.post('/approvals', async (req, res) => {
 // GET /governance/approvals/:projectId
 // Get approval history for a project
 // =====================================================
-router.get('/approvals/:projectId', async (req, res) => {
+router.get('/approvals/:projectId', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { projectId } = req.params;
         const result = await pool.query(
@@ -600,7 +601,7 @@ router.get('/approvals/:projectId', async (req, res) => {
 // GET /governance/execution-trend
 // Get daily pass rate trend for last 30 days
 // =====================================================
-router.get('/execution-trend', async (req, res) => {
+router.get('/execution-trend', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         const { project_id } = req.query;
 
@@ -681,7 +682,7 @@ router.get('/execution-trend', async (req, res) => {
 // GET /governance/global-settings
 // Get global quality gate settings
 // =====================================================
-router.get('/global-settings', async (req, res) => {
+router.get('/global-settings', requireAuth, requirePermission('page:governance'), async (req, res) => {
     try {
         // Ensure table exists
         await pool.query(`
@@ -744,7 +745,7 @@ router.get('/global-settings', async (req, res) => {
 // POST /governance/global-settings
 // Save global quality gate settings
 // =====================================================
-router.post('/global-settings', async (req, res) => {
+router.post('/global-settings', requireAuth, requirePermission('action:governance:manage_gates'), async (req, res) => {
     try {
         const settings = req.body;
 

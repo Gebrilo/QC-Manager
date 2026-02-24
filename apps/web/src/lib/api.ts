@@ -32,6 +32,24 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
+        // Handle 401 Unauthorized - token expired or invalid, force logout
+        if (response.status === 401) {
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('auth_token');
+                if (!window.location.pathname.startsWith('/login')) {
+                    window.location.href = '/login';
+                }
+            }
+            throw new Error(errorData.error || 'Session expired. Please log in again.');
+        }
+
+        // Handle 403 Forbidden - insufficient permissions
+        if (response.status === 403) {
+            const err = new Error(errorData.error || 'You do not have permission to perform this action');
+            (err as any).status = 403;
+            throw err;
+        }
+
         // Handle Zod validation errors with details
         if (errorData.details && Array.isArray(errorData.details)) {
             const validationMessages = errorData.details.map((d: any) =>
