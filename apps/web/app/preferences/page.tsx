@@ -18,7 +18,7 @@ interface UserProfile {
 const DEFAULT_PREFS: Required<UserPreferences> = {
     theme: 'system',
     quick_nav_visible: true,
-    default_page: '/dashboard',
+    default_page: '/my-tasks',
     notification_frequency: 'immediate',
     display_density: 'comfortable',
     timezone: 'UTC',
@@ -94,7 +94,7 @@ export default function PreferencesPage() {
         if (loading) return;
         const allowed = allowedLandingPages.map(o => o.path);
         if (prefs.default_page && !allowed.includes(prefs.default_page)) {
-            setPrefs(p => ({ ...p, default_page: '/dashboard' }));
+            setPrefs(p => ({ ...p, default_page: '/my-tasks' }));
         }
     }, [allowedLandingPages, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 

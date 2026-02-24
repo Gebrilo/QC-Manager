@@ -88,10 +88,14 @@ interface UserForLanding {
     };
 }
 
+// Safe fallback page accessible by all roles (no special permission required)
+const DEFAULT_LANDING = '/my-tasks';
+
 /**
  * Returns the user's preferred landing page with permission validation.
- * Falls back to /dashboard if the preferred page is invalid, doesn't exist,
- * or the user lacks permission.
+ * Falls back to /my-tasks if the preferred page is invalid, doesn't exist,
+ * or the user lacks permission. /my-tasks is used as fallback because it
+ * is accessible to all roles, unlike /dashboard which requires page:dashboard.
  *
  * @param user - User object with activation status and preferences
  * @param permissions - Array of permission keys the user has (optional, needed for validation)
@@ -102,12 +106,12 @@ export function getLandingPage(user: UserForLanding | null, permissions?: string
 
     const preferredPage = user.preferences?.default_page;
 
-    // If no preference set, default to /dashboard
-    if (!preferredPage || preferredPage === '/dashboard') return '/dashboard';
+    // If no preference set, use the safe default
+    if (!preferredPage) return DEFAULT_LANDING;
 
     // Validate the preferred page exists in our route config
     const route = getRouteConfig(preferredPage);
-    if (!route) return '/dashboard';
+    if (!route) return DEFAULT_LANDING;
 
     // Check if route requires activation (user is already activated at this point)
     if (route.requiresActivation === false) {
@@ -117,14 +121,14 @@ export function getLandingPage(user: UserForLanding | null, permissions?: string
 
     // Check admin-only routes
     if (route.adminOnly && user.role !== 'admin') {
-        return '/dashboard';
+        return DEFAULT_LANDING;
     }
 
     // Check permission if required
     if (route.permission && permissions) {
         // Admins bypass all permission checks
         if (user.role === 'admin') return preferredPage;
-        if (!permissions.includes(route.permission)) return '/dashboard';
+        if (!permissions.includes(route.permission)) return DEFAULT_LANDING;
     }
 
     return preferredPage;
