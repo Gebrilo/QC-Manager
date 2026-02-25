@@ -1,60 +1,25 @@
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - banner [ref=e3]:
-      - generic [ref=e5]:
-        - link "QC QC Manager" [ref=e6] [cursor=pointer]:
-          - /url: /
-          - generic [ref=e7]: QC
-          - generic [ref=e8]: QC Manager
-        - navigation [ref=e9]:
-          - link "Dashboard" [ref=e10] [cursor=pointer]:
-            - /url: /
-          - link "Tasks" [ref=e11] [cursor=pointer]:
-            - /url: /tasks
-          - link "Projects" [ref=e12] [cursor=pointer]:
-            - /url: /projects
-          - link "Governance" [ref=e13] [cursor=pointer]:
-            - /url: /governance
-          - link "Reports" [ref=e14] [cursor=pointer]:
-            - /url: /reports
-        - generic [ref=e15]:
-          - button [ref=e16] [cursor=pointer]:
-            - img [ref=e17]
-          - link "J John Doe" [ref=e20] [cursor=pointer]:
-            - /url: /preferences
-            - generic [ref=e21]: J
-            - generic [ref=e22]: John Doe
-    - main [ref=e23]:
-      - generic [ref=e24]:
-        - generic [ref=e25]:
-          - generic [ref=e26]:
-            - heading "Dashboard" [level=1] [ref=e27]
-            - paragraph [ref=e28]: Overview of your projects and pending tasks.
-          - generic [ref=e29]:
-            - link "+ New Project" [ref=e30] [cursor=pointer]:
-              - /url: /projects/create
-              - button "+ New Project" [ref=e31]
-            - link "+ New Task" [ref=e32] [cursor=pointer]:
-              - /url: /tasks/create
-              - button "+ New Task" [ref=e33]
-        - generic [ref=e35]:
-          - generic [ref=e36]:
-            - 'button "View: All Tasks" [ref=e38] [cursor=pointer]':
-              - generic [ref=e39]: "View:"
-              - text: All Tasks
-              - img [ref=e40]
-            - generic [ref=e43]:
-              - textbox "Search tasks..." [ref=e44]
-              - img [ref=e45]
-          - generic [ref=e47]:
-            - button "Filter" [ref=e49] [cursor=pointer]:
-              - img [ref=e50]
-              - text: Filter
-            - 'button "Current density: comfortable" [ref=e52] [cursor=pointer]':
-              - img [ref=e53]
-        - img [ref=e57]
-  - alert [ref=e60]
+- generic [ref=e1]:
+  - alert [ref=e2]: QC Manager - Login
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: QC
+      - heading "Welcome back" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Sign in to QC Manager
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Email
+          - textbox "you@company.com" [active] [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]: Password
+          - textbox "••••••••" [ref=e16]
+        - button "Sign In" [ref=e17] [cursor=pointer]
+      - paragraph [ref=e19]:
+        - text: Don't have an account?
+        - link "Create one" [ref=e20] [cursor=pointer]:
+          - /url: /register
+    - paragraph [ref=e21]: QC Management Tool © 2026
 ```

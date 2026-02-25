@@ -1,0 +1,193 @@
+﻿
+Running 9 tests using 9 workers
+
+[1A[2K[1/9] [chromium] ΓÇ║ e2e\app.spec.ts:5:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should load the dashboard
+[1A[2K[2/9] [chromium] ΓÇ║ e2e\app.spec.ts:28:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Projects page and list projects
+[1A[2K[3/9] [chromium] ΓÇ║ e2e\app.spec.ts:48:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Test Cases page
+[1A[2K[4/9] [chromium] ΓÇ║ e2e\app.spec.ts:42:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Resources page
+[1A[2K[5/9] [chromium] ΓÇ║ e2e\app.spec.ts:36:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Tasks page
+[1A[2K[6/9] [chromium] ΓÇ║ e2e\app.spec.ts:54:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Governance page
+[1A[2K[7/9] [chromium] ΓÇ║ e2e\app.spec.ts:68:13 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ Creation Flows ΓÇ║ should create a new project
+[1A[2K[8/9] [chromium] ΓÇ║ e2e\app.spec.ts:60:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Reports page
+[1A[2K[9/9] [chromium] ΓÇ║ e2e\app.spec.ts:97:13 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ Creation Flows ΓÇ║ should create a new task
+[1A[2K  1) [chromium] ΓÇ║ e2e\app.spec.ts:97:13 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ Creation Flows ΓÇ║ should create a new task 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Create New Task"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      113 |
+      114 |             // Form Loading
+    > 115 |             await expect(page.locator('h1')).toContainText('Create New Task');
+          |                                              ^
+      116 |
+      117 |             // Fill Form
+      118 |             await page.fill('input[name="task_id"]', 'TSK-999');
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:115:46
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-ddee6-ws-should-create-a-new-task-chromium\error-context.md
+
+
+[1A[2K  2) [chromium] ΓÇ║ e2e\app.spec.ts:60:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Reports page 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Reports"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      61 |         await page.goto('/reports');
+      62 |         await expect(page).toHaveURL(/\/reports/);
+    > 63 |         await expect(page.locator('h1')).toContainText('Reports');
+         |                                          ^
+      64 |     });
+      65 |
+      66 |     test.describe('Creation Flows', () => {
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:63:42
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-e3824-ld-navigate-to-Reports-page-chromium\error-context.md
+
+
+[1A[2K  3) [chromium] ΓÇ║ e2e\app.spec.ts:5:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should load the dashboard 
+
+    Error: [2mexpect([22m[31mpage[39m[2m).[22mtoHaveTitle[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Expected pattern: [32m/QC Management/i[39m
+    Received string:  [31m""[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toHaveTitle" with timeout 5000ms[22m
+    [2m    8 ├ù unexpected value ""[22m
+
+
+      21 |
+      22 |         await page.goto('/');
+    > 23 |         await expect(page).toHaveTitle(/QC Management/i);
+         |                            ^
+      24 |         // Check for key elements on the dashboard
+      25 |         await expect(page.locator('text=Dashboard')).toBeVisible();
+      26 |     });
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:23:28
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-61888-s-should-load-the-dashboard-chromium\error-context.md
+
+
+[1A[2K  4) [chromium] ΓÇ║ e2e\app.spec.ts:48:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Test Cases page 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Test Cases"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      49 |         await page.goto('/test-cases');
+      50 |         await expect(page).toHaveURL(/\/test-cases/);
+    > 51 |         await expect(page.locator('h1')).toContainText('Test Cases');
+         |                                          ^
+      52 |     });
+      53 |
+      54 |     test('should navigate to Governance page', async ({ page }) => {
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:51:42
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-b3cc0-navigate-to-Test-Cases-page-chromium\error-context.md
+
+
+[1A[2K  5) [chromium] ΓÇ║ e2e\app.spec.ts:36:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Tasks page 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Tasks"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      37 |         await page.goto('/tasks');
+      38 |         await expect(page).toHaveURL(/\/tasks/);
+    > 39 |         await expect(page.locator('h1')).toContainText('Tasks');
+         |                                          ^
+      40 |     });
+      41 |
+      42 |     test('should navigate to Resources page', async ({ page }) => {
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:39:42
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-612b7-ould-navigate-to-Tasks-page-chromium\error-context.md
+
+
+[1A[2K  6) [chromium] ΓÇ║ e2e\app.spec.ts:42:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Resources page 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Resources"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      43 |         await page.goto('/resources');
+      44 |         await expect(page).toHaveURL(/\/resources/);
+    > 45 |         await expect(page.locator('h1')).toContainText('Resources');
+         |                                          ^
+      46 |     });
+      47 |
+      48 |     test('should navigate to Test Cases page', async ({ page }) => {
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:45:42
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-a1437--navigate-to-Resources-page-chromium\error-context.md
+
+
+[1A[2K  7) [chromium] ΓÇ║ e2e\app.spec.ts:28:9 ΓÇ║ QC Management Tool Frontend Tests ΓÇ║ should navigate to Projects page and list projects 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected substring: [32m"Projects"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      29 |         await page.goto('/projects');
+      30 |         await expect(page).toHaveURL(/\/projects/);
+    > 31 |         await expect(page.locator('h1')).toContainText('Projects');
+         |                                          ^
+      32 |         // Check for "New Project" button or similar
+      33 |         await expect(page.getByRole('button', { name: /New Project|Create Project/i })).toBeVisible();
+      34 |     });
+        at D:\Claude\QC management tool\apps\web\e2e\app.spec.ts:31:42
+
+    Error Context: test-results\app-QC-Management-Tool-Fro-f5059-ects-page-and-list-projects-chromium\error-context.md
+
+

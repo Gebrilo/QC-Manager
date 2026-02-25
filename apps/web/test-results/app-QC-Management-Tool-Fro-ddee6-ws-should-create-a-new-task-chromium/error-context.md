@@ -2,87 +2,24 @@
 
 ```yaml
 - generic [ref=e1]:
-  - generic [ref=e2]:
-    - banner [ref=e3]:
-      - generic [ref=e5]:
-        - link "QC QC Manager" [ref=e6] [cursor=pointer]:
-          - /url: /
-          - generic [ref=e7]: QC
-          - generic [ref=e8]: QC Manager
-        - navigation [ref=e9]:
-          - link "Dashboard" [ref=e10] [cursor=pointer]:
-            - /url: /
-          - link "Tasks" [ref=e11] [cursor=pointer]:
-            - /url: /tasks
-          - link "Projects" [ref=e12] [cursor=pointer]:
-            - /url: /projects
-          - link "Governance" [ref=e13] [cursor=pointer]:
-            - /url: /governance
-          - link "Reports" [ref=e14] [cursor=pointer]:
-            - /url: /reports
-        - generic [ref=e15]:
-          - button [ref=e16] [cursor=pointer]:
-            - img [ref=e17]
-          - link "J John Doe" [ref=e20] [cursor=pointer]:
-            - /url: /preferences
-            - generic [ref=e21]: J
-            - generic [ref=e22]: John Doe
-    - main [ref=e23]:
-      - generic [ref=e24]:
-        - heading "Create New Task" [level=1] [ref=e25]
-        - generic [ref=e26]:
-          - generic [ref=e27]:
-            - heading "Task Details" [level=3] [ref=e28]
-            - generic [ref=e29]:
-              - generic [ref=e30]:
-                - generic [ref=e31]: Task ID
-                - textbox "TSK-001" [ref=e32]: TSK-999
-              - generic [ref=e33]:
-                - generic [ref=e34]: Status
-                - combobox [ref=e35]:
-                  - option "Backlog"
-                  - option "In Progress" [selected]
-                  - option "Done"
-                  - option "Cancelled"
-              - generic [ref=e37]:
-                - generic [ref=e38]: Priority
-                - combobox [ref=e39]:
-                  - option "High"
-                  - option "Medium" [selected]
-                  - option "Low"
-              - generic [ref=e42]:
-                - generic [ref=e43]: Task Name
-                - textbox "e.g. Implement Authorization Logic" [ref=e44]: E2E Test Task
-              - generic [ref=e45]:
-                - generic [ref=e46]: Description / Notes
-                - textbox "Add detailed notes about this task..." [ref=e47]
-          - generic [ref=e48]:
-            - heading "Assignment & Planning" [level=3] [ref=e49]
-            - generic [ref=e50]:
-              - generic [ref=e51]:
-                - generic [ref=e52]: Project
-                - combobox [ref=e53]:
-                  - option "PRJ-1 - Mock Project" [selected]
-              - generic [ref=e54]:
-                - generic [ref=e55]: Estimate (Days)
-                - spinbutton [active] [ref=e56]
-                - paragraph [ref=e57]: "Too small: expected number to be >0"
-              - generic [ref=e58]:
-                - generic [ref=e59]: Primary Resource
-                - combobox [ref=e60]:
-                  - option "Mock Resource" [selected]
-              - generic [ref=e61]:
-                - generic [ref=e62]: Secondary Resource (Optional)
-                - combobox [ref=e63]:
-                  - option "Mock Resource"
-              - generic [ref=e64]:
-                - generic [ref=e65]: Deadline
-                - textbox [ref=e66]
-              - generic [ref=e67]:
-                - generic [ref=e68]: Completed Date
-                - textbox [ref=e69]
-          - generic [ref=e70]:
-            - button "Cancel" [ref=e71] [cursor=pointer]
-            - button "Create Task" [ref=e72] [cursor=pointer]
-  - alert [ref=e73]
+  - alert [ref=e2]: QC Manager - Login
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: QC
+      - heading "Welcome back" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Sign in to QC Manager
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Email
+          - textbox "you@company.com" [active] [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]: Password
+          - textbox "••••••••" [ref=e16]
+        - button "Sign In" [ref=e17] [cursor=pointer]
+      - paragraph [ref=e19]:
+        - text: Don't have an account?
+        - link "Create one" [ref=e20] [cursor=pointer]:
+          - /url: /register
+    - paragraph [ref=e21]: QC Management Tool © 2026
 ```

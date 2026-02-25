@@ -63,11 +63,10 @@ export function Sidebar() {
                                     onClick={closeMobile}
                                     aria-current={active ? 'page' : undefined}
                                     title={!isExpanded ? route.label : undefined}
-                                    className={`flex items-center gap-3 rounded-lg transition-all duration-150 ${isExpanded ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'} ${
-                                        active
+                                    className={`flex items-center gap-3 rounded-lg transition-all duration-150 ${isExpanded ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'} ${active
                                             ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-900 dark:text-white border-l-2 border-indigo-500 ml-0 pl-2.5'
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-700 dark:hover:text-slate-300 border-l-2 border-transparent'
-                                    }`}
+                                        }`}
                                 >
                                     {Icon && <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />}
                                     {isExpanded && (
@@ -112,7 +111,7 @@ export function Sidebar() {
             <aside
                 className={`
                     fixed md:sticky top-0 left-0 z-50 md:z-30 h-screen
-                    bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800
+                    glass-panel
                     transition-all duration-200 ease-in-out flex-shrink-0
                     ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                     ${isExpanded ? 'w-60' : 'w-16'}
