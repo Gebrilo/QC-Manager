@@ -64,3 +64,4 @@ n8n_data/
 # Backup directories
 backups/
 backups-staging/
+.claude/worktrees/thirsty-bassi/nul
