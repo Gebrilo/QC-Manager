@@ -22,7 +22,7 @@ export function StatCard({ label, title, value, subtitle, trend, icon, tooltip }
         : trend;
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow">
+        <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">

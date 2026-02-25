@@ -3,6 +3,47 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Slate */
+    --color-slate-50: 248 250 252;
+    --color-slate-100: 241 245 249;
+    --color-slate-200: 226 232 240;
+    --color-slate-300: 203 213 225;
+    --color-slate-400: 148 163 184;
+    --color-slate-500: 100 116 139;
+    --color-slate-600: 71 85 105;
+    --color-slate-700: 51 65 85;
+    --color-slate-800: 30 41 59;
+    --color-slate-900: 15 23 42;
+    --color-slate-950: 2 6 23;
+
+    /* Indigo */
+    --color-indigo-50: 238 242 255;
+    --color-indigo-100: 224 231 255;
+    --color-indigo-200: 199 210 254;
+    --color-indigo-300: 165 180 252;
+    --color-indigo-400: 129 140 248;
+    --color-indigo-500: 99 102 241;
+    --color-indigo-600: 79 70 229;
+    --color-indigo-700: 67 56 202;
+    --color-indigo-800: 55 48 163;
+    --color-indigo-900: 49 46 129;
+    --color-indigo-950: 30 27 75;
+
+    /* Violet */
+    --color-violet-50: 245 243 255;
+    --color-violet-100: 237 233 254;
+    --color-violet-200: 221 214 254;
+    --color-violet-300: 196 181 253;
+    --color-violet-400: 167 139 250;
+    --color-violet-500: 139 92 246;
+    --color-violet-600: 124 58 237;
+    --color-violet-700: 109 40 217;
+    --color-violet-800: 91 33 182;
+    --color-violet-900: 76 29 149;
+    --color-violet-950: 46 16 101;
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
@@ -15,6 +56,30 @@
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-indigo-100 selection:text-indigo-900;
     overflow: hidden;
     height: 100%;
+  }
+}
+
+@layer components {
+
+  /* Liquid Glass Base Utilities */
+  .glass-panel {
+    @apply bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-r border-slate-200/50 dark:border-slate-700/50;
+  }
+
+  .glass-card {
+    @apply bg-white/60 dark:bg-slate-800/60 backdrop-blur-md rounded-xl border border-white/40 dark:border-slate-600/40 shadow-[0_4px_30px_#0000000D] dark:shadow-[0_4px_30px_#00000033] hover:shadow-md transition-shadow;
+  }
+
+  .glass-button {
+    @apply bg-indigo-600/80 hover:bg-indigo-600/95 dark:bg-indigo-500/80 dark:hover:bg-indigo-500/95 backdrop-blur-md text-white transition-all duration-200 border border-white/20 dark:border-white/10 shadow-sm hover:shadow active:scale-95;
+  }
+
+  .glass-button-secondary {
+    @apply bg-white/50 hover:bg-white/70 dark:bg-slate-800/50 dark:hover:bg-slate-700/70 backdrop-blur-md text-slate-800 dark:text-slate-100 transition-all duration-200 border border-slate-200/40 dark:border-slate-600/40 shadow-sm hover:shadow active:scale-95;
+  }
+
+  .glass-modal {
+    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-slate-700/50 shadow-[0_8px_30px_#0000001F] dark:shadow-[0_8px_30px_#00000066] rounded-2xl;
   }
 }
 
@@ -42,9 +107,11 @@
 .sidebar-scrollbar::-webkit-scrollbar {
   width: 3px;
 }
+
 .sidebar-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-slate-200 dark:bg-slate-700 rounded-full;
 }

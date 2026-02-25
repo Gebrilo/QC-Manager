@@ -65,3 +65,7 @@ n8n_data/
 backups/
 backups-staging/
 .claude/worktrees/thirsty-bassi/nul
+
+# Playwright Test Output
+playwright-report/
+test-results/

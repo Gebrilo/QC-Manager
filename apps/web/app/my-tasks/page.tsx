@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../src/components/providers/AuthProvider';
+import { ViewToggle } from '../../src/components/tasks/ViewToggle';
+import { TaskKanbanBoard } from '../../src/components/tasks/TaskKanbanBoard';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -39,6 +41,21 @@ export default function MyTasksPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({ title: '', description: '', priority: 'medium', due_date: '' });
     const [saving, setSaving] = useState(false);
+
+    // View mode - hydrate from localStorage to avoid SSR mismatch
+    const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
+
+    useEffect(() => {
+        const stored = localStorage.getItem('qc_my_tasks_view');
+        if (stored === 'table' || stored === 'board') {
+            setViewMode(stored);
+        }
+    }, []);
+
+    const handleViewChange = useCallback((view: 'table' | 'board') => {
+        setViewMode(view);
+        localStorage.setItem('qc_my_tasks_view', view);
+    }, []);
 
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
@@ -87,13 +104,19 @@ export default function MyTasksPage() {
     };
 
     const handleStatusChange = async (taskId: string, status: string) => {
+        // Optimistic update
+        const prevTasks = [...tasks];
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: status as PersonalTask['status'] } : t));
+
         try {
             const res = await fetch(`${API_URL}/my-tasks/${taskId}`, {
                 method: 'PATCH', headers, body: JSON.stringify({ status }),
             });
             if (!res.ok) throw new Error('Failed to update status');
+            // Re-fetch to sync completed_at etc.
             await fetchTasks();
         } catch (err: any) {
+            setTasks(prevTasks);
             setError(err.message);
         }
     };
@@ -126,19 +149,24 @@ export default function MyTasksPage() {
 
     return (
         <div className="space-y-6 px-4 sm:px-0">
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Tasks</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Your personal to-do list</p>
                 </div>
-                <button
-                    onClick={() => { setShowForm(true); setEditingId(null); setFormData({ title: '', description: '', priority: 'medium', due_date: '' }); }}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors"
-                >
-                    + New Task
-                </button>
+                <div className="flex items-center gap-3">
+                    <ViewToggle view={viewMode} onChange={handleViewChange} />
+                    <button
+                        onClick={() => { setShowForm(true); setEditingId(null); setFormData({ title: '', description: '', priority: 'medium', due_date: '' }); }}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors"
+                    >
+                        + New Task
+                    </button>
+                </div>
             </div>
 
+            {/* Error Banner */}
             {error && (
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-4 py-3 text-rose-600 dark:text-rose-400 text-sm">
                     {error}
@@ -146,8 +174,9 @@ export default function MyTasksPage() {
                 </div>
             )}
 
+            {/* Task Form */}
             {showForm && (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-sm">
+                <div className="glass-card p-5 space-y-4">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                         {editingId ? 'Edit Task' : 'New Task'}
                     </h2>
@@ -201,42 +230,57 @@ export default function MyTasksPage() {
                 </div>
             )}
 
-            {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <svg className="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                </div>
-            ) : tasks.length === 0 && !showForm ? (
-                <div className="text-center py-16">
-                    <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4">
-                        <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                    </div>
-                    <p className="text-lg font-medium text-slate-700 dark:text-slate-300">No tasks yet</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Create your first personal task to get started</p>
-                </div>
+            {/* Content: List View or Board View */}
+            {viewMode === 'board' ? (
+                /* ──── Kanban Board View ──── */
+                <TaskKanbanBoard
+                    tasks={tasks}
+                    isLoading={loading}
+                    onStatusChange={handleStatusChange}
+                    onEdit={startEdit}
+                    onDelete={handleDelete}
+                />
             ) : (
-                <div className="space-y-6">
-                    {activeTasks.length > 0 && (
-                        <div className="space-y-2">
-                            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active ({activeTasks.length})</h3>
-                            {activeTasks.map(task => (
-                                <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onEdit={startEdit} onDelete={handleDelete} />
-                            ))}
+                /* ──── List View (Original) ──── */
+                <>
+                    {loading ? (
+                        <div className="flex items-center justify-center py-20">
+                            <svg className="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        </div>
+                    ) : tasks.length === 0 && !showForm ? (
+                        <div className="text-center py-16">
+                            <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-4">
+                                <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                            </div>
+                            <p className="text-lg font-medium text-slate-700 dark:text-slate-300">No tasks yet</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Create your first personal task to get started</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {activeTasks.length > 0 && (
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active ({activeTasks.length})</h3>
+                                    {activeTasks.map(task => (
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onEdit={startEdit} onDelete={handleDelete} />
+                                    ))}
+                                </div>
+                            )}
+                            {completedTasks.length > 0 && (
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Completed ({completedTasks.length})</h3>
+                                    {completedTasks.map(task => (
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onEdit={startEdit} onDelete={handleDelete} />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
-                    {completedTasks.length > 0 && (
-                        <div className="space-y-2">
-                            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Completed ({completedTasks.length})</h3>
-                            {completedTasks.map(task => (
-                                <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onEdit={startEdit} onDelete={handleDelete} />
-                            ))}
-                        </div>
-                    )}
-                </div>
+                </>
             )}
         </div>
     );
@@ -253,7 +297,7 @@ function TaskCard({ task, onStatusChange, onEdit, onDelete }: {
     const isDone = task.status === 'done' || task.status === 'cancelled';
 
     return (
-        <div className={`bg-white dark:bg-slate-900 border rounded-xl p-4 transition-all ${isDone ? 'border-slate-100 dark:border-slate-800/50 opacity-60' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}>
+        <div className={`glass-card p-4 transition-all ${isDone ? 'opacity-60' : 'hover:shadow-md'}`}>
             <div className="flex items-start gap-3">
                 <button
                     onClick={() => onStatusChange(task.id, task.status === 'done' ? 'pending' : 'done')}
