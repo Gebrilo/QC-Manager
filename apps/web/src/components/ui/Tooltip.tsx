@@ -1,55 +1,101 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+/**
+ * Tooltip components built on @radix-ui/react-tooltip.
+ *
+ * All tooltips render via a React Portal at the end of <body>, so they
+ * always escape any parent `overflow: hidden` / local stacking contexts.
+ * Radix UI uses floating-ui under the hood for viewport collision detection
+ * (flip + shift), ensuring tooltips never overflow the screen edges.
+ *
+ * Usage:
+ *   1. Wrap the app root with <TooltipProvider> (already added to layout.tsx).
+ *   2. Use <Tooltip>, <TooltipTrigger>, <TooltipContent> for full control.
+ *   3. Use <InfoTooltip> for the common "?" info icon pattern.
+ */
 
-interface TooltipProps {
-    content: string;
-    children: ReactNode;
-    position?: 'top' | 'bottom' | 'left' | 'right';
+import * as RadixTooltip from '@radix-ui/react-tooltip';
+import { ReactNode } from 'react';
+import { Info } from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// Re-export Radix primitives for full-control usage
+// ---------------------------------------------------------------------------
+export const TooltipProvider = RadixTooltip.Provider;
+export const Tooltip = RadixTooltip.Root;
+export const TooltipTrigger = RadixTooltip.Trigger;
+
+export interface TooltipContentProps
+    extends React.ComponentPropsWithoutRef<typeof RadixTooltip.Content> {
+    className?: string;
 }
 
-export function Tooltip({ content, children, position = 'top' }: TooltipProps) {
-    const [isVisible, setIsVisible] = useState(false);
-
-    const positionClasses = {
-        top: 'bottom-full left-1/2 -translate-x-1/2 mb-3',
-        bottom: 'top-full left-1/2 -translate-x-1/2 mt-3',
-        left: 'right-full top-1/2 -translate-y-1/2 mr-3',
-        right: 'left-full top-1/2 -translate-y-1/2 ml-3',
-    };
-
-    const arrowClasses = {
-        top: 'top-full left-1/2 -translate-x-1/2 border-t-slate-800 border-x-transparent border-b-transparent',
-        bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-slate-800 border-x-transparent border-t-transparent',
-        left: 'left-full top-1/2 -translate-y-1/2 border-l-slate-800 border-y-transparent border-r-transparent',
-        right: 'right-full top-1/2 -translate-y-1/2 border-r-slate-800 border-y-transparent border-l-transparent',
-    };
-
+export function TooltipContent({
+    className = '',
+    sideOffset = 6,
+    children,
+    ...props
+}: TooltipContentProps) {
     return (
-        <div
-            className="relative inline-flex"
-            onMouseEnter={() => setIsVisible(true)}
-            onMouseLeave={() => setIsVisible(false)}
-        >
-            {children}
-            {isVisible && (
-                <div
-                    className={`absolute z-50 ${positionClasses[position]} pointer-events-none`}
-                    role="tooltip"
-                >
-                    <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-4 py-3 rounded-lg shadow-xl w-72 md:w-96 whitespace-normal leading-relaxed">
-                        {content}
-                    </div>
-                    <div
-                        className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
-                    />
-                </div>
-            )}
-        </div>
+        <RadixTooltip.Portal>
+            <RadixTooltip.Content
+                sideOffset={sideOffset}
+                className={[
+                    // Layer: tooltips always on top
+                    'z-[9999]',
+                    // Sizing
+                    'max-w-xs md:max-w-sm',
+                    // Visual styling
+                    'rounded-lg bg-slate-800 dark:bg-slate-700 px-4 py-3',
+                    'text-white text-xs leading-relaxed shadow-xl',
+                    'pointer-events-none select-none whitespace-normal',
+                    // Animation (Radix data-state driven)
+                    'data-[state=delayed-open]:animate-in',
+                    'data-[state=delayed-open]:fade-in-0',
+                    'data-[state=delayed-open]:zoom-in-95',
+                    'data-[state=closed]:animate-out',
+                    'data-[state=closed]:fade-out-0',
+                    'data-[state=closed]:zoom-out-95',
+                    className,
+                ].join(' ')}
+                {...props}
+            >
+                {children}
+                <RadixTooltip.Arrow className="fill-slate-800 dark:fill-slate-700" />
+            </RadixTooltip.Content>
+        </RadixTooltip.Portal>
     );
 }
 
-// Simple info icon with tooltip
+// ---------------------------------------------------------------------------
+// SimpleTooltip – backward-compat wrapper matching the old Tooltip API:
+//   <SimpleTooltip content="text" position="top"><button /></SimpleTooltip>
+// ---------------------------------------------------------------------------
+interface SimpleTooltipProps {
+    content: string;
+    children: ReactNode;
+    position?: 'top' | 'bottom' | 'left' | 'right';
+    delayDuration?: number;
+}
+
+export function SimpleTooltip({
+    content,
+    children,
+    position = 'top',
+    delayDuration = 300,
+}: SimpleTooltipProps) {
+    return (
+        <Tooltip delayDuration={delayDuration}>
+            <TooltipTrigger asChild>{children}</TooltipTrigger>
+            <TooltipContent side={position}>{content}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// InfoTooltip – the "?" icon pattern, fully backward-compatible:
+//   <InfoTooltip content="text" position="top" />
+// ---------------------------------------------------------------------------
 interface InfoTooltipProps {
     content: string;
     position?: 'top' | 'bottom' | 'left' | 'right';
@@ -57,10 +103,13 @@ interface InfoTooltipProps {
 
 export function InfoTooltip({ content, position = 'top' }: InfoTooltipProps) {
     return (
-        <Tooltip content={content} position={position}>
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] cursor-help hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                ?
-            </span>
+        <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-help hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                    <Info className="w-3 h-3" />
+                </span>
+            </TooltipTrigger>
+            <TooltipContent side={position}>{content}</TooltipContent>
         </Tooltip>
     );
 }
