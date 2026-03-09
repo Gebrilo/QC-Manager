@@ -49,9 +49,19 @@
             "credentials": {
                 "postgres": {
                     "id": "1",
-                    "name": "Local Postgres"
+                    "name": "QC Tool Postgres"
                 }
             }
+        },
+        {
+            "parameters": {},
+            "name": "Not Completed (No-Op)",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                650,
+                400
+            ]
         }
     ],
     "connections": {
@@ -71,6 +81,13 @@
                 [
                     {
                         "node": "Log Completion",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Not Completed (No-Op)",
                         "type": "main",
                         "index": 0
                     }

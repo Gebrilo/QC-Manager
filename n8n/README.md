@@ -33,10 +33,21 @@ This directory contains n8n workflow definitions for automating QC Management To
 | `workflows/02_Update_Task.json` | `/webhook/task-updated` | Triggered when task is updated |
 | `workflows/task_automation.json` | `/webhook/task-automation` | Generic task automation |
 
+### Tuleap Sync
+| Workflow | Webhook URL | Description |
+|----------|-------------|-------------|
+| `workflows/tuleap_task_sync.json` | `/webhook/tuleap-task` | Syncs tasks from Tuleap artifacts → QC Tool via `POST /tuleap-webhook/task` |
+| `workflows/tuleap_bug_sync.json` | `/webhook/tuleap-bug` | Syncs bugs from Tuleap artifacts → QC Tool via `POST /tuleap-webhook/bug` |
+
+**Prerequisites for Tuleap Sync**:
+- Create a sync config via `POST /tuleap-webhook/config` with `field_mappings` matching your Tuleap tracker fields
+- PostgreSQL credential named `QC Tool Postgres` must exist in n8n
+- QC API must be reachable at `http://qc-api:3001` from the n8n container
+
 ### Project Workflows
 | Workflow | Webhook URL | Description |
 |----------|-------------|-------------|
-| `workflows/create_project.json` | `/webhook/project-created` | Triggered when project is created |
+| `workflows/create_project.json` | `/webhook/project-created` | Triggered when project is created (placeholder) |
 
 ### Maintenance
 | Workflow | Description |

@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]: QC Manager - My Tasks
+  - generic [ref=e31]:
+    - complementary "Sidebar" [ref=e32]:
+      - generic [ref=e33]:
+        - link "QC QC Manager" [ref=e35] [cursor=pointer]:
+          - /url: /my-tasks
+          - generic [ref=e36]: QC
+          - generic [ref=e37]: QC Manager
+        - navigation "Main navigation" [ref=e38]:
+          - list [ref=e39]:
+            - listitem [ref=e40]:
+              - link "My Tasks" [ref=e41] [cursor=pointer]:
+                - /url: /my-tasks
+                - img [ref=e42]
+                - generic [ref=e45]: My Tasks
+            - listitem [ref=e46]:
+              - link "My Journeys" [ref=e47] [cursor=pointer]:
+                - /url: /journeys
+                - img [ref=e48]
+                - generic [ref=e50]: My Journeys
+        - button "Collapse sidebar" [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+          - generic [ref=e56]: Collapse
+    - generic [ref=e57]:
+      - banner [ref=e58]:
+        - generic [ref=e59]:
+          - button "Toggle navigation" [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+          - generic [ref=e63]:
+            - button "Switch to dark mode" [ref=e64] [cursor=pointer]:
+              - img [ref=e65]
+            - link "T Test User" [ref=e68] [cursor=pointer]:
+              - /url: /preferences
+              - generic [ref=e69]: T
+              - generic [ref=e70]: Test User
+            - button "Sign out" [ref=e71] [cursor=pointer]:
+              - img [ref=e72]
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - img [ref=e79]
+          - paragraph [ref=e81]:
+            - text: Your account is pending activation. You can use
+            - strong [ref=e82]: My Tasks
+            - text: while waiting. An administrator will activate your account soon.
+        - generic [ref=e83]:
+          - button "Check status" [ref=e84] [cursor=pointer]
+          - button [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+      - main [ref=e88]:
+        - generic [ref=e90]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - heading "My Tasks" [level=1] [ref=e93]
+              - paragraph [ref=e94]: Your personal to-do list
+            - generic [ref=e95]:
+              - generic [ref=e96]:
+                - button "Switch to table view" [pressed] [ref=e97] [cursor=pointer]:
+                  - img [ref=e98]
+                  - generic [ref=e100]: Table
+                - button "Switch to board view" [ref=e101] [cursor=pointer]:
+                  - img [ref=e102]
+                  - generic [ref=e104]: Board
+              - button "+ New Task" [ref=e105] [cursor=pointer]
+          - generic [ref=e106]:
+            - img [ref=e108]
+            - paragraph [ref=e110]: No tasks yet
+            - paragraph [ref=e111]: Create your first personal task to get started

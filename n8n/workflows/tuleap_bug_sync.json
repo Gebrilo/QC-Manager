@@ -13,7 +13,10 @@
             "name": "Webhook",
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1.1,
-            "position": [150, 300],
+            "position": [
+                150,
+                300
+            ],
             "webhookId": "tuleap-bug-webhook"
         },
         {
@@ -23,7 +26,10 @@
             "name": "Parse Tuleap Payload",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [350, 300]
+            "position": [
+                350,
+                300
+            ]
         },
         {
             "parameters": {
@@ -33,7 +39,10 @@
             "name": "Get Sync Config",
             "type": "n8n-nodes-base.postgres",
             "typeVersion": 2.5,
-            "position": [550, 300],
+            "position": [
+                550,
+                300
+            ],
             "credentials": {
                 "postgres": {
                     "id": "1",
@@ -65,16 +74,22 @@
             "name": "Has Config?",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2,
-            "position": [750, 300]
+            "position": [
+                750,
+                300
+            ]
         },
         {
             "parameters": {
-                "jsCode": "const payload = $('Parse Tuleap Payload').first().json.payload;\nconst config = $('Get Sync Config').first().json;\nconst artifact = payload.current;\nconst fieldMappings = config.field_mappings || {};\nconst statusMappings = config.status_mappings || {};\n\n// Helper to get field value by field ID\nfunction getFieldValue(values, fieldId) {\n  if (!values || !fieldId) return null;\n  const field = values.find(v => v.field_id === parseInt(fieldId));\n  if (!field) return null;\n  \n  // Handle different field types\n  if (field.type === 'sb' || field.type === 'msb') {\n    return field.values && field.values[0] ? field.values[0].label || field.values[0] : null;\n  }\n  if (field.type === 'string' || field.type === 'text') {\n    return field.value;\n  }\n  if (field.type === 'date') {\n    return field.value;\n  }\n  if (field.type === 'aid') {\n    return field.value;\n  }\n  return field.value || null;\n}\n\n// Map Tuleap status to QC Tool status\nfunction mapStatus(tuleapStatus) {\n  if (statusMappings[tuleapStatus]) {\n    return statusMappings[tuleapStatus];\n  }\n  // Default mappings\n  const defaults = {\n    'New': 'Open',\n    'Assigned': 'In Progress',\n    'Fixed': 'Resolved',\n    'Closed': 'Closed',\n    'Rejected': 'Closed',\n    'Open': 'Open',\n    'In Progress': 'In Progress',\n    'Reopened': 'Reopened'\n  };\n  return defaults[tuleapStatus] || 'Open';\n}\n\n// Map severity\nfunction mapSeverity(tuleapSeverity) {\n  const severityMap = {\n    'Critical': 'critical',\n    'High': 'high',\n    'Major': 'high',\n    'Medium': 'medium',\n    'Normal': 'medium',\n    'Low': 'low',\n    'Minor': 'low'\n  };\n  return severityMap[tuleapSeverity] || 'medium';\n}\n\nconst values = artifact.values || [];\n\n// Extract bug data using field mappings\nconst bugData = {\n  tuleap_artifact_id: artifact.id,\n  tuleap_tracker_id: artifact.tracker.id,\n  tuleap_url: config.tuleap_base_url ? `${config.tuleap_base_url}/plugins/tracker/?aid=${artifact.id}` : null,\n  bug_id: `TLP-${artifact.id}`,\n  title: getFieldValue(values, fieldMappings.title_field_id) || `Bug ${artifact.id}`,\n  description: getFieldValue(values, fieldMappings.description_field_id),\n  status: mapStatus(getFieldValue(values, fieldMappings.status_field_id)),\n  severity: mapSeverity(getFieldValue(values, fieldMappings.severity_field_id)),\n  priority: getFieldValue(values, fieldMappings.priority_field_id) || 'medium',\n  bug_type: getFieldValue(values, fieldMappings.type_field_id),\n  component: getFieldValue(values, fieldMappings.component_field_id),\n  project_id: config.qc_project_id,\n  reported_by: payload.user ? payload.user.display_name : null,\n  assigned_to: getFieldValue(values, fieldMappings.assigned_to_field_id),\n  reported_date: artifact.submitted_on,\n  raw_tuleap_payload: payload\n};\n\n// Compute payload hash for idempotency\nconst crypto = require('crypto');\nconst payloadHash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');\n\nreturn [{ \n  json: { \n    bugData,\n    payloadHash,\n    action: payload.action || 'update'\n  } \n}];"
+                "jsCode": "const payload = $('Parse Tuleap Payload').first().json.payload;\nconst config = $('Get Sync Config').first().json;\nconst artifact = payload.current;\nconst fieldMappings = config.field_mappings || {};\nconst statusMappings = config.status_mappings || {};\n\n// Helper to get field value by field ID\nfunction getFieldValue(values, fieldId) {\n  if (!values || !fieldId) return null;\n  const field = values.find(v => v.field_id === parseInt(fieldId));\n  if (!field) return null;\n  \n  // Handle different field types\n  if (field.type === 'sb' || field.type === 'msb') {\n    return field.values && field.values[0] ? field.values[0].label || field.values[0] : null;\n  }\n  if (field.type === 'string' || field.type === 'text') {\n    return field.value;\n  }\n  if (field.type === 'date') {\n    return field.value;\n  }\n  if (field.type === 'aid' || field.type === 'computed') {\n    return field.value;\n  }\n  return field.value || null;\n}\n\n// Get assigned user display name from user-type select box\nfunction getAssignedUser(values, fieldId) {\n  if (!values || !fieldId) return null;\n  const field = values.find(v => v.field_id === parseInt(fieldId));\n  if (!field || !field.values) return null;\n  const user = field.values[0];\n  if (!user) return null;\n  return user.display_name || user.username || user.label || null;\n}\n\n// Map Tuleap status to QC Tool status\nfunction mapStatus(tuleapStatus) {\n  if (statusMappings[tuleapStatus]) {\n    return statusMappings[tuleapStatus];\n  }\n  // Default mappings\n  const defaults = {\n    'New': 'Open',\n    'Assigned': 'In Progress',\n    'Fixed': 'Resolved',\n    'Closed': 'Closed',\n    'Rejected': 'Closed',\n    'Open': 'Open',\n    'In Progress': 'In Progress',\n    'Reopened': 'Reopened'\n  };\n  return defaults[tuleapStatus] || 'Open';\n}\n\n// Map severity\nfunction mapSeverity(tuleapSeverity) {\n  const severityMap = {\n    'Critical': 'critical',\n    'High': 'high',\n    'Major': 'high',\n    'Medium': 'medium',\n    'Normal': 'medium',\n    'Low': 'low',\n    'Minor': 'low'\n  };\n  return severityMap[tuleapSeverity] || 'medium';\n}\n\nconst values = artifact.values || [];\n\n// Extract bug data using field mappings\nconst bugData = {\n  tuleap_artifact_id: artifact.id,\n  tuleap_tracker_id: artifact.tracker.id,\n  tuleap_url: config.tuleap_base_url ? `${config.tuleap_base_url}/plugins/tracker/?aid=${artifact.id}` : null,\n  bug_id: `TLP-${artifact.id}`,\n  title: getFieldValue(values, fieldMappings.title_field_id) || `Bug ${artifact.id}`,\n  description: getFieldValue(values, fieldMappings.description_field_id),\n  status: mapStatus(getFieldValue(values, fieldMappings.status_field_id)),\n  severity: mapSeverity(getFieldValue(values, fieldMappings.severity_field_id)),\n  priority: getFieldValue(values, fieldMappings.priority_field_id) || 'medium',\n  bug_type: getFieldValue(values, fieldMappings.type_field_id),\n  component: getFieldValue(values, fieldMappings.component_field_id),\n  project_id: config.qc_project_id,\n  reported_by: payload.user ? payload.user.display_name : null,\n  assigned_to: getAssignedUser(values, fieldMappings.assigned_to_field_id),\n  reported_date: artifact.submitted_on,\n  raw_tuleap_payload: payload\n};\n\n// Compute payload hash for idempotency\nconst crypto = require('crypto');\nconst payloadHash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');\n\nreturn [{ \n  json: { \n    bugData,\n    payloadHash,\n    action: payload.action || 'update'\n  } \n}];"
             },
             "name": "Transform Bug Data",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [950, 200]
+            "position": [
+                950,
+                200
+            ]
         },
         {
             "parameters": {
@@ -89,7 +104,10 @@
             "name": "Send to QC API",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
-            "position": [1150, 200]
+            "position": [
+                1150,
+                200
+            ]
         },
         {
             "parameters": {
@@ -99,7 +117,10 @@
             "name": "Respond Success",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
-            "position": [1350, 200]
+            "position": [
+                1350,
+                200
+            ]
         },
         {
             "parameters": {
@@ -109,7 +130,10 @@
             "name": "Respond No Config",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
-            "position": [950, 400]
+            "position": [
+                950,
+                400
+            ]
         },
         {
             "parameters": {
@@ -119,7 +143,10 @@
             "name": "Log Webhook",
             "type": "n8n-nodes-base.postgres",
             "typeVersion": 2.5,
-            "position": [1350, 350],
+            "position": [
+                1350,
+                350
+            ],
             "credentials": {
                 "postgres": {
                     "id": "1",
