@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { dashboardApi, tasksApi, myJourneysApi, fetchApi, type DashboardMetrics, type Task, type AssignedJourney } from '@/lib/api';
 import { DonutChart, BarChart } from '@/components/dashboard/ChartComponents';
 import { ResourceUtilizationChart } from '@/components/dashboard/ResourceUtilizationChart';
 import { ResourceStats } from '@/components/dashboard/ResourceStats';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { supabase } from '@/lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { InfoTooltip } from '@/components/ui/Tooltip';
@@ -43,29 +44,49 @@ export function DashboardClient() {
     // Theme context available if needed for dynamic styling
     useTheme();
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const [tasksData, metricsData, journeyData, meData] = await Promise.all([
-                    tasksApi.list().catch(() => []),
-                    dashboardApi.getMetrics().catch(() => null),
-                    myJourneysApi.list().catch(() => []),
-                    fetchApi<{ user: { preferences?: { quick_nav_visible?: boolean } } }>('/auth/me').catch(() => null),
-                ]);
+    const load = useCallback(async () => {
+        try {
+            const [tasksData, metricsData, journeyData, meData] = await Promise.all([
+                tasksApi.list().catch(() => []),
+                dashboardApi.getMetrics().catch(() => null),
+                myJourneysApi.list().catch(() => []),
+                fetchApi<{ user: { preferences?: { quick_nav_visible?: boolean } } }>('/auth/me').catch(() => null),
+            ]);
 
-                setTasks(tasksData || []);
-                if (metricsData) setMetrics(metricsData);
-                setJourneys(journeyData || []);
-                if (meData?.user?.preferences?.quick_nav_visible === false) setShowQuickNav(false);
-            } catch (err) {
-                console.error('API failed', err);
-                setTasks([]);
-            } finally {
-                setIsLoading(false);
-            }
+            setTasks(tasksData || []);
+            if (metricsData) setMetrics(metricsData);
+            setJourneys(journeyData || []);
+            if (meData?.user?.preferences?.quick_nav_visible === false) setShowQuickNav(false);
+        } catch (err) {
+            console.error('API failed', err);
+            setTasks([]);
+        } finally {
+            setIsLoading(false);
         }
-        load();
     }, []);
+
+    useEffect(() => { load() }, [load]);
+
+    // Supabase Realtime: refetch dashboard data when tasks change in the DB
+    useEffect(() => {
+        if (!supabase) return // Realtime disabled — polling is the fallback
+
+        const channel = supabase
+            .channel('dashboard-task-changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'task' },
+                () => {
+                    // Don't use payload data — refetch from API to respect permissions
+                    load()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase!.removeChannel(channel)
+        }
+    }, [load]);
 
     // Derived Statistics - filtered by month selections
     const stats = useMemo(() => {
