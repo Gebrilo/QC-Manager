@@ -75,7 +75,7 @@ export function DashboardClient() {
             .channel('dashboard-task-changes')
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'task' },
+                { event: '*', schema: 'public', table: 'tasks' },
                 () => {
                     // Don't use payload data — refetch from API to respect permissions
                     load()
