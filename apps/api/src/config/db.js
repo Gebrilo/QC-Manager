@@ -1,10 +1,14 @@
 const { Pool } = require('pg');
 
+const isSupabase = process.env.DATABASE_URL?.includes('supabase.co');
 const sslConfig = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
 
 const pool = new Pool(
     process.env.DATABASE_URL
-        ? { connectionString: process.env.DATABASE_URL, ssl: sslConfig }
+        ? { 
+            connectionString: process.env.DATABASE_URL, 
+            ssl: isSupabase ? { rejectUnauthorized: false } : sslConfig 
+          }
         : {
             user: process.env.POSTGRES_USER,
             host: process.env.POSTGRES_HOST || 'qc-postgres',

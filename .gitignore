@@ -45,13 +45,13 @@ server.log
 
 # OS
 Thumbs.db
+nul
 
 # Temporary
 *.tmp
 *.temp
 
 # Local development/test directories
-qc-app/
 
 # Backup files
 *.bak
@@ -64,7 +64,7 @@ n8n_data/
 # Backup directories
 backups/
 backups-staging/
-.claude/worktrees/thirsty-bassi/nul
+
 
 # Playwright Test Output
 playwright-report/

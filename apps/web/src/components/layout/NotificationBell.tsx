@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { useAuth } from '../providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -25,7 +26,7 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
 };
 
 export function NotificationBell() {
-    const { token, isAdmin } = useAuth();
+    const { token, isAdmin, user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
@@ -53,6 +54,31 @@ export function NotificationBell() {
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
     }, [fetchNotifications]);
+
+    // Supabase Realtime: update badge instantly when new notifications arrive
+    useEffect(() => {
+        if (!supabase || !user?.id) return;
+
+        const channel = supabase
+            .channel(`notifications-${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notification',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                () => {
+                    fetchNotifications();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase!.removeChannel(channel);
+        };
+    }, [user?.id, fetchNotifications]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
