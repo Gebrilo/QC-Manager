@@ -47,7 +47,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - qc_postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d:ro
     networks:
       - qc-network
     healthcheck:
