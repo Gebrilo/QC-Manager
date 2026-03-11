@@ -76,7 +76,8 @@
       "Bash(command -v gh:*)",
       "Bash(npx tsc:*)",
       "Skill(playwright-cli)",
-      "Skill(playwright-cli:*)"
+      "Skill(playwright-cli:*)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

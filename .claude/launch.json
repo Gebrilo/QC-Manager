@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "-d", "web"],
+      "port": 3000
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "-d", "api"],
+      "port": 3001
+    },
+    {
+      "name": "n8n",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "-d", "n8n"],
+      "port": 5678
+    },
+    {
+      "name": "postgres",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "-d", "postgres"],
+      "port": 5432
+    }
+  ]
+}
