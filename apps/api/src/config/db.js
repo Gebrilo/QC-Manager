@@ -1,8 +1,10 @@
 const { Pool } = require('pg');
 
+const sslConfig = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
+
 const pool = new Pool(
     process.env.DATABASE_URL
-        ? { connectionString: process.env.DATABASE_URL }
+        ? { connectionString: process.env.DATABASE_URL, ssl: sslConfig }
         : {
             user: process.env.POSTGRES_USER,
             host: process.env.POSTGRES_HOST || 'qc-postgres',
