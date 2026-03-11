@@ -86,6 +86,7 @@ jobs:
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
           WEB_DOMAIN: ${{ secrets.WEB_DOMAIN }}
           API_DOMAIN: ${{ secrets.API_DOMAIN }}
@@ -95,7 +96,7 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN
           script_stop: true
           script: |
             set -euo pipefail
@@ -120,22 +121,19 @@ jobs:
             echo "=== Ensuring shared network exists ==="
             docker network create qc-shared-network 2>/dev/null || true
 
-            echo "=== Ensuring backup directory exists ==="
-            mkdir -p "$DEPLOY_DIR/backups"
-
             echo "=== Writing .env ==="
             {
               echo "DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}"
               echo "WEB_DOMAIN=${WEB_DOMAIN}"
               echo "API_DOMAIN=${API_DOMAIN}"
+              echo "SUPABASE_DATABASE_URL=${SUPABASE_DATABASE_URL}"
+              echo "DATABASE_SSL=false"
               echo "POSTGRES_USER=qc_admin"
               echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
               echo "POSTGRES_DB=qc_app"
               echo "JWT_SECRET=${JWT_SECRET}"
               echo "CORS_ORIGIN=${CORS_ORIGIN}"
               echo "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
-              echo "BACKUP_PATH=./backups"
-              echo "BACKUP_RETENTION_DAYS=7"
             } > .env
 
             echo "=== Docker login ==="

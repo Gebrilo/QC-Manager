@@ -22,6 +22,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./database/init/002_audit_logs.sql:/docker-entrypoint-initdb.d/002_audit_logs.sql
     networks:
       - qc-internal
     healthcheck:

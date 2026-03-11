@@ -44,7 +44,7 @@ router.post('/', requireAuth, requirePermission('action:reports:generate'), asyn
         );
 
         // Trigger n8n workflow for report generation (async)
-        triggerWorkflow('report-generate', {
+        triggerWorkflow('generate-report', {
             job_id: jobId,
             report_type: data.report_type,
             format: data.format,

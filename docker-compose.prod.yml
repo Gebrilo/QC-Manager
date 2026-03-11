@@ -4,8 +4,8 @@
 #
 # Architecture:
 #   Traefik (external) -> web (3000), api (3001)
-#   api -> postgres (app database)
-#   api -> n8n (external, via qc-shared-network)
+#   api -> Supabase (cloud database, via DATABASE_URL)
+#   postgres (local) -> n8n only (via qc-network)
 #
 # Prerequisites:
 #   1. docker network create qc-shared-network
@@ -49,7 +49,7 @@ services:
       - qc_postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d:ro
     networks:
-      - qc-internal
+      - qc-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 30s
@@ -68,7 +68,8 @@ services:
     environment:
       - PORT=3001
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@qc-postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=${SUPABASE_DATABASE_URL}
+      - DATABASE_SSL=false
       - JWT_SECRET=${JWT_SECRET}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
       - CORS_ORIGIN=${CORS_ORIGIN}
@@ -87,10 +88,6 @@ services:
       - ./uploads:/app/uploads
     networks:
       - qc-shared-network
-      - qc-internal
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
@@ -124,47 +121,6 @@ services:
       retries: 5
       start_period: 30s
 
-  # ---------------------------------------------------------------------------
-  # BACKUP
-  # ---------------------------------------------------------------------------
-
-  backup:
-    image: postgres:15-alpine
-    container_name: qc-backup
-    restart: unless-stopped
-    environment:
-      POSTGRES_HOST: qc-postgres
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-    volumes:
-      - ./backup/backup.sh:/backup.sh:ro
-      - ${BACKUP_PATH:-./backups}:/backups
-    networks:
-      - qc-internal
-    depends_on:
-      postgres:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Backup scheduler started. Running nightly at 2:00 AM."
-        while true; do
-          CURRENT_HOUR=$$(date +%H)
-          CURRENT_MIN=$$(date +%M)
-          if [ "$$CURRENT_HOUR" = "02" ] && [ "$$CURRENT_MIN" = "00" ]; then
-            /bin/sh /backup.sh
-          fi
-          sleep 60
-        done
-    healthcheck:
-      test: ["CMD-SHELL", "test -d /backups"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-
 # =============================================================================
 # VOLUMES
 # =============================================================================
@@ -178,6 +134,5 @@ volumes:
 networks:
   qc-shared-network:
     external: true
-  qc-internal:
-    driver: bridge
-    internal: true
+  qc-network:
+    external: true

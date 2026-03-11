@@ -1,6 +1,3 @@
-# Page snapshot
-
-```yaml
 - generic [ref=e1]:
   - alert [ref=e2]: QC Manager - Login
   - generic [ref=e4]:
@@ -22,4 +19,3 @@
         - link "Create one" [ref=e20] [cursor=pointer]:
           - /url: /register
     - paragraph [ref=e21]: QC Management Tool © 2026
-```

@@ -71,6 +71,7 @@ REQUIRED_VARS=(
   DOCKER_HUB_TOKEN
   JWT_SECRET
   POSTGRES_PASSWORD
+  SUPABASE_DATABASE_URL
   N8N_WEBHOOK_URL
   WEB_DOMAIN
   API_DOMAIN
@@ -187,7 +188,11 @@ section "Writing .env"
   echo "WEB_DOMAIN=${WEB_DOMAIN}"
   echo "API_DOMAIN=${API_DOMAIN}"
   echo ""
-  echo "# PostgreSQL"
+  echo "# Supabase (app database — self-hosted, no SSL on internal network)"
+  echo "SUPABASE_DATABASE_URL=${SUPABASE_DATABASE_URL}"
+  echo "DATABASE_SSL=false"
+  echo ""
+  echo "# PostgreSQL (local — n8n only)"
   echo "POSTGRES_USER=qc_admin"
   echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
   echo "POSTGRES_DB=qc_app"
@@ -196,10 +201,6 @@ section "Writing .env"
   echo "JWT_SECRET=${JWT_SECRET}"
   echo "CORS_ORIGIN=${CORS_ORIGIN}"
   echo "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
-  echo ""
-  echo "# Backups"
-  echo "BACKUP_PATH=./backups"
-  echo "BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS}"
 } > .env
 
 # Restrict .env permissions — only the owner should read it

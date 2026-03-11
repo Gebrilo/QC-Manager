@@ -30,8 +30,8 @@
             ],
             "credentials": {
                 "postgres": {
-                    "id": "postgresCredentials",
-                    "name": "Postgres account"
+                    "id": "1",
+                    "name": "QC Tool Postgres"
                 }
             }
         },

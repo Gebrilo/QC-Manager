@@ -5,7 +5,10 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
-        "start": "next start"
+        "start": "next start",
+        "test:e2e": "playwright test",
+        "test:e2e:headed": "playwright test --headed",
+        "test:e2e:report": "playwright show-report"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.2.2",
