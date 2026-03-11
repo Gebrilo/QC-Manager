@@ -74,7 +74,10 @@
       "Bash(git push:*)",
       "Bash(gh pr create:*)",
       "Bash(command -v gh:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Skill(playwright-cli)",
+      "Skill(playwright-cli:*)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

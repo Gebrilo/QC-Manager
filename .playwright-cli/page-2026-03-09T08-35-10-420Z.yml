@@ -1,0 +1,30 @@
+- generic [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: QC
+      - heading "Create an account" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Get started with QC Manager
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Full Name
+          - textbox "John Doe" [active] [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]: Email
+          - textbox "you@company.com" [ref=e16]
+        - generic [ref=e17]:
+          - generic [ref=e18]: Phone Number
+          - textbox "+1 (555) 000-0000" [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e21]: Password
+          - textbox "••••••••" [ref=e22]
+        - generic [ref=e23]:
+          - generic [ref=e24]: Confirm Password
+          - textbox "••••••••" [ref=e25]
+        - button "Create Account" [ref=e26] [cursor=pointer]
+      - paragraph [ref=e28]:
+        - text: Already have an account?
+        - link "Sign in" [ref=e29] [cursor=pointer]:
+          - /url: /login
+    - paragraph [ref=e30]: QC Management Tool © 2026

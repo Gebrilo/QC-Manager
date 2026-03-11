@@ -30,7 +30,7 @@
             "credentials": {
                 "postgres": {
                     "id": "1",
-                    "name": "Local Postgres"
+                    "name": "QC Tool Postgres"
                 }
             }
         },
@@ -63,7 +63,7 @@
             "credentials": {
                 "postgres": {
                     "id": "1",
-                    "name": "Local Postgres"
+                    "name": "QC Tool Postgres"
                 }
             }
         }
