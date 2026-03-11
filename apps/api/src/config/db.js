@@ -724,6 +724,46 @@ const runMigrations = async () => {
         `);
 
         // =====================================================
+        // SUPABASE AUTH MIGRATION
+        // =====================================================
+
+        // Add supabase_id column to link app_user to Supabase auth.users
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='supabase_id') THEN
+                    ALTER TABLE app_user ADD COLUMN supabase_id UUID UNIQUE;
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_app_user_supabase_id ON app_user(supabase_id) WHERE supabase_id IS NOT NULL`);
+
+        // Add auth_provider column to track primary sign-in method
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='auth_provider') THEN
+                    ALTER TABLE app_user ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'email';
+                END IF;
+            END $$;
+        `);
+
+        // Make password_hash nullable (social/phone users won't have one)
+        await client.query(`
+            ALTER TABLE app_user ALTER COLUMN password_hash DROP NOT NULL
+        `);
+
+        // Make email nullable (phone-only users may not have an email initially)
+        await client.query(`
+            DO $$
+            BEGIN
+                ALTER TABLE app_user ALTER COLUMN email DROP NOT NULL;
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END $$;
+        `);
+
+
+        // =====================================================
         // TEAM-BASED ACCESS CONTROL TABLES
         // =====================================================
 

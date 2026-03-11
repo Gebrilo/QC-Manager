@@ -1,8 +1,10 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { supabase } from '../../lib/supabase';
 import { getLandingPage } from '../../config/routes';
+import type { Session, Provider } from '@supabase/supabase-js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -28,17 +30,24 @@ interface AuthContextType {
     permissions: string[];
     token: string | null;
     loading: boolean;
-    login: (email: string, password: string) => Promise<void>;
-    register: (data: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
-    logout: () => void;
+    signInWithEmail: (email: string, password: string) => Promise<void>;
+    signUpWithEmail: (data: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
+    signInWithProvider: (provider: Provider) => Promise<void>;
+    signInWithPhone: (phone: string) => Promise<void>;
+    verifyOtp: (phone: string, otpToken: string) => Promise<void>;
+    resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+    logout: () => Promise<void>;
     hasPermission: (key: string) => boolean;
     isAdmin: boolean;
     refreshUser: () => Promise<void>;
+    // Legacy aliases for backward compatibility
+    login: (email: string, password: string) => Promise<void>;
+    register: (data: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_PATHS = ['/login', '/register'];
+const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -47,145 +56,243 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
+    const syncInProgress = useRef(false);
 
-    const fetchCurrentUser = useCallback(async (authToken: string) => {
-        try {
-            const res = await fetch(`${API_URL}/auth/me`, {
-                headers: { Authorization: `Bearer ${authToken}` },
-            });
-            if (!res.ok) throw new Error('Invalid token');
-            const data = await res.json();
-            const userPref = data.user.preferences;
-            if (userPref?.theme && userPref.theme !== 'system') {
-                localStorage.setItem('theme', userPref.theme);
-                if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            }
-            if (userPref?.display_density) {
-                localStorage.setItem('density', userPref.display_density);
-            }
-
-            setUser({
-                ...data.user,
-                activated: data.user.activated ?? true,
-            });
-            setPermissions(data.permissions || []);
-            return true;
-        } catch {
-            localStorage.removeItem('auth_token');
-            setToken(null);
-            setUser(null);
-            setPermissions([]);
-            return false;
+    /**
+     * Apply user preferences (theme, density) from user data
+     */
+    const applyPreferences = useCallback((prefs?: User['preferences']) => {
+        if (prefs?.theme && prefs.theme !== 'system') {
+            localStorage.setItem('theme', prefs.theme);
+            if (prefs.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+        }
+        if (prefs?.display_density) {
+            localStorage.setItem('density', prefs.display_density);
         }
     }, []);
 
-    useEffect(() => {
-        const storedToken = localStorage.getItem('auth_token');
-        if (storedToken) {
-            setToken(storedToken);
-            fetchCurrentUser(storedToken).finally(() => setLoading(false));
-        } else {
+    /**
+     * Sync the Supabase session with the API backend.
+     * Creates the app_user if it doesn't exist, or retrieves existing user data.
+     */
+    const syncWithBackend = useCallback(async (accessToken: string): Promise<{ user: User; permissions: string[] } | null> => {
+        try {
+            const res = await fetch(`${API_URL}/auth/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Sync failed');
+            }
+
+            const data = await res.json();
+            return {
+                user: { ...data.user, activated: data.user.activated ?? true },
+                permissions: data.permissions || [],
+            };
+        } catch (err) {
+            console.error('[AuthProvider] Backend sync failed:', err);
+            return null;
+        }
+    }, []);
+
+    /**
+     * Fetch current user data from the API (for refresh scenarios)
+     */
+    const fetchCurrentUser = useCallback(async (accessToken: string): Promise<boolean> => {
+        try {
+            const res = await fetch(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (!res.ok) throw new Error('Invalid token');
+            const data = await res.json();
+            applyPreferences(data.user.preferences);
+            setUser({ ...data.user, activated: data.user.activated ?? true });
+            setPermissions(data.permissions || []);
+            return true;
+        } catch {
+            return false;
+        }
+    }, [applyPreferences]);
+
+    /**
+     * Handle session change — sync with backend and update state
+     */
+    const handleSession = useCallback(async (session: Session | null) => {
+        if (syncInProgress.current) return;
+        syncInProgress.current = true;
+
+        try {
+            if (!session) {
+                setUser(null);
+                setPermissions([]);
+                setToken(null);
+                setLoading(false);
+                return;
+            }
+
+            const accessToken = session.access_token;
+            setToken(accessToken);
+
+            // Try to sync with backend
+            const syncResult = await syncWithBackend(accessToken);
+            if (syncResult) {
+                applyPreferences(syncResult.user.preferences);
+                setUser(syncResult.user);
+                setPermissions(syncResult.permissions);
+            } else {
+                // Sync failed — try fetching current user (maybe they're already synced)
+                const fetched = await fetchCurrentUser(accessToken);
+                if (!fetched) {
+                    // Complete failure — sign out
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    setPermissions([]);
+                    setToken(null);
+                }
+            }
+        } finally {
+            syncInProgress.current = false;
             setLoading(false);
         }
-    }, [fetchCurrentUser]);
+    }, [syncWithBackend, fetchCurrentUser, applyPreferences]);
 
+    /**
+     * Initialize: check for existing Supabase session and listen for auth changes
+     */
     useEffect(() => {
-        if (!loading && !user && !PUBLIC_PATHS.includes(pathname || '')) {
+        // Check existing session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            handleSession(session);
+        });
+
+        // Listen for auth state changes (sign in, sign out, token refresh)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, session) => {
+                await handleSession(session);
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [handleSession]);
+
+    /**
+     * Redirect unauthenticated users to login (unless on a public path)
+     */
+    useEffect(() => {
+        if (!loading && !user && !PUBLIC_PATHS.some(p => pathname?.startsWith(p))) {
             router.push('/login');
         }
     }, [loading, user, pathname, router]);
 
     const refreshUser = useCallback(async () => {
-        const currentToken = token || localStorage.getItem('auth_token');
-        if (currentToken) {
-            await fetchCurrentUser(currentToken);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            await fetchCurrentUser(session.access_token);
         }
-    }, [token, fetchCurrentUser]);
+    }, [fetchCurrentUser]);
 
-    const login = useCallback(async (email: string, password: string) => {
-        const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+    /**
+     * Sign in with email and password via Supabase
+     */
+    const signInWithEmail = useCallback(async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+            throw new Error(error.message === 'Invalid login credentials'
+                ? 'Invalid email or password'
+                : error.message
+            );
+        }
+        // onAuthStateChange will handle the rest
+    }, []);
+
+    /**
+     * Sign up with email and password via Supabase, then sync
+     */
+    const signUpWithEmail = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
+        const { error } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+                data: {
+                    full_name: data.name,
+                    phone: data.phone,
+                },
+            },
         });
+        if (error) throw new Error(error.message);
+        // onAuthStateChange will handle session + sync
+    }, []);
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Login failed');
-        }
-
-        const data = await res.json();
-        const userPref = data.user.preferences;
-        if (userPref?.theme && userPref.theme !== 'system') {
-            localStorage.setItem('theme', userPref.theme);
-            if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-        }
-        if (userPref?.display_density) {
-            localStorage.setItem('density', userPref.display_density);
-        }
-
-        const loggedInUser = {
-            ...data.user,
-            activated: data.user.activated ?? true,
-        };
-        const userPerms = data.permissions || [];
-
-        setUser(loggedInUser);
-        setPermissions(userPerms);
-        setToken(data.token);
-        localStorage.setItem('auth_token', data.token);
-
-        // Use getLandingPage for permission-validated redirect
-        const landing = getLandingPage(loggedInUser, userPerms);
-        router.push(landing);
-    }, [router]);
-
-    const register = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
-        const res = await fetch(`${API_URL}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+    /**
+     * Sign in with an OAuth provider (Google, Microsoft/Azure)
+     */
+    const signInWithProvider = useCallback(async (provider: Provider) => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+            },
         });
+        if (error) throw new Error(error.message);
+        // Browser redirects to provider — callback handles the rest
+    }, []);
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Registration failed');
+    /**
+     * Sign in with phone (sends OTP via SMS)
+     */
+    const signInWithPhone = useCallback(async (phone: string) => {
+        const { error } = await supabase.auth.signInWithOtp({ phone });
+        if (error) throw new Error(error.message);
+    }, []);
+
+    /**
+     * Verify phone OTP
+     */
+    const verifyOtp = useCallback(async (phone: string, otpToken: string) => {
+        const { error } = await supabase.auth.verifyOtp({
+            phone,
+            token: otpToken,
+            type: 'sms',
+        });
+        if (error) throw new Error(error.message);
+        // onAuthStateChange will handle session + sync
+    }, []);
+
+    /**
+     * Request password reset email
+     */
+    const resetPassword = useCallback(async (email: string): Promise<{ success: boolean; message: string }> => {
+        try {
+            const res = await fetch(`${API_URL}/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await res.json();
+            return { success: true, message: data.message || 'Check your email for a reset link.' };
+        } catch {
+            return { success: true, message: 'If an account exists with this email, a reset link has been sent.' };
         }
+    }, []);
 
-        const result = await res.json();
-        const userPref = result.user.preferences;
-        if (userPref?.theme && userPref.theme !== 'system') {
-            localStorage.setItem('theme', userPref.theme);
-            if (userPref.theme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-        }
-        if (userPref?.display_density) {
-            localStorage.setItem('density', userPref.display_density);
-        }
-
-        const registeredUser = {
-            ...result.user,
-            activated: result.user.activated ?? false,
-        };
-        const userPerms = result.permissions || [];
-
-        setUser(registeredUser);
-        setPermissions(userPerms);
-        setToken(result.token);
-        localStorage.setItem('auth_token', result.token);
-
-        // Use getLandingPage for permission-validated redirect
-        const landing = getLandingPage(registeredUser, userPerms);
-        router.push(landing);
-    }, [router]);
-
-    const logout = useCallback(() => {
+    /**
+     * Sign out from Supabase and clear state
+     */
+    const logout = useCallback(async () => {
+        await supabase.auth.signOut();
         setUser(null);
         setPermissions([]);
         setToken(null);
-        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_token'); // Clean up any legacy tokens
         router.push('/login');
     }, [router]);
 
@@ -196,8 +303,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const isAdmin = user?.role === 'admin';
 
+    // Legacy aliases for backward compatibility
+    const login = signInWithEmail;
+    const register = signUpWithEmail;
+
     return (
-        <AuthContext.Provider value={{ user, permissions, token, loading, login, register, logout, hasPermission, isAdmin, refreshUser }}>
+        <AuthContext.Provider value={{
+            user, permissions, token, loading,
+            signInWithEmail, signUpWithEmail, signInWithProvider,
+            signInWithPhone, verifyOtp, resetPassword,
+            logout, hasPermission, isAdmin, refreshUser,
+            login, register,
+        }}>
             {children}
         </AuthContext.Provider>
     );

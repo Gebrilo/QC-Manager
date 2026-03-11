@@ -1,12 +1,16 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+// Legacy fallback for old custom JWTs during transition
+const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
 
 /**
- * Middleware: Verify JWT token, check user is active, and attach fresh user data to request.
+ * Middleware: Verify Supabase JWT token, check user is active, and attach fresh user data to request.
  * This reads the user's current role and active status from the DB on every request,
  * ensuring role changes and deactivation take effect immediately.
+ *
+ * Supports both Supabase JWTs (by supabase_id) and legacy custom JWTs (by id) during transition.
  */
 async function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -15,38 +19,64 @@ async function requireAuth(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+    let user = null;
 
-        // Fetch fresh user data from DB to ensure role changes and deactivation are immediate
-        const result = await db.query(
-            'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
-            [decoded.id]
-        );
+    // Try Supabase JWT first
+    if (SUPABASE_JWT_SECRET) {
+        try {
+            const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
+            const supabaseId = decoded.sub;
 
-        if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'User not found' });
+            if (supabaseId) {
+                const result = await db.query(
+                    'SELECT id, email, name, role, active, activated FROM app_user WHERE supabase_id = $1',
+                    [supabaseId]
+                );
+                if (result.rows.length > 0) {
+                    user = result.rows[0];
+                }
+            }
+        } catch (err) {
+            // Not a valid Supabase JWT — fall through to legacy
         }
-
-        const user = result.rows[0];
-
-        if (!user.active) {
-            return res.status(403).json({ error: 'Account is deactivated. Contact an administrator.' });
-        }
-
-        // Attach fresh user data (not stale JWT data)
-        req.user = {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            active: user.active,
-            activated: user.activated,
-        };
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
     }
+
+    // Fallback: legacy custom JWT (for backward compatibility during migration)
+    if (!user) {
+        try {
+            const decoded = jwt.verify(token, LEGACY_JWT_SECRET);
+            if (decoded.id) {
+                const result = await db.query(
+                    'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
+                    [decoded.id]
+                );
+                if (result.rows.length > 0) {
+                    user = result.rows[0];
+                }
+            }
+        } catch (err) {
+            return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+    }
+
+    if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (!user.active) {
+        return res.status(403).json({ error: 'Account is deactivated. Contact an administrator.' });
+    }
+
+    // Attach fresh user data (not stale JWT data)
+    req.user = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active,
+        activated: user.activated,
+    };
+    next();
 }
 
 /**
@@ -76,24 +106,54 @@ async function optionalAuth(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const result = await db.query(
-            'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
-            [decoded.id]
-        );
-        if (result.rows.length > 0 && result.rows[0].active) {
-            req.user = {
-                id: result.rows[0].id,
-                email: result.rows[0].email,
-                name: result.rows[0].name,
-                role: result.rows[0].role,
-                active: result.rows[0].active,
-                activated: result.rows[0].activated,
-            };
+    let user = null;
+
+    // Try Supabase JWT first
+    if (SUPABASE_JWT_SECRET) {
+        try {
+            const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
+            const supabaseId = decoded.sub;
+            if (supabaseId) {
+                const result = await db.query(
+                    'SELECT id, email, name, role, active, activated FROM app_user WHERE supabase_id = $1',
+                    [supabaseId]
+                );
+                if (result.rows.length > 0 && result.rows[0].active) {
+                    user = result.rows[0];
+                }
+            }
+        } catch (err) {
+            // Not a Supabase JWT — try legacy
         }
-    } catch (err) {
-        // Token invalid, continue without user
+    }
+
+    // Fallback: legacy custom JWT
+    if (!user) {
+        try {
+            const decoded = jwt.verify(token, LEGACY_JWT_SECRET);
+            if (decoded.id) {
+                const result = await db.query(
+                    'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
+                    [decoded.id]
+                );
+                if (result.rows.length > 0 && result.rows[0].active) {
+                    user = result.rows[0];
+                }
+            }
+        } catch (err) {
+            // Token invalid, continue without user
+        }
+    }
+
+    if (user) {
+        req.user = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            active: user.active,
+            activated: user.activated,
+        };
     }
     next();
 }

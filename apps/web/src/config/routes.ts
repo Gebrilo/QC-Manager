@@ -13,11 +13,13 @@ export interface RouteConfig {
     onboardingGroup?: string;
 }
 
-const PUBLIC_PATHS = ['/login', '/register'];
+const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password'];
 
 const ROUTES: RouteConfig[] = [
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Register' },
+    { path: '/auth/callback', label: 'Auth Callback' },
+    { path: '/auth/reset-password', label: 'Reset Password' },
     { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
     { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map },
     { path: '/journeys/[id]', label: 'Journey Details', permission: 'page:my-tasks', requiresActivation: false },
