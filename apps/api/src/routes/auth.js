@@ -1,27 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { supabaseAdmin } = require('../config/supabase');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { notifyAdmins } = require('./notifications');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
-const JWT_EXPIRES_IN = '7d';
-
-// Legacy password helpers — kept for backward compatibility during migration
-function hashPassword(password) {
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-    return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, storedHash) {
-    const [salt, hash] = storedHash.split(':');
-    const testHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-    return hash === testHash;
-}
 
 const DEFAULT_PERMISSIONS = {
     admin: [
@@ -170,8 +151,8 @@ async function setInactivePermissions(userId) {
     await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
     for (const perm of INACTIVE_PERMISSIONS) {
         await db.query(
-            `INSERT INTO user_permissions (user_id, permission_key, granted) 
-             VALUES ($1, $2, true) 
+            `INSERT INTO user_permissions (user_id, permission_key, granted)
+             VALUES ($1, $2, true)
              ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
             [userId, perm]
         );
@@ -180,7 +161,7 @@ async function setInactivePermissions(userId) {
 
 // =============================================================================
 // POST /auth/sync — Supabase session sync
-// Called by frontend after any Supabase sign-in (email, OAuth, phone).
+// Called by frontend after any Supabase sign-in (magic link).
 // Creates or retrieves the app_user and returns user + permissions + token.
 // =============================================================================
 router.post('/sync', async (req, res, next) => {
@@ -286,25 +267,9 @@ router.post('/sync', async (req, res, next) => {
                     });
                 }
 
-                // Email exists and is linked to a different Supabase account / provider
-                // Block cross-provider login to prevent account hijacking
-                const providerName = existing.auth_provider || 'email/password';
+                // Email exists and is linked to a different Supabase account
                 return res.status(409).json({
-                    error: `This email is already registered with ${providerName}. Please sign in using your original method.`,
-                    existing_provider: providerName,
-                });
-            }
-        }
-
-        // Check phone conflict for phone-only users
-        if (phone && !email) {
-            const phoneCheck = await db.query(
-                'SELECT id, supabase_id FROM app_user WHERE phone = $1',
-                [phone]
-            );
-            if (phoneCheck.rows.length > 0 && phoneCheck.rows[0].supabase_id) {
-                return res.status(409).json({
-                    error: 'This phone number is already linked to another account.',
+                    error: `This email is already registered with a different account. Please contact an administrator.`,
                 });
             }
         }
@@ -358,7 +323,7 @@ router.post('/sync', async (req, res, next) => {
             notifyAdmins(
                 'user_registered',
                 'New User Registered',
-                `${user.name} (${user.email || user.phone}) has registered via ${authProvider} and is awaiting activation.`,
+                `${user.name} (${user.email || user.phone}) has registered via magic link and is awaiting activation.`,
                 { user_id: user.id, user_name: user.name, user_email: user.email, auth_provider: authProvider }
             );
         }
@@ -368,146 +333,7 @@ router.post('/sync', async (req, res, next) => {
 });
 
 // =============================================================================
-// Legacy: POST /auth/register — kept for backward compatibility
-// New registrations should go through Supabase SDK + /auth/sync
-// =============================================================================
-router.post('/register', async (req, res, next) => {
-    try {
-        const { name, email, password, phone } = req.body;
-
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: 'Name, email, and password are required' });
-        }
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        }
-
-        const existing = await db.query('SELECT id FROM app_user WHERE email = $1', [email.toLowerCase()]);
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ error: 'Email already registered' });
-        }
-
-        const userCount = await db.query('SELECT COUNT(*) as count FROM app_user');
-        const isFirstUser = parseInt(userCount.rows[0].count) === 0;
-        const role = isFirstUser ? 'admin' : 'viewer';
-        const activated = isFirstUser;
-
-        const passwordHash = hashPassword(password);
-
-        const result = await db.query(
-            `INSERT INTO app_user (name, email, password_hash, phone, role, active, activated, auth_provider) 
-             VALUES ($1, $2, $3, $4, $5, true, $6, 'email') 
-             RETURNING id, name, email, phone, role, active, activated, created_at`,
-            [name, email.toLowerCase(), passwordHash, phone || null, role, activated]
-        );
-
-        const user = result.rows[0];
-
-        if (activated) {
-            await setDefaultPermissions(user.id, user.role);
-        } else {
-            await setInactivePermissions(user.id);
-        }
-
-        const token = jwt.sign(
-            { id: user.id, email: user.email, name: user.name, role: user.role },
-            JWT_SECRET,
-            { expiresIn: JWT_EXPIRES_IN }
-        );
-
-        await db.query('UPDATE app_user SET last_login = NOW() WHERE id = $1', [user.id]);
-
-        const permsResult = await db.query(
-            'SELECT permission_key FROM user_permissions WHERE user_id = $1 AND granted = true',
-            [user.id]
-        );
-        const permissions = permsResult.rows.map(p => p.permission_key);
-
-        res.status(201).json({
-            user: {
-                id: user.id, name: user.name, email: user.email, phone: user.phone,
-                role: user.role, activated: user.activated,
-                preferences: {},
-            },
-            permissions,
-            token,
-        });
-
-        // Notify admins about new registration (fire-and-forget)
-        notifyAdmins(
-            'user_registered',
-            'New User Registered',
-            `${user.name} (${user.email}) has registered and is awaiting activation.`,
-            { user_id: user.id, user_name: user.name, user_email: user.email }
-        );
-    } catch (err) {
-        next(err);
-    }
-});
-
-// =============================================================================
-// Legacy: POST /auth/login — kept for backward compatibility
-// New logins should go through Supabase SDK + /auth/sync
-// =============================================================================
-router.post('/login', async (req, res, next) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-
-        const result = await db.query(
-            'SELECT * FROM app_user WHERE email = $1',
-            [email.toLowerCase()]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        const user = result.rows[0];
-
-        if (!user.active) {
-            return res.status(403).json({ error: 'Account is deactivated. Contact an administrator.' });
-        }
-
-        if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, email: user.email, name: user.name, role: user.role },
-            JWT_SECRET,
-            { expiresIn: JWT_EXPIRES_IN }
-        );
-
-        await db.query('UPDATE app_user SET last_login = NOW() WHERE id = $1', [user.id]);
-
-        const permsResult = await db.query(
-            'SELECT permission_key, granted FROM user_permissions WHERE user_id = $1',
-            [user.id]
-        );
-        const permissions = permsResult.rows
-            .filter(p => p.granted)
-            .map(p => p.permission_key);
-
-        res.json({
-            user: {
-                id: user.id, name: user.name, email: user.email, phone: user.phone,
-                role: user.role, activated: user.activated,
-                preferences: user.preferences || {},
-            },
-            permissions,
-            token,
-        });
-    } catch (err) {
-        next(err);
-    }
-});
-
-// =============================================================================
-// GET /auth/me — Get current user (works with both Supabase and legacy tokens)
+// GET /auth/me — Get current user
 // =============================================================================
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
@@ -575,116 +401,6 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
 
         res.json(result.rows[0]);
     } catch (err) { next(err); }
-});
-
-// =============================================================================
-// POST /auth/change-password — Change password (Supabase-aware)
-// =============================================================================
-router.post('/change-password', requireAuth, async (req, res, next) => {
-    try {
-        const { current_password, new_password } = req.body;
-
-        if (!current_password || !new_password) {
-            return res.status(400).json({ error: 'current_password and new_password are required' });
-        }
-        if (new_password.length < 6) {
-            return res.status(400).json({ error: 'New password must be at least 6 characters' });
-        }
-
-        // Get user to check auth method
-        const userResult = await db.query(
-            'SELECT password_hash, supabase_id, auth_provider FROM app_user WHERE id = $1',
-            [req.user.id]
-        );
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const user = userResult.rows[0];
-
-        // If user has a supabase_id and Supabase admin is available, use Supabase
-        if (user.supabase_id && supabaseAdmin) {
-            // Verify current password via legacy method if they have one
-            if (user.password_hash) {
-                if (!verifyPassword(current_password, user.password_hash)) {
-                    return res.status(401).json({ error: 'Current password is incorrect' });
-                }
-            }
-
-            // Update password in Supabase
-            const { error } = await supabaseAdmin.auth.admin.updateUserById(user.supabase_id, {
-                password: new_password,
-            });
-            if (error) {
-                return res.status(500).json({ error: 'Failed to update password' });
-            }
-
-            // Also update legacy hash for backward compatibility
-            const newHash = hashPassword(new_password);
-            await db.query(
-                'UPDATE app_user SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-                [newHash, req.user.id]
-            );
-        } else {
-            // Legacy path: verify and update password hash directly
-            if (!user.password_hash) {
-                return res.status(400).json({ error: 'Password change not available for social login accounts' });
-            }
-
-            if (!verifyPassword(current_password, user.password_hash)) {
-                return res.status(401).json({ error: 'Current password is incorrect' });
-            }
-
-            const newHash = hashPassword(new_password);
-            await db.query(
-                'UPDATE app_user SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-                [newHash, req.user.id]
-            );
-        }
-
-        res.json({ success: true, message: 'Password updated successfully' });
-    } catch (err) { next(err); }
-});
-
-// =============================================================================
-// POST /auth/forgot-password — Request password reset email via Supabase
-// =============================================================================
-router.post('/forgot-password', async (req, res, next) => {
-    try {
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
-        }
-
-        // Always return success to prevent email enumeration (FR-015)
-        const successResponse = {
-            success: true,
-            message: 'If an account exists with this email, a password reset link has been sent.',
-        };
-
-        if (!supabaseAdmin) {
-            // Supabase not configured — still return success to prevent enumeration
-            return res.json(successResponse);
-        }
-
-        try {
-            const redirectTo = process.env.NEXT_PUBLIC_APP_URL
-                ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`
-                : undefined;
-
-            await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
-                redirectTo,
-            });
-        } catch (err) {
-            // Silently handle errors to prevent email enumeration
-            console.error('[Auth] Password reset error:', err.message);
-        }
-
-        res.json(successResponse);
-    } catch (err) {
-        next(err);
-    }
 });
 
 module.exports = router;

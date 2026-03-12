@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 /**
- * OAuth callback route handler.
- * Supabase redirects here after a successful OAuth flow (Google, Microsoft).
+ * Auth callback route handler.
+ * Supabase redirects here after a user clicks a magic link in their email.
  * Exchanges the auth code for a session, then redirects to the login page
  * which picks up the session via onAuthStateChange.
  */
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
 
-    // Handle OAuth errors (user cancelled, provider error, etc.)
+    // Handle auth errors (expired link, etc.)
     if (error) {
         const message = errorDescription || error
         return NextResponse.redirect(

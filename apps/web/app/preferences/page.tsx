@@ -70,10 +70,6 @@ export default function PreferencesPage() {
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
-    const [pwSaving, setPwSaving] = useState(false);
-    const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
     const [prefs, setPrefs] = useState<Required<UserPreferences>>(DEFAULT_PREFS);
     const [prefSaving, setPrefSaving] = useState(false);
     const [prefMsg, setPrefMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -107,21 +103,6 @@ export default function PreferencesPage() {
         } catch (err: any) {
             setProfileMsg({ type: 'error', text: err.message || 'Failed to save' });
         } finally { setProfileSaving(false); }
-    };
-
-    const savePassword = async () => {
-        setPwMsg(null);
-        if (!pwForm.current || !pwForm.next) { setPwMsg({ type: 'error', text: 'All fields are required' }); return; }
-        if (pwForm.next !== pwForm.confirm) { setPwMsg({ type: 'error', text: 'New passwords do not match' }); return; }
-        if (pwForm.next.length < 6) { setPwMsg({ type: 'error', text: 'Password must be at least 6 characters' }); return; }
-        setPwSaving(true);
-        try {
-            await profileApi.changePassword({ current_password: pwForm.current, new_password: pwForm.next });
-            setPwMsg({ type: 'success', text: 'Password changed successfully!' });
-            setPwForm({ current: '', next: '', confirm: '' });
-        } catch (err: any) {
-            setPwMsg({ type: 'error', text: err.message || 'Failed to change password' });
-        } finally { setPwSaving(false); }
     };
 
     const savePrefs = async () => {
@@ -172,25 +153,6 @@ export default function PreferencesPage() {
                     {profileMsg && <Msg {...profileMsg} />}
                     <button onClick={saveProfile} disabled={profileSaving} className={btnPrimary}>
                         {profileSaving ? 'Saving…' : 'Save Profile'}
-                    </button>
-                </div>
-            </PrefSection>
-
-            {/* ── Change Password ── */}
-            <PrefSection title="Change Password" icon="🔒">
-                <div className="space-y-3">
-                    <PrefField label="Current Password">
-                        <input type="password" value={pwForm.current} onChange={e => setPwForm({ ...pwForm, current: e.target.value })} className={inputCls} autoComplete="current-password" />
-                    </PrefField>
-                    <PrefField label="New Password">
-                        <input type="password" value={pwForm.next} onChange={e => setPwForm({ ...pwForm, next: e.target.value })} className={inputCls} autoComplete="new-password" />
-                    </PrefField>
-                    <PrefField label="Confirm New Password">
-                        <input type="password" value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} className={inputCls} autoComplete="new-password" />
-                    </PrefField>
-                    {pwMsg && <Msg {...pwMsg} />}
-                    <button onClick={savePassword} disabled={pwSaving} className={btnPrimary}>
-                        {pwSaving ? 'Updating…' : 'Change Password'}
                     </button>
                 </div>
             </PrefSection>

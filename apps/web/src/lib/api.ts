@@ -438,11 +438,6 @@ export const profileApi = {
         fetchApi<{ id: string; name: string; display_name: string | null; email: string; preferences: UserPreferences }>(
             '/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }
         ),
-
-    changePassword: (data: { current_password: string; new_password: string }) =>
-        fetchApi<{ success: boolean; message: string }>(
-            '/auth/change-password', { method: 'POST', body: JSON.stringify(data) }
-        ),
 };
 
 // ============================================================================

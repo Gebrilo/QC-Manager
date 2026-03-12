@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode,
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { getLandingPage } from '../../config/routes';
-import type { Session, Provider } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -30,24 +30,16 @@ interface AuthContextType {
     permissions: string[];
     token: string | null;
     loading: boolean;
-    signInWithEmail: (email: string, password: string) => Promise<void>;
-    signUpWithEmail: (data: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
-    signInWithProvider: (provider: Provider) => Promise<void>;
-    signInWithPhone: (phone: string) => Promise<void>;
-    verifyOtp: (phone: string, otpToken: string) => Promise<void>;
-    resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+    signInWithOtp: (email: string) => Promise<void>;
     logout: () => Promise<void>;
     hasPermission: (key: string) => boolean;
     isAdmin: boolean;
     refreshUser: () => Promise<void>;
-    // Legacy aliases for backward compatibility
-    login: (email: string, password: string) => Promise<void>;
-    register: (data: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password'];
+const PUBLIC_PATHS = ['/login', '/auth/callback'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -201,87 +193,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [fetchCurrentUser]);
 
     /**
-     * Sign in with email and password via Supabase
+     * Send a magic link to the given email address via Supabase OTP.
+     * The user clicks the link in their inbox, which redirects to /auth/callback
+     * where the session is established automatically.
      */
-    const signInWithEmail = useCallback(async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-            throw new Error(error.message === 'Invalid login credentials'
-                ? 'Invalid email or password'
-                : error.message
-            );
-        }
-        // onAuthStateChange will handle the rest
-    }, []);
-
-    /**
-     * Sign up with email and password via Supabase, then sync
-     */
-    const signUpWithEmail = useCallback(async (data: { name: string; email: string; password: string; phone?: string }) => {
-        const { error } = await supabase.auth.signUp({
-            email: data.email,
-            password: data.password,
+    const signInWithOtp = useCallback(async (email: string) => {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
             options: {
-                data: {
-                    full_name: data.name,
-                    phone: data.phone,
-                },
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
             },
         });
         if (error) throw new Error(error.message);
-        // onAuthStateChange will handle session + sync
-    }, []);
-
-    /**
-     * Sign in with an OAuth provider (Google, Microsoft/Azure)
-     */
-    const signInWithProvider = useCallback(async (provider: Provider) => {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider,
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
-        });
-        if (error) throw new Error(error.message);
-        // Browser redirects to provider — callback handles the rest
-    }, []);
-
-    /**
-     * Sign in with phone (sends OTP via SMS)
-     */
-    const signInWithPhone = useCallback(async (phone: string) => {
-        const { error } = await supabase.auth.signInWithOtp({ phone });
-        if (error) throw new Error(error.message);
-    }, []);
-
-    /**
-     * Verify phone OTP
-     */
-    const verifyOtp = useCallback(async (phone: string, otpToken: string) => {
-        const { error } = await supabase.auth.verifyOtp({
-            phone,
-            token: otpToken,
-            type: 'sms',
-        });
-        if (error) throw new Error(error.message);
-        // onAuthStateChange will handle session + sync
-    }, []);
-
-    /**
-     * Request password reset email
-     */
-    const resetPassword = useCallback(async (email: string): Promise<{ success: boolean; message: string }> => {
-        try {
-            const res = await fetch(`${API_URL}/auth/forgot-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
-            });
-            const data = await res.json();
-            return { success: true, message: data.message || 'Check your email for a reset link.' };
-        } catch {
-            return { success: true, message: 'If an account exists with this email, a reset link has been sent.' };
-        }
     }, []);
 
     /**
@@ -303,17 +226,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const isAdmin = user?.role === 'admin';
 
-    // Legacy aliases for backward compatibility
-    const login = signInWithEmail;
-    const register = signUpWithEmail;
-
     return (
         <AuthContext.Provider value={{
             user, permissions, token, loading,
-            signInWithEmail, signUpWithEmail, signInWithProvider,
-            signInWithPhone, verifyOtp, resetPassword,
+            signInWithOtp,
             logout, hasPermission, isAdmin, refreshUser,
-            login, register,
         }}>
             {children}
         </AuthContext.Provider>
