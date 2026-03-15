@@ -125,12 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUser(null);
                 setPermissions([]);
                 setToken(null);
+                localStorage.removeItem('auth_token');
                 setLoading(false);
                 return;
             }
 
             const accessToken = session.access_token;
             setToken(accessToken);
+            localStorage.setItem('auth_token', accessToken);
 
             // Try to sync with backend
             const syncResult = await syncWithBackend(accessToken);

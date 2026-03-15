@@ -15,7 +15,7 @@ import { useEffect } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 
-const AUTH_PAGES = ['/login', '/register'];
+const AUTH_PAGES = ['/login', '/register', '/auth/callback'];
 
 const PAGE_TITLES: Record<string, string> = {
     '/': 'Dashboard',
