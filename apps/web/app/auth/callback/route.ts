@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+
+function getOrigin(request: NextRequest): string {
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+    return forwardedHost
+        ? `${forwardedProto}://${forwardedHost}`
+        : new URL(request.url).origin
+}
 
 /**
- * Auth callback route handler.
- * Supabase redirects here after a user clicks a magic link in their email.
- * Exchanges the auth code for a session, then redirects to the login page
- * which picks up the session via onAuthStateChange.
+ * Auth callback handler.
+ *
+ * Handles two cases:
+ * 1. Error params (e.g. expired link) → redirect to /login?error=...
+ * 2. Email confirmation → redirect to /auth/confirmed (activation screen).
+ *    The email is already verified by Supabase when this callback is hit,
+ *    so the user can sign in manually after seeing the confirmation.
  */
 export async function GET(request: NextRequest) {
-    const { searchParams, origin } = new URL(request.url)
-    const code = searchParams.get('code')
+    const { searchParams } = new URL(request.url)
+    const origin = getOrigin(request)
+
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
 
-    // Handle auth errors (expired link, etc.)
     if (error) {
         const message = errorDescription || error
         return NextResponse.redirect(
@@ -21,39 +31,8 @@ export async function GET(request: NextRequest) {
         )
     }
 
-    if (!code) {
-        return NextResponse.redirect(
-            `${origin}/login?error=${encodeURIComponent('No authorization code received')}`
-        )
-    }
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return NextResponse.redirect(
-            `${origin}/login?error=${encodeURIComponent('Authentication service not configured')}`
-        )
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-    try {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-
-        if (exchangeError) {
-            return NextResponse.redirect(
-                `${origin}/login?error=${encodeURIComponent(exchangeError.message)}`
-            )
-        }
-
-        // Successful exchange — redirect to login page.
-        // The AuthProvider's onAuthStateChange listener will detect the new session
-        // and call /auth/sync to create/retrieve the app_user.
-        return NextResponse.redirect(`${origin}/login?auth=callback`)
-    } catch (err) {
-        return NextResponse.redirect(
-            `${origin}/login?error=${encodeURIComponent('Authentication failed. Please try again.')}`
-        )
-    }
+    // Email confirmation callback — redirect to the confirmation page.
+    // The email is already verified by Supabase at this point; the user
+    // will sign in manually after seeing the confirmation screen.
+    return NextResponse.redirect(`${origin}/auth/confirmed`)
 }

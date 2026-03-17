@@ -13,10 +13,18 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (loading) return;
 
+        // Redirect authenticated users away from auth pages
+        if (user && (pathname === '/login' || pathname === '/register')) {
+            console.log('[RouteGuard] redirect from auth page → landing', { role: user.role, activated: user.activated, landing: getLandingPage(user, permissions) });
+            router.replace(getLandingPage(user, permissions));
+            return;
+        }
+
         if (isPublicRoute(pathname || '')) return;
 
         // All non-public routes require authentication
         if (!user) {
+            console.log('[RouteGuard] no user → /login', { pathname });
             router.replace('/login');
             return;
         }
@@ -30,19 +38,24 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const landing = getLandingPage(user, permissions);
 
         if (route.requiresActivation && !user.activated) {
+            console.log('[RouteGuard] not activated → /my-tasks', { pathname, role: user.role, activated: user.activated });
             router.replace('/my-tasks');
             return;
         }
 
         if (route.adminOnly && !isAdmin) {
+            console.log('[RouteGuard] adminOnly denied → landing', { pathname, role: user.role, isAdmin, landing });
             router.replace(landing);
             return;
         }
 
         if (route.permission && !hasPermission(route.permission)) {
+            console.log('[RouteGuard] permission denied → landing', { pathname, permission: route.permission, role: user.role, isAdmin, permCount: permissions.length, landing });
             router.replace(landing);
             return;
         }
+
+        console.log('[RouteGuard] access OK', { pathname, role: user.role, activated: user.activated, isAdmin });
     }, [loading, user, permissions, pathname, router, hasPermission, isAdmin]);
 
     if (loading) {

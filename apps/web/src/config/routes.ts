@@ -13,7 +13,7 @@ export interface RouteConfig {
     onboardingGroup?: string;
 }
 
-const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password'];
+const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
 
 const ROUTES: RouteConfig[] = [
     { path: '/login', label: 'Login' },

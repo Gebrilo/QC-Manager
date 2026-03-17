@@ -1,9 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
-import { getLandingPage } from '../../config/routes';
 import type { Session } from '@supabase/supabase-js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -30,7 +29,8 @@ interface AuthContextType {
     permissions: string[];
     token: string | null;
     loading: boolean;
-    signInWithOtp: (email: string) => Promise<void>;
+    signInWithPassword: (email: string, password: string) => Promise<void>;
+    signUp: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
     hasPermission: (key: string) => boolean;
     isAdmin: boolean;
@@ -39,7 +39,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_PATHS = ['/login', '/auth/callback'];
+const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/confirmed'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -47,12 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
-    const pathname = usePathname();
     const syncInProgress = useRef(false);
 
-    /**
-     * Apply user preferences (theme, density) from user data
-     */
     const applyPreferences = useCallback((prefs?: User['preferences']) => {
         if (prefs?.theme && prefs.theme !== 'system') {
             localStorage.setItem('theme', prefs.theme);
@@ -64,10 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    /**
-     * Sync the Supabase session with the API backend.
-     * Creates the app_user if it doesn't exist, or retrieves existing user data.
-     */
     const syncWithBackend = useCallback(async (accessToken: string): Promise<{ user: User; permissions: string[] } | null> => {
         try {
             const res = await fetch(`${API_URL}/auth/sync`, {
@@ -77,12 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     Authorization: `Bearer ${accessToken}`,
                 },
             });
-
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.error || 'Sync failed');
             }
-
             const data = await res.json();
             return {
                 user: { ...data.user, activated: data.user.activated ?? true },
@@ -94,9 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    /**
-     * Fetch current user data from the API (for refresh scenarios)
-     */
     const fetchCurrentUser = useCallback(async (accessToken: string): Promise<boolean> => {
         try {
             const res = await fetch(`${API_URL}/auth/me`, {
@@ -113,13 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [applyPreferences]);
 
-    /**
-     * Handle session change — sync with backend and update state
-     */
     const handleSession = useCallback(async (session: Session | null) => {
         if (syncInProgress.current) return;
         syncInProgress.current = true;
-
         try {
             if (!session) {
                 setUser(null);
@@ -128,21 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setLoading(false);
                 return;
             }
-
             const accessToken = session.access_token;
             setToken(accessToken);
-
-            // Try to sync with backend
             const syncResult = await syncWithBackend(accessToken);
             if (syncResult) {
                 applyPreferences(syncResult.user.preferences);
                 setUser(syncResult.user);
                 setPermissions(syncResult.permissions);
             } else {
-                // Sync failed — try fetching current user (maybe they're already synced)
                 const fetched = await fetchCurrentUser(accessToken);
                 if (!fetched) {
-                    // Complete failure — sign out
                     await supabase.auth.signOut();
                     setUser(null);
                     setPermissions([]);
@@ -155,67 +133,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [syncWithBackend, fetchCurrentUser, applyPreferences]);
 
-    /**
-     * Initialize: check for existing Supabase session and listen for auth changes
-     */
     useEffect(() => {
-        // Check existing session
         supabase.auth.getSession().then(({ data: { session } }) => {
             handleSession(session);
         });
-
-        // Listen for auth state changes (sign in, sign out, token refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
                 await handleSession(session);
             }
         );
-
-        return () => {
-            subscription.unsubscribe();
-        };
+        return () => { subscription.unsubscribe(); };
     }, [handleSession]);
 
-    /**
-     * Redirect unauthenticated users to login (unless on a public path)
-     */
-    useEffect(() => {
-        if (!loading && !user && !PUBLIC_PATHS.some(p => pathname?.startsWith(p))) {
-            router.push('/login');
-        }
-    }, [loading, user, pathname, router]);
+    // Routing is handled entirely by RouteGuard to avoid double-redirect conflicts.
 
     const refreshUser = useCallback(async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            await fetchCurrentUser(session.access_token);
-        }
+        if (session) await fetchCurrentUser(session.access_token);
     }, [fetchCurrentUser]);
 
-    /**
-     * Send a magic link to the given email address via Supabase OTP.
-     * The user clicks the link in their inbox, which redirects to /auth/callback
-     * where the session is established automatically.
-     */
-    const signInWithOtp = useCallback(async (email: string) => {
-        const { error } = await supabase.auth.signInWithOtp({
+    const signInWithPassword = useCallback(async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw new Error(error.message);
+    }, []);
+
+    const signUp = useCallback(async (email: string, password: string, name: string) => {
+        const redirectTo = typeof window !== 'undefined'
+            ? `${window.location.origin}/auth/callback`
+            : '/auth/callback';
+        const { error } = await supabase.auth.signUp({
             email,
+            password,
             options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`,
+                emailRedirectTo: redirectTo,
+                data: { full_name: name },
             },
         });
         if (error) throw new Error(error.message);
     }, []);
 
-    /**
-     * Sign out from Supabase and clear state
-     */
     const logout = useCallback(async () => {
         await supabase.auth.signOut();
         setUser(null);
         setPermissions([]);
         setToken(null);
-        localStorage.removeItem('auth_token'); // Clean up any legacy tokens
         router.push('/login');
     }, [router]);
 
@@ -229,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
         <AuthContext.Provider value={{
             user, permissions, token, loading,
-            signInWithOtp,
+            signInWithPassword, signUp,
             logout, hasPermission, isAdmin, refreshUser,
         }}>
             {children}
@@ -239,8 +200,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
+    if (!context) throw new Error('useAuth must be used within an AuthProvider');
     return context;
 }

@@ -9,10 +9,12 @@ const API_URL = _rawApiUrl.length > 8 ? _rawApiUrl : 'https://api.gebrils.cloud'
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-    // Get auth token if available
+    // Get auth token from Supabase session
     let authToken: string | null = null;
     if (typeof window !== 'undefined') {
-        authToken = localStorage.getItem('auth_token');
+        const { supabase } = await import('./supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        authToken = session?.access_token || null;
     }
 
     const headers: Record<string, string> = {
@@ -32,13 +34,11 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
-        // Handle 401 Unauthorized - token expired or invalid, force logout
+        // Handle 401 Unauthorized - session expired, sign out so RouteGuard redirects to login
         if (response.status === 401) {
             if (typeof window !== 'undefined') {
-                localStorage.removeItem('auth_token');
-                if (!window.location.pathname.startsWith('/login')) {
-                    window.location.href = '/login';
-                }
+                const { supabase } = await import('./supabase');
+                supabase.auth.signOut();
             }
             throw new Error(errorData.error || 'Session expired. Please log in again.');
         }
@@ -703,7 +703,9 @@ export const myJourneysApi = {
 
         let authToken: string | null = null;
         if (typeof window !== 'undefined') {
-            authToken = localStorage.getItem('auth_token');
+            const { supabase } = await import('./supabase');
+            const { data: { session } } = await supabase.auth.getSession();
+            authToken = session?.access_token || null;
         }
 
         const headers: Record<string, string> = {};
