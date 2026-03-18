@@ -21,7 +21,7 @@ const WORKFLOW_DIRS = [
     path.join(__dirname, 'workflows')
 ];
 
-const EXPECTED_CREDENTIAL_NAME = 'QC Tool Postgres';
+const EXPECTED_CREDENTIAL_NAME = 'QC Supabase Postgres';
 
 let totalErrors = 0;
 let totalWarnings = 0;

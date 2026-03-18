@@ -8,12 +8,13 @@ This directory contains n8n workflow definitions for automating QC Management To
 
 1. **Open n8n Dashboard**: http://localhost:5678
 2. **Login**: Use credentials from `.env` (default: admin/admin)
-3. **Create PostgreSQL Credentials**:
-   - Host: `postgres` (in Docker) or `localhost` (standalone)
+3. **Create Supabase PostgreSQL Credential** (named `QC Supabase Postgres`):
+   - Host: `db.[PROJECT_REF].supabase.co`
    - Port: `5432`
-   - Database: `qc_app`
+   - Database: `postgres`
    - User: `postgres`
-   - Password: `postgres`
+   - Password: your Supabase database password
+   - SSL: Enable (required for Supabase)
 4. **Import Workflows**: Go to "Workflows" > "Import from File" and select `.json` files
 5. **Activate Workflows**: Toggle the workflow active switch
 
@@ -41,7 +42,7 @@ This directory contains n8n workflow definitions for automating QC Management To
 
 **Prerequisites for Tuleap Sync**:
 - Create a sync config via `POST /tuleap-webhook/config` with `field_mappings` matching your Tuleap tracker fields
-- PostgreSQL credential named `QC Tool Postgres` must exist in n8n
+- PostgreSQL credential named `QC Supabase Postgres` must exist in n8n (pointing at your Supabase database)
 - QC API must be reachable at `http://qc-api:3001` from the n8n container
 
 ### Project Workflows
@@ -115,14 +116,18 @@ N8N_PORT=5678
 N8N_PROTOCOL=http
 WEBHOOK_URL=http://localhost:5678
 
-# PostgreSQL connection (for n8n internal storage)
+# PostgreSQL connection (for n8n internal storage ONLY — NOT app data)
 DB_TYPE=postgresdb
 DB_POSTGRESDB_HOST=postgres
 DB_POSTGRESDB_PORT=5432
-DB_POSTGRESDB_DATABASE=qc_app
+DB_POSTGRESDB_DATABASE=n8n
 DB_POSTGRESDB_USER=postgres
 DB_POSTGRESDB_PASSWORD=postgres
 ```
+
+> **Note:** n8n's internal storage (execution history, credentials, etc.) uses the local
+> PostgreSQL container. App data queries inside workflows use the `QC Supabase Postgres`
+> credential configured in the n8n UI, which points to your Supabase cloud database.
 
 ## Customization
 
@@ -147,9 +152,9 @@ If you change webhook paths, update the API trigger code in:
 3. Verify `N8N_WEBHOOK_URL` is correct in API environment
 
 ### Database Connection Failed
-1. Verify PostgreSQL credentials in workflow
-2. Use `postgres` as host inside Docker network
-3. Check if PostgreSQL container is healthy
+1. Verify the `QC Supabase Postgres` credential in n8n points to your Supabase database
+2. Ensure SSL is enabled in the credential configuration
+3. Check Supabase dashboard for connection limits or IP restrictions
 
 ### Report Not Generating
 1. Check workflow execution history in n8n

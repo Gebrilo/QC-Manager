@@ -29,8 +29,8 @@
             ],
             "credentials": {
                 "postgres": {
-                    "id": "1",
-                    "name": "QC Tool Postgres"
+                    "id": "supabase-postgres-id",
+                    "name": "QC Supabase Postgres"
                 }
             }
         },
@@ -62,8 +62,8 @@
             ],
             "credentials": {
                 "postgres": {
-                    "id": "1",
-                    "name": "QC Tool Postgres"
+                    "id": "supabase-postgres-id",
+                    "name": "QC Supabase Postgres"
                 }
             }
         }
