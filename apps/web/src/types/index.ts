@@ -115,6 +115,7 @@ export interface Task {
     completed_date?: string;
     tags?: string[];
     notes?: string;
+    tuleap_url?: string;
 
     // Joined fields from API View
     project_name?: string;

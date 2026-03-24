@@ -77,7 +77,21 @@ export default function TaskDetailPage() {
                                 {task.status}
                             </Badge>
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{task.task_id} • {task.project_name || 'No Project'}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            {task.tuleap_url ? (
+                                <a
+                                    href={task.tuleap_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                                >
+                                    {task.task_id}
+                                </a>
+                            ) : (
+                                task.task_id
+                            )}
+                            {' '}• {task.project_name || 'No Project'}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
