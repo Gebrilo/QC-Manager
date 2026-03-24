@@ -91,21 +91,20 @@ export function TaskCommentSection({ taskId }: TaskCommentSectionProps) {
             </CardHeader>
             <CardContent>
                 {/* Comment Input */}
-                <form onSubmit={handleSubmit} className="mb-6">
-                    <div className="flex items-stretch gap-2">
-                        <input
-                            type="text"
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Add a comment..."
-                            className="flex-1 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={isSubmitting}
-                        />
+                <form onSubmit={handleSubmit} className="mb-6 space-y-2">
+                    <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isSubmitting}
+                    />
+                    <div className="flex justify-end">
                         <Button
                             type="submit"
                             size="sm"
                             disabled={isSubmitting || !newComment.trim()}
-                            className="flex-shrink-0"
                         >
                             {isSubmitting ? '...' : 'Add'}
                         </Button>

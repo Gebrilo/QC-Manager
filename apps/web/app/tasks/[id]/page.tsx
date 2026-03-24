@@ -131,9 +131,14 @@ export default function TaskDetailPage() {
                             <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Notes</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-slate-700 dark:text-slate-300 italic">
-                                {task.notes || 'No notes added.'}
-                            </p>
+                            {task.notes ? (
+                                <div
+                                    className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-indigo-600 [&_a]:underline"
+                                    dangerouslySetInnerHTML={{ __html: task.notes.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '') }}
+                                />
+                            ) : (
+                                <p className="text-slate-700 dark:text-slate-300 italic">No notes added.</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
