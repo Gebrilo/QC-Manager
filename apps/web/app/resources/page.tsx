@@ -13,7 +13,9 @@ export default function ResourcesPage() {
     const [filter, setFilter] = useState('');
     const [showDialog, setShowDialog] = useState(false);
     const [editingResource, setEditingResource] = useState<Resource | null>(null);
-    const { hasPermission } = useAuth();
+    const [autoMapStatus, setAutoMapStatus] = useState<string | null>(null);
+    const [isAutoMapping, setIsAutoMapping] = useState(false);
+    const { hasPermission, user } = useAuth();
 
     const canCreate = hasPermission('action:resources:create');
     const canEdit = hasPermission('action:resources:edit');
@@ -79,6 +81,20 @@ export default function ResourcesPage() {
         setShowDialog(true);
     };
 
+    const handleAutoMap = async () => {
+        setIsAutoMapping(true);
+        setAutoMapStatus(null);
+        try {
+            const result = await resourcesApi.autoMap();
+            setAutoMapStatus(result.message);
+            if (result.mapped > 0) await loadResources();
+        } catch (err: any) {
+            setAutoMapStatus(`Error: ${err.message}`);
+        } finally {
+            setIsAutoMapping(false);
+        }
+    };
+
     return (
         <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -89,6 +105,16 @@ export default function ResourcesPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                        <Button
+                            onClick={handleAutoMap}
+                            disabled={isAutoMapping}
+                            variant="outline"
+                            className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                            {isAutoMapping ? 'Mapping…' : 'Auto-Map Users'}
+                        </Button>
+                    )}
                     {canCreate && (
                         <Button
                             onClick={handleAddNew}
@@ -99,6 +125,14 @@ export default function ResourcesPage() {
                     )}
                 </div>
             </div>
+
+            {/* Auto-map result banner */}
+            {autoMapStatus && (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-sm text-indigo-800 dark:text-indigo-300">
+                    <span>{autoMapStatus}</span>
+                    <button onClick={() => setAutoMapStatus(null)} className="text-indigo-500 hover:text-indigo-700">✕</button>
+                </div>
+            )}
 
             {/* Simple Search Bar for Resources */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">

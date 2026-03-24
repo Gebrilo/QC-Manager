@@ -289,6 +289,11 @@ export const resourcesApi = {
         fetchApi<{ success: boolean; message: string }>(`/resources/${id}`, {
             method: 'DELETE',
         }),
+
+    autoMap: () =>
+        fetchApi<{ success: boolean; mapped: number; total_candidates: number; message: string }>('/resources/auto-map', {
+            method: 'POST',
+        }),
 };
 
 // ============================================================================

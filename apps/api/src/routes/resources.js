@@ -148,16 +148,83 @@ router.get('/:id', requireAuth, requirePermission('page:resources'), async (req,
     }
 });
 
+// POST auto-map resources to users by matching email
+router.post('/auto-map', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        // Find all unlinked resources that have an email matching an app_user
+        const candidates = await db.query(`
+            SELECT r.id AS resource_id, r.resource_name, r.email,
+                   u.id AS user_id, u.name AS user_name
+            FROM resources r
+            JOIN app_user u ON LOWER(r.email) = LOWER(u.email)
+            WHERE r.user_id IS NULL
+              AND r.deleted_at IS NULL
+              AND r.email IS NOT NULL
+              AND u.deleted_at IS NULL
+        `);
+
+        if (candidates.rows.length === 0) {
+            return res.json({ success: true, mapped: 0, message: 'No unlinked resources with matching user emails found.' });
+        }
+
+        let mapped = 0;
+        for (const row of candidates.rows) {
+            // Skip if the user is already linked to a different resource
+            const conflict = await db.query(
+                'SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL AND id != $2',
+                [row.user_id, row.resource_id]
+            );
+            if (conflict.rows.length > 0) continue;
+
+            await db.query(
+                'UPDATE resources SET user_id = $1, updated_at = NOW() WHERE id = $2',
+                [row.user_id, row.resource_id]
+            );
+            await auditLog('resources', row.resource_id, 'UPDATE',
+                { user_id: row.user_id }, { user_id: null });
+            mapped++;
+        }
+
+        return res.json({
+            success: true,
+            mapped,
+            total_candidates: candidates.rows.length,
+            message: `Linked ${mapped} resource(s) to their matching user account.`
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST create resource
 router.post('/', requireAuth, requirePermission('action:resources:create'), async (req, res, next) => {
     try {
         // Validate with Zod
         const data = createResourceSchema.parse(req.body);
 
+        // Auto-link to user account if email matches
+        let linkedUserId = null;
+        if (data.email) {
+            const userMatch = await db.query(
+                'SELECT id FROM app_user WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+                [data.email]
+            );
+            if (userMatch.rows.length > 0) {
+                // Only link if that user isn't already linked to another resource
+                const alreadyLinked = await db.query(
+                    'SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL LIMIT 1',
+                    [userMatch.rows[0].id]
+                );
+                if (alreadyLinked.rows.length === 0) {
+                    linkedUserId = userMatch.rows[0].id;
+                }
+            }
+        }
+
         const result = await db.query(
             `INSERT INTO resources (
-                resource_name, weekly_capacity_hrs, email, department, role, is_active
-            ) VALUES ($1, $2, $3, $4, $5, $6) 
+                resource_name, weekly_capacity_hrs, email, department, role, is_active, user_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
             [
                 data.resource_name,
@@ -165,7 +232,8 @@ router.post('/', requireAuth, requirePermission('action:resources:create'), asyn
                 data.email || null,
                 data.department || null,
                 data.role || null,
-                data.is_active
+                data.is_active,
+                linkedUserId
             ]
         );
 

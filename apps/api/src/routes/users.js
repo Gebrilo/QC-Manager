@@ -126,6 +126,17 @@ router.patch('/:id', async (req, res, next) => {
                  ON CONFLICT (user_id, journey_id) DO NOTHING`,
                 [id]
             ).catch(err => console.error('Journey auto-assignment error:', err.message));
+
+            // Auto-link to matching resource by email (if not already linked)
+            if (updatedUser.email) {
+                db.query(
+                    `UPDATE resources SET user_id = $1, updated_at = NOW()
+                     WHERE LOWER(email) = LOWER($2)
+                       AND user_id IS NULL
+                       AND deleted_at IS NULL`,
+                    [id, updatedUser.email]
+                ).catch(err => console.error('Resource auto-link error:', err.message));
+            }
         }
     } catch (err) {
         next(err);
