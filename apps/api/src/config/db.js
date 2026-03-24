@@ -430,6 +430,20 @@ const runMigrations = async () => {
             END $$;
         `);
 
+        // Add Tuleap columns to projects table
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='tuleap_project_id') THEN
+                    ALTER TABLE projects ADD COLUMN tuleap_project_id INTEGER;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='tuleap_short_name') THEN
+                    ALTER TABLE projects ADD COLUMN tuleap_short_name VARCHAR(100);
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tuleap_project_id ON projects(tuleap_project_id) WHERE tuleap_project_id IS NOT NULL AND deleted_at IS NULL`);
+
         // Add Tuleap columns to tasks table
         await client.query(`
             DO $$

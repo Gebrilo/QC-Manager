@@ -57,6 +57,106 @@ function mapTuleapStatus(tuleapStatus) {
 }
 
 // =====================================================
+// HELPER: Find-or-create QC project + sync config from Tuleap project data
+// Returns { project, syncConfig, createdProject, createdConfig }
+// =====================================================
+async function provisionTuleapProject({ tuleap_project_id, tuleap_project_name, tuleap_short_name, tuleap_tracker_id, tracker_type = 'task' }) {
+    if (!tuleap_project_id) return null;
+
+    // Find or create QC project
+    let project, createdProject = false;
+    const existing = await pool.query(
+        'SELECT * FROM projects WHERE tuleap_project_id = $1 AND deleted_at IS NULL LIMIT 1',
+        [tuleap_project_id]
+    );
+    if (existing.rows.length > 0) {
+        project = existing.rows[0];
+    } else {
+        const res = await pool.query(
+            `INSERT INTO projects (project_name, tuleap_project_id, tuleap_short_name, status, created_by)
+             VALUES ($1, $2, $3, 'active', 'tuleap-sync')
+             ON CONFLICT DO NOTHING
+             RETURNING *`,
+            [tuleap_project_name || `Tuleap Project ${tuleap_project_id}`, tuleap_project_id, tuleap_short_name || null]
+        );
+        project = res.rows[0];
+        createdProject = true;
+    }
+    if (!project) return null;
+
+    // Find or create sync config for this tracker (if tracker info provided)
+    let syncConfig = null, createdConfig = false;
+    if (tuleap_tracker_id) {
+        const existingConfig = await pool.query(
+            'SELECT * FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND tuleap_project_id = $2 AND is_active = true LIMIT 1',
+            [tuleap_tracker_id, tuleap_project_id]
+        );
+        if (existingConfig.rows.length > 0) {
+            syncConfig = existingConfig.rows[0];
+        } else {
+            const configRes = await pool.query(
+                `INSERT INTO tuleap_sync_config (tuleap_tracker_id, tuleap_project_id, qc_project_id, tracker_type, is_active)
+                 VALUES ($1, $2, $3, $4, true)
+                 ON CONFLICT DO NOTHING
+                 RETURNING *`,
+                [tuleap_tracker_id, tuleap_project_id, project.id, tracker_type]
+            );
+            syncConfig = configRes.rows[0];
+            createdConfig = true;
+        }
+    }
+
+    return { project, syncConfig, createdProject, createdConfig };
+}
+
+// =====================================================
+// POST /tuleap-webhook/project
+// Receive Tuleap project creation/update webhook
+// Payload format: { event_name, project_id, name, path, owner_email, owner_name }
+// =====================================================
+router.post('/project', async (req, res) => {
+    try {
+        const body = req.body;
+
+        // Support both direct JSON and form-encoded payload wrapping
+        let payload = body;
+        if (body.payload) {
+            payload = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;
+        }
+
+        const tuleap_project_id = payload.project_id;
+        const tuleap_project_name = payload.name;
+        const tuleap_short_name = payload.path;
+        const event_name = payload.event_name || 'project_sync';
+
+        if (!tuleap_project_id) {
+            return res.status(400).json({ success: false, error: 'project_id is required' });
+        }
+
+        const result = await provisionTuleapProject({
+            tuleap_project_id,
+            tuleap_project_name,
+            tuleap_short_name,
+        });
+
+        if (!result) {
+            return res.status(500).json({ success: false, error: 'Failed to provision project' });
+        }
+
+        console.log(`Tuleap project ${event_name}: ${tuleap_project_name} (${tuleap_project_id}) → QC project ${result.project.id} (created: ${result.createdProject})`);
+
+        return res.status(result.createdProject ? 201 : 200).json({
+            success: true,
+            action: result.createdProject ? 'created' : 'exists',
+            data: result.project
+        });
+    } catch (error) {
+        console.error('Error processing project webhook:', error);
+        res.status(500).json({ success: false, error: 'Failed to process project webhook', message: error.message });
+    }
+});
+
+// =====================================================
 // HELPER: Generate next task ID
 // =====================================================
 async function generateTaskId() {
@@ -347,18 +447,37 @@ router.post('/test-case', async (req, res) => {
 router.post('/task', async (req, res) => {
     try {
         const {
-            action,  // 'create', 'update', 'reject', 'archive'
+            action,  // 'create', 'update', 'delete', 'reject', 'archive'
             tuleap_artifact_id,
             tuleap_url,
             task_name,
             notes,
             tuleap_status,
             resource1_id,
-            project_id,
             new_assignee_name,
             action_reason,
-            raw_tuleap_payload
+            raw_tuleap_payload,
+            // Tuleap project metadata — used for auto-provisioning when project_id is null
+            tuleap_project_id,
+            tuleap_project_name,
+            tuleap_tracker_id,
         } = req.body;
+
+        // Auto-provision QC project + sync config when no project_id supplied
+        let project_id = req.body.project_id;
+        if (!project_id && tuleap_project_id && action !== 'delete') {
+            const provisioned = await provisionTuleapProject({
+                tuleap_project_id,
+                tuleap_project_name,
+                tuleap_short_name: null,
+                tuleap_tracker_id,
+                tracker_type: 'task',
+            });
+            if (provisioned?.project) {
+                project_id = provisioned.project.id;
+                console.log(`Auto-provisioned project ${provisioned.project.project_name} (${provisioned.createdProject ? 'new' : 'existing'}) for artifact ${tuleap_artifact_id}`);
+            }
+        }
 
         const mappedStatus = mapTuleapStatus(tuleap_status);
 

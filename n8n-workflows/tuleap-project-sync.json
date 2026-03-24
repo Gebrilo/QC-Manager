@@ -1,0 +1,116 @@
+[
+  {
+    "id": "05fdf348d00a41f6",
+    "name": "Tuleap Project Sync",
+    "active": false,
+    "versionId": "633e9861-eeb8-49c4-8980-96116cbf405d",
+    "nodes": [
+      {
+        "id": "920d708f-a12a-4371-af5a-b5f27fa07634",
+        "name": "Webhook: Tuleap Project",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "f91bd2cf-f648-4fbe-a395-dc02da3508fc",
+        "parameters": {
+          "path": "tuleap-project-sync",
+          "responseMode": "responseNode",
+          "httpMethod": "POST"
+        }
+      },
+      {
+        "id": "1a5fe82d-80af-43ae-8176-8c7cf8b2b918",
+        "name": "Parse Project Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          300
+        ],
+        "parameters": {
+          "jsCode": "\n// Tuleap project webhook \u2014 may be raw JSON or form-encoded with 'payload' key\nconst bodyPayload = $input.first().json.body;\nlet p = bodyPayload;\n\nif (typeof bodyPayload === 'string' && bodyPayload.includes('payload=')) {\n  const params = new URLSearchParams(bodyPayload);\n  const payloadStr = params.get('payload');\n  p = JSON.parse(payloadStr);\n} else if (bodyPayload?.payload) {\n  p = typeof bodyPayload.payload === 'string' ? JSON.parse(bodyPayload.payload) : bodyPayload.payload;\n}\n\nreturn [{ json: {\n  tuleap_project_id:   p.project_id,\n  tuleap_project_name: p.name,\n  tuleap_short_name:   p.path || p.path_with_namespace,\n  event_name:          p.event_name || 'project_sync',\n  owner_email:         p.owner_email || null,\n  owner_name:          p.owner_name  || null,\n  raw_payload:         p\n}}];\n"
+        }
+      },
+      {
+        "id": "b314a77d-4e90-4aea-8978-850e7096f361",
+        "name": "Sync Project to QC",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          680,
+          300
+        ],
+        "parameters": {
+          "url": "http://qc-api:3001/tuleap-webhook/project",
+          "method": "POST",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ project_id: $json.tuleap_project_id, name: $json.tuleap_project_name, path: $json.tuleap_short_name, event_name: $json.event_name, owner_email: $json.owner_email, owner_name: $json.owner_name }) }}",
+          "options": {
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "1e5f41d2-0a76-4b33-9e95-6e511780f873",
+        "name": "Respond: OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          900,
+          300
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ success: true, action: $json.action, project: $json.data }) }}"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook: Tuleap Project": {
+        "main": [
+          [
+            {
+              "node": "Parse Project Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Project Payload": {
+        "main": [
+          [
+            {
+              "node": "Sync Project to QC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sync Project to QC": {
+        "main": [
+          [
+            {
+              "node": "Respond: OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "tags": [
+      {
+        "name": "tuleap"
+      }
+    ]
+  }
+]

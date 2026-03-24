@@ -58,7 +58,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const parsed  = $('Parse Payload').first().json;\nconst configs = $input.first().json.data || [];\n\nconst teamNames    = parsed.teamNames || [];\nconst isWrongTeam  = teamNames.length > 0 && !teamNames.includes('QA-Team');\nconst tuleapAction = (parsed.tuleapAction || '').toLowerCase();\n\n// Team changed away from QA-Team on an existing task \u2192 force-delete from QC\nif (isWrongTeam && (tuleapAction === 'update' || tuleapAction === 'delete')) {\n  const config = configs.find(c =>\n    String(c.tuleap_tracker_id) === String(parsed.trackerId) &&\n    String(c.tuleap_project_id) === String(parsed.tuleapProjectId)\n  );\n  return [{ json: {\n    configFound: true,\n    config: config || {},\n    forceDelete: true,\n    forceReason: `Team changed to [${teamNames.join(', ')}] \u2014 task removed from QC`\n  }}];\n}\n\n// New task created with wrong team \u2192 skip entirely, don't touch QC\nif (isWrongTeam) {\n  return [{ json: {\n    configFound: false,\n    reason: `Skipped: task belongs to [${teamNames.join(', ')}], not QA-Team`\n  }}];\n}\n\n// Normal flow: match sync config by tracker + project\nconst config = configs.find(c =>\n  String(c.tuleap_tracker_id) === String(parsed.trackerId) &&\n  String(c.tuleap_project_id) === String(parsed.tuleapProjectId)\n);\n\nif (!config) {\n  return [{ json: {\n    configFound: false,\n    reason: `No active sync config for tracker ${parsed.trackerId} in Tuleap project ${parsed.tuleapProjectId} (${parsed.tuleapProjectName})`\n  }}];\n}\n\nreturn [{ json: { configFound: true, config } }];"
+        "jsCode": "const parsed  = $('Parse Payload').first().json;\nconst configs = $input.first().json.data || [];\n\nconst teamNames    = parsed.teamNames || [];\nconst isWrongTeam  = teamNames.length > 0 && !teamNames.includes('QA-Team');\nconst tuleapAction = (parsed.tuleapAction || '').toLowerCase();\n\n// Team changed away from QA-Team on an existing task \u2192 force-delete from QC\nif (isWrongTeam && (tuleapAction === 'update' || tuleapAction === 'delete')) {\n  const config = configs.find(c =>\n    String(c.tuleap_tracker_id) === String(parsed.trackerId) &&\n    String(c.tuleap_project_id) === String(parsed.tuleapProjectId)\n  );\n  return [{ json: {\n    configFound: true,\n    config: config || {},\n    forceDelete: true,\n    forceReason: `Team changed to [${teamNames.join(', ')}] \u2014 task removed from QC`\n  }}];\n}\n\n// New task created with wrong team \u2192 skip entirely, don't touch QC\nif (isWrongTeam) {\n  return [{ json: {\n    configFound: false,\n    skip: true,\n    reason: `Skipped: task belongs to [${teamNames.join(', ')}], not QA-Team`\n  }}];\n}\n\n// Normal flow: match sync config by tracker + project\nconst config = configs.find(c =>\n  String(c.tuleap_tracker_id) === String(parsed.trackerId) &&\n  String(c.tuleap_project_id) === String(parsed.tuleapProjectId)\n);\n\nif (!config) {\n  return [{ json: {\n    configFound: false,\n    skip: false,\n    reason: `No active sync config for tracker ${parsed.trackerId} in Tuleap project ${parsed.tuleapProjectId} (${parsed.tuleapProjectName})`\n  }}];\n}\n\nreturn [{ json: { configFound: true, config } }];"
       },
       "id": "a1234567-0004-4004-8004-000000000004",
       "name": "Match Config",
@@ -135,7 +135,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const parsed      = $('Parse Payload').first().json;\nconst matchResult = $('Match Config').first().json;\nconst config      = matchResult.config;\nconst resources   = $('Fetch All Resources').first().json.data || [];\n\n// \u2500\u2500 Force-delete: team changed away from QA-Team \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nif (matchResult.forceDelete) {\n  return [{\n    json: {\n      action:             'delete',\n      tuleap_artifact_id: parsed.artifactId,\n      tuleap_url:         parsed.tuleapUrl,\n      task_name:          parsed.taskTitle,\n      notes:              null,\n      resource1_id:       null,\n      new_assignee_name:  parsed.assigneeDisplayName,\n      project_id:         config?.qc_project_id || null,\n      action_reason:      matchResult.forceReason,\n      raw_tuleap_payload: parsed.rawPayload,\n      _debug: { forceDelete: true, teams: parsed.teamNames }\n    }\n  }];\n}\n\n// \u2500\u2500 Normal flow \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst email    = (parsed.assigneeEmail    || '').toLowerCase().trim();\nconst realName = (parsed.assigneeRealName || '').toLowerCase().trim();\nconst uname    = (parsed.assigneeUsername || '').toLowerCase().trim();\n\nconst resource = resources.find(r => {\n  const re = (r.email         || '').toLowerCase().trim();\n  const rn = (r.resource_name || '').toLowerCase().trim();\n  return (email    && re === email)    ||\n         (realName && rn === realName) ||\n         (uname    && rn === uname);\n}) || null;\n\nconst tuleapAction = (parsed.tuleapAction || '').toLowerCase();\nconst qcAction = tuleapAction === 'delete' ? 'delete'\n               : tuleapAction === 'create' ? 'create'\n               : 'update';\n\nconst STATUS_MAP = {\n  'Todo':        'Backlog',\n  'In Progress': 'In Progress',\n  'Blocked':     'In Progress',\n  'Done':        'Done',\n  'Canceled':    'Cancelled'\n};\n\nreturn [{\n  json: {\n    action:             qcAction,\n    tuleap_artifact_id: parsed.artifactId,\n    tuleap_url:         parsed.tuleapUrl,\n    task_name:          parsed.taskTitle,\n    notes:              parsed.description || null,\n    tuleap_status:      parsed.tuleapStatus,\n    resource1_id:       resource?.id       || null,\n    new_assignee_name:  parsed.assigneeDisplayName,\n    project_id:         config?.qc_project_id || null,\n    action_reason:      null,\n    raw_tuleap_payload: parsed.rawPayload,\n    _debug: {\n      matchedResource: resource ? { id: resource.id, name: resource.resource_name } : null,\n      resourceMatched: !!resource,\n      tuleapAction:    parsed.tuleapAction,\n      qcAction,\n      tuleapStatus:    parsed.tuleapStatus,\n      mappedStatus:    STATUS_MAP[parsed.tuleapStatus] || 'Backlog',\n    }\n  }\n}];"
+        "jsCode": "const parsed      = $('Parse Payload').first().json;\nconst matchResult = $('Match Config').first().json;\nconst config      = matchResult.config;\nconst resources   = $('Fetch All Resources').first().json.data || [];\n\n// \u2500\u2500 Force-delete: team changed away from QA-Team \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nif (matchResult.forceDelete) {\n  return [{\n    json: {\n      action:             'delete',\n      tuleap_artifact_id: parsed.artifactId,\n      tuleap_url:         parsed.tuleapUrl,\n      task_name:          parsed.taskTitle,\n      notes:              null,\n      resource1_id:       null,\n      new_assignee_name:  parsed.assigneeDisplayName,\n      project_id:         config?.qc_project_id || null,\n      action_reason:      matchResult.forceReason,\n      raw_tuleap_payload: parsed.rawPayload,\n      tuleap_project_id:  parsed.tuleapProjectId,\n      tuleap_project_name: parsed.tuleapProjectName,\n      tuleap_tracker_id:  parsed.trackerId,\n      _debug: { forceDelete: true, teams: parsed.teamNames }\n    }\n  }];\n}\n\n// \u2500\u2500 Normal flow \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst email    = (parsed.assigneeEmail    || '').toLowerCase().trim();\nconst realName = (parsed.assigneeRealName || '').toLowerCase().trim();\nconst uname    = (parsed.assigneeUsername || '').toLowerCase().trim();\n\nconst resource = resources.find(r => {\n  const re = (r.email         || '').toLowerCase().trim();\n  const rn = (r.resource_name || '').toLowerCase().trim();\n  return (email    && re === email)    ||\n         (realName && rn === realName) ||\n         (uname    && rn === uname);\n}) || null;\n\nconst tuleapAction = (parsed.tuleapAction || '').toLowerCase();\nconst qcAction = tuleapAction === 'delete' ? 'delete'\n               : tuleapAction === 'create' ? 'create'\n               : 'update';\n\nconst STATUS_MAP = {\n  'Todo':        'Backlog',\n  'In Progress': 'In Progress',\n  'Blocked':     'In Progress',\n  'Done':        'Done',\n  'Canceled':    'Cancelled'\n};\n\nreturn [{\n  json: {\n    action:             qcAction,\n    tuleap_artifact_id: parsed.artifactId,\n    tuleap_url:         parsed.tuleapUrl,\n    task_name:          parsed.taskTitle,\n    notes:              parsed.description || null,\n    tuleap_status:      parsed.tuleapStatus,\n    resource1_id:       resource?.id       || null,\n    new_assignee_name:  parsed.assigneeDisplayName,\n    project_id:         config?.qc_project_id || null,\n    action_reason:      null,\n    raw_tuleap_payload: parsed.rawPayload,\n    tuleap_project_id:  parsed.tuleapProjectId,\n    tuleap_project_name: parsed.tuleapProjectName,\n    tuleap_tracker_id:  parsed.trackerId,\n    _debug: {\n      matchedResource: resource ? { id: resource.id, name: resource.resource_name } : null,\n      resourceMatched: !!resource,\n      tuleapAction:    parsed.tuleapAction,\n      qcAction,\n      tuleapStatus:    parsed.tuleapStatus,\n      mappedStatus:    STATUS_MAP[parsed.tuleapStatus] || 'Backlog',\n    }\n  }\n}];"
       },
       "id": "a1234567-0008-4008-8008-000000000008",
       "name": "Find Resource + Build Payload",
@@ -181,6 +181,38 @@
         2160,
         304
       ]
+    },
+    {
+      "id": "7de26819-216c-49ab-89cd-369bb288bba4",
+      "name": "Should Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        378
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "e4b2cd55-ca4d-4ef1-ac93-29ba11debbd6",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
     }
   ],
   "connections": {
@@ -239,7 +271,7 @@
         ],
         [
           {
-            "node": "Respond: Not Configured",
+            "node": "Should Skip?",
             "type": "main",
             "index": 0
           }
@@ -278,6 +310,24 @@
           }
         ]
       ]
+    },
+    "Should Skip?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch All Resources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -288,7 +338,7 @@
     "templateCredsSetupCompleted": true
   },
   "pinData": {},
-  "versionId": "8f633180-c92a-43bf-8d6c-de498a4d2a50",
+  "versionId": "03a595a9-5972-401d-8798-c8faa1a3550e",
   "tags": [
     {
       "name": "tuleap"

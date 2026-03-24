@@ -297,6 +297,42 @@ export const resourcesApi = {
 };
 
 // ============================================================================
+// API Client - Bugs
+// ============================================================================
+
+export interface Bug {
+    id: string;
+    bug_id: string;
+    title: string;
+    description?: string;
+    status: string;
+    severity: string;
+    priority: string;
+    bug_type?: string;
+    component?: string;
+    project_id?: string;
+    project_name?: string;
+    reported_by?: string;
+    assigned_to?: string;
+    reported_date?: string;
+    tuleap_url?: string;
+    has_test_link?: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export const bugsApi = {
+    list: (params?: { project_id?: string; status?: string; severity?: string; limit?: number; offset?: number }) =>
+        fetchApi<{ success: boolean; count: number; total: number; data: Bug[] }>(`/bugs?${new URLSearchParams(params as any || {}).toString()}`),
+
+    get: (id: string) =>
+        fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}`),
+
+    summary: (project_id?: string) =>
+        fetchApi<{ success: boolean; data: any }>(`/bugs/summary${project_id ? `?project_id=${project_id}` : ''}`),
+};
+
+// ============================================================================
 // API Client - Dashboard
 // ============================================================================
 

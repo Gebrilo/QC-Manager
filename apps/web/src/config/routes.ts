@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2 } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug } from 'lucide-react';
 
 export interface RouteConfig {
     path: string;
@@ -36,6 +36,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/resources', label: 'Resources', permission: 'page:resources', requiresActivation: true, showInNavbar: true, navOrder: 5, icon: Users },
     { path: '/resources/create', label: 'Create Resource', permission: 'page:resources', requiresActivation: true },
     { path: '/resources/[id]', label: 'Resource Dashboard', permission: 'page:resources', requiresActivation: true },
+    { path: '/bugs', label: 'Bugs', permission: 'page:bugs', requiresActivation: true, showInNavbar: true, navOrder: 5.5, icon: Bug },
+    { path: '/bugs/[id]', label: 'Bug Details', permission: 'page:bugs', requiresActivation: true },
     { path: '/governance', label: 'Governance', permission: 'page:governance', requiresActivation: true, showInNavbar: true, navOrder: 6, icon: ShieldCheck },
     { path: '/test-executions', label: 'Test Runs', permission: 'page:test-executions', requiresActivation: true, showInNavbar: true, navOrder: 7, icon: FlaskConical },
     { path: '/test-cases', label: 'Test Cases', permission: 'page:test-executions', requiresActivation: true },
