@@ -383,12 +383,19 @@ router.post('/task', async (req, res) => {
             raw_payload: raw_tuleap_payload
         });
 
-        // Check if task exists
+        // Check if task exists (live)
         const existingRes = await pool.query(
             'SELECT * FROM tasks WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL',
             [tuleap_artifact_id]
         );
         const existingTask = existingRes.rows[0];
+
+        // Also check for previously soft-deleted task (for revival)
+        const deletedRes = await pool.query(
+            'SELECT * FROM tasks WHERE tuleap_artifact_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 1',
+            [tuleap_artifact_id]
+        );
+        const deletedTask = deletedRes.rows[0];
 
         let result;
         let processingResult;
@@ -582,7 +589,7 @@ router.post('/task', async (req, res) => {
 
             case 'create':
             default:
-                // Create new task
+                // Create new task (or revive soft-deleted one)
                 if (!task_name) {
                     return res.status(400).json({
                         success: false,
@@ -590,13 +597,58 @@ router.post('/task', async (req, res) => {
                     });
                 }
 
-                // Check if task already exists (duplicate webhook)
+                // Check if task already exists as live (duplicate webhook)
                 if (existingTask) {
                     return res.json({
                         success: true,
                         action: 'exists',
                         message: 'Task already exists',
                         data: existingTask
+                    });
+                }
+
+                // Revive soft-deleted task instead of creating a new one
+                if (deletedTask) {
+                    result = await pool.query(`
+                        UPDATE tasks SET
+                            deleted_at = NULL,
+                            status = $1,
+                            task_name = $2,
+                            notes = $3,
+                            resource1_id = $4,
+                            tuleap_url = COALESCE($5, tuleap_url),
+                            last_tuleap_sync = NOW(),
+                            updated_at = NOW()
+                        WHERE id = $6
+                        RETURNING *
+                    `, [
+                        mappedStatus || 'Backlog',
+                        task_name,
+                        notes,
+                        resource1_id,
+                        tuleap_url,
+                        deletedTask.id
+                    ]);
+
+                    const revived = result.rows[0];
+                    await auditLog('tasks', revived.id, 'UPDATE', revived, deletedTask);
+
+                    processingResult = `Task revived from history: ${revived.task_id}`;
+
+                    await logWebhook({
+                        tuleap_artifact_id,
+                        artifact_type: 'task',
+                        action: 'create',
+                        payload_hash,
+                        raw_payload: raw_tuleap_payload,
+                        processing_status: 'processed',
+                        processing_result: processingResult
+                    });
+
+                    return res.status(200).json({
+                        success: true,
+                        action: 'revived',
+                        data: revived
                     });
                 }
 
