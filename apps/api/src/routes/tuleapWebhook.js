@@ -375,6 +375,64 @@ router.post('/task', async (req, res) => {
                     message: processingResult
                 });
 
+            case 'delete':
+                // Tuleap artifact deleted — move to history and soft-delete from QC
+                if (existingTask) {
+                    let previousResourceName = null;
+                    if (existingTask.resource1_id) {
+                        const resourceRes = await pool.query(
+                            'SELECT resource_name FROM resources WHERE id = $1',
+                            [existingTask.resource1_id]
+                        );
+                        if (resourceRes.rows.length > 0) {
+                            previousResourceName = resourceRes.rows[0].resource_name;
+                        }
+                    }
+
+                    await pool.query(`
+                        INSERT INTO tuleap_task_history (
+                            original_task_id, tuleap_artifact_id, tuleap_url,
+                            task_name, notes, status, project_id,
+                            previous_resource_id, previous_resource_name,
+                            new_assignee_name, action, action_reason, raw_tuleap_payload
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    `, [
+                        existingTask.id, tuleap_artifact_id, tuleap_url,
+                        existingTask.task_name, existingTask.notes, existingTask.status, existingTask.project_id,
+                        existingTask.resource1_id, previousResourceName,
+                        new_assignee_name, 'deleted_from_tuleap',
+                        `Artifact ${tuleap_artifact_id} was deleted in Tuleap`,
+                        raw_tuleap_payload
+                    ]);
+
+                    await pool.query(`
+                        UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW()
+                        WHERE id = $1
+                    `, [existingTask.id]);
+
+                    await auditLog('tasks', existingTask.id, 'DELETE', { ...existingTask, deleted_at: new Date() }, existingTask);
+
+                    processingResult = `Task deleted from Tuleap and moved to history: ${existingTask.task_name}`;
+                } else {
+                    processingResult = `Task not found for deletion: ${tuleap_artifact_id}`;
+                }
+
+                await logWebhook({
+                    tuleap_artifact_id,
+                    artifact_type: 'task',
+                    action: 'delete',
+                    payload_hash,
+                    raw_payload: raw_tuleap_payload,
+                    processing_status: 'processed',
+                    processing_result: processingResult
+                });
+
+                return res.json({
+                    success: true,
+                    action: 'deleted',
+                    message: processingResult
+                });
+
             case 'archive':
                 // Existing task reassigned to unknown user - move to history and delete
                 if (existingTask) {

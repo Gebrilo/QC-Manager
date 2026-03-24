@@ -1,0 +1,300 @@
+{
+  "id": "128X2Y8VwTURYGKu",
+  "name": "Tuleap Task \u2192 QC-Manager Sync",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tuleap-task",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1234567-0001-4001-8001-000000000001",
+      "name": "Webhook: Tuleap Task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "webhookId": "tuleap-task-sync"
+    },
+    {
+      "parameters": {
+        "jsCode": "// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// Tuleap sends application/x-www-form-urlencoded with a single 'payload' key\n// whose value is a JSON string. This node parses it into a clean structure.\n// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nconst bodyPayload = $input.first().json.body?.payload;\nif (!bodyPayload) throw new Error('Missing payload field in request body');\n\n// body.payload may arrive as a string (form-encoded) or already parsed by n8n\nconst p = typeof bodyPayload === 'string' ? JSON.parse(bodyPayload) : bodyPayload;\n\n// Build a label-keyed map from current changeset values for easy access\nconst fields = {};\nfor (const v of (p.current?.values || [])) {\n  fields[v.label] = v;\n}\n\n// \u2500\u2500 Assignee (type: sb \u2014 user select box, gives full user object) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst assignee = fields['Assigned to']?.values?.[0] || null;\n\n// \u2500\u2500 Status (type: sb \u2014 static values list) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst tuleapStatus = fields['Status']?.values?.[0]?.label || 'Todo';\n\nconst TULEAP_BASE = 'https://tuleap.windinfosys.com';\n\nreturn [{\n  json: {\n    // \u2500\u2500 Identifiers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    artifactId:        p.id,\n    trackerId:         p.tracker?.id,\n    trackerItemName:   p.tracker?.item_name,\n    tuleapProjectId:   p.tracker?.project?.id,\n    tuleapProjectName: p.tracker?.project?.label,\n    tuleapAction:      p.action,          // 'create' or 'update'\n    tuleapUrl:         `${TULEAP_BASE}/plugins/tracker/?aid=${p.id}`,\n\n    // \u2500\u2500 Task content \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    taskTitle:    fields['Task title']?.value  || null,\n    description:  fields['Description']?.value || null,\n    tuleapStatus,\n    blockedReason: fields['Blocked Reason']?.value || null,\n\n    // \u2500\u2500 Hours (passed through for future API expansion) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    pmEstimate:   fields['PM Final Estimate (Hours)']?.value   ?? null,\n    devEstimate:  fields['Dev Initial Estimate (Hours)']?.value ?? null,\n    actualEffort: fields['Actual Effort']?.value               ?? null,\n\n    // \u2500\u2500 Dates \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    submittedOn:  fields['Submitted on']?.value    || null,\n    lastModified: p.current?.last_modified_date    || null,\n\n    // \u2500\u2500 Assignee details (all available for flexible resource matching) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    assigneeId:          assignee?.id                    || null,\n    assigneeUsername:    assignee?.username               || null,\n    assigneeRealName:    assignee?.real_name?.trim()      || null,\n    assigneeDisplayName: assignee?.display_name           || null,\n    assigneeEmail:       assignee?.email                  || null,\n\n    // \u2500\u2500 Linked artifacts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    // Parent User Story artifact ID (from reverse art_link)\n    parentStoryId: fields['Parent Story']?.reverse_links?.[0]?.id || null,\n\n    // \u2500\u2500 Audit \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    changedBy:   p.user?.username || null,\n    rawPayload:  p\n  }\n}];"
+      },
+      "id": "a1234567-0002-4002-8002-000000000002",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://qc-api:3001/tuleap-webhook/config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "is_active",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1234567-0003-4003-8003-000000000003",
+      "name": "Fetch Sync Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        720,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed  = $('Parse Payload').first().json;\nconst configs = $input.first().json.data || [];\n\n// Match by both tracker ID and Tuleap project ID (a project can have many trackers)\nconst config = configs.find(c =>\n  String(c.tuleap_tracker_id) === String(parsed.trackerId) &&\n  String(c.tuleap_project_id) === String(parsed.tuleapProjectId)\n);\n\nif (!config) {\n  return [{ json: {\n    configFound: false,\n    reason: `No active sync config for tracker ${parsed.trackerId} in Tuleap project ${parsed.tuleapProjectId} (${parsed.tuleapProjectName})`\n  }}];\n}\n\nreturn [{ json: { configFound: true, config } }];"
+      },
+      "id": "a1234567-0004-4004-8004-000000000004",
+      "name": "Match Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-config-found",
+              "leftValue": "={{ $json.configFound }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1234567-0005-4005-8005-000000000005",
+      "name": "Config Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, skipped: true, reason: $('Match Config').first().json.reason }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1234567-0006-4006-8006-000000000006",
+      "name": "Respond: Not Configured",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://qc-api:3001/tuleap-webhook/resources",
+        "options": {}
+      },
+      "id": "a1234567-0007-4007-8007-000000000007",
+      "name": "Fetch All Resources",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1440,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// Multi-strategy resource matching and QC action determination.\n//\n// Matching priority (first match wins):\n//   1. Email match        \u2014 most reliable when both systems share emails\n//   2. Real name match    \u2014 e.g. Tuleap 'Belal Abdalaziz' == QC 'Belal Abdalaziz'\n//   3. Username match     \u2014 e.g. Tuleap 'belal.z' == QC resource name 'belal.z'\n//\n// Action logic:\n//   tuleap:create  \u2192 qc:create  (task created, assigned or unassigned)\n//   tuleap:update  \u2192 qc:update  (task updated, assigned or unassigned)\n//   tuleap:delete  \u2192 qc:delete  (task moved to history, removed from tasks screen)\n// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nconst parsed    = $('Parse Payload').first().json;\nconst config    = $('Match Config').first().json.config;\nconst resources = $('Fetch All Resources').first().json.data || [];\n\nconst email    = (parsed.assigneeEmail    || '').toLowerCase().trim();\nconst realName = (parsed.assigneeRealName || '').toLowerCase().trim();\nconst uname    = (parsed.assigneeUsername || '').toLowerCase().trim();\n\nconst resource = resources.find(r => {\n  const re = (r.email         || '').toLowerCase().trim();\n  const rn = (r.resource_name || '').toLowerCase().trim();\n  return (email    && re === email)    ||\n         (realName && rn === realName) ||\n         (uname    && rn === uname);\n}) || null;\n\n// Map Tuleap action \u2192 QC action\n// delete is passed straight through; create/update always land in QC\nconst tuleapAction = (parsed.tuleapAction || '').toLowerCase();\nconst qcAction = tuleapAction === 'delete' ? 'delete'\n               : tuleapAction === 'create' ? 'create'\n               : 'update';\n\n// \u2500\u2500 Status mapping: Tuleap labels \u2192 QC status values \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst STATUS_MAP = {\n  'Todo':        'Backlog',\n  'In Progress': 'In Progress',\n  'Blocked':     'In Progress',\n  'Done':        'Done',\n  'Canceled':    'Cancelled'\n};\n\nreturn [{\n  json: {\n    action:             qcAction,\n    tuleap_artifact_id: parsed.artifactId,\n    tuleap_url:         parsed.tuleapUrl,\n    task_name:          parsed.taskTitle,\n    notes:              parsed.description || null,\n    resource1_id:       resource?.id       || null,\n    new_assignee_name:  parsed.assigneeDisplayName,\n    project_id:         config?.qc_project_id || null,\n    action_reason:      null,\n    raw_tuleap_payload: parsed.rawPayload,\n\n    _debug: {\n      matchedResource:  resource ? { id: resource.id, name: resource.resource_name } : null,\n      resourceMatched:  !!resource,\n      tuleapAction:     parsed.tuleapAction,\n      qcAction,\n      tuleapStatus:     parsed.tuleapStatus,\n      mappedStatus:     STATUS_MAP[parsed.tuleapStatus] || 'Backlog',\n    }\n  }\n}];"
+      },
+      "id": "a1234567-0008-4008-8008-000000000008",
+      "name": "Find Resource + Build Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/task",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "a1234567-0009-4009-8009-000000000009",
+      "name": "POST to QC API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1920,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, qcResponse: $json }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1234567-0010-4010-8010-000000000010",
+      "name": "Respond: OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Tuleap Task": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Payload": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sync Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sync Config": {
+      "main": [
+        [
+          {
+            "node": "Match Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Config": {
+      "main": [
+        [
+          {
+            "node": "Config Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Found?": {
+      "main": [
+        [
+          {
+            "node": "Fetch All Resources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All Resources": {
+      "main": [
+        [
+          {
+            "node": "Find Resource + Build Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Resource + Build Payload": {
+      "main": [
+        [
+          {
+            "node": "POST to QC API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to QC API": {
+      "main": [
+        [
+          {
+            "node": "Respond: OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "eadd4cca-e623-45d8-8e94-22612fc954ef",
+  "tags": [
+    {
+      "name": "tuleap"
+    },
+    {
+      "name": "sync"
+    }
+  ]
+}
