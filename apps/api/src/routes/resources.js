@@ -160,7 +160,6 @@ router.post('/auto-map', requireAuth, requireRole('admin', 'manager'), async (re
             WHERE r.user_id IS NULL
               AND r.deleted_at IS NULL
               AND r.email IS NOT NULL
-              AND u.deleted_at IS NULL
         `);
 
         if (candidates.rows.length === 0) {
@@ -206,7 +205,7 @@ router.post('/', requireAuth, requirePermission('action:resources:create'), asyn
         let linkedUserId = null;
         if (data.email) {
             const userMatch = await db.query(
-                'SELECT id FROM app_user WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+                'SELECT id FROM app_user WHERE LOWER(email) = LOWER($1) LIMIT 1',
                 [data.email]
             );
             if (userMatch.rows.length > 0) {
