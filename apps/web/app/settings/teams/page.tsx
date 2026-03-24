@@ -203,7 +203,7 @@ export default function TeamsAdminPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-950 flex items-center justify-center">
+            <div className="flex items-center justify-center py-20">
                 <div className="flex items-center gap-3 text-slate-500">
                     <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -216,32 +216,25 @@ export default function TeamsAdminPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-950 pb-12">
+        <div className="space-y-6">
 
-            {/* Header */}
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-20 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                                Team Management
-                            </h1>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Create teams, assign managers, members, and projects
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => { setFormName(''); setFormDescription(''); setFormManagerId(''); setShowCreateModal(true); }}
-                            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all"
-                        >
-                            + New Team
-                        </button>
-                    </div>
+            {/* Page header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Team Management</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Create teams, assign managers, members, and projects</p>
                 </div>
+                <button
+                    onClick={() => { setFormName(''); setFormDescription(''); setFormManagerId(''); setShowCreateModal(true); }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all"
+                >
+                    + New Team
+                </button>
             </div>
 
             {/* Toast messages */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 space-y-2">
+            {(success || error) && (
+            <div className="space-y-2">
                 {success && (
                     <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -255,14 +248,15 @@ export default function TeamsAdminPage() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Main layout: team list + detail panel */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex gap-6">
+            <div className="flex gap-6">
 
                 {/* Team list */}
                 <div className="w-80 flex-shrink-0 space-y-3">
                     {teams.length === 0 && (
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 text-center text-slate-400 text-sm">
+                        <div className="glass-card p-8 text-center text-slate-400 text-sm">
                             No teams yet. Create one to get started.
                         </div>
                     )}
@@ -270,10 +264,10 @@ export default function TeamsAdminPage() {
                         <div
                             key={team.id}
                             onClick={() => loadTeamDetails(team.id)}
-                            className={`bg-white dark:bg-slate-800 rounded-2xl border cursor-pointer p-5 transition-all hover:shadow-md ${
+                            className={`glass-card cursor-pointer p-5 transition-all hover:shadow-md ${
                                 selectedTeam?.id === team.id
-                                    ? 'border-indigo-400 dark:border-indigo-500 shadow-md ring-2 ring-indigo-200 dark:ring-indigo-900'
-                                    : 'border-slate-200 dark:border-slate-700'
+                                    ? 'border-indigo-400 dark:border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900'
+                                    : ''
                             }`}
                         >
                             <div className="flex items-start justify-between gap-2">
@@ -308,14 +302,14 @@ export default function TeamsAdminPage() {
                 {/* Team detail panel */}
                 <div className="flex-1 min-w-0">
                     {!selectedTeam ? (
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-400">
+                        <div className="glass-card p-12 text-center text-slate-400">
                             <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                             <p className="text-sm">Select a team to view and manage its details</p>
                         </div>
                     ) : (
                         <div className="space-y-5">
                             {/* Team header */}
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                            <div className="glass-card p-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
                                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedTeam.name}</h2>
@@ -341,7 +335,7 @@ export default function TeamsAdminPage() {
                             </div>
 
                             {/* Members */}
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                            <div className="glass-card p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-semibold text-slate-900 dark:text-white">
                                         Members
@@ -378,7 +372,7 @@ export default function TeamsAdminPage() {
                             </div>
 
                             {/* Projects */}
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+                            <div className="glass-card p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-semibold text-slate-900 dark:text-white">
                                         Projects
@@ -522,7 +516,7 @@ export default function TeamsAdminPage() {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+            <div className="glass-modal w-full max-w-md">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="font-semibold text-slate-900 dark:text-white">{title}</h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">

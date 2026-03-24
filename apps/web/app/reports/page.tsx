@@ -100,50 +100,48 @@ export default function ReportsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-12 print:bg-white print:pb-0">
-            {/* Header - Hidden on Print */}
-            <div className="print:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports & Exports</h1>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Generate and export quality governance reports</p>
-                        </div>
+        <div className="space-y-6 print:space-y-0">
+            {/* Page header */}
+            <div className="print:hidden">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports & Exports</h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Generate and export quality governance reports</p>
                     </div>
-                    
-                    {/* Tab Navigation */}
-                    <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-                        <button
-                            onClick={() => setActiveTab('async')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                                activeTab === 'async'
-                                    ? 'text-indigo-600 dark:text-indigo-400'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                            }`}
-                        >
-                            Async Reports
-                            {activeTab === 'async' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('governance')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                                activeTab === 'governance'
-                                    ? 'text-indigo-600 dark:text-indigo-400'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                            }`}
-                        >
-                            Governance Reports
-                            {activeTab === 'governance' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
-                            )}
-                        </button>
-                    </div>
+                </div>
+
+                {/* Tab Navigation */}
+                <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
+                    <button
+                        onClick={() => setActiveTab('async')}
+                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                            activeTab === 'async'
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                        }`}
+                    >
+                        Async Reports
+                        {activeTab === 'async' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('governance')}
+                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                            activeTab === 'governance'
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                        }`}
+                    >
+                        Governance Reports
+                        {activeTab === 'governance' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
+                        )}
+                    </button>
                 </div>
             </div>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 print:p-0 print:max-w-none">
+            <div className="space-y-8 print:p-0">
 
                 {/* Async Reports Tab */}
                 {activeTab === 'async' && (
@@ -360,7 +358,7 @@ export default function ReportsPage() {
                         )}
                     </div>
                 )}
-            </main>
+            </div>
         </div>
     );
 }

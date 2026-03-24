@@ -44,6 +44,10 @@
     --color-violet-950: 46 16 101;
   }
 
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-slate-900 dark:text-white;
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
