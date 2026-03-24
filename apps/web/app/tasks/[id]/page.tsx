@@ -191,9 +191,11 @@ export default function TaskDetailPage() {
                         </CardContent>
                     </Card>
 
-                    <TaskCommentSection taskId={task.id} />
                 </div>
             </div>
+
+            {/* Comments — full width */}
+            <TaskCommentSection taskId={task.id} />
         </div>
     );
 }
