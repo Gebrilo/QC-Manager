@@ -402,7 +402,7 @@ const runMigrations = async () => {
                 previous_resource_id UUID,
                 previous_resource_name VARCHAR(255),
                 new_assignee_name VARCHAR(255) NOT NULL,
-                action VARCHAR(50) NOT NULL CHECK (action IN ('reassigned_out', 'rejected_new')),
+                action VARCHAR(50) NOT NULL CHECK (action IN ('reassigned_out', 'rejected_new', 'deleted_from_tuleap', 'team_change_delete')),
                 action_reason TEXT,
                 tuleap_last_modified TIMESTAMP WITH TIME ZONE,
                 raw_tuleap_payload JSONB,
@@ -413,6 +413,22 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_tuleap_artifact ON tuleap_task_history(tuleap_artifact_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_project ON tuleap_task_history(project_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_history_action ON tuleap_task_history(action)`);
+
+        // Migrate: expand action check constraint to include delete actions
+        await client.query(`
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'tuleap_task_history_action_check'
+                    AND pg_get_constraintdef(oid) NOT LIKE '%deleted_from_tuleap%'
+                ) THEN
+                    ALTER TABLE tuleap_task_history DROP CONSTRAINT tuleap_task_history_action_check;
+                    ALTER TABLE tuleap_task_history ADD CONSTRAINT tuleap_task_history_action_check
+                        CHECK (action IN ('reassigned_out', 'rejected_new', 'deleted_from_tuleap', 'team_change_delete'));
+                END IF;
+            END $$;
+        `);
 
         // Add Tuleap columns to tasks table
         await client.query(`
