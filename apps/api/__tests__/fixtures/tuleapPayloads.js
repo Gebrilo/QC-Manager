@@ -68,6 +68,7 @@ const processedTaskData = {
     tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=12345',
     task_name: 'Implement login page',
     notes: 'Create a responsive login page with OAuth support',
+    tuleap_status: 'In Progress',  // Tuleap status label — mapped to QC status by the webhook handler
     resource1_id: null,
     project_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     assignee_name: 'John Doe',

@@ -17,10 +17,8 @@ jest.mock('../src/middleware/audit', () => ({
 }));
 
 const express = require('express');
-const request = require('supertest');
 
-// We'll use a lightweight approach without supertest external dep
-// Instead test the route handler directly
+// We use a lightweight approach without supertest — test the route handler directly
 const tuleapRouter = require('../src/routes/tuleapWebhook');
 
 const app = express();

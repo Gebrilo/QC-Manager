@@ -11,6 +11,52 @@ const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
 
 // =====================================================
+// HELPER: Map Tuleap status labels to QC-Manager task statuses
+// Valid QC statuses: 'Backlog', 'In Progress', 'Done', 'Cancelled'
+// =====================================================
+function mapTuleapStatus(tuleapStatus) {
+    if (!tuleapStatus) return 'Backlog';
+
+    const normalized = tuleapStatus.trim().toLowerCase();
+
+    const statusMap = {
+        // → Done
+        'done': 'Done',
+        'closed': 'Done',
+        'fixed': 'Done',
+        'resolved': 'Done',
+        'verified': 'Done',
+        'complete': 'Done',
+        'completed': 'Done',
+        // → In Progress
+        'in progress': 'In Progress',
+        'ongoing': 'In Progress',
+        'on going': 'In Progress',
+        'doing': 'In Progress',
+        'in review': 'In Progress',
+        'review': 'In Progress',
+        // → Cancelled
+        'cancelled': 'Cancelled',
+        'canceled': 'Cancelled',
+        'rejected': 'Cancelled',
+        "won't fix": 'Cancelled',
+        'wont fix': 'Cancelled',
+        'invalid': 'Cancelled',
+        'abandoned': 'Cancelled',
+        // → Backlog (default for todo/open/blocked/unknown)
+        'todo': 'Backlog',
+        'to do': 'Backlog',
+        'open': 'Backlog',
+        'new': 'Backlog',
+        'backlog': 'Backlog',
+        'pending': 'Backlog',
+        'blocked': 'Backlog',
+    };
+
+    return statusMap[normalized] || 'Backlog';
+}
+
+// =====================================================
 // HELPER: Generate next task ID
 // =====================================================
 async function generateTaskId() {
@@ -306,12 +352,15 @@ router.post('/task', async (req, res) => {
             tuleap_url,
             task_name,
             notes,
+            tuleap_status,
             resource1_id,
             project_id,
             new_assignee_name,
             action_reason,
             raw_tuleap_payload
         } = req.body;
+
+        const mappedStatus = mapTuleapStatus(tuleap_status);
 
         if (!tuleap_artifact_id) {
             return res.status(400).json({
@@ -501,11 +550,12 @@ router.post('/task', async (req, res) => {
                             notes = COALESCE($2, notes),
                             resource1_id = COALESCE($3, resource1_id),
                             tuleap_url = COALESCE($4, tuleap_url),
+                            status = COALESCE($5, status),
                             last_tuleap_sync = NOW(),
                             updated_at = NOW()
-                        WHERE id = $5
+                        WHERE id = $6
                         RETURNING *
-                    `, [task_name, notes, resource1_id, tuleap_url, existingTask.id]);
+                    `, [task_name, notes, resource1_id, tuleap_url, tuleap_status ? mappedStatus : null, existingTask.id]);
 
                     const updated = result.rows[0];
                     await auditLog('tasks', updated.id, 'UPDATE', updated, existingTask);
@@ -559,7 +609,7 @@ router.post('/task', async (req, res) => {
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW())
                     RETURNING *
                 `, [
-                    task_id, task_name, notes, 'Backlog',
+                    task_id, task_name, notes, mappedStatus,
                     project_id, resource1_id,
                     tuleap_artifact_id, tuleap_url
                 ]);
