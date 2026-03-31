@@ -131,37 +131,12 @@ export default function ProjectQualityDetailsPage() {
             <section>
               <TrendAnalysisWidget data={trendData} title="Quality Trend (Last 14 Days)" />
             </section>
-            {/* Detailed Metrics Table Placeholder */}
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Test Executions</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                  <thead>
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Test Suite</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pass Rate</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Duration</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">Smoke Test A</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">Today, 10:00 AM</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">100%</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">12m 30s</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Passed</span></td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">Regression Suite</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">Yesterday, 4:00 PM</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-bold">92%</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">45m 10s</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Warning</span></td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="text-center py-12">
+                <div className="text-slate-300 dark:text-slate-600 text-5xl mb-4">📋</div>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">No test executions recorded yet</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Test execution data will appear here once test runs are completed for this project.</p>
               </div>
             </div>
           </div>

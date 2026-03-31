@@ -3,7 +3,7 @@
  * Phase 2: API calls for governance dashboard
  */
 
-import axios from 'axios';
+import { fetchApi } from '../lib/api';
 import type {
     ReleaseReadiness,
     QualityRisk,
@@ -19,8 +19,6 @@ import type {
     Bug,
     TaskHistory
 } from '../types/governance';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // =====================================================
 // Dashboard Summary
@@ -40,10 +38,10 @@ const DEFAULT_SUMMARY: DashboardSummary = {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
     try {
-        const response = await axios.get<GovernanceApiResponse<DashboardSummary>>(
-            `${API_BASE}/governance/dashboard-summary`
+        const result = await fetchApi<GovernanceApiResponse<DashboardSummary>>(
+            '/governance/dashboard-summary'
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Dashboard API failed', error);
         return DEFAULT_SUMMARY;
@@ -62,10 +60,11 @@ export async function getReleaseReadiness(
         const params = new URLSearchParams();
         if (projectId) params.append('project_id', projectId);
         if (status) params.append('status', status);
-
-        const url = `${API_BASE}/governance/release-readiness${params.toString() ? '?' + params.toString() : ''}`;
-        const response = await axios.get<GovernanceApiResponse<ReleaseReadiness[]>>(url);
-        return response.data.data;
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<ReleaseReadiness[]>>(
+            `/governance/release-readiness${qs ? '?' + qs : ''}`
+        );
+        return result.data;
     } catch (error) {
         console.warn('Readiness API failed', error);
         return [];
@@ -74,10 +73,10 @@ export async function getReleaseReadiness(
 
 export async function getProjectReleaseReadiness(projectId: string): Promise<ReleaseReadiness | null> {
     try {
-        const response = await axios.get<GovernanceApiResponse<ReleaseReadiness>>(
-            `${API_BASE}/governance/release-readiness/${projectId}`
+        const result = await fetchApi<GovernanceApiResponse<ReleaseReadiness>>(
+            `/governance/release-readiness/${projectId}`
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Project Readiness API failed', error);
         return null;
@@ -92,10 +91,11 @@ export async function getQualityRisks(riskLevel?: RiskLevel): Promise<QualityRis
     try {
         const params = new URLSearchParams();
         if (riskLevel) params.append('risk_level', riskLevel);
-
-        const url = `${API_BASE}/governance/quality-risks${params.toString() ? '?' + params.toString() : ''}`;
-        const response = await axios.get<GovernanceApiResponse<QualityRisk[]>>(url);
-        return response.data.data;
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<QualityRisk[]>>(
+            `/governance/quality-risks${qs ? '?' + qs : ''}`
+        );
+        return result.data;
     } catch (error) {
         console.warn('Risks API failed', error);
         return [];
@@ -104,10 +104,10 @@ export async function getQualityRisks(riskLevel?: RiskLevel): Promise<QualityRis
 
 export async function getProjectQualityRisk(projectId: string): Promise<QualityRisk | null> {
     try {
-        const response = await axios.get<GovernanceApiResponse<QualityRisk>>(
-            `${API_BASE}/governance/quality-risks/${projectId}`
+        const result = await fetchApi<GovernanceApiResponse<QualityRisk>>(
+            `/governance/quality-risks/${projectId}`
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Project Risk API failed', error);
         return null;
@@ -120,10 +120,10 @@ export async function getProjectQualityRisk(projectId: string): Promise<QualityR
 
 export async function getWorkloadBalance(): Promise<WorkloadBalance[]> {
     try {
-        const response = await axios.get<GovernanceApiResponse<WorkloadBalance[]>>(
-            `${API_BASE}/governance/workload-balance`
+        const result = await fetchApi<GovernanceApiResponse<WorkloadBalance[]>>(
+            '/governance/workload-balance'
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Workload API failed', error);
         return [];
@@ -138,10 +138,11 @@ export async function getProjectHealth(healthStatus?: HealthStatus): Promise<Pro
     try {
         const params = new URLSearchParams();
         if (healthStatus) params.append('health_status', healthStatus);
-
-        const url = `${API_BASE}/governance/project-health${params.toString() ? '?' + params.toString() : ''}`;
-        const response = await axios.get<GovernanceApiResponse<ProjectHealth[]>>(url);
-        return response.data.data;
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<ProjectHealth[]>>(
+            `/governance/project-health${qs ? '?' + qs : ''}`
+        );
+        return result.data;
     } catch (error) {
         console.warn('Project Health API failed', error);
         return [];
@@ -150,10 +151,10 @@ export async function getProjectHealth(healthStatus?: HealthStatus): Promise<Pro
 
 export async function getProjectHealthSummary(projectId: string): Promise<ProjectHealth | null> {
     try {
-        const response = await axios.get<GovernanceApiResponse<ProjectHealth>>(
-            `${API_BASE}/governance/project-health/${projectId}`
+        const result = await fetchApi<GovernanceApiResponse<ProjectHealth>>(
+            `/governance/project-health/${projectId}`
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Project Health Summary API failed', error);
         return null;
@@ -168,10 +169,11 @@ export async function getExecutionTrend(projectId?: string): Promise<TrendData[]
     try {
         const params = new URLSearchParams();
         if (projectId) params.append('project_id', projectId);
-
-        const url = `${API_BASE}/governance/execution-trend${params.toString() ? '?' + params.toString() : ''}`;
-        const response = await axios.get<GovernanceApiResponse<TrendData[]>>(url);
-        return response.data.data;
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<TrendData[]>>(
+            `/governance/execution-trend${qs ? '?' + qs : ''}`
+        );
+        return result.data;
     } catch (error) {
         console.warn('Trend API failed', error);
         return [];
@@ -186,10 +188,11 @@ export async function getBugSummary(projectId?: string): Promise<BugSummaryData>
     try {
         const params = new URLSearchParams();
         if (projectId) params.append('project_id', projectId);
-
-        const url = `${API_BASE}/bugs/summary${params.toString() ? '?' + params.toString() : ''}`;
-        const response = await axios.get<GovernanceApiResponse<BugSummaryData>>(url);
-        return response.data.data;
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<BugSummaryData>>(
+            `/bugs/summary${qs ? '?' + qs : ''}`
+        );
+        return result.data;
     } catch (error) {
         console.warn('Bug Summary API failed', error);
         return {
@@ -226,12 +229,12 @@ export async function getBugs(
         if (severity) params.append('severity', severity);
         params.append('limit', limit.toString());
         params.append('offset', offset.toString());
-
-        const url = `${API_BASE}/bugs?${params.toString()}`;
-        const response = await axios.get(url);
+        const result = await fetchApi<{ success: boolean; data: Bug[]; total: number }>(
+            `/bugs?${params.toString()}`
+        );
         return {
-            bugs: response.data.data,
-            total: response.data.total
+            bugs: result.data,
+            total: result.total
         };
     } catch (error) {
         console.warn('Bugs API failed', error);
@@ -240,11 +243,12 @@ export async function getBugs(
 }
 
 export async function getBugsByProject(projectId: string): Promise<Bug[]> {
+    if (!projectId || projectId === 'undefined') return [];
     try {
-        const response = await axios.get<GovernanceApiResponse<Bug[]>>(
-            `${API_BASE}/bugs/by-project/${projectId}`
+        const result = await fetchApi<GovernanceApiResponse<Bug[]>>(
+            `/bugs/by-project/${projectId}`
         );
-        return response.data.data;
+        return result.data;
     } catch (error) {
         console.warn('Project Bugs API failed', error);
         return [];
@@ -257,11 +261,11 @@ export async function getBugsByProject(projectId: string): Promise<Bug[]> {
 
 export async function getTaskHistory(projectId?: string): Promise<TaskHistory[]> {
     try {
-        const url = projectId
-            ? `${API_BASE}/tuleap-webhook/task-history/${projectId}`
-            : `${API_BASE}/tuleap-webhook/task-history`;
-        const response = await axios.get<GovernanceApiResponse<TaskHistory[]>>(url);
-        return response.data.data;
+        const endpoint = projectId
+            ? `/tuleap-webhook/task-history/${projectId}`
+            : '/tuleap-webhook/task-history';
+        const result = await fetchApi<GovernanceApiResponse<TaskHistory[]>>(endpoint);
+        return result.data;
     } catch (error) {
         console.warn('Task History API failed', error);
         return [];
@@ -295,8 +299,8 @@ export const governanceApi = {
     // Quality Gates
     getProjectGates: async (projectId: string) => {
         try {
-            const res = await axios.get<GovernanceApiResponse<any>>(`${API_BASE}/governance/gates/${projectId}`);
-            return res.data.data;
+            const res = await fetchApi<GovernanceApiResponse<any>>(`/governance/gates/${projectId}`);
+            return res.data;
         } catch (e) {
             console.warn('Get Gates Failed', e);
             return {
@@ -309,22 +313,28 @@ export const governanceApi = {
         }
     },
     saveProjectGates: async (data: any) => {
-        const res = await axios.post<GovernanceApiResponse<any>>(`${API_BASE}/governance/gates`, data);
-        return res.data.data;
+        const res = await fetchApi<GovernanceApiResponse<any>>('/governance/gates', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        return res.data;
     },
 
     // Approvals
     getApprovalHistory: async (projectId: string) => {
         try {
-            const res = await axios.get<GovernanceApiResponse<any[]>>(`${API_BASE}/governance/approvals/${projectId}`);
-            return res.data.data;
+            const res = await fetchApi<GovernanceApiResponse<any[]>>(`/governance/approvals/${projectId}`);
+            return res.data;
         } catch (e) {
             return [];
         }
     },
     submitApproval: async (data: any) => {
-        const res = await axios.post<GovernanceApiResponse<any>>(`${API_BASE}/governance/approvals`, data);
-        return res.data.data;
+        const res = await fetchApi<GovernanceApiResponse<any>>('/governance/approvals', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        return res.data;
     },
 
     // Bug Summary (Tuleap Integration)

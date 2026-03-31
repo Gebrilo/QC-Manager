@@ -531,11 +531,27 @@ const runMigrations = async () => {
                 CASE WHEN p.target_date IS NOT NULL THEN p.target_date - CURRENT_DATE ELSE NULL END AS days_until_target,
                 COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) AS task_hrs_est,
                 COALESCE(SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)), 0) AS task_hrs_actual,
+                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) AS task_hrs_done,
                 COUNT(t.id) AS tasks_total_count,
                 SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done_count,
                 SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress_count,
                 SUM(CASE WHEN t.status = 'Backlog' THEN 1 ELSE 0 END) AS tasks_backlog_count,
                 CASE WHEN COUNT(t.id) = 0 THEN 'No Tasks' WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete' ELSE 'Active' END AS status,
+                CASE
+                    WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
+                    THEN ROUND((COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) /
+                         COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 1) * 100)::NUMERIC, 2)
+                    ELSE 0
+                END AS overall_completion_pct,
+                CASE
+                    WHEN COUNT(t.id) = 0 THEN 'No Tasks'
+                    WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete'
+                    WHEN CASE WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
+                         THEN (COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) /
+                               COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 1) * 100) ELSE 0 END >= 70
+                    THEN 'On Track'
+                    ELSE 'At Risk'
+                END AS dynamic_status,
                 p.created_at,
                 p.updated_at,
                 p.deleted_at
@@ -1033,6 +1049,248 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_task_completions_task ON user_task_completions(task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_task_attachments_task ON journey_task_attachments(task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_task_attachments_user ON journey_task_attachments(user_id)`);
+
+        // =====================================================
+        // GOVERNANCE: Missing columns & test_result table
+        // =====================================================
+
+        // Add created_by to test_run if missing
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS created_by UUID`);
+
+        // Add executed_by and executed_at to test_execution if missing
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS executed_by UUID`);
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+
+        // Create test_result table for the testResults.js upload endpoint
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_result (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                test_case_id VARCHAR(100) NOT NULL,
+                test_case_title VARCHAR(500),
+                project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL,
+                executed_at DATE DEFAULT CURRENT_DATE,
+                notes TEXT,
+                tester_name VARCHAR(255),
+                upload_batch_id UUID,
+                uploaded_by UUID,
+                uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_project_id ON test_result(project_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_executed_at ON test_result(executed_at) WHERE deleted_at IS NULL`);
+
+        // =====================================================
+        // GOVERNANCE VIEWS
+        // =====================================================
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_workload_balance AS
+            SELECT
+                p.id AS project_id,
+                p.project_name,
+                COALESCE(t.task_count, 0) AS total_tasks,
+                COALESCE(te.test_count, 0) AS total_tests,
+                CASE WHEN COALESCE(t.task_count, 0) = 0 THEN NULL
+                     ELSE ROUND(COALESCE(te.test_count, 0)::NUMERIC / t.task_count, 2)
+                END AS tests_per_task_ratio,
+                CASE
+                    WHEN COALESCE(t.task_count, 0) = 0 THEN 'NO_TASKS'
+                    WHEN COALESCE(te.test_count, 0) = 0 THEN 'NO_TESTS'
+                    WHEN COALESCE(te.test_count, 0)::NUMERIC / t.task_count >= 2 THEN 'OVER_TESTED'
+                    WHEN COALESCE(te.test_count, 0)::NUMERIC / t.task_count >= 0.5 THEN 'BALANCED'
+                    ELSE 'UNDER_TESTED'
+                END AS balance_status
+            FROM projects p
+            LEFT JOIN (
+                SELECT project_id, COUNT(*) AS task_count FROM tasks WHERE deleted_at IS NULL GROUP BY project_id
+            ) t ON t.project_id = p.id
+            LEFT JOIN (
+                SELECT tr.project_id, COUNT(te.id) AS test_count
+                FROM test_run tr JOIN test_execution te ON te.test_run_id = tr.id
+                WHERE tr.deleted_at IS NULL GROUP BY tr.project_id
+            ) te ON te.project_id = p.id
+            WHERE p.deleted_at IS NULL
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_release_readiness AS
+            WITH latest_run AS (
+                SELECT DISTINCT ON (project_id)
+                    project_id, id AS test_run_id, started_at AS execution_date,
+                    EXTRACT(DAY FROM (CURRENT_TIMESTAMP - started_at))::INTEGER AS days_since_execution
+                FROM test_run WHERE deleted_at IS NULL ORDER BY project_id, started_at DESC
+            ),
+            run_metrics AS (
+                SELECT
+                    te.test_run_id,
+                    COUNT(te.id) AS total_executions,
+                    COUNT(te.id) FILTER (WHERE te.status = 'pass') AS passed_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'fail') AS failed_count,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status = 'pass')::NUMERIC / NULLIF(COUNT(te.id),0) * 100, 2) AS pass_rate,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status = 'not_run')::NUMERIC / NULLIF(COUNT(te.id),0) * 100, 2) AS not_run_pct,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status = 'fail')::NUMERIC / NULLIF(COUNT(te.id),0) * 100, 2) AS fail_rate
+                FROM test_execution te GROUP BY te.test_run_id
+            )
+            SELECT
+                p.id AS project_id, p.project_name, p.status AS project_status,
+                COALESCE(rm.pass_rate, 0)        AS latest_pass_rate_pct,
+                COALESCE(rm.not_run_pct, 0)      AS latest_not_run_pct,
+                COALESCE(rm.failed_count, 0)     AS latest_failed_count,
+                COALESCE(rm.fail_rate, 0)        AS latest_fail_rate_pct,
+                lr.days_since_execution          AS days_since_latest_execution,
+                COALESCE(rm.total_executions, 0) AS total_test_cases,
+                COALESCE(rm.total_executions, 0) AS latest_tests_executed,
+                COALESCE(rm.passed_count, 0)     AS latest_passed_count,
+                lr.execution_date                AS latest_execution_date,
+                CASE
+                    WHEN lr.test_run_id IS NULL THEN 'UNKNOWN'
+                    WHEN COALESCE(rm.pass_rate,0) >= 95 AND COALESCE(rm.failed_count,0) = 0
+                         AND COALESCE(lr.days_since_execution,999) <= 3 THEN 'GREEN'
+                    WHEN COALESCE(rm.pass_rate,0) >= 80 AND COALESCE(lr.days_since_execution,999) <= 7 THEN 'AMBER'
+                    ELSE 'RED'
+                END AS readiness_status,
+                ARRAY_REMOVE(ARRAY[
+                    CASE WHEN lr.test_run_id IS NULL        THEN 'No test runs recorded' END,
+                    CASE WHEN COALESCE(rm.failed_count,0)>0 THEN rm.failed_count || ' failing tests' END,
+                    CASE WHEN COALESCE(lr.days_since_execution,999)>7 THEN 'Last run was '||lr.days_since_execution||' days ago' END,
+                    CASE WHEN COALESCE(rm.pass_rate,0)<80   THEN 'Pass rate below 80% ('||COALESCE(rm.pass_rate,0)||'%)' END,
+                    CASE WHEN COALESCE(rm.not_run_pct,0)>20 THEN ROUND(rm.not_run_pct)||'% of tests not run' END
+                ], NULL) AS blocking_issues,
+                (CASE WHEN lr.test_run_id IS NULL THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(rm.failed_count,0)>0 THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(lr.days_since_execution,999)>7 THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(rm.pass_rate,0)<80 THEN 1 ELSE 0 END) AS blocking_issue_count,
+                CASE
+                    WHEN lr.test_run_id IS NULL THEN 'No test results available. Upload test results to assess readiness.'
+                    WHEN COALESCE(rm.pass_rate,0)>=95 AND COALESCE(rm.failed_count,0)=0
+                        THEN 'Project meets quality gates. Ready for release.'
+                    WHEN COALESCE(rm.pass_rate,0)>=80 THEN 'Nearly ready. Review and resolve failing tests.'
+                    ELSE 'Does not meet quality gates. Resolve failures before release.'
+                END AS recommendation,
+                p.created_at, p.updated_at
+            FROM projects p
+            LEFT JOIN latest_run lr ON lr.project_id = p.id
+            LEFT JOIN run_metrics rm ON rm.test_run_id = lr.test_run_id
+            WHERE p.deleted_at IS NULL
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_quality_risks AS
+            WITH project_latest AS (
+                SELECT DISTINCT ON (project_id)
+                    project_id, id AS test_run_id, started_at,
+                    EXTRACT(DAY FROM (CURRENT_TIMESTAMP - started_at))::INTEGER AS days_since_execution
+                FROM test_run WHERE deleted_at IS NULL ORDER BY project_id, started_at DESC
+            ),
+            latest_metrics AS (
+                SELECT
+                    pl.project_id, pl.days_since_execution,
+                    COUNT(te.id) AS total_executions,
+                    COUNT(te.id) FILTER (WHERE te.status = 'fail') AS failed,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status = 'pass')::NUMERIC / NULLIF(COUNT(te.id),0)*100,2) AS pass_rate,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status = 'not_run')::NUMERIC / NULLIF(COUNT(te.id),0)*100,2) AS not_run_pct
+                FROM project_latest pl JOIN test_execution te ON te.test_run_id = pl.test_run_id
+                GROUP BY pl.project_id, pl.days_since_execution
+            ),
+            recent_week AS (
+                SELECT tr.project_id,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status='pass')::NUMERIC/NULLIF(COUNT(te.id),0)*100,2) AS pass_rate
+                FROM test_run tr JOIN test_execution te ON te.test_run_id=tr.id
+                WHERE tr.deleted_at IS NULL AND tr.started_at >= CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY tr.project_id
+            ),
+            prev_week AS (
+                SELECT tr.project_id,
+                    ROUND(COUNT(te.id) FILTER (WHERE te.status='pass')::NUMERIC/NULLIF(COUNT(te.id),0)*100,2) AS pass_rate
+                FROM test_run tr JOIN test_execution te ON te.test_run_id=tr.id
+                WHERE tr.deleted_at IS NULL
+                    AND tr.started_at >= CURRENT_DATE - INTERVAL '14 days'
+                    AND tr.started_at <  CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY tr.project_id
+            )
+            SELECT
+                p.id AS project_id, p.project_name, p.status AS project_status,
+                COALESCE(lm.pass_rate, 0)     AS latest_pass_rate_pct,
+                COALESCE(lm.not_run_pct, 0)   AS latest_not_run_pct,
+                COALESCE(lm.failed, 0)        AS latest_failed_count,
+                lm.days_since_execution       AS days_since_latest_execution,
+                COALESCE(lm.total_executions, 0) AS total_test_cases,
+                COALESCE(rw.pass_rate, 0)     AS recent_pass_rate,
+                COALESCE(pw.pass_rate, 0)     AS previous_pass_rate,
+                COALESCE(rw.pass_rate,0) - COALESCE(pw.pass_rate,0) AS pass_rate_change,
+                7 AS recent_execution_days,
+                ARRAY_REMOVE(ARRAY[
+                    CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 'LOW_PASS_RATE' END,
+                    CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 'HIGH_NOT_RUN' END,
+                    CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 'STALE_TESTS' END,
+                    CASE WHEN COALESCE(lm.failed,0)>10 THEN 'HIGH_FAILURE_COUNT' END,
+                    CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 'DECLINING_TREND' END,
+                    CASE WHEN lm.total_executions IS NULL THEN 'NO_TESTS' END
+                ], NULL) AS risk_flags,
+                (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
+                 CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
+                 CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) AS risk_flag_count,
+                CASE
+                    WHEN (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
+                          CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) >= 2 THEN 'CRITICAL'
+                    WHEN (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
+                          CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
+                          CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) >= 1 THEN 'WARNING'
+                    ELSE 'NORMAL'
+                END AS risk_level
+            FROM projects p
+            LEFT JOIN latest_metrics lm ON lm.project_id = p.id
+            LEFT JOIN recent_week rw ON rw.project_id = p.id
+            LEFT JOIN prev_week pw ON pw.project_id = p.id
+            WHERE p.deleted_at IS NULL
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_project_health_summary AS
+            SELECT
+                rr.project_id, rr.project_name, rr.project_status,
+                rr.readiness_status,
+                qr.risk_level,
+                wb.balance_status,
+                CASE
+                    WHEN rr.readiness_status = 'RED'    OR qr.risk_level = 'CRITICAL' THEN 'RED'
+                    WHEN rr.readiness_status = 'AMBER'  OR qr.risk_level = 'WARNING'  THEN 'AMBER'
+                    WHEN rr.readiness_status = 'GREEN'  AND qr.risk_level = 'NORMAL'  THEN 'GREEN'
+                    ELSE 'RED'
+                END AS overall_health_status,
+                ARRAY_CAT(
+                    COALESCE(rr.blocking_issues, '{}'::TEXT[]),
+                    ARRAY_REMOVE(ARRAY[
+                        CASE WHEN wb.balance_status = 'NO_TESTS'     THEN 'No test executions recorded' END,
+                        CASE WHEN wb.balance_status = 'UNDER_TESTED' THEN 'Under-tested relative to task count' END
+                    ], NULL)
+                ) AS action_items,
+                rr.latest_pass_rate_pct,
+                rr.latest_failed_count,
+                rr.days_since_latest_execution,
+                rr.total_test_cases,
+                wb.total_tasks,
+                wb.total_tests,
+                wb.tests_per_task_ratio,
+                rr.latest_execution_date,
+                rr.blocking_issue_count,
+                COALESCE(qr.risk_flag_count, 0)       AS risk_flag_count,
+                COALESCE(qr.risk_flags, '{}'::TEXT[]) AS risk_flags,
+                COALESCE(qr.pass_rate_change, 0)      AS pass_rate_change
+            FROM v_release_readiness rr
+            LEFT JOIN v_quality_risks qr   ON qr.project_id = rr.project_id
+            LEFT JOIN v_workload_balance wb ON wb.project_id = rr.project_id
+        `);
 
         // Seed: Day-One Essentials & Orientation journey
         await client.query(`

@@ -10,7 +10,7 @@ const createProjectSchema = z.object({
     target_date: z.string().date().optional()
 });
 
-const updateProjectSchema = createProjectSchema.partial().omit({ project_id: true }); // ID usually immutable
+const updateProjectSchema = createProjectSchema.partial(); // project_id updatable for auto-provisioned projects
 
 module.exports = {
     createProjectSchema,

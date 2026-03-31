@@ -52,11 +52,11 @@ export default function RiskIndicatorsWidget({
 
     if (loading) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
                 <div className="animate-pulse">
-                    <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-16 bg-gray-200 rounded mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-4"></div>
+                    <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
                 </div>
             </div>
         );
@@ -64,18 +64,18 @@ export default function RiskIndicatorsWidget({
 
     if (error || !data) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Quality Risks</h3>
-                <div className="text-red-600">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Quality Risks</h3>
+                <div className="text-red-600 dark:text-red-400">
                     {error || 'No data available'}
                 </div>
             </div>
         );
     }
 
-    const badgeColor = RISK_LEVEL_BADGE_COLORS[data.risk_level] || 'bg-gray-500 text-white';
-    const riskColorClass = RISK_LEVEL_COLORS[data.risk_level] || 'border-gray-300';
-    const borderColor = riskColorClass.split(' ').find(c => c.startsWith('border-')) || 'border-gray-300';
+    const badgeColor = RISK_LEVEL_BADGE_COLORS[data.risk_level] || 'bg-slate-500 text-white';
+    const riskColorClass = RISK_LEVEL_COLORS[data.risk_level] || 'border-slate-300';
+    const borderColor = riskColorClass.split(' ').find(c => c.startsWith('border-')) || 'border-slate-300';
     const icon = getRiskLevelIcon(data.risk_level);
 
     const getTrendIcon = () => {
@@ -85,17 +85,16 @@ export default function RiskIndicatorsWidget({
     };
 
     const getTrendColor = () => {
-        if (data.pass_rate_change > 5) return 'text-green-600';
-        if (data.pass_rate_change < -5) return 'text-red-600';
-        return 'text-gray-600';
+        if (data.pass_rate_change > 5) return 'text-green-600 dark:text-green-400';
+        if (data.pass_rate_change < -5) return 'text-red-600 dark:text-red-400';
+        return 'text-slate-600 dark:text-slate-400';
     };
 
     return (
-        <div className={`bg-white rounded-lg shadow border-l-4 ${borderColor || 'border-gray-300'}`}>
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+        <div className={`bg-white dark:bg-slate-800 rounded-lg shadow border-l-4 ${borderColor || 'border-slate-300'}`}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                         Quality Risks
                     </h3>
                     <button
@@ -107,34 +106,31 @@ export default function RiskIndicatorsWidget({
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="p-6">
-                {/* Current Metrics */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
                             {formatPassRate(data.latest_pass_rate_pct)}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">Current Pass Rate</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Current Pass Rate</div>
                     </div>
                     <div>
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
                             {data.risk_flag_count}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">Risk Flags</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Risk Flags</div>
                     </div>
                 </div>
 
-                {/* Trend Analysis */}
                 {showTrend && data.pass_rate_change !== 0 && (
                     <div className="mb-6">
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-700 font-medium">
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
                                         Week-over-Week Trend
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                         Recent: {formatPassRate(data.recent_pass_rate)} vs Previous: {formatPassRate(data.previous_pass_rate)}
                                     </p>
                                 </div>
@@ -147,10 +143,9 @@ export default function RiskIndicatorsWidget({
                     </div>
                 )}
 
-                {/* Risk Flags */}
                 {data.risk_flags && data.risk_flags.length > 0 && (
                     <div className="mb-6">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                             Active Risk Flags
                         </h4>
                         <div className="space-y-2">
@@ -161,15 +156,15 @@ export default function RiskIndicatorsWidget({
                                 return (
                                     <div
                                         key={flag}
-                                        className="flex items-start p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                                        className="flex items-start p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"
                                         title={description}
                                     >
                                         <span className="inline-flex items-center justify-center w-6 h-6 bg-yellow-500 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
                                             !
                                         </span>
                                         <div className="flex-1">
-                                            <p className="text-sm font-medium text-gray-900">{label}</p>
-                                            <p className="text-xs text-gray-600 mt-0.5">{description}</p>
+                                            <p className="text-sm font-medium text-slate-900 dark:text-white">{label}</p>
+                                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{description}</p>
                                         </div>
                                     </div>
                                 );
@@ -178,25 +173,23 @@ export default function RiskIndicatorsWidget({
                     </div>
                 )}
 
-                {/* No Risks Message */}
                 {(!data.risk_flags || data.risk_flags.length === 0) && (
                     <div className="text-center py-8">
                         <div className="text-5xl mb-3">✓</div>
-                        <p className="text-gray-600">No quality risks detected</p>
-                        <p className="text-sm text-gray-500 mt-1">Project quality is within acceptable ranges</p>
+                        <p className="text-slate-600 dark:text-slate-400">No quality risks detected</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Project quality is within acceptable ranges</p>
                     </div>
                 )}
 
-                {/* Details */}
-                <div className="pt-4 border-t border-gray-200">
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                            <span className="text-gray-500">Failed Tests:</span>
-                            <span className="ml-2 text-gray-900 font-medium">{data.latest_failed_count}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Failed Tests:</span>
+                            <span className="ml-2 text-slate-900 dark:text-white font-medium">{data.latest_failed_count}</span>
                         </div>
                         <div>
-                            <span className="text-gray-500">Total Tests:</span>
-                            <span className="ml-2 text-gray-900 font-medium">{data.total_test_cases}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Total Tests:</span>
+                            <span className="ml-2 text-slate-900 dark:text-white font-medium">{data.total_test_cases}</span>
                         </div>
                     </div>
                 </div>

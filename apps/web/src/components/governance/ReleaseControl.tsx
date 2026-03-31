@@ -85,7 +85,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
         <div className="space-y-6">
 
             {/* Gate Status Card */}
-            <Card className={allPassed ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50"}>
+            <Card className={allPassed ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20"}>
                 <CardHeader>
                     <CardTitle className="flex justify-between items-center">
                         <span>Release Gate Status</span>
@@ -97,7 +97,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                 <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {gatesEvaluation.map((g, idx) => (
-                            <div key={idx} className={`p-4 rounded-lg border ${g.passed ? 'bg-white border-green-100' : 'bg-white border-red-200'}`}>
+                            <div key={idx} className={`p-4 rounded-lg border ${g.passed ? 'bg-white dark:bg-slate-800 border-green-100 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-800'}`}>
                                 <div className="text-sm text-slate-500 mb-1">{g.name}</div>
                                 <div className="text-2xl font-bold mb-1">
                                     {g.metric}{g.name.includes('Rate') ? '%' : ''}
@@ -123,28 +123,28 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
 
             {/* Approval Modal / Form Area */}
             {showForm && (
-                <Card className="border-indigo-200 ring-4 ring-indigo-50 animate-in fade-in zoom-in-95 duration-200">
+                <Card className="border-indigo-200 dark:border-indigo-800 ring-4 ring-indigo-50 dark:ring-indigo-900/40 animate-in fade-in zoom-in-95 duration-200">
                     <CardHeader>
                         <CardTitle>Authorize Release</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Release Version</label>
-                                <input className="w-full p-2 border rounded" placeholder="e.g. v1.2.0" value={version} onChange={e => setVersion(e.target.value)} />
+                                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Release Version</label>
+                                <input className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400" placeholder="e.g. v1.2.0" value={version} onChange={e => setVersion(e.target.value)} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Decision</label>
+                                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Decision</label>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setAction('APPROVED')}
-                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'APPROVED' ? 'bg-green-600 text-white' : 'bg-slate-100'}`}
+                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'APPROVED' ? 'bg-green-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                     >
                                         APPROVE
                                     </button>
                                     <button
                                         onClick={() => setAction('REJECTED')}
-                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'REJECTED' ? 'bg-red-600 text-white' : 'bg-slate-100'}`}
+                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'REJECTED' ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                     >
                                         REJECT
                                     </button>
@@ -152,9 +152,9 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Comments / Audit Note</label>
+                            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Comments / Audit Note</label>
                             <textarea
-                                className="w-full p-2 border rounded"
+                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400"
                                 rows={3}
                                 placeholder="Enter justification or approval notes..."
                                 value={comments}
@@ -162,7 +162,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                             />
                         </div>
                         {!allPassed && action === 'APPROVED' && (
-                            <div className="bg-yellow-50 text-yellow-800 p-3 rounded text-sm border border-yellow-200">
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 p-3 rounded text-sm border border-yellow-200 dark:border-yellow-800">
                                 <strong>Warning:</strong> You are approving a release that has failed Quality Gates. This will be logged as an exception.
                             </div>
                         )}

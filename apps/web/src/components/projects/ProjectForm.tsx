@@ -24,7 +24,7 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
 
     const [formData, setFormData] = useState({
         project_id: initialData?.project_id || '',
-        name: initialData?.name || '',
+        name: initialData?.project_name || initialData?.name || '',
         total_weight: initialData?.total_weight || 0,
         priority: initialData?.priority || 'Medium',
         start_date: initialData?.start_date?.split('T')[0] || '',

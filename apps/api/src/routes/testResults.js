@@ -70,9 +70,9 @@ router.get('/test-results', requireAuth, requirePermission('page:test-executions
       query = `
         SELECT
           tr.*,
-          p.name AS project_name
+          p.project_name
         FROM test_result tr
-        LEFT JOIN project p ON tr.project_id = p.id
+        LEFT JOIN projects p ON tr.project_id = p.id
         WHERE tr.deleted_at IS NULL
       `;
 
@@ -195,9 +195,9 @@ router.get('/test-results/test-case/:test_case_id/history', requireAuth, require
     const historyResult = await pool.query(
       `SELECT
         tr.*,
-        p.name AS project_name
+        p.project_name
        FROM test_result tr
-       LEFT JOIN project p ON tr.project_id = p.id
+       LEFT JOIN projects p ON tr.project_id = p.id
        WHERE tr.test_case_id = $1
          AND tr.project_id = $2
          AND tr.deleted_at IS NULL
@@ -381,7 +381,7 @@ router.get('/test-results/uploads', requireAuth, requirePermission('page:test-ex
       SELECT
         upload_batch_id,
         project_id,
-        p.name AS project_name,
+        p.project_name,
         MIN(uploaded_at) AS uploaded_at,
         MAX(uploaded_by) AS uploaded_by,
         u.name AS uploaded_by_name,
@@ -391,7 +391,7 @@ router.get('/test-results/uploads', requireAuth, requirePermission('page:test-ex
         MIN(executed_at) AS earliest_execution_date,
         MAX(executed_at) AS latest_execution_date
       FROM test_result tr
-      LEFT JOIN project p ON tr.project_id = p.id
+      LEFT JOIN projects p ON tr.project_id = p.id
       LEFT JOIN app_user u ON tr.uploaded_by = u.id
       WHERE tr.deleted_at IS NULL
         AND tr.upload_batch_id IS NOT NULL
@@ -404,7 +404,7 @@ router.get('/test-results/uploads', requireAuth, requirePermission('page:test-ex
     }
 
     query += `
-      GROUP BY upload_batch_id, project_id, p.name, u.name
+      GROUP BY upload_batch_id, project_id, p.project_name, u.name
       ORDER BY MIN(uploaded_at) DESC
       LIMIT $${params.length + 1}
     `;

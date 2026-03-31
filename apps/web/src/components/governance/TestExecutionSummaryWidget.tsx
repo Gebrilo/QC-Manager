@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { DonutChart } from '../dashboard/ChartComponents';
+import { fetchApi } from '@/lib/api';
 
 interface TestExecutionSummary {
     total_test_runs: number;
@@ -33,8 +34,6 @@ interface TestExecutionSummaryData {
     recent_runs: RecentRun[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 export function TestExecutionSummaryWidget() {
     const [data, setData] = useState<TestExecutionSummaryData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -44,9 +43,7 @@ export function TestExecutionSummaryWidget() {
         async function loadData() {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_BASE}/test-executions/summary`);
-                if (!response.ok) throw new Error('Failed to fetch test execution summary');
-                const result = await response.json();
+                const result = await fetchApi<TestExecutionSummaryData>('/test-executions/summary');
                 setData(result);
             } catch (err: any) {
                 console.error('Error loading test execution summary:', err);

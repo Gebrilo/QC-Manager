@@ -131,6 +131,7 @@ router.patch('/:id', requireAuth, requirePermission('action:projects:edit'), asy
         }
 
         const dbFields = {};
+        if (validatedData.project_id) dbFields.project_id = validatedData.project_id;
         if (validatedData.name) dbFields.project_name = validatedData.name;
         if (validatedData.description !== undefined) dbFields.description = validatedData.description;
         if (validatedData.total_weight) dbFields.total_weight = validatedData.total_weight;

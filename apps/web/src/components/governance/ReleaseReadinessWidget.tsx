@@ -76,17 +76,16 @@ export default function ReleaseReadinessWidget({
         );
     }
 
-    const badgeColor = READINESS_BADGE_COLORS[data.readiness_status] || 'bg-gray-500 text-white';
-    const readinessColorClass = READINESS_COLORS[data.readiness_status] || 'border-gray-300';
-    const borderColor = readinessColorClass.split(' ').find(c => c.startsWith('border-')) || 'border-gray-300';
+    const badgeColor = READINESS_BADGE_COLORS[data.readiness_status] || 'bg-slate-500 text-white';
+    const readinessColorClass = READINESS_COLORS[data.readiness_status] || 'border-slate-300';
+    const borderColor = readinessColorClass.split(' ').find(c => c.startsWith('border-')) || 'border-slate-300';
     const icon = getReadinessStatusIcon(data.readiness_status);
 
     return (
-        <div className={`bg-white rounded-lg shadow border-l-4 ${borderColor || 'border-gray-300'}`}>
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+        <div className={`bg-white dark:bg-slate-800 rounded-lg shadow border-l-4 ${borderColor || 'border-slate-300'}`}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                         Release Readiness
                     </h3>
                     <button
@@ -98,36 +97,33 @@ export default function ReleaseReadinessWidget({
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="p-6">
-                {/* Key Metrics */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
                             {formatPassRate(data.latest_pass_rate_pct)}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">Pass Rate</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Pass Rate</div>
                     </div>
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
                             {data.total_test_cases}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">Total Tests</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total Tests</div>
                     </div>
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
                             {data.latest_failed_count}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">Failed</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Failed</div>
                     </div>
                 </div>
 
-                {/* Recommendation */}
                 <div className="mb-6">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <div className="flex items-start">
                             <svg
-                                className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0"
+                                className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0"
                                 fill="none"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -138,10 +134,10 @@ export default function ReleaseReadinessWidget({
                                 <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                             <div>
-                                <p className="text-sm text-blue-900 font-medium mb-1">
+                                <p className="text-sm text-blue-900 dark:text-blue-300 font-medium mb-1">
                                     Recommendation
                                 </p>
-                                <p className="text-sm text-blue-800">
+                                <p className="text-sm text-blue-800 dark:text-blue-400">
                                     {data.recommendation}
                                 </p>
                             </div>
@@ -149,42 +145,39 @@ export default function ReleaseReadinessWidget({
                     </div>
                 </div>
 
-                {/* Blocking Issues */}
                 {data.blocking_issues && data.blocking_issues.length > 0 && (
                     <div className="mb-6">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                             Blocking Issues ({data.blocking_issue_count})
                         </h4>
                         <ul className="space-y-2">
                             {data.blocking_issues.map((issue, index) => (
                                 <li key={index} className="flex items-start">
                                     <span className="inline-block w-2 h-2 bg-red-500 rounded-full mt-1.5 mr-3 flex-shrink-0"></span>
-                                    <span className="text-sm text-gray-700">{issue}</span>
+                                    <span className="text-sm text-slate-700 dark:text-slate-300">{issue}</span>
                                 </li>
                             ))}
                         </ul>
                     </div>
                 )}
 
-                {/* Last Execution */}
-                <div className="pt-4 border-t border-gray-200">
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Last Execution:</span>
-                        <span className="text-gray-900 font-medium">
+                        <span className="text-slate-500 dark:text-slate-400">Last Execution:</span>
+                        <span className="text-slate-900 dark:text-white font-medium">
                             {formatDate(data.latest_execution_date)}
-                            <span className="text-gray-500 ml-2">
+                            <span className="text-slate-500 dark:text-slate-400 ml-2">
                                 ({formatDaysAgo(data.days_since_latest_execution)})
                             </span>
                         </span>
                     </div>
                 </div>
 
-                {/* Details Link (optional) */}
                 {showDetails && (
                     <div className="mt-4">
                         <button
                             onClick={onStatusClick}
-                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                         >
                             View Detailed Metrics →
                         </button>

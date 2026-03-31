@@ -150,7 +150,7 @@ router.get('/test-runs', requireAuth, requirePermission('page:test-executions'),
     let query = `
       SELECT
         tr.*,
-        p.name AS project_name,
+        p.project_name,
         u.name AS created_by_name,
         COUNT(te.id) AS total_executions,
         COUNT(te.id) FILTER (WHERE te.status = 'pass') AS pass_count,
@@ -163,7 +163,7 @@ router.get('/test-runs', requireAuth, requirePermission('page:test-executions'),
           ELSE 0
         END AS pass_rate_pct
       FROM test_run tr
-      LEFT JOIN project p ON tr.project_id = p.id
+      LEFT JOIN projects p ON tr.project_id = p.id
       LEFT JOIN app_user u ON tr.created_by = u.id
       LEFT JOIN test_execution te ON tr.id = te.test_run_id
       WHERE tr.deleted_at IS NULL
@@ -185,7 +185,7 @@ router.get('/test-runs', requireAuth, requirePermission('page:test-executions'),
     }
 
     query += `
-      GROUP BY tr.id, p.name, u.name
+      GROUP BY tr.id, p.project_name, u.name
       ORDER BY tr.started_at DESC
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
     `;
@@ -215,10 +215,10 @@ router.get('/test-runs/:id', requireAuth, requirePermission('page:test-execution
     const runResult = await pool.query(
       `SELECT
         tr.*,
-        p.name AS project_name,
+        p.project_name,
         u.name AS created_by_name
       FROM test_run tr
-      LEFT JOIN project p ON tr.project_id = p.id
+      LEFT JOIN projects p ON tr.project_id = p.id
       LEFT JOIN app_user u ON tr.created_by = u.id
       WHERE tr.id = $1 AND tr.deleted_at IS NULL`,
       [id]
@@ -238,7 +238,7 @@ router.get('/test-runs/:id', requireAuth, requirePermission('page:test-execution
         tc.priority,
         u.name AS executed_by_name
       FROM test_execution te
-      LEFT JOIN test_case tc ON te.test_case_id = tc.id
+      LEFT JOIN test_cases tc ON te.test_case_id = tc.id
       LEFT JOIN app_user u ON te.executed_by = u.id
       WHERE te.test_run_id = $1
       ORDER BY te.executed_at DESC`,
@@ -496,7 +496,7 @@ router.get('/executions', requireAuth, requirePermission('page:test-executions')
         tr.name AS test_run_name,
         u.name AS executed_by_name
       FROM test_execution te
-      LEFT JOIN test_case tc ON te.test_case_id = tc.id
+      LEFT JOIN test_cases tc ON te.test_case_id = tc.id
       LEFT JOIN test_run tr ON te.test_run_id = tr.id
       LEFT JOIN app_user u ON te.executed_by = u.id
       WHERE 1=1

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsApi } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 interface Project {
     id: string;
@@ -46,6 +47,12 @@ interface UploadResult {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Sample template data
 const SAMPLE_TEMPLATE = [
     ['Test Case ID', 'Name', 'Status', 'Notes'],
@@ -81,9 +88,10 @@ export default function TestExecutionsPage() {
         async function loadData() {
             try {
                 setLoading(true);
+                const authHeaders = await getAuthHeaders();
                 const [projectsData, runsResponse] = await Promise.all([
                     projectsApi.list(),
-                    fetch(`${API_BASE}/test-executions/recent-uploads`)
+                    fetch(`${API_BASE}/test-executions/recent-uploads`, { headers: authHeaders })
                 ]);
 
                 setProjects(Array.isArray(projectsData) ? projectsData : []);
@@ -200,8 +208,10 @@ export default function TestExecutionsPage() {
                 formData.append('test_run_name', testRunName);
             }
 
+            const authHeaders = await getAuthHeaders();
             const response = await fetch(`${API_BASE}/test-executions/upload-excel`, {
                 method: 'POST',
+                headers: authHeaders,
                 body: formData
             });
 
@@ -217,7 +227,7 @@ export default function TestExecutionsPage() {
             setUploadResult(result);
 
             // Refresh the test runs list
-            const runsResponse = await fetch(`${API_BASE}/test-executions/recent-uploads`);
+            const runsResponse = await fetch(`${API_BASE}/test-executions/recent-uploads`, { headers: authHeaders });
             if (runsResponse.ok) {
                 const runsData = await runsResponse.json();
                 setTestRuns(Array.isArray(runsData) ? runsData : []);
@@ -251,8 +261,10 @@ export default function TestExecutionsPage() {
     const handleDeleteRun = async (runId: string) => {
         setDeleting(true);
         try {
+            const authHeaders = await getAuthHeaders();
             const response = await fetch(`${API_BASE}/test-executions/test-runs/${runId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: authHeaders
             });
 
             if (response.ok) {

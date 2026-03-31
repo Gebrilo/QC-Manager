@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { DonutChart } from '../dashboard/ChartComponents';
+import { fetchApi } from '../../lib/api';
 import type {
     BugSummaryData,
     Bug,
@@ -12,8 +13,6 @@ import {
     BUG_SEVERITY_BADGE_COLORS,
     BUG_STATUS_COLORS
 } from '../../types/governance';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface BugSummaryWidgetProps {
     projectId?: string;
@@ -29,9 +28,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
             try {
                 setLoading(true);
                 const params = projectId ? `?project_id=${projectId}` : '';
-                const response = await fetch(`${API_BASE}/bugs/summary${params}`);
-                if (!response.ok) throw new Error('Failed to fetch bug summary');
-                const result = await response.json();
+                const result = await fetchApi<{ success: boolean; data: BugSummaryData }>(`/bugs/summary${params}`);
                 setData(result.data);
             } catch (err: any) {
                 console.error('Error loading bug summary:', err);

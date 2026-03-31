@@ -322,8 +322,15 @@ export interface Bug {
 }
 
 export const bugsApi = {
-    list: (params?: { project_id?: string; status?: string; severity?: string; limit?: number; offset?: number }) =>
-        fetchApi<{ success: boolean; count: number; total: number; data: Bug[] }>(`/bugs?${new URLSearchParams(params as any || {}).toString()}`),
+    list: (params?: { project_id?: string; status?: string; severity?: string; limit?: number; offset?: number }) => {
+        const clean: Record<string, string> = {};
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
+            }
+        }
+        return fetchApi<{ success: boolean; count: number; total: number; data: Bug[] }>(`/bugs?${new URLSearchParams(clean).toString()}`);
+    },
 
     get: (id: string) =>
         fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}`),

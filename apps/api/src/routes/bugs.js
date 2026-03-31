@@ -10,13 +10,16 @@ const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
+
 // =====================================================
 // GET /bugs/summary
 // Get aggregated bug statistics for dashboard
 // =====================================================
 router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
-        const { project_id } = req.query;
+        const project_id = validUUID(req.query.project_id);
 
         // Get global totals
         const globalQuery = `SELECT * FROM v_bug_summary_global`;
@@ -104,7 +107,8 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
 // =====================================================
 router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
-        const { project_id, status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
+        const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
+        const project_id = validUUID(req.query.project_id);
 
         let query = `
             SELECT
@@ -152,7 +156,7 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
         let countQuery = `SELECT COUNT(*) FROM bugs WHERE deleted_at IS NULL`;
         const countParams = [];
         let countParamIndex = 1;
-        if (project_id) {
+        if (project_id) {   // already validated as UUID above
             countQuery += ` AND project_id = $${countParamIndex}`;
             countParams.push(project_id);
             countParamIndex++;
