@@ -1,17 +1,15 @@
 -- Phase 0: Backfill severity from stored Tuleap payloads
--- Run once after deploying the n8n mapSeverity fix
+-- Tuleap severity mapping: Critical impact→critical, Major impact→high,
+--   Minor impact→medium, Cosmetic impact→low
 -- This corrects all bugs that defaulted to 'medium' due to the mapping bug
 
 BEGIN;
 
 UPDATE bugs SET severity = CASE
   WHEN sv_label ILIKE '%critical%' THEN 'critical'
-  WHEN sv_label ILIKE '%high%'     THEN 'high'
   WHEN sv_label ILIKE '%major%'    THEN 'high'
-  WHEN sv_label ILIKE '%medium%'   THEN 'medium'
-  WHEN sv_label ILIKE '%normal%'   THEN 'medium'
-  WHEN sv_label ILIKE '%low%'      THEN 'low'
-  WHEN sv_label ILIKE '%minor%'    THEN 'low'
+  WHEN sv_label ILIKE '%minor%'    THEN 'medium'
+  WHEN sv_label ILIKE '%cosmetic%' THEN 'low'
   ELSE 'medium'
 END,
 updated_at = NOW()
