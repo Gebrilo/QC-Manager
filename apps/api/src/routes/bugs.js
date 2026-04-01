@@ -1,8 +1,3 @@
-/**
- * Bugs API Routes
- * CRUD operations for bugs synced from Tuleap
- */
-
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
@@ -13,40 +8,22 @@ const { requireAuth, requirePermission } = require('../middleware/authMiddleware
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
 
-// =====================================================
-// GET /bugs/summary
-// Get aggregated bug statistics for dashboard
-// =====================================================
 router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const project_id = validUUID(req.query.project_id);
 
-        // Get global totals
-        const globalQuery = `SELECT * FROM v_bug_summary_global`;
-        const globalResult = await pool.query(globalQuery);
-        const totals = globalResult.rows[0] || {
-            total_bugs: 0,
-            open_bugs: 0,
-            closed_bugs: 0,
-            critical_bugs: 0,
-            high_bugs: 0,
-            medium_bugs: 0,
-            low_bugs: 0,
-            bugs_from_testing: 0,
-            standalone_bugs: 0
-        };
+        const globalResult = await pool.query('SELECT * FROM v_bug_summary_global');
+        const totals = globalResult.rows[0] || {};
 
-        // Get by project
-        let byProjectQuery = `SELECT * FROM v_bug_summary`;
+        let byProjectQuery = 'SELECT * FROM v_bug_summary';
         const byProjectParams = [];
         if (project_id) {
-            byProjectQuery += ` WHERE project_id = $1`;
+            byProjectQuery += ' WHERE project_id = $1';
             byProjectParams.push(project_id);
         }
-        byProjectQuery += ` ORDER BY total_bugs DESC`;
+        byProjectQuery += ' ORDER BY total_bugs DESC';
         const byProjectResult = await pool.query(byProjectQuery, byProjectParams);
 
-        // Get recent bugs
         let recentQuery = `
             SELECT
                 b.id,
@@ -65,10 +42,10 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
         `;
         const recentParams = [];
         if (project_id) {
-            recentQuery += ` AND b.project_id = $1`;
+            recentQuery += ' AND b.project_id = $1';
             recentParams.push(project_id);
         }
-        recentQuery += ` ORDER BY b.reported_date DESC NULLS LAST, b.created_at DESC LIMIT 10`;
+        recentQuery += ' ORDER BY b.reported_date DESC NULLS LAST, b.created_at DESC LIMIT 10';
         const recentResult = await pool.query(recentQuery, recentParams);
 
         res.json({
@@ -87,6 +64,10 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
                     medium: parseInt(totals.medium_bugs) || 0,
                     low: parseInt(totals.low_bugs) || 0
                 },
+                by_source: {
+                    test_case: parseInt(totals.bugs_from_test_cases) || 0,
+                    exploratory: parseInt(totals.bugs_from_exploratory) || 0
+                },
                 by_project: byProjectResult.rows,
                 recent_bugs: recentResult.rows
             }
@@ -101,10 +82,6 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
     }
 });
 
-// =====================================================
-// GET /bugs
-// List bugs with filters
-// =====================================================
 router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
@@ -140,7 +117,6 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
             paramIndex++;
         }
 
-        // Parse sort parameter
         const [sortField, sortDir] = sort.split(':');
         const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
         const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
@@ -152,11 +128,10 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
 
         const result = await pool.query(query, params);
 
-        // Get total count
-        let countQuery = `SELECT COUNT(*) FROM bugs WHERE deleted_at IS NULL`;
+        let countQuery = 'SELECT COUNT(*) FROM bugs WHERE deleted_at IS NULL';
         const countParams = [];
         let countParamIndex = 1;
-        if (project_id) {   // already validated as UUID above
+        if (project_id) {
             countQuery += ` AND project_id = $${countParamIndex}`;
             countParams.push(project_id);
             countParamIndex++;
@@ -188,10 +163,6 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
     }
 });
 
-// =====================================================
-// GET /bugs/:id
-// Get single bug by ID
-// =====================================================
 router.get('/:id', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -228,10 +199,6 @@ router.get('/:id', requireAuth, requirePermission('page:bugs'), async (req, res)
     }
 });
 
-// =====================================================
-// GET /bugs/by-project/:projectId
-// Get bugs for a specific project
-// =====================================================
 router.get('/by-project/:projectId', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -263,10 +230,6 @@ router.get('/by-project/:projectId', requireAuth, requirePermission('page:bugs')
     }
 });
 
-// =====================================================
-// POST /bugs
-// Create a new bug (internal use / testing)
-// =====================================================
 router.post('/', requireAuth, requirePermission('action:bugs:create'), async (req, res) => {
     try {
         const {
@@ -290,7 +253,6 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             raw_tuleap_payload
         } = req.body;
 
-        // Generate bug_id if not provided
         const finalBugId = bug_id || `BUG-${Date.now().toString(36).toUpperCase()}`;
 
         const query = `
@@ -317,7 +279,6 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
         const result = await pool.query(query, values);
         const bug = result.rows[0];
 
-        // Audit log
         await auditLog('bugs', bug.id, 'CREATE', bug, null);
 
         res.status(201).json({
@@ -327,7 +288,6 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
     } catch (error) {
         console.error('Error creating bug:', error);
 
-        // Handle duplicate tuleap_artifact_id
         if (error.code === '23505' && error.constraint === 'bugs_tuleap_artifact_id_key') {
             return res.status(409).json({
                 success: false,
@@ -344,15 +304,10 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
     }
 });
 
-// =====================================================
-// PATCH /bugs/:id
-// Update a bug
-// =====================================================
 router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Fetch original
         const originalRes = await pool.query('SELECT * FROM bugs WHERE id = $1', [id]);
         if (originalRes.rows.length === 0) {
             return res.status(404).json({
@@ -362,21 +317,23 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
         }
         const original = originalRes.rows[0];
 
-        // Build update query
         const allowedFields = [
             'title', 'description', 'status', 'severity', 'priority',
-            'bug_type', 'component', 'assigned_to', 'resolved_date',
-            'linked_test_case_ids', 'linked_test_execution_ids', 'raw_tuleap_payload'
+            'bug_type', 'component', 'assigned_to',
+            'resolved_date',
+            'linked_test_case_ids', 'linked_test_execution_ids', 'raw_tuleap_payload',
+            'source'
         ];
 
         const fields = [];
         const values = [];
         let idx = 1;
 
-        for (const [key, value] of Object.entries(req.body)) {
-            if (allowedFields.includes(key)) {
-                fields.push(`${key} = $${idx++}`);
-                values.push(value);
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                fields.push(`${field} = $${idx}`);
+                values.push(req.body[field]);
+                idx++;
             }
         }
 
@@ -384,15 +341,14 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
             return res.json({ success: true, data: original });
         }
 
-        fields.push(`updated_at = NOW()`);
-        fields.push(`last_sync_at = NOW()`);
+        fields.push('updated_at = NOW()');
+        fields.push('last_sync_at = NOW()');
         values.push(id);
 
         const query = `UPDATE bugs SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         const result = await pool.query(query, values);
         const updated = result.rows[0];
 
-        // Audit log
         await auditLog('bugs', id, 'UPDATE', updated, original);
 
         res.json({
@@ -409,15 +365,10 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
     }
 });
 
-// =====================================================
-// DELETE /bugs/:id
-// Soft delete a bug
-// =====================================================
 router.delete('/:id', requireAuth, requirePermission('action:bugs:delete'), async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Fetch original
         const originalRes = await pool.query('SELECT * FROM bugs WHERE id = $1', [id]);
         if (originalRes.rows.length === 0) {
             return res.status(404).json({
@@ -434,14 +385,12 @@ router.delete('/:id', requireAuth, requirePermission('action:bugs:delete'), asyn
             });
         }
 
-        // Soft delete
         const result = await pool.query(
-            `UPDATE bugs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+            'UPDATE bugs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *',
             [id]
         );
         const deleted = result.rows[0];
 
-        // Audit log
         await auditLog('bugs', id, 'DELETE', deleted, original);
 
         res.json({

@@ -348,6 +348,24 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity) WHERE deleted_at IS NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_tuleap_artifact ON bugs(tuleap_artifact_id)`);
 
+        // Add source column (Hybrid Option C)
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bugs' AND column_name='source') THEN
+                    ALTER TABLE bugs ADD COLUMN source TEXT DEFAULT 'EXPLORATORY';
+                END IF;
+            END $$;
+        `);
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='source_check') THEN
+                    ALTER TABLE bugs ADD CONSTRAINT source_check CHECK (source IN ('TEST_CASE', 'EXPLORATORY'));
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_source ON bugs(source)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_project_source ON bugs(project_id, source) WHERE deleted_at IS NULL`);
+
         // Tuleap Sync Configuration
         await client.query(`
             CREATE TABLE IF NOT EXISTS tuleap_sync_config (
@@ -486,14 +504,29 @@ const runMigrations = async () => {
                 COUNT(b.id) FILTER (WHERE b.severity = 'high') AS high_bugs,
                 COUNT(b.id) FILTER (WHERE b.severity = 'medium') AS medium_bugs,
                 COUNT(b.id) FILTER (WHERE b.severity = 'low') AS low_bugs,
-                COUNT(b.id) FILTER (WHERE array_length(b.linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
-                COUNT(b.id) FILTER (WHERE b.linked_test_execution_ids IS NULL
-                    OR array_length(b.linked_test_execution_ids, 1) = 0) AS standalone_bugs,
-                MAX(b.reported_date) AS latest_bug_date
+                COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(b.id) FILTER (WHERE b.source = 'EXPLORATORY') AS bugs_from_exploratory
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.deleted_at IS NULL
             GROUP BY b.project_id, p.project_name
+        `);
+
+        // Global Bug Summary View
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_summary_global AS
+            SELECT
+                COUNT(id) AS total_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
+                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
+                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
+                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
+                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
+                COUNT(id) FILTER (WHERE source = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(id) FILTER (WHERE source = 'EXPLORATORY') AS bugs_from_exploratory
+            FROM bugs
+            WHERE deleted_at IS NULL
         `);
 
         // Global Bug Summary View

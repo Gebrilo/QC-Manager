@@ -236,7 +236,8 @@ router.post('/bug', async (req, res) => {
             reported_by,
             assigned_to,
             reported_date,
-            raw_tuleap_payload
+            raw_tuleap_payload,
+            source = 'EXPLORATORY'
         } = req.body;
 
         if (!tuleap_artifact_id || !title) {
@@ -338,14 +339,14 @@ router.post('/bug', async (req, res) => {
                     title = $1, description = $2, status = $3, severity = $4, priority = $5,
                     bug_type = $6, component = $7, assigned_to = $8,
                     linked_test_case_ids = $9, linked_test_execution_ids = $10,
-                    raw_tuleap_payload = $11, last_sync_at = NOW(), updated_at = NOW()
-                WHERE id = $12
+                    raw_tuleap_payload = $11, source = $12, last_sync_at = NOW(), updated_at = NOW()
+                WHERE id = $13
                 RETURNING *
             `, [
                 title, description, status, severity, priority,
                 bug_type, component, assigned_to,
                 linked_test_case_ids, linked_test_execution_ids,
-                raw_tuleap_payload, existingId
+                raw_tuleap_payload, source, existingId
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'UPDATE', bug, null);
@@ -358,15 +359,15 @@ router.post('/bug', async (req, res) => {
                     bug_id, title, description, status, severity, priority,
                     bug_type, component, project_id,
                     linked_test_case_ids, linked_test_execution_ids,
-                    reported_by, assigned_to, reported_date, raw_tuleap_payload
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                    reported_by, assigned_to, reported_date, raw_tuleap_payload, source
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
                 RETURNING *
             `, [
                 tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
                 bug_id, title, description, status, severity, priority,
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload
+                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, source
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'CREATE', bug, null);

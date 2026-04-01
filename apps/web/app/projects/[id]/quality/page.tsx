@@ -10,6 +10,8 @@ import {
   ReleaseControl
 } from '@/components/governance'; // We need to export TrendAnalysisWidget from index
 import { getProjectHealthSummary, getExecutionTrend } from '@/services/governanceApi';
+import { bugsApi } from '@/lib/api';
+import { BugsBySourceChart } from '@/components/BugsBySourceChart';
 
 
 export default function ProjectQualityDetailsPage() {
@@ -22,6 +24,13 @@ export default function ProjectQualityDetailsPage() {
   const [trendData, setTrendData] = useState<{ date: string; passRate: number; testsExecuted: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bugSummary, setBugSummary] = useState<{
+    totals: { total_bugs: number; open_bugs: number; closed_bugs: number; bugs_from_testing: number; standalone_bugs: number };
+    by_severity: { critical: number; high: number; medium: number; low: number };
+    by_source: { test_case: number; exploratory: number };
+    by_project: any[];
+    recent_bugs: any[];
+  } | null>(null);
 
   useEffect(() => {
     async function loadProjectData() {
@@ -30,9 +39,10 @@ export default function ProjectQualityDetailsPage() {
       try {
         setLoading(true);
         // Fetch project health and trend data in parallel
-        const [healthData, trendResult] = await Promise.all([
+        const [healthData, trendResult, bugResult] = await Promise.all([
           getProjectHealthSummary(projectId),
-          getExecutionTrend(projectId)
+          getExecutionTrend(projectId),
+          bugsApi.summary(projectId),
         ]);
 
         if (healthData) {
@@ -46,6 +56,7 @@ export default function ProjectQualityDetailsPage() {
         }
 
         setTrendData(trendResult || []);
+        setBugSummary(bugResult.data);
       } catch (err) {
         console.error("Failed to load project details:", err);
         setError("Failed to load project details");
@@ -130,6 +141,40 @@ export default function ProjectQualityDetailsPage() {
             {/* Trend Analysis */}
             <section>
               <TrendAnalysisWidget data={trendData} title="Quality Trend (Last 14 Days)" />
+            </section>
+            {/* Bug Summary — By Source Classification */}
+            <section>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Bug Summary</h3>
+              {bugSummary ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-white">{bugSummary.by_source.test_case}</p>
+                      <p className="text-xs text-blue-100">Test Cases</p>
+                    </div>
+                    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-white">{bugSummary.by_source.exploratory}</p>
+                      <p className="text-xs text-amber-100">Exploratory</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-700 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{bugSummary.totals.total_bugs}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Total Bugs</p>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-white">{bugSummary.totals.open_bugs}</p>
+                      <p className="text-xs text-red-100">Open Bugs</p>
+                    </div>
+                  </div>
+                  <BugsBySourceChart
+                    testCase={bugSummary.by_source.test_case}
+                    exploratory={bugSummary.by_source.exploratory}
+                  />
+                </>
+              ) : (
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex items-center justify-center h-40">
+                  <p className="text-slate-400 text-sm">Loading bug data...</p>
+                </div>
+              )}
             </section>
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Test Executions</h3>

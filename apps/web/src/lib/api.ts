@@ -317,6 +317,7 @@ export interface Bug {
     reported_date?: string;
     tuleap_url?: string;
     has_test_link?: boolean;
+    source?: 'TEST_CASE' | 'EXPLORATORY';
     created_at?: string;
     updated_at?: string;
 }
@@ -336,7 +337,13 @@ export const bugsApi = {
         fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}`),
 
     summary: (project_id?: string) =>
-        fetchApi<{ success: boolean; data: any }>(`/bugs/summary${project_id ? `?project_id=${project_id}` : ''}`),
+        fetchApi<{ success: boolean; data: {
+            totals: { total_bugs: number; open_bugs: number; closed_bugs: number; bugs_from_testing: number; standalone_bugs: number };
+            by_severity: { critical: number; high: number; medium: number; low: number };
+            by_source: { test_case: number; exploratory: number };
+            by_project: any[];
+            recent_bugs: Bug[];
+        } }>(`/bugs/summary${project_id ? `?project_id=${project_id}` : ''}`),
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: Bug }>(`/bugs/${id}`, { method: 'DELETE' }),
