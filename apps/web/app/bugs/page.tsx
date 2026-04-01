@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { bugsApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 const SEVERITY_COLORS: Record<string, string> = {
     critical: 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400',
@@ -20,16 +22,49 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BugsPage() {
+    return (
+        <Suspense fallback={<div className="py-12 text-center text-slate-400">Loading\u2026</div>}>
+            <BugsContent />
+        </Suspense>
+    );
+}
+
+function BugsContent() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { hasPermission } = useAuth();
+    const canDelete = hasPermission('action:bugs:delete');
+
     const [bugs, setBugs] = useState<Bug[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [total, setTotal] = useState(0);
     const [filter, setFilter] = useState('');
-    const [projectFilter, setProjectFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
-    const [severityFilter, setSeverityFilter] = useState('');
-    const [page, setPage] = useState(0);
+    const [projectFilter, setProjectFilter] = useState(searchParams.get('project_id') || '');
+    const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+    const [severityFilter, setSeverityFilter] = useState(searchParams.get('severity') || '');
+    const [page, setPage] = useState(() => {
+        const p = searchParams.get('page');
+        return p ? Math.max(0, parseInt(p) - 1) : 0;
+    });
+    const [deleteTarget, setDeleteTarget] = useState<Bug | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const PAGE_SIZE = 50;
+
+    const updateUrlParams = useCallback(() => {
+        const params = new URLSearchParams();
+        if (projectFilter) params.set('project_id', projectFilter);
+        if (statusFilter) params.set('status', statusFilter);
+        if (severityFilter) params.set('severity', severityFilter);
+        if (page > 0) params.set('page', String(page + 1));
+        const qs = params.toString();
+        router.replace(`/bugs${qs ? `?${qs}` : ''}`, { scroll: false });
+    }, [projectFilter, statusFilter, severityFilter, page, router]);
+
+    useEffect(() => {
+        updateUrlParams();
+    }, [updateUrlParams]);
 
     const loadBugs = async () => {
         try {
@@ -69,9 +104,32 @@ export default function BugsPage() {
             b.title.toLowerCase().includes(q) ||
             b.bug_id.toLowerCase().includes(q) ||
             b.assigned_to?.toLowerCase().includes(q) ||
+            b.reported_by?.toLowerCase().includes(q) ||
             b.component?.toLowerCase().includes(q)
         );
     }, [bugs, filter]);
+
+    useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(null), 4000);
+        return () => clearTimeout(t);
+    }, [toast]);
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        try {
+            await bugsApi.delete(deleteTarget.id);
+            setBugs(prev => prev.filter(b => b.id !== deleteTarget.id));
+            setTotal(prev => prev - 1);
+            setToast({ type: 'success', message: `Bug "${deleteTarget.bug_id}" deleted` });
+            setDeleteTarget(null);
+        } catch (err: any) {
+            setToast({ type: 'error', message: err.message || 'Failed to delete bug' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
@@ -139,15 +197,19 @@ export default function BugsPage() {
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Severity</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-32">Status</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Project</th>
+                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Reported By</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Assigned To</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Reported</th>
+                                {canDelete && (
+                                    <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-16"></th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
-                                <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
+                                <tr><td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
+                                <tr><td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
                             ) : filtered.map(bug => (
                                 <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
@@ -173,14 +235,30 @@ export default function BugsPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
-                                        {bug.project_name || '—'}
+                                        {bug.project_name || '\u2014'}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
+                                        {bug.reported_by || '\u2014'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                                        {bug.assigned_to || '—'}
+                                        {bug.assigned_to || '\u2014'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-400 text-xs">
-                                        {bug.reported_date ? new Date(bug.reported_date).toLocaleDateString() : '—'}
+                                        {bug.reported_date ? new Date(bug.reported_date).toLocaleDateString() : '\u2014'}
                                     </td>
+                                    {canDelete && (
+                                        <td className="px-4 py-3">
+                                            <button
+                                                onClick={() => setDeleteTarget(bug)}
+                                                className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                title="Delete bug"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
@@ -190,7 +268,7 @@ export default function BugsPage() {
                 {/* Pagination */}
                 {total > PAGE_SIZE && (
                     <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-sm text-slate-500">
-                        <span>Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
+                        <span>Showing {page * PAGE_SIZE + 1}\u2013{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
                         <div className="flex gap-2">
                             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
                                 className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -204,6 +282,58 @@ export default function BugsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-md w-full mx-4 p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-slate-900 dark:text-white">Delete Bug</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    Delete <span className="font-mono font-medium">{deleteTarget.bug_id}</span>: {deleteTarget.title}?
+                                </p>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    This removes the bug from QC-Manager only. It will not be deleted in Tuleap.
+                                    The next Tuleap sync will skip this bug.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                            >
+                                {isDeleting ? 'Deleting\u2026' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast */}
+            {toast && (
+                <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
+                    toast.type === 'success'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-red-600 text-white'
+                }`}>
+                    {toast.message}
+                </div>
+            )}
         </div>
     );
 }

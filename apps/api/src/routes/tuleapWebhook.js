@@ -261,14 +261,74 @@ router.post('/bug', async (req, res) => {
             raw_payload: raw_tuleap_payload
         });
 
-        // Check if bug exists
+        const action = req.body.action || 'sync';
+
+        // Handle delete action (Tuleap artifact was deleted)
+        if (action === 'delete') {
+            const existingRes = await pool.query(
+                'SELECT * FROM bugs WHERE tuleap_artifact_id = $1',
+                [tuleap_artifact_id]
+            );
+
+            if (existingRes.rows.length > 0 && !existingRes.rows[0].deleted_at) {
+                const existing = existingRes.rows[0];
+                await pool.query(
+                    `UPDATE bugs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+                    [existing.id]
+                );
+                await auditLog('bugs', existing.id, 'DELETE', { ...existing, deleted_at: new Date() }, existing);
+
+                await logWebhook({
+                    tuleap_artifact_id,
+                    tuleap_tracker_id,
+                    artifact_type: 'bug',
+                    action: 'delete',
+                    payload_hash,
+                    raw_payload: raw_tuleap_payload,
+                    processing_status: 'processed',
+                    processing_result: `Bug deleted from Tuleap: ${existing.bug_id}`
+                });
+
+                return res.json({ success: true, action: 'deleted', data: { bug_id: existing.bug_id } });
+            }
+
+            await logWebhook({
+                tuleap_artifact_id,
+                tuleap_tracker_id,
+                artifact_type: 'bug',
+                action: 'delete',
+                payload_hash,
+                raw_payload: raw_tuleap_payload,
+                processing_status: 'processed',
+                processing_result: `Bug not found or already deleted: ${tuleap_artifact_id}`
+            });
+
+            return res.json({ success: true, action: 'noop', message: 'Bug not found or already deleted' });
+        }
+
+        // Check if bug exists (including soft-deleted)
         const existingRes = await pool.query(
-            'SELECT id FROM bugs WHERE tuleap_artifact_id = $1',
+            'SELECT id, deleted_at FROM bugs WHERE tuleap_artifact_id = $1',
             [tuleap_artifact_id]
         );
 
         let bug;
         let isUpdate = existingRes.rows.length > 0;
+
+        // Skip updates for soft-deleted bugs (manually deleted by admin)
+        if (isUpdate && existingRes.rows[0].deleted_at) {
+            await logWebhook({
+                tuleap_artifact_id,
+                tuleap_tracker_id,
+                artifact_type: 'bug',
+                action: 'sync',
+                payload_hash,
+                raw_payload: raw_tuleap_payload,
+                processing_status: 'skipped',
+                processing_result: `Bug ${tuleap_artifact_id} is soft-deleted locally, skipping sync`
+            });
+            return res.json({ success: true, action: 'skipped', message: 'Bug is soft-deleted locally' });
+        }
 
         if (isUpdate) {
             // Update existing bug
@@ -1025,6 +1085,96 @@ router.get('/resources', async (req, res) => {
             error: 'Failed to fetch resources',
             message: error.message
         });
+    }
+});
+
+// =====================================================
+// POST /tuleap-webhook/bug-deletion-sync
+// Bulk deletion sync: receives list of active Tuleap artifact IDs,
+// soft-deletes any QC bugs not in the list (orphaned bugs).
+// Called by n8n polling workflow.
+// =====================================================
+router.post('/bug-deletion-sync', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { tuleap_tracker_id, active_tuleap_artifact_ids } = req.body;
+
+        if (!tuleap_tracker_id) {
+            return res.status(400).json({ success: false, error: 'tuleap_tracker_id is required' });
+        }
+
+        // Guard clause: empty list likely means Tuleap API failure — refuse to mass-delete
+        if (!Array.isArray(active_tuleap_artifact_ids)) {
+            return res.status(400).json({ success: false, error: 'active_tuleap_artifact_ids must be an array' });
+        }
+        if (active_tuleap_artifact_ids.length === 0) {
+            console.warn(`[bug-deletion-sync] Received empty artifact list for tracker ${tuleap_tracker_id} — likely API failure, skipping`);
+            await logWebhook({
+                tuleap_artifact_id: 0,
+                tuleap_tracker_id,
+                artifact_type: 'bug',
+                action: 'deletion_sync',
+                payload_hash: 'guard-empty-list',
+                processing_status: 'skipped',
+                processing_result: 'Empty artifact list received — refusing to delete'
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Empty artifact list — refusing to delete all bugs (likely Tuleap API failure)'
+            });
+        }
+
+        await client.query('BEGIN');
+
+        // Find bugs in this tracker that are NOT in the active list
+        const orphansRes = await client.query(`
+            SELECT id, bug_id, tuleap_artifact_id, title
+            FROM bugs
+            WHERE tuleap_tracker_id = $1
+              AND deleted_at IS NULL
+              AND tuleap_artifact_id != ALL($2::integer[])
+        `, [tuleap_tracker_id, active_tuleap_artifact_ids]);
+
+        if (orphansRes.rows.length === 0) {
+            await client.query('COMMIT');
+            return res.json({ success: true, action: 'noop', deleted_count: 0, deleted_bugs: [] });
+        }
+
+        // Soft-delete all orphans in one batch
+        const orphanIds = orphansRes.rows.map(b => b.id);
+        await client.query(`
+            UPDATE bugs SET deleted_at = NOW(), updated_at = NOW()
+            WHERE id = ANY($1)
+        `, [orphanIds]);
+
+        // Audit log each deletion
+        for (const bug of orphansRes.rows) {
+            await auditLog('bugs', bug.id, 'DELETE', { ...bug, deleted_at: new Date(), deletion_source: 'tuleap_sync' }, bug);
+        }
+
+        await client.query('COMMIT');
+
+        const deletedBugs = orphansRes.rows.map(b => ({ id: b.id, bug_id: b.bug_id, tuleap_artifact_id: b.tuleap_artifact_id, title: b.title }));
+
+        await logWebhook({
+            tuleap_artifact_id: 0,
+            tuleap_tracker_id,
+            artifact_type: 'bug',
+            action: 'deletion_sync',
+            payload_hash: `sync-${Date.now()}`,
+            processing_status: 'processed',
+            processing_result: `Deleted ${deletedBugs.length} orphaned bug(s) from tracker ${tuleap_tracker_id}`
+        });
+
+        console.log(`[bug-deletion-sync] Soft-deleted ${deletedBugs.length} orphaned bug(s) from tracker ${tuleap_tracker_id}`);
+
+        res.json({ success: true, action: 'synced', deleted_count: deletedBugs.length, deleted_bugs: deletedBugs });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error in bug deletion sync:', error);
+        res.status(500).json({ success: false, error: 'Failed to sync bug deletions', message: error.message });
+    } finally {
+        client.release();
     }
 });
 

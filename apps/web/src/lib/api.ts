@@ -337,6 +337,9 @@ export const bugsApi = {
 
     summary: (project_id?: string) =>
         fetchApi<{ success: boolean; data: any }>(`/bugs/summary${project_id ? `?project_id=${project_id}` : ''}`),
+
+    delete: (id: string) =>
+        fetchApi<{ success: boolean; message: string; data: Bug }>(`/bugs/${id}`, { method: 'DELETE' }),
 };
 
 // ============================================================================
