@@ -209,6 +209,10 @@ export async function getBugSummary(projectId?: string): Promise<BugSummaryData>
                 medium: 0,
                 low: 0
             },
+            by_source: {
+                test_case: 0,
+                exploratory: 0
+            },
             by_project: [],
             recent_bugs: []
         };

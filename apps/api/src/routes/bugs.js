@@ -34,6 +34,8 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
                 b.priority,
                 b.reported_date,
                 b.tuleap_url,
+                b.source,
+                b.tuleap_artifact_id,
                 p.project_name,
                 CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
             FROM bugs b
@@ -253,7 +255,7 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             raw_tuleap_payload
         } = req.body;
 
-        const finalBugId = bug_id || `BUG-${Date.now().toString(36).toUpperCase()}`;
+        const finalBugId = bug_id || (tuleap_artifact_id ? `TLP-${tuleap_artifact_id}` : `BUG-${Date.now().toString(36).toUpperCase()}`);
 
         const query = `
             INSERT INTO bugs (

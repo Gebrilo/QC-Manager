@@ -303,6 +303,7 @@ export const resourcesApi = {
 export interface Bug {
     id: string;
     bug_id: string;
+    tuleap_artifact_id?: number;
     title: string;
     description?: string;
     status: string;

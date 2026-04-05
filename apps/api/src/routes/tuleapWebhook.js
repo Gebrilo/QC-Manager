@@ -247,6 +247,11 @@ router.post('/bug', async (req, res) => {
             });
         }
 
+        const computedSource = linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0
+            ? 'TEST_CASE'
+            : 'EXPLORATORY';
+        const finalSource = source || computedSource;
+
         // Generate payload hash for idempotency
         const payload_hash = crypto.createHash('sha256')
             .update(JSON.stringify(req.body))
@@ -346,13 +351,13 @@ router.post('/bug', async (req, res) => {
                 title, description, status, severity, priority,
                 bug_type, component, assigned_to,
                 linked_test_case_ids, linked_test_execution_ids,
-                raw_tuleap_payload, source, existingId
+                raw_tuleap_payload, finalSource, existingId
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'UPDATE', bug, null);
         } else {
             // Create new bug
-            const bug_id = `BUG-${Date.now().toString(36).toUpperCase()}`;
+            const bug_id = `TLP-${tuleap_artifact_id}`;
             const result = await pool.query(`
                 INSERT INTO bugs (
                     tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
@@ -367,7 +372,7 @@ router.post('/bug', async (req, res) => {
                 bug_id, title, description, status, severity, priority,
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, source
+                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'CREATE', bug, null);

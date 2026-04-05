@@ -192,8 +192,9 @@ function BugsContent() {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-24">ID</th>
+                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">ID</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Title</th>
+                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Source</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Severity</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-32">Status</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Project</th>
@@ -207,22 +208,31 @@ function BugsContent() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
-                                <tr><td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
+                                <tr><td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
+                                <tr><td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
                             ) : filtered.map(bug => (
                                 <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
                                         {bug.tuleap_url ? (
                                             <a href={bug.tuleap_url} target="_blank" rel="noopener noreferrer"
                                                className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {bug.bug_id}
+                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
                                             </a>
-                                        ) : bug.bug_id}
+                                        ) : (bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id)}
                                     </td>
                                     <td className="px-4 py-3">
                                         <p className="font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</p>
                                         {bug.component && <p className="text-xs text-slate-400 mt-0.5">{bug.component}</p>}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                            bug.source === 'TEST_CASE'
+                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                                                : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400'
+                                        }`}>
+                                            {bug.source === 'TEST_CASE' ? 'Test Cases' : 'Standalone'}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${SEVERITY_COLORS[bug.severity] || SEVERITY_COLORS.low}`}>

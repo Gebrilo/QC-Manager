@@ -252,6 +252,7 @@ export type BugStatus = 'Open' | 'In Progress' | 'Reopened' | 'Resolved' | 'Clos
 export interface Bug {
     id: string;
     bug_id: string;
+    tuleap_artifact_id?: number;
     title: string;
     description?: string;
     status: BugStatus;
@@ -267,6 +268,7 @@ export interface Bug {
     resolved_date?: string | null;
     tuleap_url?: string;
     has_test_link: boolean;
+    source?: 'TEST_CASE' | 'EXPLORATORY';
     linked_test_case_ids?: string[];
     linked_test_execution_ids?: string[];
     created_at: string;
@@ -306,6 +308,10 @@ export interface BugSummaryByProject {
 export interface BugSummaryData {
     totals: BugSummaryTotals;
     by_severity: BugSummarySeverity;
+    by_source: {
+        test_case: number;
+        exploratory: number;
+    };
     by_project: BugSummaryByProject[];
     recent_bugs: Bug[];
 }

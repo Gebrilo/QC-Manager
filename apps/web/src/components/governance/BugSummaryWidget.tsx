@@ -65,6 +65,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
 
     const totals = data?.totals;
     const severity = data?.by_severity;
+    const bySource = data?.by_source;
     const recentBugs = data?.recent_bugs || [];
 
     // Prepare donut chart data for severity breakdown
@@ -76,9 +77,9 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
     ].filter(d => d.value > 0) : [];
 
     // Prepare donut chart for bugs from testing vs standalone
-    const sourceDonutData = totals ? [
-        { label: 'From Testing', value: totals.bugs_from_testing, color: '#3b82f6' },
-        { label: 'Standalone', value: totals.standalone_bugs, color: '#8b5cf6' },
+    const sourceDonutData = bySource ? [
+        { label: 'Testing via Test Cases', value: bySource.test_case, color: '#3b82f6' },
+        { label: 'Standalone Bug', value: bySource.exploratory, color: '#8b5cf6' },
     ].filter(d => d.value > 0) : [];
 
     const hasBugs = totals && totals.total_bugs > 0;
@@ -116,13 +117,13 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                     />
                     <StatCard
                         label="From Testing"
-                        value={totals?.bugs_from_testing || 0}
+                        value={bySource?.test_case || 0}
                         subLabel="Found via test cases"
                         color="blue"
                     />
                     <StatCard
                         label="Standalone"
-                        value={totals?.standalone_bugs || 0}
+                        value={bySource?.exploratory || 0}
                         subLabel="Exploratory / External"
                         color="purple"
                     />
@@ -253,6 +254,12 @@ function StatCard({
 function BugRow({ bug }: { bug: Bug }) {
     const severityColor = BUG_SEVERITY_COLORS[bug.severity as BugSeverity] || 'bg-gray-400 text-white';
     const statusColor = BUG_STATUS_COLORS[bug.status] || 'bg-gray-100 text-gray-800';
+    const displayId = bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id;
+    const isTestCase = bug.source === 'TEST_CASE';
+    const sourceLabel = isTestCase ? 'Testing via Test Cases' : 'Standalone Bug';
+    const sourceBadgeClass = isTestCase
+        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+        : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300';
 
     return (
         <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
@@ -265,14 +272,12 @@ function BugRow({ bug }: { bug: Bug }) {
                         {bug.title}
                     </span>
                 </div>
-                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                    <span>{bug.bug_id}</span>
+                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-mono">{displayId}</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${sourceBadgeClass}`}>
+                        {sourceLabel}
+                    </span>
                     {bug.project_name && <span>• {bug.project_name}</span>}
-                    {bug.has_test_link && (
-                        <span className="text-blue-500" title="Linked to test execution">
-                            <TestLinkIcon className="w-3 h-3" />
-                        </span>
-                    )}
                 </div>
             </div>
             <div className="ml-2">
