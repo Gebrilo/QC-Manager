@@ -101,6 +101,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://${API_DOMAIN}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qc-web.rule=Host(`${WEB_DOMAIN}`)"
