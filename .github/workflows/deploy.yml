@@ -68,6 +68,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=web
           build-args: |
             NEXT_PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
   # ===========================================================================
   # PRODUCTION DEPLOY (main branch)
