@@ -252,10 +252,15 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             reported_by,
             assigned_to,
             reported_date,
-            raw_tuleap_payload
+            raw_tuleap_payload,
+            source
         } = req.body;
 
         const finalBugId = bug_id || (tuleap_artifact_id ? `TLP-${tuleap_artifact_id}` : `BUG-${Date.now().toString(36).toUpperCase()}`);
+        const computedSource = (linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0)
+            ? 'TEST_CASE'
+            : 'EXPLORATORY';
+        const finalSource = source || computedSource;
 
         const query = `
             INSERT INTO bugs (
@@ -263,9 +268,9 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
                 bug_id, title, description, status, severity, priority,
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date, raw_tuleap_payload
+                reported_by, assigned_to, reported_date, raw_tuleap_payload, source
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
             )
             RETURNING *
         `;
@@ -275,7 +280,7 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             finalBugId, title, description, status, severity, priority,
             bug_type, component, project_id,
             linked_test_case_ids, linked_test_execution_ids,
-            reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload
+            reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource
         ];
 
         const result = await pool.query(query, values);

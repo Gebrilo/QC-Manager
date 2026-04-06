@@ -512,7 +512,7 @@ const runMigrations = async () => {
             GROUP BY b.project_id, p.project_name
         `);
 
-        // Global Bug Summary View
+        // Global Bug Summary View (includes source-based columns + legacy linked_test cols)
         await client.query(`
             CREATE OR REPLACE VIEW v_bug_summary_global AS
             SELECT
@@ -523,27 +523,11 @@ const runMigrations = async () => {
                 COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
                 COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
                 COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
-                COUNT(id) FILTER (WHERE source = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(id) FILTER (WHERE source = 'EXPLORATORY') AS bugs_from_exploratory
-            FROM bugs
-            WHERE deleted_at IS NULL
-        `);
-
-        // Global Bug Summary View (final — includes source-based columns + legacy linked_test cols)
-        await client.query(`
-            CREATE OR REPLACE VIEW v_bug_summary_global AS
-            SELECT
-                COUNT(id) AS total_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
-                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
-                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
-                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
-                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
-                COUNT(id) FILTER (WHERE source = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(id) FILTER (WHERE source = 'EXPLORATORY') AS bugs_from_exploratory,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
                 COUNT(id) FILTER (WHERE array_length(linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
                 COUNT(id) FILTER (WHERE linked_test_execution_ids IS NULL
+                    OR array_length(linked_test_execution_ids, 1) IS NULL
                     OR array_length(linked_test_execution_ids, 1) = 0) AS standalone_bugs
             FROM bugs
             WHERE deleted_at IS NULL
