@@ -832,6 +832,17 @@ router.post('/executions/bulk-import', requireAuth, requirePermission('action:te
   }
 });
 
+// Exported for testing
+function validateExecutionDate(value) {
+  if (!value || typeof value !== 'string') return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const today = new Date().toISOString().split('T')[0];
+  if (value > today) {
+    throw new Error('Execution date cannot be in the future');
+  }
+  return value;
+}
+
 // ============================================================================
 // EXCEL UPLOAD - Import test results from Excel/CSV
 // ============================================================================
@@ -845,9 +856,17 @@ router.post('/upload-excel', requireAuth, requirePermission('action:test-executi
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { project_id, test_run_name } = req.body;
+    const { project_id, test_run_name, execution_date: rawDate } = req.body;
     if (!project_id) {
       return res.status(400).json({ error: 'project_id is required' });
+    }
+
+    // Validate execution_date if provided
+    let validatedDate;
+    try {
+      validatedDate = validateExecutionDate(rawDate);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
     }
 
     // Parse Excel file
@@ -872,16 +891,16 @@ router.post('/upload-excel', requireAuth, requirePermission('action:test-executi
     const runId = `RUN-${String(nextId).padStart(4, '0')}`;
 
     const testRunResult = await client.query(
-      `INSERT INTO test_run (run_id, name, description, project_id, status)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [
-        runId,
-        test_run_name || `Excel Import - ${new Date().toISOString().split('T')[0]}`,
-        `Imported from file: ${req.file.originalname}`,
-        project_id,
-        'completed'
-      ]
+      validatedDate
+        ? `INSERT INTO test_run (run_id, name, description, project_id, status, started_at)
+           VALUES ($1, $2, $3, $4, $5, $6::timestamptz)
+           RETURNING *`
+        : `INSERT INTO test_run (run_id, name, description, project_id, status)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+      validatedDate
+        ? [runId, test_run_name || `Excel Import - ${validatedDate}`, `Imported from file: ${req.file.originalname}`, project_id, 'completed', validatedDate]
+        : [runId, test_run_name || `Excel Import - ${new Date().toISOString().split('T')[0]}`, `Imported from file: ${req.file.originalname}`, project_id, 'completed']
     );
 
     const testRun = testRunResult.rows[0];
@@ -1021,3 +1040,4 @@ router.get('/recent-uploads', requireAuth, requirePermission('page:test-executio
 });
 
 module.exports = router;
+module.exports.validateExecutionDate = validateExecutionDate;
