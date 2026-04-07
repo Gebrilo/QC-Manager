@@ -71,6 +71,9 @@ export default function TestExecutionsPage() {
     const [filteredRuns, setFilteredRuns] = useState<TestRun[]>([]);
     const [selectedProject, setSelectedProject] = useState<string>('');
     const [testRunName, setTestRunName] = useState('');
+    const [executionDate, setExecutionDate] = useState<string>(
+        new Date().toISOString().split('T')[0]
+    );
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -204,6 +207,7 @@ export default function TestExecutionsPage() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('project_id', selectedProject);
+            formData.append('execution_date', executionDate);
             if (testRunName) {
                 formData.append('test_run_name', testRunName);
             }
@@ -236,6 +240,7 @@ export default function TestExecutionsPage() {
             // Clear form
             setFile(null);
             setTestRunName('');
+            setExecutionDate(new Date().toISOString().split('T')[0]);
             if (fileInputRef.current) fileInputRef.current.value = '';
 
         } catch (err: any) {
@@ -388,6 +393,20 @@ export default function TestExecutionsPage() {
                                     onChange={(e) => setTestRunName(e.target.value)}
                                     placeholder="e.g., Sprint 5 Regression Tests"
                                     className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm hover:border-indigo-300 placeholder:text-slate-400"
+                                />
+                            </div>
+
+                            {/* Execution Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Execution Date <span className="text-slate-400">(When tests were run)</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={executionDate}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setExecutionDate(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm hover:border-indigo-300"
                                 />
                             </div>
 
