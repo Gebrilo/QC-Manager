@@ -836,6 +836,8 @@ router.post('/executions/bulk-import', requireAuth, requirePermission('action:te
 function validateExecutionDate(value) {
   if (!value || typeof value !== 'string') return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
   const today = new Date().toISOString().split('T')[0];
   if (value > today) {
     throw new Error('Execution date cannot be in the future');

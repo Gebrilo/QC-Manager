@@ -42,4 +42,8 @@ describe('validateExecutionDate', () => {
   test('returns null for a non-date string that fails the regex', () => {
     expect(validateExecutionDate('not-a-date')).toBeNull();
   });
+
+  test('returns null for a syntactically valid but impossible date (2026-99-99)', () => {
+    expect(validateExecutionDate('2026-99-99')).toBeNull();
+  });
 });
