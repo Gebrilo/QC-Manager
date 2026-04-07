@@ -21,17 +21,20 @@ Add a date picker to the upload form. The selected date is passed to the API and
 ### 1. Frontend — `apps/web/app/test-executions/page.tsx`
 
 - Add `executionDate` state, initialised to `new Date().toISOString().split('T')[0]` (today in `YYYY-MM-DD`)
-- Add `<input type="date">` labeled **"Execution Date"**, placed between the run name field and the file drop zone
+- Add `<input type="date">` labeled **"Execution Date"**, placed between the run name field and the file drop zone; set `max` attribute to today's date to prevent selecting future dates in the browser
 - Append `execution_date` to the `FormData` sent to `POST /test-executions/upload-excel`
-- Use `executionDate` (not `new Date()`) when generating the fallback run name: `Excel Import - <executionDate>`
+- At upload submission time (inside `handleUpload`), use `executionDate` instead of `new Date().toISOString().split('T')[0]` for the fallback run name passed to `FormData` — the fallback is applied at submission, not reactively as the user changes the date picker
+- After a successful upload, reset `executionDate` back to today (`new Date().toISOString().split('T')[0]`) alongside the existing form resets (`setFile(null)`, `setTestRunName('')`)
 
 ### 2. Backend — `apps/api/src/routes/testExecutions.js` (`upload-excel` handler)
 
 - Destructure `execution_date` from `req.body`
-- Validate: if present, must match `YYYY-MM-DD` format (simple regex `^\d{4}-\d{2}-\d{2}$`)
-- In the `INSERT INTO test_run` query:
-  - If valid: pass `execution_date` as the 6th parameter, add `started_at` to the column list, use `$6::timestamptz`
-  - If missing or invalid: omit `started_at` from the insert and let the DB default (`CURRENT_TIMESTAMP`) apply
+- Validate when present:
+  - Must match `YYYY-MM-DD` format (regex `^\d{4}-\d{2}-\d{2}$`)
+  - Must not be a future date — if `execution_date > today` return HTTP 400 `{ error: 'Execution date cannot be in the future' }`
+- Two distinct INSERT strings based on whether `execution_date` is valid:
+  - **With date:** `INSERT INTO test_run (run_id, name, description, project_id, status, started_at) VALUES ($1, $2, $3, $4, $5, $6::timestamptz)` — pass `execution_date` as the 6th parameter
+  - **Without date (missing or invalid format):** `INSERT INTO test_run (run_id, name, description, project_id, status) VALUES ($1, $2, $3, $4, $5)` — omit `started_at` entirely so the DB default (`CURRENT_TIMESTAMP`) applies. Do NOT pass `NULL` as `$6` as this would override the column default and leave `started_at` null.
 - No other endpoints are affected
 
 ---
