@@ -369,7 +369,8 @@ router.post('/bug', async (req, res) => {
             // Create new bug — resolve reporter to a resource (set once, immutable)
             let ownerResourceId = null;
             if (reported_by) {
-                const reporterName = reported_by.includes('(') ? reported_by.split(' (')[0] : reported_by;
+                const reporterClean = (reported_by || '').trim();
+                const reporterName = reporterClean.includes('(') ? reporterClean.split(' (')[0].trim() : reporterClean;
                 const resourceRes = await pool.query(
                     `SELECT id FROM resources
                      WHERE deleted_at IS NULL
