@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.tuleap_base_url }}/api/trackers/{{ $json.tuleap_tracker_id }}/artifacts?values=all&limit=500&offset=0",
+        "url": "={{ $json.tuleap_base_url + '/api/trackers/' + $json.tuleap_tracker_id + '/artifacts?values=all&limit=500&offset=0' }}",
         "options": {
           "timeout": 30000
         },
@@ -95,7 +95,7 @@
           "parameters": [
             {
               "name": "X-Auth-Token",
-              "value": "={{$credentials.tuleapApiToken}}"
+              "value": "={{ $env.TULEAP_API_TOKEN }}"
             }
           ]
         }
