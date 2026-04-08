@@ -10,6 +10,13 @@ const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function sanitizeUuidArray(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(v => typeof v === 'string' && UUID_REGEX.test(v));
+}
+
 // =====================================================
 // HELPER: Map Tuleap status labels to QC-Manager task statuses
 // Valid QC statuses: 'Backlog', 'In Progress', 'Done', 'Cancelled'
@@ -231,8 +238,8 @@ router.post('/bug', async (req, res) => {
             bug_type,
             component,
             project_id,
-            linked_test_case_ids = [],
-            linked_test_execution_ids = [],
+            linked_test_case_ids: rawTestCaseIds = [],
+            linked_test_execution_ids: rawTestExecIds = [],
             reported_by,
             assigned_to,
             reported_date,
@@ -246,6 +253,9 @@ router.post('/bug', async (req, res) => {
                 error: 'tuleap_artifact_id and title are required'
             });
         }
+
+        const linked_test_case_ids = sanitizeUuidArray(rawTestCaseIds);
+        const linked_test_execution_ids = sanitizeUuidArray(rawTestExecIds);
 
         const computedSource = linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0
             ? 'TEST_CASE'
@@ -356,7 +366,21 @@ router.post('/bug', async (req, res) => {
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'UPDATE', bug, null);
         } else {
-            // Create new bug
+            // Create new bug — resolve reporter to a resource (set once, immutable)
+            let ownerResourceId = null;
+            if (reported_by) {
+                const resourceRes = await pool.query(
+                    `SELECT id FROM resources
+                     WHERE deleted_at IS NULL
+                       AND (LOWER(email) = LOWER($1) OR LOWER(resource_name) = LOWER($1))
+                     LIMIT 1`,
+                    [reported_by]
+                );
+                if (resourceRes.rows.length > 0) {
+                    ownerResourceId = resourceRes.rows[0].id;
+                }
+            }
+
             const bug_id = `TLP-${tuleap_artifact_id}`;
             const result = await pool.query(`
                 INSERT INTO bugs (
@@ -364,15 +388,17 @@ router.post('/bug', async (req, res) => {
                     bug_id, title, description, status, severity, priority,
                     bug_type, component, project_id,
                     linked_test_case_ids, linked_test_execution_ids,
-                    reported_by, assigned_to, reported_date, raw_tuleap_payload, source
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                    reported_by, assigned_to, reported_date, raw_tuleap_payload, source,
+                    owner_resource_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
                 RETURNING *
             `, [
                 tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
                 bug_id, title, description, status, severity, priority,
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource
+                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource,
+                ownerResourceId
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'CREATE', bug, null);

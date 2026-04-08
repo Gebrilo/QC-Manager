@@ -89,7 +89,41 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
                 t.created_at DESC
         `, [id]);
 
-        // 5. Compute timeline metrics per task
+        // 5. Bugs owned by this resource (owner set once at first sync, immutable)
+        const bugsResult = await db.query(`
+            SELECT
+                b.id,
+                b.bug_id,
+                b.title,
+                b.source,
+                b.status,
+                b.severity,
+                p.project_name,
+                b.reported_date AS creation_date
+            FROM bugs b
+            LEFT JOIN projects p ON b.project_id = p.id
+            WHERE b.owner_resource_id = $1
+              AND b.deleted_at IS NULL
+            ORDER BY b.reported_date DESC NULLS LAST, b.created_at DESC
+        `, [id]);
+
+        // 6. Task summary stats (computed in JS — no extra query)
+        const taskSummary = {
+            total: tasksResult.rows.length,
+            by_status: {},
+            by_priority: {},
+            by_project: {},
+        };
+        for (const t of tasksResult.rows) {
+            taskSummary.by_status[t.status] = (taskSummary.by_status[t.status] || 0) + 1;
+            if (t.priority) {
+                taskSummary.by_priority[t.priority] = (taskSummary.by_priority[t.priority] || 0) + 1;
+            }
+            const proj = t.project_name || 'Unassigned';
+            taskSummary.by_project[proj] = (taskSummary.by_project[proj] || 0) + 1;
+        }
+
+        // 7. Compute timeline metrics per task
         const now = new Date();
         const timelineSummary = { on_track: 0, at_risk: 0, overdue: 0, completed_early: 0 };
 
@@ -121,7 +155,9 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
             current_week_actual_hrs: Number(weekActualsResult.rows[0]?.current_week_actual_hrs || 0),
             backlog_hrs: Number(backlogResult.rows[0]?.backlog_hrs || 0),
             timeline_summary: timelineSummary,
+            task_summary: taskSummary,
             tasks: enrichedTasks,
+            bugs: bugsResult.rows,
         });
     } catch (err) {
         next(err);

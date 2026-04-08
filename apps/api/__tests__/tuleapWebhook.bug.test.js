@@ -36,6 +36,7 @@ describe('POST /tuleap-webhook/bug', () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
             .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing bug
+            .mockResolvedValueOnce({ rows: [] })  // SELECT resource by reporter (no match)
             .mockResolvedValueOnce({
                 rows: [{ // INSERT bug
                     id: 'new-bug-uuid',
@@ -43,7 +44,8 @@ describe('POST /tuleap-webhook/bug', () => {
                     title: bugPayload.title,
                     status: bugPayload.status,
                     severity: bugPayload.severity,
-                    tuleap_artifact_id: bugPayload.tuleap_artifact_id
+                    tuleap_artifact_id: bugPayload.tuleap_artifact_id,
+                    owner_resource_id: null,
                 }]
             })
             .mockResolvedValueOnce({ rows: [] }); // logWebhook update

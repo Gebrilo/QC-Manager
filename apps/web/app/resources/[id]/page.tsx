@@ -32,6 +32,12 @@ interface ResourceAnalytics {
         overdue: number;
         completed_early: number;
     };
+    task_summary: {
+        total: number;
+        by_status: Record<string, number>;
+        by_priority: Record<string, number>;
+        by_project: Record<string, number>;
+    };
     tasks: Array<{
         id: string;
         task_id: string;
@@ -42,11 +48,20 @@ interface ResourceAnalytics {
         estimate_hrs: number;
         actual_hrs: number;
         assignment_role: string;
-        // Timeline fields
         start_variance: number | null;
         completion_variance: number | null;
         execution_variance: number | null;
         health_status: 'on_track' | 'at_risk' | 'overdue' | 'completed_early' | null;
+    }>;
+    bugs: Array<{
+        id: string;
+        bug_id: string;
+        title: string;
+        source: 'TEST_CASE' | 'EXPLORATORY';
+        status: string;
+        severity: string;
+        project_name?: string;
+        creation_date?: string;
     }>;
 }
 
@@ -351,6 +366,60 @@ export default function ResourceDashboardPage() {
                 </div>
             </div>
 
+            {/* Task Summary */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        Task Summary
+                    </h3>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Status</p>
+                        <div className="space-y-2">
+                            {Object.entries(data.task_summary.by_status).map(([status, count]) => {
+                                const color = status === 'Done' ? 'emerald' : status === 'In Progress' ? 'blue' : status === 'Cancelled' ? 'slate' : 'amber';
+                                return (
+                                    <div key={status} className="flex items-center justify-between">
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${color}-50 dark:bg-${color}-900/20 text-${color}-600 dark:text-${color}-400`}>
+                                            {status}
+                                        </span>
+                                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Priority</p>
+                        <div className="space-y-2">
+                            {Object.entries(data.task_summary.by_priority).map(([priority, count]) => {
+                                const color = priority === 'critical' ? 'red' : priority === 'high' ? 'rose' : priority === 'medium' ? 'amber' : 'slate';
+                                return (
+                                    <div key={priority} className="flex items-center justify-between">
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${color}-50 dark:bg-${color}-900/20 text-${color}-600 dark:text-${color}-400 capitalize`}>
+                                            {priority}
+                                        </span>
+                                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Project</p>
+                        <div className="space-y-2">
+                            {Object.entries(data.task_summary.by_project).map(([project, count]) => (
+                                <div key={project} className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate max-w-[140px]">{project}</span>
+                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-2">{count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Assigned Tasks Table with Timeline Columns */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
@@ -431,6 +500,70 @@ export default function ResourceDashboardPage() {
                                             </td>
                                             <td className="px-3 py-3 text-right text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">{Number(task.estimate_hrs).toFixed(1)}</td>
                                             <td className="px-3 py-3 text-right text-sm font-medium text-slate-900 dark:text-white whitespace-nowrap">{Number(task.actual_hrs).toFixed(1)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Reported Bugs */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        Reported Bugs ({data.bugs.length})
+                    </h3>
+                </div>
+                {data.bugs.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400 dark:text-slate-500">
+                        No bugs associated with this resource.
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full table-fixed">
+                            <thead className="bg-slate-50 dark:bg-slate-800/50">
+                                <tr>
+                                    <th className="w-[8%] px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID</th>
+                                    <th className="w-[28%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Title</th>
+                                    <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Source</th>
+                                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Severity</th>
+                                    <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
+                                    <th className="w-[14%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {data.bugs.map(bug => {
+                                    const sourceColor = bug.source === 'TEST_CASE' ? 'violet' : 'orange';
+                                    const statusColor = bug.status === 'Closed' || bug.status === 'Resolved' ? 'emerald' : bug.status === 'Open' ? 'rose' : 'amber';
+                                    const severityColor = bug.severity === 'critical' ? 'red' : bug.severity === 'high' ? 'rose' : bug.severity === 'medium' ? 'amber' : 'slate';
+                                    return (
+                                        <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400">{bug.bug_id}</td>
+                                            <td className="px-3 py-3 text-sm text-slate-900 dark:text-white truncate">{bug.title}</td>
+                                            <td className="px-3 py-3 whitespace-nowrap">
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${sourceColor}-50 dark:bg-${sourceColor}-900/20 text-${sourceColor}-600 dark:text-${sourceColor}-400`}>
+                                                    {bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap">
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${statusColor}-50 dark:bg-${statusColor}-900/20 text-${statusColor}-600 dark:text-${statusColor}-400`}>
+                                                    {bug.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap">
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${severityColor}-50 dark:bg-${severityColor}-900/20 text-${severityColor}-600 dark:text-${severityColor}-400 capitalize`}>
+                                                    {bug.severity}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400 truncate">{bug.project_name || '—'}</td>
+                                            <td className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                {bug.creation_date
+                                                    ? new Date(bug.creation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                    : '—'}
+                                            </td>
                                         </tr>
                                     );
                                 })}

@@ -366,6 +366,16 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_source ON bugs(source)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_project_source ON bugs(project_id, source) WHERE deleted_at IS NULL`);
 
+        // Bug ownership: immutable FK to resources, set once on first sync
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bugs' AND column_name='owner_resource_id') THEN
+                    ALTER TABLE bugs ADD COLUMN owner_resource_id UUID REFERENCES resources(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_owner_resource_id ON bugs(owner_resource_id) WHERE deleted_at IS NULL`);
+
         // Tuleap Sync Configuration
         await client.query(`
             CREATE TABLE IF NOT EXISTS tuleap_sync_config (
