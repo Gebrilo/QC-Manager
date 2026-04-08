@@ -67,10 +67,10 @@ interface ResourceAnalytics {
 
 const HEALTH_CONFIG: Record<string, {
     label: string;
-    color: string;       // hex for dot / accents
-    lightBg: string;     // hex for card & badge background (light)
-    lightBorder: string; // hex for card & badge border (light)
-    lightText: string;   // hex for text (light)
+    color: string;
+    lightBg: string;
+    lightBorder: string;
+    lightText: string;
     pulse: boolean;
 }> = {
     on_track: {
@@ -105,6 +105,17 @@ const HEALTH_CONFIG: Record<string, {
         lightText: '#1e40af',
         pulse: false,
     },
+};
+
+const BADGE_CLASSES: Record<string, string> = {
+    emerald:  'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
+    blue:     'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    amber:    'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+    slate:    'bg-slate-50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400',
+    rose:     'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400',
+    red:      'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+    violet:   'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400',
+    orange:   'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
 };
 
 function StatusIndicator({ config, size = 'sm' }: { config: typeof HEALTH_CONFIG[string]; size?: 'sm' | 'lg' }) {
@@ -381,7 +392,7 @@ export default function ResourceDashboardPage() {
                                 const color = status === 'Done' ? 'emerald' : status === 'In Progress' ? 'blue' : status === 'Cancelled' ? 'slate' : 'amber';
                                 return (
                                     <div key={status} className="flex items-center justify-between">
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${color}-50 dark:bg-${color}-900/20 text-${color}-600 dark:text-${color}-400`}>
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[color]}`}>
                                             {status}
                                         </span>
                                         <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
@@ -397,7 +408,7 @@ export default function ResourceDashboardPage() {
                                 const color = priority === 'critical' ? 'red' : priority === 'high' ? 'rose' : priority === 'medium' ? 'amber' : 'slate';
                                 return (
                                     <div key={priority} className="flex items-center justify-between">
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${color}-50 dark:bg-${color}-900/20 text-${color}-600 dark:text-${color}-400 capitalize`}>
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded capitalize ${BADGE_CLASSES[color]}`}>
                                             {priority}
                                         </span>
                                         <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
@@ -544,17 +555,17 @@ export default function ResourceDashboardPage() {
                                             <td className="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400">{bug.bug_id}</td>
                                             <td className="px-3 py-3 text-sm text-slate-900 dark:text-white truncate">{bug.title}</td>
                                             <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${sourceColor}-50 dark:bg-${sourceColor}-900/20 text-${sourceColor}-600 dark:text-${sourceColor}-400`}>
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[sourceColor]}`}>
                                                     {bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory'}
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${statusColor}-50 dark:bg-${statusColor}-900/20 text-${statusColor}-600 dark:text-${statusColor}-400`}>
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[statusColor]}`}>
                                                     {bug.status}
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded bg-${severityColor}-50 dark:bg-${severityColor}-900/20 text-${severityColor}-600 dark:text-${severityColor}-400 capitalize`}>
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded capitalize ${BADGE_CLASSES[severityColor]}`}>
                                                     {bug.severity}
                                                 </span>
                                             </td>
