@@ -143,8 +143,9 @@ export interface DashboardSummary {
 
 export interface TrendData {
     date: string;
-    passRate: number;
-    testsExecuted: number;
+    passRate: number | null;
+    totalTests: number;
+    passedCount: number;
 }
 
 // =====================================================
@@ -263,6 +264,7 @@ export interface Bug {
     project_id?: string;
     project_name?: string;
     reported_by?: string;
+    updated_by?: string;
     assigned_to?: string;
     reported_date: string | null;
     resolved_date?: string | null;
