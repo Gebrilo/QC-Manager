@@ -248,7 +248,7 @@ function BugsContent() {
                                         {bug.project_name || '\u2014'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
-                                        {bug.reported_by || '\u2014'}
+                                        {bug.updated_by || bug.reported_by || '\u2014'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
                                         {bug.assigned_to || '\u2014'}

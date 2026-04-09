@@ -314,6 +314,7 @@ export interface Bug {
     project_id?: string;
     project_name?: string;
     reported_by?: string;
+    updated_by?: string;
     assigned_to?: string;
     reported_date?: string;
     tuleap_url?: string;
