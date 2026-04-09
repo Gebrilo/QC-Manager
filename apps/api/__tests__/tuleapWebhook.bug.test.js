@@ -213,7 +213,8 @@ describe('POST /tuleap-webhook/bug', () => {
         expect(updateCall[0]).toContain('updated_by');
         expect(updateCall[1]).toContain('Bob Editor');
 
-        // Verify reported_by was NOT included in the UPDATE query parameters
+        // Verify reported_by was NOT included in the UPDATE SQL or parameters
+        expect(updateCall[0]).not.toContain('reported_by');
         expect(updateCall[1]).not.toContain('Jane Smith');
     });
 });
