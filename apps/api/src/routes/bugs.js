@@ -326,7 +326,7 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
 
         const allowedFields = [
             'title', 'description', 'status', 'severity', 'priority',
-            'bug_type', 'component', 'assigned_to',
+            'bug_type', 'component', 'assigned_to', 'updated_by',
             'resolved_date',
             'linked_test_case_ids', 'linked_test_execution_ids', 'raw_tuleap_payload',
             'source'
