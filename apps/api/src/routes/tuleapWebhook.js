@@ -241,6 +241,7 @@ router.post('/bug', async (req, res) => {
             linked_test_case_ids: rawTestCaseIds = [],
             linked_test_execution_ids: rawTestExecIds = [],
             reported_by,
+            updated_by,
             assigned_to,
             reported_date,
             raw_tuleap_payload,
@@ -354,14 +355,18 @@ router.post('/bug', async (req, res) => {
                     title = $1, description = $2, status = $3, severity = $4, priority = $5,
                     bug_type = $6, component = $7, assigned_to = $8,
                     linked_test_case_ids = $9, linked_test_execution_ids = $10,
-                    raw_tuleap_payload = $11, source = $12, last_sync_at = NOW(), updated_at = NOW()
-                WHERE id = $13
+                    raw_tuleap_payload = $11, source = $12,
+                    updated_by = $13,
+                    last_sync_at = NOW(), updated_at = NOW()
+                WHERE id = $14
                 RETURNING *
             `, [
                 title, description, status, severity, priority,
                 bug_type, component, assigned_to,
                 linked_test_case_ids, linked_test_execution_ids,
-                raw_tuleap_payload, finalSource, existingId
+                raw_tuleap_payload, finalSource,
+                updated_by || null,
+                existingId
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'UPDATE', bug, null);
