@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import Link from 'next/link';
+import { usePagination } from '@/hooks/usePagination';
+import { Pagination } from '@/components/ui/Pagination';
+import { downloadCSV, downloadXLSX, safeFilename } from '@/lib/exportUtils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -118,6 +121,40 @@ const BADGE_CLASSES: Record<string, string> = {
     orange:   'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
 };
 
+function tasksToRows(tasks: ResourceAnalytics['tasks']) {
+  return tasks.map(t => ({
+    'Task ID': t.task_id,
+    'Task Name': t.task_name,
+    'Project': t.project_name ?? '',
+    'Status': t.status,
+    'Priority': t.priority ?? '',
+    'Health Status': t.health_status ?? '',
+    'Start Variance (days)': t.start_variance ?? '',
+    'Completion Variance (days)': t.completion_variance ?? '',
+    'Execution Variance (days)': t.execution_variance ?? '',
+    'Estimated Hrs': Number(t.estimate_hrs).toFixed(1),
+    'Actual Hrs': Number(t.actual_hrs).toFixed(1),
+  }));
+}
+
+function bugsToRows(bugs: ResourceAnalytics['bugs']) {
+  return bugs.map(b => ({
+    'Bug ID': b.bug_id,
+    'Title': b.title,
+    'Source': b.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory',
+    'Status': b.status,
+    'Severity': b.severity,
+    'Project': b.project_name ?? '',
+    'Created': b.creation_date
+      ? new Date(b.creation_date).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '',
+  }));
+}
+
 function StatusIndicator({ config, size = 'sm' }: { config: typeof HEALTH_CONFIG[string]; size?: 'sm' | 'lg' }) {
     const dotSize = size === 'lg' ? 12 : 8;
     const pingSize = size === 'lg' ? 12 : 8;
@@ -163,6 +200,8 @@ export default function ResourceDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const resourceId = params?.id as string;
+    const tasksPagination = usePagination(data?.tasks.length ?? 0);
+    const bugsPagination = usePagination(data?.bugs.length ?? 0);
 
     const isManager = user?.role === 'manager';
     const canAccess = isAdmin || isManager;
@@ -433,10 +472,34 @@ export default function ResourceDashboardPage() {
 
             {/* Assigned Tasks Table with Timeline Columns */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Assigned Tasks ({data.tasks.length})
                     </h3>
+                    {data.tasks.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                data-testid="tasks-export-csv"
+                                onClick={() => downloadCSV(
+                                    `resource_tasks_${safeFilename(profile.resource_name)}.csv`,
+                                    tasksToRows(data.tasks)
+                                )}
+                                className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Export CSV
+                            </button>
+                            <button
+                                data-testid="tasks-export-xlsx"
+                                onClick={() => downloadXLSX(
+                                    `resource_tasks_${safeFilename(profile.resource_name)}.xlsx`,
+                                    tasksToRows(data.tasks)
+                                )}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white transition-colors shadow-sm"
+                            >
+                                Export Excel
+                            </button>
+                        </div>
+                    )}
                 </div>
                 {data.tasks.length === 0 ? (
                     <div className="p-12 text-center text-slate-400 dark:text-slate-500">
@@ -444,7 +507,7 @@ export default function ResourceDashboardPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed">
+                        <table data-testid="tasks-table" className="w-full table-fixed">
                             <thead className="bg-slate-50 dark:bg-slate-800/50">
                                 <tr>
                                     <th className="w-[26%] px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Task</th>
@@ -459,7 +522,7 @@ export default function ResourceDashboardPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {data.tasks.map(task => {
+                                {tasksPagination.slice(data.tasks).map(task => {
                                     const healthCfg = task.health_status ? HEALTH_CONFIG[task.health_status] : null;
                                     const statusColor =
                                         task.status === 'Done' ? 'emerald' :
@@ -516,16 +579,47 @@ export default function ResourceDashboardPage() {
                                 })}
                             </tbody>
                         </table>
+                        <Pagination
+                            currentPage={tasksPagination.currentPage}
+                            totalPages={tasksPagination.totalPages}
+                            onPrev={tasksPagination.goToPrev}
+                            onNext={tasksPagination.goToNext}
+                            testIdPrefix="tasks"
+                        />
                     </div>
                 )}
             </div>
 
             {/* Reported Bugs */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Reported Bugs ({data.bugs.length})
                     </h3>
+                    {data.bugs.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                data-testid="bugs-export-csv"
+                                onClick={() => downloadCSV(
+                                    `resource_bugs_${safeFilename(profile.resource_name)}.csv`,
+                                    bugsToRows(data.bugs)
+                                )}
+                                className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Export CSV
+                            </button>
+                            <button
+                                data-testid="bugs-export-xlsx"
+                                onClick={() => downloadXLSX(
+                                    `resource_bugs_${safeFilename(profile.resource_name)}.xlsx`,
+                                    bugsToRows(data.bugs)
+                                )}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white transition-colors shadow-sm"
+                            >
+                                Export Excel
+                            </button>
+                        </div>
+                    )}
                 </div>
                 {data.bugs.length === 0 ? (
                     <div className="p-12 text-center text-slate-400 dark:text-slate-500">
@@ -533,7 +627,7 @@ export default function ResourceDashboardPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed">
+                        <table data-testid="bugs-table" className="w-full table-fixed">
                             <thead className="bg-slate-50 dark:bg-slate-800/50">
                                 <tr>
                                     <th className="w-[8%] px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID</th>
@@ -546,7 +640,7 @@ export default function ResourceDashboardPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {data.bugs.map(bug => {
+                                {bugsPagination.slice(data.bugs).map(bug => {
                                     const sourceColor = bug.source === 'TEST_CASE' ? 'violet' : 'orange';
                                     const statusColor = bug.status === 'Closed' || bug.status === 'Resolved' ? 'emerald' : bug.status === 'Open' ? 'rose' : 'amber';
                                     const severityColor = bug.severity === 'critical' ? 'red' : bug.severity === 'high' ? 'rose' : bug.severity === 'medium' ? 'amber' : 'slate';
@@ -580,6 +674,13 @@ export default function ResourceDashboardPage() {
                                 })}
                             </tbody>
                         </table>
+                        <Pagination
+                            currentPage={bugsPagination.currentPage}
+                            totalPages={bugsPagination.totalPages}
+                            onPrev={bugsPagination.goToPrev}
+                            onNext={bugsPagination.goToNext}
+                            testIdPrefix="bugs"
+                        />
                     </div>
                 )}
             </div>

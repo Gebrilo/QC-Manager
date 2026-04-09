@@ -45,9 +45,26 @@ export async function mockAuthenticatedSession(
     const permissions = options?.permissions || adminPermissions;
     const token = options?.token || 'e2e-auth-token';
 
-    await page.addInitScript((value) => {
-        window.localStorage.setItem('auth_token', value);
-    }, token);
+    const supabaseSession = JSON.stringify({
+        access_token: token,
+        refresh_token: 'e2e-refresh-token',
+        token_type: 'bearer',
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: {
+            id: user.id,
+            email: user.email,
+            aud: 'authenticated',
+            role: 'authenticated',
+            app_metadata: {},
+            user_metadata: { full_name: user.name },
+        },
+    });
+
+    await page.addInitScript((values) => {
+        window.localStorage.setItem('auth_token', values.token);
+        window.localStorage.setItem('sb-placeholder-auth-token', values.session);
+    }, { token, session: supabaseSession });
 
     // Mock both the old production API and new localhost API URLs
     await page.route('**/auth/me', async (route) => {
@@ -63,6 +80,33 @@ export async function mockAuthenticatedSession(
             contentType: 'application/json',
             body: JSON.stringify({ user, permissions }),
         });
+    });
+
+    // Mock Supabase GoTrue auth endpoints
+    await page.route('**/placeholder.supabase.co/**', async (route) => {
+        const url = route.request().url();
+        if (url.includes('/token') || url.includes('/oauth')) {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    access_token: token,
+                    refresh_token: 'e2e-refresh-token',
+                    token_type: 'bearer',
+                    expires_in: 3600,
+                    expires_at: Math.floor(Date.now() / 1000) + 3600,
+                    user: { id: user.id, email: user.email, aud: 'authenticated', role: 'authenticated' },
+                }),
+            });
+        } else if (url.includes('/user')) {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ id: user.id, email: user.email, aud: 'authenticated', role: 'authenticated' }),
+            });
+        } else {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+        }
     });
 }
 
