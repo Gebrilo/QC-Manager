@@ -158,4 +158,62 @@ describe('POST /tuleap-webhook/bug', () => {
         const response = mockRes.json.mock.calls[0][0];
         expect(response.success).toBe(false);
     });
+
+    // T021: updated_by is synced on update, reported_by is not overwritten
+    test('T021: updated_by is written to DB on update; reported_by is not touched', async () => {
+        const bugPayload = {
+            ...processedBugData,
+            updated_by: 'Bob Editor',   // a different user from the original reporter
+        };
+
+        const existingBug = {
+            id: 'existing-bug-uuid',
+            bug_id: 'TLP-67890',
+            tuleap_artifact_id: bugPayload.tuleap_artifact_id,
+            deleted_at: null,
+            reported_by: 'Jane Smith',  // original reporter — must not change
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })            // logWebhook (received)
+            .mockResolvedValueOnce({ rows: [existingBug] }) // SELECT: bug exists
+            .mockResolvedValueOnce({
+                rows: [{
+                    ...existingBug,
+                    title: bugPayload.title,
+                    status: bugPayload.status,
+                    updated_by: 'Bob Editor',
+                }]
+            })                                              // UPDATE bug
+            .mockResolvedValueOnce({ rows: [] });           // logWebhook (processed)
+
+        const mockReq = { body: bugPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/bug' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('updated');
+        expect(response.data.updated_by).toBe('Bob Editor');
+
+        // Verify the UPDATE query included updated_by
+        const updateCall = mockQuery.mock.calls.find(
+            call => typeof call[0] === 'string' && call[0].includes('UPDATE bugs SET')
+        );
+        expect(updateCall).toBeDefined();
+        expect(updateCall[0]).toContain('updated_by');
+        expect(updateCall[1]).toContain('Bob Editor');
+
+        // Verify reported_by was NOT included in the UPDATE query parameters
+        expect(updateCall[1]).not.toContain('Jane Smith');
+    });
 });

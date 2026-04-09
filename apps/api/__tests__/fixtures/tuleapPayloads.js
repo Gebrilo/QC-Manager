@@ -92,6 +92,7 @@ const processedBugData = {
     component: 'Frontend',
     project_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     reported_by: 'Jane Smith',
+    updated_by: 'Jane Smith',
     assigned_to: 'Bob Builder',
     reported_date: '2026-02-20T14:00:00+00:00',
     raw_tuleap_payload: sampleBugPayload
