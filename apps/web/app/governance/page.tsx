@@ -9,11 +9,14 @@ import {
     ReleaseReadinessWidget,
     TrendAnalysisWidget,
     TestExecutionSummaryWidget,
-    BugSummaryWidget
+    BugSummaryWidget,
+    QualityMetricsWidget,
+    BlockedTestsWidget,
+    GrossNetProgressWidget,
 } from '../../src/components/governance';
-import { getDashboardSummary, getQualityRisks, getExecutionTrend } from '../../src/services/governanceApi';
+import { getDashboardSummary, getQualityRisks, getExecutionTrend, getQualityMetrics, getBlockedAnalysis, getExecutionProgress } from '../../src/services/governanceApi';
 import { projectsApi, tasksApi } from '../../src/lib/api';
-import type { DashboardSummary, QualityRisk, TrendData } from '../../src/types/governance';
+import type { DashboardSummary, QualityRisk, TrendData, QualityMetrics, BlockedModuleAnalysis, ExecutionProgress } from '../../src/types/governance';
 import type { Project, Task } from '../../src/lib/api';
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
@@ -37,6 +40,9 @@ export default function GovernanceDashboardPage() {
     const [trendData, setTrendData] = useState<TrendData[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics[]>([]);
+    const [blockedAnalysis, setBlockedAnalysis] = useState<BlockedModuleAnalysis[]>([]);
+    const [execProgress, setExecProgress] = useState<ExecutionProgress[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -46,18 +52,24 @@ export default function GovernanceDashboardPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [summaryData, risksData, trendDataResult, projectsData, tasksData] = await Promise.all([
+            const [summaryData, risksData, trendDataResult, projectsData, tasksData, qualityMetricsData, blockedAnalysisData, execProgressData] = await Promise.all([
                 getDashboardSummary(),
                 getQualityRisks('CRITICAL'),
                 getExecutionTrend(),
                 projectsApi.list().catch(() => [] as Project[]),
                 tasksApi.list().catch(() => [] as Task[]),
+                getQualityMetrics(),
+                getBlockedAnalysis(),
+                getExecutionProgress(),
             ]);
             setSummary(summaryData);
             setTopRisks(risksData.slice(0, 5));
             setTrendData(trendDataResult);
             setProjects(projectsData);
             setTasks(tasksData);
+            setQualityMetrics(qualityMetricsData);
+            setBlockedAnalysis(blockedAnalysisData);
+            setExecProgress(execProgressData);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
         } finally {
@@ -129,6 +141,22 @@ export default function GovernanceDashboardPage() {
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Bug Summary</h2>
                     </div>
                     <BugSummaryWidget />
+                </section>
+
+                {/* Quality Metrics Row */}
+                <section>
+                    <div className="mb-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Quality Metrics</h2>
+                    </div>
+                    <QualityMetricsWidget data={qualityMetrics} />
+                </section>
+
+                {/* Blocked Analysis + Gross/Net Progress Row */}
+                <section>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <BlockedTestsWidget data={blockedAnalysis} />
+                        <GrossNetProgressWidget data={execProgress} />
+                    </div>
                 </section>
 
                 {/* Projects Section */}
