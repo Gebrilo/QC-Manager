@@ -56,7 +56,7 @@ latest_results AS (
 )
 SELECT
     p.id                 AS project_id,
-    p.name               AS project_name,
+    p.project_name       AS project_name,
 
     -- Status counts (latest execution batch only)
     COUNT(lr.id)::INTEGER                                                               AS total_in_scope,
@@ -132,7 +132,7 @@ FROM projects p
 LEFT JOIN latest l ON p.id = l.project_id
 LEFT JOIN latest_results lr ON p.id = lr.project_id
 WHERE p.deleted_at IS NULL
-GROUP BY p.id, p.name;
+GROUP BY p.id, p.project_name;
 
 COMMENT ON VIEW v_execution_progress IS
 'Gross/Net Progress, Execution Coverage, and Requirement Coverage per project based on latest upload batch.';
@@ -158,7 +158,7 @@ latest_results AS (
 )
 SELECT
     p.id   AS project_id,
-    p.name AS project_name,
+    p.project_name AS project_name,
     COALESCE(lr.module_name, 'Unassigned')                                AS module_name,
     COUNT(lr.id)::INTEGER                                                  AS total_tests,
     COUNT(lr.id) FILTER (WHERE lr.status = 'blocked')::INTEGER            AS blocked_count,
@@ -183,8 +183,8 @@ FROM projects p
 LEFT JOIN latest l ON p.id = l.project_id
 LEFT JOIN latest_results lr ON p.id = lr.project_id
 WHERE p.deleted_at IS NULL
-GROUP BY p.id, p.name, COALESCE(lr.module_name, 'Unassigned')
-ORDER BY p.name, COALESCE(lr.module_name, 'Unassigned');
+GROUP BY p.id, p.project_name, COALESCE(lr.module_name, 'Unassigned')
+ORDER BY p.project_name, COALESCE(lr.module_name, 'Unassigned');
 
 COMMENT ON VIEW v_blocked_test_analysis IS
 'Per-module blocked test analysis with pivot flag (fires at >=50%) and double-work effort tracking.';
@@ -198,7 +198,7 @@ COMMENT ON VIEW v_blocked_test_analysis IS
 CREATE OR REPLACE VIEW v_test_effectiveness AS
 SELECT
     p.id   AS project_id,
-    p.name AS project_name,
+    p.project_name AS project_name,
 
     -- Defects found through formal test cases (not exploratory bugs)
     COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE' AND b.deleted_at IS NULL)::INTEGER AS defects_from_testing,
@@ -228,7 +228,7 @@ SELECT
 FROM projects p
 LEFT JOIN bugs b ON b.project_id = p.id
 WHERE p.deleted_at IS NULL
-GROUP BY p.id, p.name;
+GROUP BY p.id, p.project_name;
 
 COMMENT ON VIEW v_test_effectiveness IS
 'Test Case Effectiveness = Defects Detected via TEST_CASE bugs / Total Tests Run × 100.';
