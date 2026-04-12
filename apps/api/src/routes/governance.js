@@ -827,4 +827,88 @@ router.post('/global-settings', requireAuth, requirePermission('action:governanc
     }
 });
 
+// =====================================================
+// GET /governance/quality-metrics
+// Joins v_execution_progress + v_test_effectiveness
+// =====================================================
+router.get('/quality-metrics', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        let query = `
+            SELECT
+                ep.project_id,
+                ep.project_name,
+                ep.execution_coverage_pct,
+                ep.requirement_coverage_pct,
+                ep.gross_progress_pct,
+                ep.net_progress_pct,
+                ep.total_planned_tests,
+                ep.executed_tests,
+                ep.covered_requirements,
+                ep.total_requirements,
+                te.defects_from_testing,
+                te.total_tests_run,
+                te.effectiveness_pct
+            FROM v_execution_progress ep
+            LEFT JOIN v_test_effectiveness te ON ep.project_id = te.project_id
+            WHERE 1=1
+        `;
+        const params = [];
+        if (project_id) {
+            query += ` AND ep.project_id = $1`;
+            params.push(project_id);
+        }
+        query += ' ORDER BY ep.project_name';
+        const result = await pool.query(query, params);
+        res.json({ success: true, count: result.rows.length, data: result.rows });
+    } catch (error) {
+        console.error('Error fetching quality metrics:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch quality metrics', message: error.message });
+    }
+});
+
+// =====================================================
+// GET /governance/blocked-analysis
+// Per-module blocked % with pivot flags
+// =====================================================
+router.get('/blocked-analysis', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        let query = `SELECT * FROM v_blocked_test_analysis WHERE 1=1`;
+        const params = [];
+        if (project_id) {
+            query += ` AND project_id = $1`;
+            params.push(project_id);
+        }
+        query += ' ORDER BY project_name, module_name';
+        const result = await pool.query(query, params);
+        res.json({ success: true, count: result.rows.length, data: result.rows });
+    } catch (error) {
+        console.error('Error fetching blocked analysis:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch blocked analysis', message: error.message });
+    }
+});
+
+// =====================================================
+// GET /governance/execution-progress
+// Gross/Net Progress + Execution/Requirement Coverage
+// =====================================================
+router.get('/execution-progress', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        let query = `SELECT * FROM v_execution_progress WHERE 1=1`;
+        const params = [];
+        if (project_id) {
+            query += ` AND project_id = $1`;
+            params.push(project_id);
+        }
+        query += ' ORDER BY project_name';
+        const result = await pool.query(query, params);
+        res.json({ success: true, count: result.rows.length, data: result.rows });
+    } catch (error) {
+        console.error('Error fetching execution progress:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch execution progress', message: error.message });
+    }
+});
+
 module.exports = router;
