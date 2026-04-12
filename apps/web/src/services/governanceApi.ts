@@ -17,7 +17,10 @@ import type {
     TrendData,
     BugSummaryData,
     Bug,
-    TaskHistory
+    TaskHistory,
+    ExecutionProgress,
+    BlockedModuleAnalysis,
+    QualityMetrics
 } from '../types/governance';
 
 // =====================================================
@@ -277,6 +280,55 @@ export async function getTaskHistory(projectId?: string): Promise<TaskHistory[]>
 }
 
 // =====================================================
+// Quality Metrics (new views from migration 017)
+// =====================================================
+
+export async function getQualityMetrics(projectId?: string): Promise<QualityMetrics[]> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<QualityMetrics[]>>(
+            `/governance/quality-metrics${qs ? '?' + qs : ''}`
+        );
+        return result.data;
+    } catch (error) {
+        console.warn('Quality Metrics API failed', error);
+        return [];
+    }
+}
+
+export async function getBlockedAnalysis(projectId?: string): Promise<BlockedModuleAnalysis[]> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<BlockedModuleAnalysis[]>>(
+            `/governance/blocked-analysis${qs ? '?' + qs : ''}`
+        );
+        return result.data;
+    } catch (error) {
+        console.warn('Blocked Analysis API failed', error);
+        return [];
+    }
+}
+
+export async function getExecutionProgress(projectId?: string): Promise<ExecutionProgress[]> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<ExecutionProgress[]>>(
+            `/governance/execution-progress${qs ? '?' + qs : ''}`
+        );
+        return result.data;
+    } catch (error) {
+        console.warn('Execution Progress API failed', error);
+        return [];
+    }
+}
+
+// =====================================================
 // Combined API Service Object
 // =====================================================
 
@@ -347,7 +399,12 @@ export const governanceApi = {
     getBugsByProject,
 
     // Task History (Tuleap Integration)
-    getTaskHistory
+    getTaskHistory,
+
+    // Quality Metrics (migration 017)
+    getQualityMetrics,
+    getBlockedAnalysis,
+    getExecutionProgress,
 };
 
 export default governanceApi;

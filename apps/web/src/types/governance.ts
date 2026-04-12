@@ -378,3 +378,62 @@ export const TASK_HISTORY_ACTION_COLORS: Record<TaskHistoryAction, string> = {
     'reassigned_out': 'bg-orange-100 text-orange-800',
     'rejected_new': 'bg-red-100 text-red-800'
 };
+
+// =====================================================
+// Execution Progress Types (v_execution_progress)
+// =====================================================
+
+export interface ExecutionProgress {
+    project_id: string;
+    project_name: string;
+    total_in_scope: number;
+    passed_count: number;
+    failed_count: number;
+    blocked_count: number;
+    not_run_count: number;
+    rejected_count: number;
+    gross_progress_pct: string;
+    net_progress_pct: string;
+    total_planned_tests: number;
+    executed_tests: number;
+    execution_coverage_pct: string;
+    covered_requirements: number;
+    total_requirements: number;
+    requirement_coverage_pct: string | null;
+}
+
+// =====================================================
+// Blocked Test Analysis Types (v_blocked_test_analysis)
+// =====================================================
+
+export interface BlockedModuleAnalysis {
+    project_id: string;
+    project_name: string;
+    module_name: string;
+    total_tests: number;
+    blocked_count: number;
+    blocked_pct: string;
+    pivot_required: boolean;
+    retest_hrs: string;
+    blocked_hrs: string;
+}
+
+// =====================================================
+// Quality Metrics Types (joined view)
+// =====================================================
+
+export interface QualityMetrics {
+    project_id: string;
+    project_name: string;
+    execution_coverage_pct: string;
+    requirement_coverage_pct: string | null;
+    gross_progress_pct: string;
+    net_progress_pct: string;
+    total_planned_tests: number;
+    executed_tests: number;
+    covered_requirements: number;
+    total_requirements: number;
+    defects_from_testing: number;
+    total_tests_run: number;
+    effectiveness_pct: string;
+}

@@ -11,3 +11,6 @@ export { QualityGateSettings } from './QualityGateSettings';
 export { ReleaseControl } from './ReleaseControl';
 export { TestExecutionSummaryWidget } from './TestExecutionSummaryWidget';
 export { BugSummaryWidget } from './BugSummaryWidget';
+export { QualityMetricsWidget }   from './QualityMetricsWidget';
+export { BlockedTestsWidget }     from './BlockedTestsWidget';
+export { GrossNetProgressWidget } from './GrossNetProgressWidget';
