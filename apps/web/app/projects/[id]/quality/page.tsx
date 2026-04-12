@@ -10,6 +10,7 @@ import {
   ReleaseControl
 } from '@/components/governance'; // We need to export TrendAnalysisWidget from index
 import { getProjectHealthSummary, getExecutionTrend } from '@/services/governanceApi';
+import type { TrendData } from '@/types/governance';
 import { bugsApi } from '@/lib/api';
 import { BugsBySourceChart } from '@/components/BugsBySourceChart';
 
@@ -21,7 +22,7 @@ export default function ProjectQualityDetailsPage() {
 
   // State for project data
   const [project, setProject] = useState<any | null>(null);
-  const [trendData, setTrendData] = useState<{ date: string; passRate: number; testsExecuted: number }[]>([]);
+  const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bugSummary, setBugSummary] = useState<{
