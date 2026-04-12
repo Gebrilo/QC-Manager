@@ -9,9 +9,13 @@ const testResultSchema = z.object({
   test_case_id: z.string().min(1).max(100),
   test_case_title: z.string().max(500).optional(),
   status: z.enum(['passed', 'failed', 'not_run', 'blocked', 'rejected']),
-  executed_at: z.string().optional(), // ISO date string, defaults to today
+  executed_at: z.string().optional(),
   notes: z.string().optional(),
-  tester_name: z.string().max(200).optional()
+  tester_name: z.string().max(200).optional(),
+  requirement_id: z.string().max(100).optional(),
+  module_name: z.string().max(200).optional(),
+  estimated_hrs: z.number().positive().optional().nullable(),
+  is_retest: z.boolean().optional().default(false),
 });
 
 const bulkUploadSchema = z.object({
@@ -252,28 +256,51 @@ router.post('/test-results/upload', requireAuth, requirePermission('action:test-
         );
 
         if (existingResult.rows.length > 0) {
-          // Update existing result
-          const updateResult = await client.query(
-            `UPDATE test_result
-             SET status = $1,
-                 test_case_title = COALESCE($2, test_case_title),
-                 notes = $3,
-                 tester_name = $4,
-                 upload_batch_id = $5,
-                 uploaded_by = $6,
-                 uploaded_at = CURRENT_TIMESTAMP
-             WHERE id = $7
-             RETURNING id, test_case_id, status`,
-            [
-              testResult.status,
-              testResult.test_case_title,
-              testResult.notes,
-              testResult.tester_name,
-              uploadBatchId,
-              req.user?.id || null,
-              existingResult.rows[0].id
-            ]
-          );
+          const updateParts = [
+            'status = $1',
+            'test_case_title = COALESCE($2, test_case_title)',
+            'notes = $3',
+            'tester_name = $4',
+            'upload_batch_id = $5',
+            'uploaded_by = $6',
+            'uploaded_at = CURRENT_TIMESTAMP'
+          ];
+          const updateParams = [
+            testResult.status,
+            testResult.test_case_title,
+            testResult.notes,
+            testResult.tester_name,
+            uploadBatchId,
+            req.user?.id || null
+          ];
+          let pIdx = updateParams.length;
+
+          if (testResult.requirement_id !== undefined) {
+            pIdx++;
+            updateParts.push(`requirement_id = $${pIdx}`);
+            updateParams.push(testResult.requirement_id);
+          }
+          if (testResult.module_name !== undefined) {
+            pIdx++;
+            updateParts.push(`module_name = $${pIdx}`);
+            updateParams.push(testResult.module_name);
+          }
+          if (testResult.estimated_hrs != null) {
+            pIdx++;
+            updateParts.push(`estimated_hrs = $${pIdx}`);
+            updateParams.push(testResult.estimated_hrs);
+          }
+          if (testResult.is_retest !== undefined) {
+            pIdx++;
+            updateParts.push(`is_retest = $${pIdx}`);
+            updateParams.push(testResult.is_retest);
+          }
+
+          pIdx++;
+          updateParams.push(existingResult.rows[0].id);
+
+          const updateQuery = `UPDATE test_result SET ${updateParts.join(', ')} WHERE id = $${pIdx} RETURNING id, test_case_id, status`;
+          const updateResult = await client.query(updateQuery, updateParams);
 
           importResults.updated.push({
             row: i + 1,
@@ -282,33 +309,45 @@ router.post('/test-results/upload', requireAuth, requirePermission('action:test-
             executed_at: executedDate
           });
         } else {
-          // Insert new result
-          const insertResult = await client.query(
-            `INSERT INTO test_result (
-              test_case_id,
-              test_case_title,
-              project_id,
-              status,
-              executed_at,
-              notes,
-              tester_name,
-              upload_batch_id,
-              uploaded_by
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, test_case_id, status`,
-            [
-              testResult.test_case_id,
-              testResult.test_case_title,
-              project_id,
-              testResult.status,
-              executedDate,
-              testResult.notes,
-              testResult.tester_name,
-              uploadBatchId,
-              req.user?.id || null
-            ]
-          );
+          const insertColumns = [
+            'test_case_id', 'test_case_title', 'project_id', 'status',
+            'executed_at', 'notes', 'tester_name', 'upload_batch_id', 'uploaded_by'
+          ];
+          const insertValues = [
+            testResult.test_case_id, testResult.test_case_title || null, project_id,
+            testResult.status, executedDate, testResult.notes || null, testResult.tester_name || null,
+            uploadBatchId, req.user?.id || null
+          ];
+
+          if (testResult.requirement_id) {
+            insertColumns.push('requirement_id');
+            insertValues.push(testResult.requirement_id);
+          }
+          if (testResult.module_name) {
+            insertColumns.push('module_name');
+            insertValues.push(testResult.module_name);
+          }
+          if (testResult.estimated_hrs != null) {
+            insertColumns.push('estimated_hrs');
+            insertValues.push(testResult.estimated_hrs);
+          }
+          if (testResult.is_retest) {
+            insertColumns.push('is_retest');
+            insertValues.push(true);
+          }
+
+          const placeholders = insertColumns.map((_, i) => `$${i + 1}`).join(', ');
+          const insertQuery = `
+            INSERT INTO test_result (${insertColumns.join(', ')})
+            VALUES (${placeholders})
+            ON CONFLICT (test_case_id, project_id, executed_at, is_retest, deleted_at) DO UPDATE
+              SET status = EXCLUDED.status,
+                  notes = EXCLUDED.notes,
+                  tester_name = EXCLUDED.tester_name,
+                  updated_at = CURRENT_TIMESTAMP
+            RETURNING id, test_case_id, status
+          `;
+          const insertResult = await client.query(insertQuery, insertValues);
 
           importResults.success.push({
             row: i + 1,
