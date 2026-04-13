@@ -13,6 +13,9 @@ export default function ProjectDetailPage() {
     const router = useRouter();
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
         async function load() {
@@ -35,19 +38,53 @@ export default function ProjectDetailPage() {
         return null;
     };
 
-    if (isLoading) return <div className="p-10 text-center">Loading...</div>;
-    if (!project) return <div className="p-10 text-center">Project not found</div>;
+    if (isLoading) return (
+        <div className="max-w-5xl mx-auto py-8 px-4 animate-pulse space-y-6">
+            <div className="flex items-center gap-4">
+                <div className="h-9 w-20 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+                <div className="space-y-2">
+                    <div className="h-7 w-64 bg-slate-200 dark:bg-slate-700 rounded" />
+                    <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded" />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-4">
+                    <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl" />
+                    <div className="h-28 bg-slate-200 dark:bg-slate-700 rounded-2xl" />
+                </div>
+                <div className="h-48 bg-slate-200 dark:bg-slate-700 rounded-2xl" />
+            </div>
+        </div>
+    );
 
-    const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete project "${project.project_name}"? This action will archive the project.`)) {
-            return;
-        }
+    if (!project) return (
+        <div className="max-w-5xl mx-auto py-8 px-4">
+            <div className="text-center py-20">
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                </div>
+                <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Project not found</p>
+                <button onClick={() => router.push('/projects')} className="mt-4 text-sm text-indigo-600 hover:text-indigo-800">← Back to Projects</button>
+            </div>
+        </div>
+    );
+
+    const handleDelete = () => {
+        setDeleteError(null);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        setIsDeleting(true);
+        setDeleteError(null);
         try {
             await fetchApi(`/projects/${project.id}`, { method: 'DELETE' });
-            alert('Project deleted successfully');
             router.push('/projects');
         } catch (err: any) {
-            alert(`Failed to delete project: ${err.message}`);
+            setDeleteError(err.message);
+            setIsDeleting(false);
         }
     };
 
@@ -148,6 +185,46 @@ export default function ProjectDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Archive Project</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Archive <span className="font-medium text-slate-700 dark:text-slate-200">{project.project_name}</span>? This cannot be undone.
+                                </p>
+                            </div>
+                        </div>
+                        {deleteError && (
+                            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{deleteError}</p>
+                        )}
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => { setShowDeleteModal(false); setDeleteError(null); }}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Archiving...' : 'Archive Project'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

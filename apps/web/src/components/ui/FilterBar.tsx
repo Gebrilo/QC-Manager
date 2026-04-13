@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/components/providers/ThemeProvider';
-import { Button } from '@/components/ui/Button'; // Assuming Button component exists, else I'll use standard HTML button or check imports
 
 // Define filter types
 export type FilterAttribute = 'status' | 'priority' | 'resource';
@@ -39,6 +38,8 @@ export function FilterBar() {
 
     const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
     const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+    const [showSaveForm, setShowSaveForm] = useState(false);
+    const [saveViewName, setSaveViewName] = useState('');
 
     // Load from local storage on mount
     useEffect(() => {
@@ -159,17 +160,60 @@ export function FilterBar() {
                                         ))}
                                     </div>
                                     <div className="border-t border-slate-100 dark:border-slate-700 p-2">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="w-full justify-start text-xs h-8"
-                                            onClick={() => {
-                                                const name = prompt("Enter name for this view:");
-                                                if (name) saveView(name);
-                                            }}
-                                        >
-                                            + Save Current as View
-                                        </Button>
+                                        {showSaveForm ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    value={saveViewName}
+                                                    onChange={e => setSaveViewName(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' && saveViewName.trim()) {
+                                                            saveView(saveViewName.trim());
+                                                            setSaveViewName('');
+                                                            setShowSaveForm(false);
+                                                        }
+                                                        if (e.key === 'Escape') {
+                                                            setShowSaveForm(false);
+                                                            setSaveViewName('');
+                                                        }
+                                                    }}
+                                                    placeholder="View name..."
+                                                    autoFocus
+                                                    className="flex-1 px-2 py-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-900 dark:text-white placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        if (saveViewName.trim()) {
+                                                            saveView(saveViewName.trim());
+                                                            setSaveViewName('');
+                                                            setShowSaveForm(false);
+                                                        }
+                                                    }}
+                                                    disabled={!saveViewName.trim()}
+                                                    className="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    onClick={() => { setShowSaveForm(false); setSaveViewName(''); }}
+                                                    className="p-1 text-slate-400 hover:text-slate-600 rounded-md transition-colors"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="w-full text-left px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-md transition-colors flex items-center gap-1.5"
+                                                onClick={() => setShowSaveForm(true)}
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                Save current as view
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </>

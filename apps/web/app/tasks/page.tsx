@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { fetchApi, projectsApi, resourcesApi } from '@/lib/api';
 import { Task } from '@/types';
 import { TaskTable } from '@/components/tasks/TaskTable';
+import { ViewToggle } from '@/components/tasks/ViewToggle';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -35,6 +36,20 @@ export default function TasksPage() {
     const [selectedProject, setSelectedProject] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedAssignee, setSelectedAssignee] = useState('');
+    const [selectedPriority, setSelectedPriority] = useState('');
+
+    // View mode with localStorage persistence
+    const [viewMode, setViewMode] = useState<'table' | 'board'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('tasks_view_mode') as 'table' | 'board') || 'table';
+        }
+        return 'table';
+    });
+
+    const handleViewChange = (mode: 'table' | 'board') => {
+        setViewMode(mode);
+        if (typeof window !== 'undefined') localStorage.setItem('tasks_view_mode', mode);
+    };
 
     useEffect(() => {
         async function load() {
@@ -86,18 +101,24 @@ export default function TasksPage() {
                 }
             }
 
+            // Priority filter
+            if (selectedPriority && task.priority !== selectedPriority) {
+                return false;
+            }
+
             return true;
         });
-    }, [tasks, searchTerm, selectedProject, selectedStatus, selectedAssignee]);
+    }, [tasks, searchTerm, selectedProject, selectedStatus, selectedAssignee, selectedPriority]);
 
     const clearFilters = () => {
         setSearchTerm('');
         setSelectedProject('');
         setSelectedStatus('');
         setSelectedAssignee('');
+        setSelectedPriority('');
     };
 
-    const hasActiveFilters = searchTerm || selectedProject || selectedStatus || selectedAssignee;
+    const hasActiveFilters = searchTerm || selectedProject || selectedStatus || selectedAssignee || selectedPriority;
 
     return (
         <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
@@ -108,6 +129,7 @@ export default function TasksPage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Manage all tasks across projects.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <ViewToggle view={viewMode} onChange={handleViewChange} />
                     {hasPermission('action:tasks:create') && (
                         <Link href="/tasks/create">
                             <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
@@ -188,6 +210,23 @@ export default function TasksPage() {
                             </svg>
                         </div>
 
+                        {/* Priority Filter */}
+                        <div className="relative">
+                            <select
+                                value={selectedPriority}
+                                onChange={(e) => setSelectedPriority(e.target.value)}
+                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[130px]"
+                            >
+                                <option value="">All Priorities</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+
                         {/* Clear Filters */}
                         {hasActiveFilters && (
                             <button
@@ -209,7 +248,7 @@ export default function TasksPage() {
                         <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active:</span>
                         {searchTerm && (
                             <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Search: "{searchTerm}"
+                                Search: &quot;{searchTerm}&quot;
                             </span>
                         )}
                         {selectedProject && (
@@ -227,6 +266,11 @@ export default function TasksPage() {
                                 Assignee: {resources.find(r => r.id === selectedAssignee)?.resource_name}
                             </span>
                         )}
+                        {selectedPriority && (
+                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
+                                Priority: {selectedPriority}
+                            </span>
+                        )}
                         <span className="text-xs text-slate-400 ml-2">
                             ({filteredTasks.length} of {tasks.length} tasks)
                         </span>
@@ -234,8 +278,103 @@ export default function TasksPage() {
                 )}
             </div>
 
-            {/* Task Table */}
-            <TaskTable tasks={filteredTasks} isLoading={isLoading} />
+            {/* Task Table / Board */}
+            {viewMode === 'board' ? (
+                <TaskBoardView
+                    tasks={filteredTasks}
+                    isLoading={isLoading}
+                    onTaskClick={(id) => router.push(`/tasks/${id}`)}
+                />
+            ) : (
+                <TaskTable tasks={filteredTasks} isLoading={isLoading} />
+            )}
+        </div>
+    );
+}
+
+// ─── Board View ───────────────────────────────────────────────────────────────
+
+const TASK_BOARD_COLUMNS = [
+    { status: 'Backlog',     label: 'Backlog',      badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',  border: 'border-slate-300 dark:border-slate-600' },
+    { status: 'In Progress', label: 'In Progress',  badge: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', border: 'border-indigo-300 dark:border-indigo-600' },
+    { status: 'Done',        label: 'Done',         badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-600' },
+    { status: 'Cancelled',   label: 'Cancelled',    badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',    border: 'border-rose-300 dark:border-rose-600' },
+];
+
+const PRIORITY_COLORS: Record<string, string> = {
+    High:   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    Medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
+};
+
+function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[], isLoading: boolean, onTaskClick: (id: string) => void }) {
+    const grouped = useMemo(() => {
+        const g: Record<string, Task[]> = { Backlog: [], 'In Progress': [], Done: [], Cancelled: [] };
+        tasks.forEach(t => { if (g[t.status]) g[t.status].push(t); });
+        return g;
+    }, [tasks]);
+
+    if (isLoading) {
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {TASK_BOARD_COLUMNS.map(col => (
+                    <div key={col.status} className="space-y-3">
+                        <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                        {[1,2,3].map(i => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {TASK_BOARD_COLUMNS.map(col => {
+                const colTasks = grouped[col.status] || [];
+                return (
+                    <div key={col.status} className="flex flex-col">
+                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-t-2 ${col.border} px-4 py-2.5 rounded-xl mb-3 flex items-center justify-between`}>
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{col.label}</span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${col.badge}`}>{colTasks.length}</span>
+                        </div>
+                        <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-320px)]">
+                            {colTasks.length === 0 ? (
+                                <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center">
+                                    <p className="text-sm text-slate-400">No tasks</p>
+                                </div>
+                            ) : colTasks.map(task => (
+                                <div
+                                    key={task.id}
+                                    onClick={() => onTaskClick(task.id)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all"
+                                >
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2 leading-snug mb-2">{task.task_name}</p>
+                                    {task.project_name && (
+                                        <p className="text-xs text-slate-400 mb-2 truncate">{task.project_name}</p>
+                                    )}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            {task.priority && (
+                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.Low}`}>
+                                                    {task.priority}
+                                                </span>
+                                            )}
+                                            {task.overall_completion_pct !== undefined && task.overall_completion_pct > 0 && (
+                                                <span className="text-[10px] text-slate-400">{Math.round(task.overall_completion_pct)}%</span>
+                                            )}
+                                        </div>
+                                        {(task.resource1_name || task.resource2_name) && (
+                                            <span className="text-[10px] text-slate-400 truncate max-w-[80px]">
+                                                {task.resource1_name || task.resource2_name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 }

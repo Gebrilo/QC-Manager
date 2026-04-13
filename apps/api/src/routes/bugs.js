@@ -88,6 +88,7 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
     try {
         const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
         const project_id = validUUID(req.query.project_id);
+        const source = ['TEST_CASE', 'EXPLORATORY'].includes(req.query.source) ? req.query.source : null;
 
         let query = `
             SELECT
@@ -119,6 +120,12 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
             paramIndex++;
         }
 
+        if (source) {
+            query += ` AND b.source = $${paramIndex}`;
+            params.push(source);
+            paramIndex++;
+        }
+
         const [sortField, sortDir] = sort.split(':');
         const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
         const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
@@ -146,6 +153,11 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
         if (severity) {
             countQuery += ` AND severity = $${countParamIndex}`;
             countParams.push(severity);
+            countParamIndex++;
+        }
+        if (source) {
+            countQuery += ` AND source = $${countParamIndex}`;
+            countParams.push(source);
         }
         const countResult = await pool.query(countQuery, countParams);
 

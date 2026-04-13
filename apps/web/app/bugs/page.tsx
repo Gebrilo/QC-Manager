@@ -43,6 +43,7 @@ function BugsContent() {
     const [projectFilter, setProjectFilter] = useState(searchParams.get('project_id') || '');
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
     const [severityFilter, setSeverityFilter] = useState(searchParams.get('severity') || '');
+    const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
     const [page, setPage] = useState(() => {
         const p = searchParams.get('page');
         return p ? Math.max(0, parseInt(p) - 1) : 0;
@@ -57,10 +58,11 @@ function BugsContent() {
         if (projectFilter) params.set('project_id', projectFilter);
         if (statusFilter) params.set('status', statusFilter);
         if (severityFilter) params.set('severity', severityFilter);
+        if (sourceFilter) params.set('source', sourceFilter);
         if (page > 0) params.set('page', String(page + 1));
         const qs = params.toString();
         router.replace(`/bugs${qs ? `?${qs}` : ''}`, { scroll: false });
-    }, [projectFilter, statusFilter, severityFilter, page, router]);
+    }, [projectFilter, statusFilter, severityFilter, sourceFilter, page, router]);
 
     useEffect(() => {
         updateUrlParams();
@@ -73,6 +75,7 @@ function BugsContent() {
                 project_id: projectFilter || undefined,
                 status:     statusFilter   || undefined,
                 severity:   severityFilter || undefined,
+                source:     sourceFilter   || undefined,
                 limit:  PAGE_SIZE,
                 offset: page * PAGE_SIZE,
             });
@@ -91,11 +94,11 @@ function BugsContent() {
 
     useEffect(() => {
         setPage(0);
-    }, [projectFilter, statusFilter, severityFilter]);
+    }, [projectFilter, statusFilter, severityFilter, sourceFilter]);
 
     useEffect(() => {
         loadBugs();
-    }, [projectFilter, statusFilter, severityFilter, page]);
+    }, [projectFilter, statusFilter, severityFilter, sourceFilter, page]);
 
     const filtered = useMemo(() => {
         if (!filter) return bugs;
@@ -156,6 +159,11 @@ function BugsContent() {
                     <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
+                    {filter && total > PAGE_SIZE && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            Searching within current page only. Use filters above to narrow results first.
+                        </p>
+                    )}
                 </div>
 
                 <select
@@ -184,6 +192,26 @@ function BugsContent() {
                     <option value="">All Severities</option>
                     {['critical','high','medium','low'].map(s => <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
                 </select>
+
+                <select
+                    value={sourceFilter}
+                    onChange={e => setSourceFilter(e.target.value)}
+                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                    <option value="">All Sources</option>
+                    <option value="TEST_CASE">Test Case</option>
+                    <option value="EXPLORATORY">Exploratory</option>
+                </select>
+
+                {(projectFilter || statusFilter || severityFilter || sourceFilter || filter) && (
+                    <button
+                        onClick={() => { setProjectFilter(''); setStatusFilter(''); setSeverityFilter(''); setSourceFilter(''); setFilter(''); }}
+                        className="py-2 px-3 text-sm text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 whitespace-nowrap"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        Clear
+                    </button>
+                )}
             </div>
 
             {/* Table */}

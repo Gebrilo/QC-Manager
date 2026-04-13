@@ -176,7 +176,22 @@ export function DashboardClient() {
             {showQuickNav && !isLoading && (
                 <QuickNavCards journeys={journeys} pendingTasks={tasks.filter(t => t.status !== 'Done' && t.status !== 'Cancelled').length} />
             )}
-            {/* Metrics Summary Cards */}
+            {/* Metrics Summary Cards — skeleton while loading */}
+            {isLoading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 animate-pulse">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+                                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
             {!isLoading && metrics && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard
@@ -293,12 +308,24 @@ export function DashboardClient() {
                 </div>
             )}
 
-            <TaskTable
-                tasks={filteredTasks}
-                isLoading={isLoading}
-                pagination={{ total: filteredTasks.length, limit: 10, offset: 0 }}
-                onPageChange={() => { }}
-            />
+            <section>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                        Task List
+                        {!isLoading && (searchQuery || Object.values(activeFilters).some(Boolean)) && (
+                            <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
+                                ({filteredTasks.length} of {tasks.length})
+                            </span>
+                        )}
+                    </h2>
+                </div>
+                <TaskTable
+                    tasks={filteredTasks}
+                    isLoading={isLoading}
+                    pagination={{ total: filteredTasks.length, limit: 10, offset: 0 }}
+                    onPageChange={() => { }}
+                />
+            </section>
         </div>
     );
 }

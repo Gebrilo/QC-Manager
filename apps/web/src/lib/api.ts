@@ -325,7 +325,7 @@ export interface Bug {
 }
 
 export const bugsApi = {
-    list: (params?: { project_id?: string; status?: string; severity?: string; limit?: number; offset?: number }) => {
+    list: (params?: { project_id?: string; status?: string; severity?: string; source?: string; limit?: number; offset?: number }) => {
         const clean: Record<string, string> = {};
         if (params) {
             for (const [k, v] of Object.entries(params)) {

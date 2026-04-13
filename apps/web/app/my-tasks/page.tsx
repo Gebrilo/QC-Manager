@@ -44,6 +44,8 @@ export default function MyTasksPage() {
 
     // View mode - hydrate from localStorage to avoid SSR mismatch
     const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         const stored = localStorage.getItem('qc_my_tasks_view');
@@ -121,15 +123,25 @@ export default function MyTasksPage() {
         }
     };
 
-    const handleDelete = async (taskId: string) => {
+    const handleDelete = (taskId: string) => {
+        setDeleteTarget(taskId);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            const res = await fetch(`${API_URL}/my-tasks/${taskId}`, {
+            const res = await fetch(`${API_URL}/my-tasks/${deleteTarget}`, {
                 method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error('Failed to delete task');
+            setDeleteTarget(null);
             await fetchTasks();
         } catch (err: any) {
             setError(err.message);
+            setDeleteTarget(null);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -281,6 +293,40 @@ export default function MyTasksPage() {
                         </div>
                     )}
                 </>
+            )}
+            {/* Delete Confirmation Modal */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Delete Task</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">This task will be permanently removed.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete Task'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

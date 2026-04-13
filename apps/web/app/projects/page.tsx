@@ -26,6 +26,8 @@ export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const { hasPermission } = useAuth();
 
     useEffect(() => {
@@ -109,6 +111,21 @@ export default function ProjectsPage() {
         });
     }, [projects, tasks]);
 
+    const filteredProjects = useMemo(() => {
+        return projectStats.filter(p => {
+            if (searchTerm) {
+                const q = searchTerm.toLowerCase();
+                if (!p.project_name.toLowerCase().includes(q) &&
+                    !p.project_id.toLowerCase().includes(q) &&
+                    !(p.description?.toLowerCase().includes(q))) {
+                    return false;
+                }
+            }
+            if (statusFilter && p.computedStatus !== statusFilter) return false;
+            return true;
+        });
+    }, [projectStats, searchTerm, statusFilter]);
+
     const getLogo = (projectId: string) => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem(`project_logo_${projectId}`);
@@ -135,6 +152,58 @@ export default function ProjectsPage() {
                 )}
             </div>
 
+            {!isLoading && projects.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1 min-w-0">
+                        <input
+                            type="text"
+                            placeholder="Search projects by name, ID, description..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none"
+                        />
+                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value)}
+                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[140px]"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="Complete">Complete</option>
+                                <option value="On Track">On Track</option>
+                                <option value="At Risk">At Risk</option>
+                                <option value="No Tasks">No Tasks</option>
+                            </select>
+                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        {(searchTerm || statusFilter) && (
+                            <button
+                                onClick={() => { setSearchTerm(''); setStatusFilter(''); }}
+                                className="px-3 py-2 text-sm text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {(searchTerm || statusFilter) && !isLoading && (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Showing {filteredProjects.length} of {projectStats.length} projects
+                </p>
+            )}
+
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-6">
                     {[1, 2].map(i => (
@@ -146,9 +215,15 @@ export default function ProjectsPage() {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No projects found</h3>
                     <p className="text-slate-500 dark:text-slate-400 mt-2 italic">Create a new project to get started.</p>
                 </div>
+            ) : filteredProjects.length === 0 && (searchTerm || statusFilter) ? (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-20 text-center">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No projects match your filters</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mt-2">Try adjusting your search or filter criteria.</p>
+                    <button onClick={() => { setSearchTerm(''); setStatusFilter(''); }} className="mt-4 text-sm text-indigo-600 hover:text-indigo-700">Clear filters</button>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 gap-8">
-                    {projectStats.map((project) => {
+                    {filteredProjects.map((project) => {
                         const logo = getLogo(project.id);
 
                         const statusVariants: Record<string, "complete" | "ontrack" | "atrisk" | "notasks"> = {

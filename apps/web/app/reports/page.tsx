@@ -20,10 +20,10 @@ import {
 import type { ProjectHealth, TrendData, WorkloadBalance } from '@/types/governance';
 
 type ReportType = 'READINESS' | 'WEEKLY_HEALTH' | 'COVERAGE_GAP' | null;
-type TabType = 'async' | 'governance';
+type TabType = 'custom' | 'governance';
 
 export default function ReportsPage() {
-    const [activeTab, setActiveTab] = useState<TabType>('async');
+    const [activeTab, setActiveTab] = useState<TabType>('custom');
     const [selectedReport, setSelectedReport] = useState<ReportType>(null);
     const [reportData, setReportData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -100,7 +100,7 @@ export default function ReportsPage() {
     };
 
     return (
-        <div className="space-y-6 print:space-y-0">
+        <div className="space-y-6 print:space-y-0 py-6 px-4 max-w-7xl mx-auto">
             {/* Page header */}
             <div className="print:hidden">
                 <div className="flex items-center justify-between mb-4">
@@ -113,15 +113,15 @@ export default function ReportsPage() {
                 {/* Tab Navigation */}
                 <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
                     <button
-                        onClick={() => setActiveTab('async')}
+                        onClick={() => setActiveTab('custom')}
                         className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                            activeTab === 'async'
+                            activeTab === 'custom'
                                 ? 'text-indigo-600 dark:text-indigo-400'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                         }`}
                     >
-                        Async Reports
-                        {activeTab === 'async' && (
+                        Custom Reports
+                        {activeTab === 'custom' && (
                             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
                         )}
                     </button>
@@ -143,8 +143,8 @@ export default function ReportsPage() {
 
             <div className="space-y-8 print:p-0">
 
-                {/* Async Reports Tab */}
-                {activeTab === 'async' && (
+                {/* Custom Reports Tab */}
+                {activeTab === 'custom' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <ReportGenerator />
                     </div>

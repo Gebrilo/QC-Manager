@@ -15,6 +15,9 @@ export default function ResourcesPage() {
     const [editingResource, setEditingResource] = useState<Resource | null>(null);
     const [autoMapStatus, setAutoMapStatus] = useState<string | null>(null);
     const [isAutoMapping, setIsAutoMapping] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<Resource | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const { hasPermission, user } = useAuth();
 
     const canCreate = hasPermission('action:resources:create');
@@ -53,15 +56,23 @@ export default function ResourcesPage() {
         setShowDialog(true);
     };
 
-    const handleDelete = async (resource: Resource) => {
-        if (!confirm('Are you sure you want to delete this resource? This action will mark it as inactive.')) {
-            return;
-        }
+    const handleDelete = (resource: Resource) => {
+        setDeleteError(null);
+        setDeleteTarget(resource);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        setDeleteError(null);
         try {
-            await resourcesApi.delete(resource.id);
+            await resourcesApi.delete(deleteTarget.id);
+            setDeleteTarget(null);
             await loadResources();
         } catch (err: any) {
-            alert(`Failed to delete resource: ${err.message}`);
+            setDeleteError(err.message);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -167,6 +178,46 @@ export default function ResourcesPage() {
                 onEdit={canEdit ? handleEdit : undefined}
                 onDelete={canDelete ? handleDelete : undefined}
             />
+
+            {/* Delete Confirmation Modal */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Delete Resource</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Mark <span className="font-medium text-slate-700 dark:text-slate-200">{deleteTarget.resource_name}</span> as inactive?
+                                </p>
+                            </div>
+                        </div>
+                        {deleteError && (
+                            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{deleteError}</p>
+                        )}
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete Resource'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Add/Edit Dialog */}
             {showDialog && (
