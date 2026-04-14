@@ -114,6 +114,11 @@ export default function ProjectDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Link href={`/projects/${project.id}/quality`}>
+                        <Button variant="outline" className="text-indigo-600 border-indigo-300 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-800 dark:hover:bg-indigo-900/20">
+                            Quality
+                        </Button>
+                    </Link>
                     <Link href={`/projects/${project.id}/edit`}>
                         <Button variant="outline">Edit Project</Button>
                     </Link>

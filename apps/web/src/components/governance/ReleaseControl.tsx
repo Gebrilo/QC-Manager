@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { governanceApi } from '@/services/governanceApi';
 import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface ReleaseControlProps {
     projectId: string;
@@ -21,6 +22,9 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
     const [version, setVersion] = useState('');
     const [comments, setComments] = useState('');
     const [action, setAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
+
+    const { user } = useAuth();
+    const canAuthorize = user?.role === 'admin' || user?.role === 'manager';
 
     useEffect(() => {
         loadData();
@@ -50,7 +54,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
     const gatesEvaluation = gates && projectHealth ? [
         { name: 'Pass Rate', ...evaluateGate(parseFloat(projectHealth.latest_pass_rate_pct || '0'), gates.min_pass_rate, 'min') },
         { name: 'Critical Defects', ...evaluateGate(projectHealth.blocking_issue_count || 0, gates.max_critical_defects, 'max') },
-        // { name: 'Test Coverage', ...evaluateGate(parseFloat(projectHealth.test_coverage_pct || '0'), gates.min_test_coverage, 'min') }, // If available in health
+        { name: 'Test Coverage', passed: null as unknown as boolean, metric: null as unknown as number, threshold: gates.min_test_coverage },
     ] : [];
 
     const allPassed = gatesEvaluation.every(g => g.passed);
@@ -63,7 +67,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                 project_id: projectId,
                 release_version: version,
                 status: action,
-                approver_name: 'Current User', // TODO: Get from Auth
+                approver_name: user?.name || user?.email || 'Unknown',
                 comments: comments,
                 gate_snapshot: {
                     health: projectHealth,
@@ -96,27 +100,40 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {gatesEvaluation.map((g, idx) => (
-                            <div key={idx} className={`p-4 rounded-lg border ${g.passed ? 'bg-white dark:bg-slate-800 border-green-100 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-800'}`}>
-                                <div className="text-sm text-slate-500 mb-1">{g.name}</div>
-                                <div className="text-2xl font-bold mb-1">
-                                    {g.metric}{g.name.includes('Rate') ? '%' : ''}
+                        {gatesEvaluation.map((g, idx) => {
+                            const isNA = (g as any).metric === null;
+                            const borderClass = isNA
+                                ? 'border-slate-200 dark:border-slate-700'
+                                : g.passed
+                                    ? 'border-green-100 dark:border-green-800'
+                                    : 'border-red-200 dark:border-red-800';
+                            return (
+                                <div key={idx} className={`p-4 rounded-lg border bg-white dark:bg-slate-800 ${borderClass}`}>
+                                    <div className="text-sm text-slate-500 mb-1">{g.name}</div>
+                                    <div className="text-2xl font-bold mb-1 text-slate-900 dark:text-white">
+                                        {isNA ? <span className="text-slate-400 text-base">N/A</span> : `${g.metric}${g.name.includes('Rate') || g.name.includes('Coverage') ? '%' : ''}`}
+                                    </div>
+                                    <div className="text-xs text-slate-400">
+                                        Target: {g.threshold}{g.name.includes('Rate') || g.name.includes('Coverage') ? '%' : ''}
+                                        {g.name === 'Critical Defects' ? ' Max' : ' Min'}
+                                        {isNA && <span className="ml-1 text-slate-300">(not yet tracked)</span>}
+                                    </div>
                                 </div>
-                                <div className="text-xs text-slate-400">
-                                    Target: {g.threshold}{g.name.includes('Rate') ? '%' : ''}
-                                    {g.name === 'Critical Defects' ? ' Max' : ' Min'}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="mt-6 flex justify-end">
-                        <Button
-                            onClick={() => { setAction('APPROVED'); setShowForm(true); }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        >
-                            Start Release Procedure
-                        </Button>
+                        {canAuthorize ? (
+                            <Button
+                                onClick={() => { setAction('APPROVED'); setShowForm(true); }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                Start Release Procedure
+                            </Button>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">Only managers and admins can authorise releases.</p>
+                        )}
                     </div>
                 </CardContent>
             </Card>

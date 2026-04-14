@@ -7,12 +7,20 @@ import {
   RiskIndicatorsWidget,
   TrendAnalysisWidget,
   QualityGateSettings,
-  ReleaseControl
-} from '@/components/governance'; // We need to export TrendAnalysisWidget from index
-import { getProjectHealthSummary, getExecutionTrend } from '@/services/governanceApi';
-import type { TrendData } from '@/types/governance';
-import { bugsApi } from '@/lib/api';
-import { BugsBySourceChart } from '@/components/BugsBySourceChart';
+  ReleaseControl,
+  BugSummaryWidget,
+  QualityMetricsWidget,
+  BlockedTestsWidget,
+  GrossNetProgressWidget,
+} from '@/components/governance';
+import {
+  getProjectHealthSummary,
+  getExecutionTrend,
+  getQualityMetrics,
+  getBlockedAnalysis,
+  getExecutionProgress,
+} from '@/services/governanceApi';
+import type { TrendData, QualityMetrics, BlockedModuleAnalysis, ExecutionProgress } from '@/types/governance';
 
 
 export default function ProjectQualityDetailsPage() {
@@ -20,18 +28,13 @@ export default function ProjectQualityDetailsPage() {
   const router = useRouter();
   const projectId = (params?.id as string) || '';
 
-  // State for project data
   const [project, setProject] = useState<any | null>(null);
   const [trendData, setTrendData] = useState<TrendData[]>([]);
+  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics[]>([]);
+  const [blockedAnalysis, setBlockedAnalysis] = useState<BlockedModuleAnalysis[]>([]);
+  const [executionProgress, setExecutionProgress] = useState<ExecutionProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bugSummary, setBugSummary] = useState<{
-    totals: { total_bugs: number; open_bugs: number; closed_bugs: number; bugs_from_testing: number; standalone_bugs: number };
-    by_severity: { critical: number; high: number; medium: number; low: number };
-    by_source: { test_case: number; exploratory: number };
-    by_project: any[];
-    recent_bugs: any[];
-  } | null>(null);
 
   useEffect(() => {
     async function loadProjectData() {
@@ -39,11 +42,12 @@ export default function ProjectQualityDetailsPage() {
 
       try {
         setLoading(true);
-        // Fetch project health and trend data in parallel
-        const [healthData, trendResult, bugResult] = await Promise.all([
+        const [healthData, trendResult, metricsResult, blockedResult, progressResult] = await Promise.all([
           getProjectHealthSummary(projectId),
           getExecutionTrend(projectId),
-          bugsApi.summary(projectId),
+          getQualityMetrics(projectId),
+          getBlockedAnalysis(projectId),
+          getExecutionProgress(projectId),
         ]);
 
         if (healthData) {
@@ -57,7 +61,9 @@ export default function ProjectQualityDetailsPage() {
         }
 
         setTrendData(trendResult || []);
-        setBugSummary(bugResult.data);
+        setQualityMetrics(metricsResult || []);
+        setBlockedAnalysis(blockedResult || []);
+        setExecutionProgress(progressResult || []);
       } catch (err) {
         console.error("Failed to load project details:", err);
         setError("Failed to load project details");
@@ -69,6 +75,8 @@ export default function ProjectQualityDetailsPage() {
     loadProjectData();
   }, [projectId]);
 
+  const [activeTab, setActiveTab] = useState('overview');
+
   if (!project && !loading) {
     return (
       <div className="p-8 text-center">
@@ -78,8 +86,6 @@ export default function ProjectQualityDetailsPage() {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState('overview');
 
 
   return (
@@ -139,52 +145,31 @@ export default function ProjectQualityDetailsPage() {
                 <RiskIndicatorsWidget projectId={projectId} />
               </section>
             </div>
+
             {/* Trend Analysis */}
             <section>
               <TrendAnalysisWidget data={trendData} title="Quality Trend (Last 14 Days)" />
             </section>
-            {/* Bug Summary — By Source Classification */}
+
+            {/* Gross vs Net Execution Progress */}
             <section>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Bug Summary</h3>
-              {bugSummary ? (
-                <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-white">{bugSummary.by_source.test_case}</p>
-                      <p className="text-xs text-blue-100">Test Cases</p>
-                    </div>
-                    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-white">{bugSummary.by_source.exploratory}</p>
-                      <p className="text-xs text-amber-100">Exploratory</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-700 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{bugSummary.totals.total_bugs}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Total Bugs</p>
-                    </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-white">{bugSummary.totals.open_bugs}</p>
-                      <p className="text-xs text-red-100">Open Bugs</p>
-                    </div>
-                  </div>
-                  <BugsBySourceChart
-                    testCase={bugSummary.by_source.test_case}
-                    exploratory={bugSummary.by_source.exploratory}
-                  />
-                </>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex items-center justify-center h-40">
-                  <p className="text-slate-400 text-sm">Loading bug data...</p>
-                </div>
-              )}
+              <GrossNetProgressWidget data={executionProgress} />
             </section>
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Test Executions</h3>
-              <div className="text-center py-12">
-                <div className="text-slate-300 dark:text-slate-600 text-5xl mb-4">📋</div>
-                <p className="text-slate-500 dark:text-slate-400 font-medium">No test executions recorded yet</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Test execution data will appear here once test runs are completed for this project.</p>
-              </div>
-            </div>
+
+            {/* Quality Metrics (coverage, effectiveness, PERT) */}
+            <section>
+              <QualityMetricsWidget data={qualityMetrics} />
+            </section>
+
+            {/* Blocked Test Analysis */}
+            <section>
+              <BlockedTestsWidget data={blockedAnalysis} />
+            </section>
+
+            {/* Bug Summary */}
+            <section>
+              <BugSummaryWidget projectId={projectId} />
+            </section>
           </div>
         )}
 

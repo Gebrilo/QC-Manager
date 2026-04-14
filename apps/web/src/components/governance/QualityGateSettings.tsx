@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { governanceApi } from '@/services/governanceApi';
+import { AdminOnly } from '@/components/PermissionGuard';
 
 interface QualityGateSettingsProps {
     projectId: string;
@@ -13,6 +14,7 @@ export function QualityGateSettings({ projectId }: QualityGateSettingsProps) {
     const [gates, setGates] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
     // Form State
     const [minPassRate, setMinPassRate] = useState(95);
@@ -42,6 +44,7 @@ export function QualityGateSettings({ projectId }: QualityGateSettingsProps) {
 
     const handleSave = async () => {
         setSaving(true);
+        setSaveStatus('idle');
         try {
             const data = {
                 project_id: projectId,
@@ -50,11 +53,12 @@ export function QualityGateSettings({ projectId }: QualityGateSettingsProps) {
                 min_test_coverage: minCoverage
             };
             await governanceApi.saveProjectGates(data);
-            await loadGates(); // Reload to confirm
-            alert('Quality Gates saved successfully!');
+            await loadGates();
+            setSaveStatus('success');
+            setTimeout(() => setSaveStatus('idle'), 3000);
         } catch (err) {
             console.error(err);
-            alert('Failed to save settings.');
+            setSaveStatus('error');
         } finally {
             setSaving(false);
         }
@@ -110,10 +114,20 @@ export function QualityGateSettings({ projectId }: QualityGateSettingsProps) {
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <Button onClick={handleSave} disabled={saving} variant="primary">
-                        {saving ? 'Saving...' : 'Save Configuration'}
-                    </Button>
+                <div className="flex items-center justify-end gap-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                    {saveStatus === 'success' && (
+                        <p className="text-sm text-emerald-600 dark:text-emerald-400">Settings saved successfully.</p>
+                    )}
+                    {saveStatus === 'error' && (
+                        <p className="text-sm text-red-600 dark:text-red-400">Failed to save settings. Try again.</p>
+                    )}
+                    <AdminOnly fallback={
+                        <p className="text-sm text-slate-400 italic">Only admins can change quality gate settings.</p>
+                    }>
+                        <Button onClick={handleSave} disabled={saving} variant="primary">
+                            {saving ? 'Saving...' : 'Save Configuration'}
+                        </Button>
+                    </AdminOnly>
                 </div>
             </CardContent>
         </Card>
