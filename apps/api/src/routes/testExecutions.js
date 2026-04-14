@@ -447,10 +447,21 @@ router.delete('/test-runs/:id', requireAuth, requirePermission('action:test-exec
       return res.status(404).json({ error: 'Test run not found' });
     }
 
+    const run = existingResult.rows[0];
+
     // Soft delete
     await client.query(
       'UPDATE test_run SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1',
       [id]
+    );
+
+    // Clear governance data for this project+date so metrics reflect the deletion
+    await client.query(
+      `DELETE FROM test_result
+       WHERE project_id = $1
+         AND executed_at = $2::date
+         AND deleted_at IS NULL`,
+      [run.project_id, run.started_at]
     );
 
     // Audit log
