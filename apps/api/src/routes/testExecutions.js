@@ -907,7 +907,13 @@ router.post('/upload-excel', requireAuth, requirePermission('action:test-executi
 
     const testRun = testRunResult.rows[0];
 
-    // Process each row
+    const executedAt = validatedDate || new Date().toISOString().split('T')[0];
+
+    await client.query(
+      `DELETE FROM test_result WHERE project_id = $1 AND executed_at = $2 AND deleted_at IS NULL`,
+      [project_id, executedAt]
+    );
+
     const results = {
       success: [],
       errors: [],
@@ -923,34 +929,48 @@ router.post('/upload-excel', requireAuth, requirePermission('action:test-executi
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
 
-      // Try to find test case ID or name columns (flexible column names)
       const testCaseId = row['Test Case ID'] || row['test_case_id'] || row['ID'] || row['id'] || row['TestCaseID'];
       const testCaseName = row['Test Case Name'] || row['test_case_name'] || row['Name'] || row['name'] || row['Title'] || row['title'];
       const statusRaw = row['Status'] || row['status'] || row['Result'] || row['result'] || '';
       const notes = row['Notes'] || row['notes'] || row['Comments'] || row['comments'] || '';
 
-      // Normalize status
+      const moduleName = row['Module Name'] || row['module_name'] || row['Module'] || null;
+      const requirementId = row['Requirement ID'] || row['requirement_id'] || row['Req ID'] || null;
+      const estHoursRaw = row['Est Hours'] || row['estimated_hrs'] || row['Hours'] || null;
+      const isRetestRaw = row['Is Retest'] || row['is_retest'] || row['Retest'] || null;
+
+      const estHours = estHoursRaw != null ? parseFloat(estHoursRaw) : null;
+      const normalizedEstHours = (estHours != null && !isNaN(estHoursRaw) && estHours >= 0) ? estHours : null;
+
+      const isRetestLower = String(isRetestRaw || '').toLowerCase().trim();
+      const normalizedIsRetest = ['true', 'yes', '1'].includes(isRetestLower);
+
       const statusLower = String(statusRaw).toLowerCase().trim();
       let status = 'not_run';
+      let governanceStatus = 'not_run';
       if (['pass', 'passed', 'success', 'ok'].includes(statusLower)) {
         status = 'pass';
+        governanceStatus = 'passed';
         results.summary.pass++;
       } else if (['fail', 'failed', 'failure', 'error'].includes(statusLower)) {
         status = 'fail';
+        governanceStatus = 'failed';
         results.summary.fail++;
       } else if (['blocked', 'block'].includes(statusLower)) {
         status = 'blocked';
+        governanceStatus = 'blocked';
         results.summary.blocked++;
       } else if (['skipped', 'skip', 'rejected'].includes(statusLower)) {
         status = 'skipped';
+        governanceStatus = 'rejected';
         results.summary.skipped++;
       } else if (['not run', 'not_run', 'not executed', 'not_executed', 'pending', ''].includes(statusLower)) {
         status = 'not_run';
+        governanceStatus = 'not_run';
         results.summary.not_run++;
       }
 
       try {
-        // Insert test execution record directly (without requiring test_case table)
         await client.query(
           `INSERT INTO test_execution (
             test_run_id, test_case_id, status, notes
@@ -958,8 +978,27 @@ router.post('/upload-excel', requireAuth, requirePermission('action:test-executi
           [testRun.id, status, `${testCaseId ? '[' + testCaseId + '] ' : ''}${testCaseName || ''} - ${notes}`.trim()]
         );
 
+        await client.query(
+          `INSERT INTO test_result (
+            test_case_id, project_id, executed_at,
+            status, notes,
+            module_name, requirement_id, estimated_hrs, is_retest
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            testCaseId || testCaseName || `Row ${i + 2}`,
+            project_id,
+            executedAt,
+            governanceStatus,
+            notes || null,
+            moduleName,
+            requirementId,
+            normalizedEstHours,
+            normalizedIsRetest
+          ]
+        );
+
         results.success.push({
-          row: i + 2, // +2 for 1-indexed and header row
+          row: i + 2,
           test_case: testCaseId || testCaseName || `Row ${i + 2}`,
           status
         });
