@@ -69,3 +69,4 @@ backups-staging/
 # Playwright Test Output
 playwright-report/
 test-results/
+.worktrees/
