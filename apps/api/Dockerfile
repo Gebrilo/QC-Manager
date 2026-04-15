@@ -36,6 +36,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
 COPY src/ ./src/
 
+# Pre-create uploads directory with correct ownership before dropping privileges
+RUN mkdir -p /app/uploads/avatars && chown -R apiuser:nodejs /app/uploads
+
 # Switch to non-root user
 USER apiuser
 

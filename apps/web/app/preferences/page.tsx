@@ -104,7 +104,9 @@ export default function PreferencesPage() {
                 setProfile(data.user);
                 setDisplayName(data.user.display_name || data.user.name || '');
                 setPrefs({ ...DEFAULT_PREFS, ...(data.user.preferences || {}) });
-                setAvatarUrl(data.user.avatar_url || null);
+                const _apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.gebrils.cloud';
+                const rawUrl = data.user.avatar_url || null;
+                setAvatarUrl(rawUrl?.startsWith('/uploads/') ? `${_apiUrl}${rawUrl}` : rawUrl);
                 const savedOrder: string[] = data.user.preferences?.menu_order || [];
                 const initialOrder = [
                     ...savedOrder.filter(p => accessibleNavRoutes.some(r => r.path === p)),
