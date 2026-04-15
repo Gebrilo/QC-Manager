@@ -8,15 +8,17 @@ const { requireAuth } = require('../middleware/authMiddleware');
 
 const AVATARS_DIR = path.join(__dirname, '..', '..', 'uploads', 'avatars');
 
-if (!fs.existsSync(AVATARS_DIR)) {
-    fs.mkdirSync(AVATARS_DIR, { recursive: true });
-}
+const ensureAvatarsDir = () => {
+    if (!fs.existsSync(AVATARS_DIR)) {
+        fs.mkdirSync(AVATARS_DIR, { recursive: true });
+    }
+};
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 
 const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, AVATARS_DIR),
+    destination: (_req, _file, cb) => { ensureAvatarsDir(); cb(null, AVATARS_DIR); },
     filename: (req, _file, cb) => {
         const ext = _file.mimetype === 'image/png' ? 'png'
                   : _file.mimetype === 'image/gif' ? 'gif'
