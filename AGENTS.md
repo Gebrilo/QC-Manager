@@ -17,6 +17,11 @@ This file provides guidance when working with code in this repository.
 - **Run API tests:** `cd apps/api && npm test`
 - **View logs:** `docker compose logs -f <service>` (services: qc-api, qc-web)
 - **No lint commands configured** [inferred]
+- **Deploy to production (when user says "deploy"):**
+  1. Stage changed files: `git add <files>`
+  2. Commit: `git commit -m "<descriptive message>"`
+  3. Push: `git push`
+  4. CI/CD pipeline auto-builds and deploys to VPS via GitHub Actions
 
 ## Architecture
 

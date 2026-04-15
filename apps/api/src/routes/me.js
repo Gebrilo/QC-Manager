@@ -80,6 +80,7 @@ async function dashboardHandler(req, res) {
             `SELECT
                 b.id,
                 b.bug_id,
+                b.tuleap_url,
                 b.title,
                 b.status,
                 b.severity,

@@ -48,6 +48,7 @@ const ALL_PERMISSIONS = [
     { key: 'page:reports', label: 'Reports', group: 'Pages' },
     { key: 'page:users', label: 'User Management', group: 'Pages' },
     { key: 'page:my-tasks', label: 'My Tasks', group: 'Pages' },
+    { key: 'page:my-dashboard', label: 'My Dashboard', group: 'Pages' },
     { key: 'page:task-history', label: 'Task History', group: 'Pages' },
     { key: 'page:roles', label: 'Roles & Permissions', group: 'Pages' },
     { key: 'page:journeys', label: 'Journeys', group: 'Pages' },

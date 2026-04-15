@@ -379,6 +379,7 @@ export interface MeDashboard {
     submitted_bugs: Array<{
         id: string;
         bug_id: string;
+        tuleap_url: string | null;
         title: string;
         status: string;
         severity: string;

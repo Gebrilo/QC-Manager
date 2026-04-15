@@ -49,7 +49,14 @@ export function MyBugsTable({ bugs }: MyBugsTableProps) {
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                 {bugs.map(bug => (
                                     <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{bug.bug_id}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                                            {bug.tuleap_url ? (
+                                                <a href={bug.tuleap_url} target="_blank" rel="noopener noreferrer"
+                                                   className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                                    {bug.bug_id}
+                                                </a>
+                                            ) : bug.bug_id}
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${SEVERITY_COLORS[bug.severity] || SEVERITY_COLORS.low}`}>

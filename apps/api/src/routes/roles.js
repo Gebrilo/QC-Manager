@@ -9,7 +9,7 @@ const ALL_PERMISSIONS = [
     // Page permissions
     'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
     'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-    'page:my-tasks', 'page:task-history', 'page:roles', 'page:journeys',
+    'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:roles', 'page:journeys',
     'page:teams', 'page:bugs',
     // Task actions
     'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
