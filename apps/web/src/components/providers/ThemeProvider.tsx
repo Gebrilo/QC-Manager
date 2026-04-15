@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 type Density = 'comfortable' | 'compact';
 
 interface ThemeContextType {
@@ -23,9 +23,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const storedTheme = localStorage.getItem('theme') as Theme | null;
         const storedDensity = localStorage.getItem('density') as Density | null;
 
-        if (storedTheme) {
-            setTheme(storedTheme);
-        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        if (storedTheme === 'dark') {
             setTheme('dark');
         }
 
@@ -38,13 +36,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
 
-        if (theme === 'system') {
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                root.classList.add('dark');
-            }
-        } else {
-            root.classList.add(theme);
-        }
+        root.classList.add(theme);
 
         localStorage.setItem('theme', theme);
     }, [theme]);
@@ -54,11 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }, [density]);
 
     const toggleTheme = () => {
-        setTheme((prev) => {
-            if (prev === 'light') return 'dark';
-            if (prev === 'dark') return 'system';
-            return 'light';
-        });
+        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
     };
 
     const toggleDensity = () => {
@@ -72,7 +60,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                     __html: `
                         try {
                             var t = localStorage.getItem('theme');
-                            if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                            if (t === 'dark') {
                                 document.documentElement.classList.add('dark');
                             } else {
                                 document.documentElement.classList.remove('dark');

@@ -338,7 +338,7 @@ router.post('/sync', async (req, res, next) => {
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
         const result = await db.query(
-            'SELECT id, name, display_name, email, phone, role, active, activated, onboarding_completed, preferences, created_at, last_login FROM app_user WHERE id = $1',
+            'SELECT id, name, display_name, email, phone, role, active, activated, onboarding_completed, preferences, avatar_url, avatar_type, created_at, last_login FROM app_user WHERE id = $1',
             [req.user.id]
         );
 
@@ -395,7 +395,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
         values.push(req.user.id);
 
         const result = await db.query(
-            `UPDATE app_user SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, name, display_name, email, role, preferences`,
+            `UPDATE app_user SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, name, display_name, email, role, preferences, avatar_url, avatar_type`,
             values
         );
 

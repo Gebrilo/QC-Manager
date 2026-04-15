@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi, profileApi, UserPreferences } from '../../src/lib/api';
 import { useTheme } from '../../src/components/providers/ThemeProvider';
 import { useAuth } from '../../src/components/providers/AuthProvider';
-import { getRouteConfig } from '../../src/config/routes';
+import { getRouteConfig, getNavbarRoutes } from '../../src/config/routes';
 
 interface UserProfile {
     id: string;
@@ -13,17 +13,19 @@ interface UserProfile {
     email: string;
     role: string;
     preferences: UserPreferences;
+    avatar_url: string | null;
+    avatar_type: 'initials' | 'preset' | 'upload' | null;
 }
 
 const DEFAULT_PREFS: Required<UserPreferences> = {
-    theme: 'system',
+    theme: 'light',
     quick_nav_visible: true,
     default_page: '/my-tasks',
-    notification_frequency: 'immediate',
     display_density: 'comfortable',
     timezone: 'UTC',
     language: 'en',
     show_profile_to_team: true,
+    menu_order: [],
 };
 
 const inputCls = 'w-full h-9 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50';
@@ -45,7 +47,7 @@ const LANDING_PAGE_OPTIONS = [
 
 export default function PreferencesPage() {
     const { setTheme } = useTheme();
-    const { user: authUser, permissions, hasPermission, isAdmin } = useAuth();
+    const { user: authUser, permissions, hasPermission, isAdmin, refreshUser } = useAuth();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -66,6 +68,15 @@ export default function PreferencesPage() {
         });
     }, [authUser, permissions, isAdmin, hasPermission]);
 
+    const accessibleNavRoutes = useMemo(() => {
+        return getNavbarRoutes().filter(route => {
+            if (route.adminOnly && !isAdmin) return false;
+            if (route.requiresActivation && !authUser?.activated) return false;
+            if (route.permission && !hasPermission(route.permission)) return false;
+            return true;
+        });
+    }, [isAdmin, authUser, hasPermission]);
+
     const [displayName, setDisplayName] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -74,16 +85,38 @@ export default function PreferencesPage() {
     const [prefSaving, setPrefSaving] = useState(false);
     const [prefMsg, setPrefMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    const [menuOrder, setMenuOrder] = useState<string[]>([]);
+    const [navSaving, setNavSaving] = useState(false);
+    const [navMsg, setNavMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+    const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+    const [pwSending, setPwSending] = useState(false);
+    const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarSaving, setAvatarSaving] = useState(false);
+    const [avatarMsg, setAvatarMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         fetchApi<{ user: UserProfile }>('/auth/me')
             .then(data => {
                 setProfile(data.user);
                 setDisplayName(data.user.display_name || data.user.name || '');
                 setPrefs({ ...DEFAULT_PREFS, ...(data.user.preferences || {}) });
+                setAvatarUrl(data.user.avatar_url || null);
+                const savedOrder: string[] = data.user.preferences?.menu_order || [];
+                const initialOrder = [
+                    ...savedOrder.filter(p => accessibleNavRoutes.some(r => r.path === p)),
+                    ...accessibleNavRoutes
+                        .map(r => r.path)
+                        .filter(p => !savedOrder.includes(p)),
+                ];
+                setMenuOrder(initialOrder);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, []);
+    }, [accessibleNavRoutes]);
 
     // If the saved default_page is no longer accessible, reset to /dashboard
     useEffect(() => {
@@ -116,6 +149,112 @@ export default function PreferencesPage() {
         } finally { setPrefSaving(false); }
     };
 
+    const saveNavOrder = async () => {
+        setNavSaving(true);
+        setNavMsg(null);
+        try {
+            await profileApi.update({ preferences: { menu_order: menuOrder } });
+            await refreshUser();
+            setNavMsg({ type: 'success', text: 'Navigation order saved!' });
+        } catch (err: any) {
+            setNavMsg({ type: 'error', text: err.message || 'Failed to save' });
+        } finally {
+            setNavSaving(false);
+        }
+    };
+
+    const handleDragStart = (idx: number) => setDraggingIdx(idx);
+
+    const handleDragOver = (e: React.DragEvent, idx: number) => {
+        e.preventDefault();
+        setDragOverIdx(idx);
+    };
+
+    const handleDrop = (idx: number) => {
+        if (draggingIdx === null || draggingIdx === idx) {
+            setDraggingIdx(null);
+            setDragOverIdx(null);
+            return;
+        }
+        const next = [...menuOrder];
+        const [moved] = next.splice(draggingIdx, 1);
+        next.splice(idx, 0, moved);
+        setMenuOrder(next);
+        setDraggingIdx(null);
+        setDragOverIdx(null);
+    };
+
+    const handleDragEnd = () => {
+        setDraggingIdx(null);
+        setDragOverIdx(null);
+    };
+
+    const sendPasswordReset = async () => {
+        if (!profile?.email) {
+            setPwMsg({ type: 'error', text: 'No email on file for this account.' });
+            return;
+        }
+        setPwSending(true);
+        setPwMsg(null);
+        try {
+            const { supabase } = await import('../../src/lib/supabase');
+            const redirectTo = `${window.location.origin}/auth/reset-password`;
+            const { error } = await supabase.auth.resetPasswordForEmail(profile.email, { redirectTo });
+            if (error) throw error;
+            setPwMsg({ type: 'success', text: `Password reset link sent to ${profile.email}` });
+        } catch (err: any) {
+            setPwMsg({ type: 'error', text: err.message || 'Failed to send reset email.' });
+        } finally {
+            setPwSending(false);
+        }
+    };
+
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+            setAvatarMsg({ type: 'error', text: 'Only JPG, PNG, GIF, or WebP images are allowed.' });
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setAvatarMsg({ type: 'error', text: 'Image must be under 2 MB.' });
+            return;
+        }
+
+        setAvatarSaving(true);
+        setAvatarMsg(null);
+        try {
+            const { avatarApi } = await import('../../src/lib/api');
+            const result = await avatarApi.upload(file);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.gebrils.cloud';
+            setAvatarUrl(`${apiUrl}${result.avatar_url}`);
+            await refreshUser();
+            setAvatarMsg({ type: 'success', text: 'Avatar updated!' });
+        } catch (err: any) {
+            setAvatarMsg({ type: 'error', text: err.message || 'Upload failed.' });
+        } finally {
+            setAvatarSaving(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleAvatarRemove = async () => {
+        setAvatarSaving(true);
+        setAvatarMsg(null);
+        try {
+            const { avatarApi } = await import('../../src/lib/api');
+            await avatarApi.remove();
+            setAvatarUrl(null);
+            await refreshUser();
+            setAvatarMsg({ type: 'success', text: 'Avatar removed.' });
+        } catch (err: any) {
+            setAvatarMsg({ type: 'error', text: err.message || 'Failed to remove avatar.' });
+        } finally {
+            setAvatarSaving(false);
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -134,12 +273,46 @@ export default function PreferencesPage() {
                 <div className="space-y-4">
                     {/* Avatar initials */}
                     <div className="flex items-center gap-4 mb-2">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                            {(displayName || profile?.name || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div>
+                        {avatarUrl ? (
+                            <img
+                                src={avatarUrl}
+                                alt="Profile avatar"
+                                className="w-14 h-14 rounded-full object-cover flex-shrink-0 border-2 border-slate-200 dark:border-slate-700"
+                            />
+                        ) : (
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+                                {(displayName || profile?.name || '?').charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <div className="space-y-1">
                             <p className="font-semibold text-slate-900 dark:text-white">{profile?.name}</p>
                             <p className="text-xs text-slate-400 capitalize">{profile?.role}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif,image/webp"
+                                    className="hidden"
+                                    onChange={handleAvatarUpload}
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={avatarSaving}
+                                    className="text-xs px-2.5 py-1 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors disabled:opacity-50"
+                                >
+                                    {avatarSaving ? 'Uploading…' : 'Upload Photo'}
+                                </button>
+                                {avatarUrl && (
+                                    <button
+                                        onClick={handleAvatarRemove}
+                                        disabled={avatarSaving}
+                                        className="text-xs px-2.5 py-1 border border-red-200 dark:border-red-900 rounded-lg text-red-500 hover:border-red-400 transition-colors disabled:opacity-50"
+                                    >
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
+                            {avatarMsg && <Msg {...avatarMsg} />}
                         </div>
                     </div>
                     <PrefField label="Display Name">
@@ -162,10 +335,10 @@ export default function PreferencesPage() {
                 <div className="space-y-5">
                     <PrefField label="Theme">
                         <div className="flex gap-2">
-                            {(['light', 'dark', 'system'] as const).map(t => (
+                            {(['light', 'dark'] as const).map(t => (
                                 <button key={t} onClick={() => { setPrefs({ ...prefs, theme: t }); setTheme(t); }}
                                     className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${prefs.theme === t ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-300 dark:hover:border-slate-600'}`}>
-                                    {t === 'light' ? '☀️ Light' : t === 'dark' ? '🌙 Dark' : '🖥 System'}
+                                    {t === 'light' ? '☀️ Light' : '🌙 Dark'}
                                 </button>
                             ))}
                         </div>
@@ -198,17 +371,72 @@ export default function PreferencesPage() {
                         </div>
                     </PrefField>
 
-                    <PrefField label="Notification Email Frequency">
-                        <select value={prefs.notification_frequency} onChange={e => setPrefs({ ...prefs, notification_frequency: e.target.value as any })} className={inputCls}>
-                            <option value="immediate">Immediate</option>
-                            <option value="daily">Daily Digest</option>
-                            <option value="weekly">Weekly Summary</option>
-                        </select>
-                    </PrefField>
-
                     {prefMsg && <Msg {...prefMsg} />}
                     <button onClick={savePrefs} disabled={prefSaving} className={btnPrimary}>
                         {prefSaving ? 'Saving…' : 'Save Preferences'}
+                    </button>
+                </div>
+            </PrefSection>
+
+            {/* Navigation Order */}
+            <PrefSection title="Navigation Order" icon="☰">
+                <div className="space-y-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Drag items to reorder the side navigation. Changes only affect items you have access to.
+                    </p>
+                    <ul className="space-y-1.5">
+                        {menuOrder.map((path, idx) => {
+                            const route = accessibleNavRoutes.find(r => r.path === path);
+                            if (!route) return null;
+                            const Icon = route.icon;
+                            return (
+                                <li
+                                    key={path}
+                                    draggable
+                                    onDragStart={() => handleDragStart(idx)}
+                                    onDragOver={(e) => handleDragOver(e, idx)}
+                                    onDrop={() => handleDrop(idx)}
+                                    onDragEnd={handleDragEnd}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border select-none cursor-grab active:cursor-grabbing transition-all ${
+                                        draggingIdx === idx
+                                            ? 'opacity-40 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30'
+                                            : dragOverIdx === idx
+                                                ? 'border-indigo-400 dark:border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20'
+                                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600'
+                                    }`}
+                                >
+                                    <svg className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                    </svg>
+                                    {Icon && <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" strokeWidth={1.75} />}
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{route.label}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    {navMsg && <Msg {...navMsg} />}
+                    <button onClick={saveNavOrder} disabled={navSaving} className={btnPrimary}>
+                        {navSaving ? 'Saving…' : 'Save Navigation Order'}
+                    </button>
+                </div>
+            </PrefSection>
+
+            {/* Security */}
+            <PrefSection title="Security" icon="🔒">
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">Change Password</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                            We&apos;ll send a secure link to <strong>{profile?.email}</strong> to set or update your password.
+                        </p>
+                    </div>
+                    {pwMsg && <Msg {...pwMsg} />}
+                    <button
+                        onClick={sendPasswordReset}
+                        disabled={pwSending}
+                        className={btnPrimary}
+                    >
+                        {pwSending ? 'Sending…' : 'Send Password Reset Link'}
                     </button>
                 </div>
             </PrefSection>

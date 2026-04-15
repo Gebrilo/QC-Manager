@@ -1,17 +1,23 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { meDashboardApi, MeDashboard } from '@/lib/api';
+import { meDashboardApi, MeDashboard, myJourneysApi, fetchApi, type AssignedJourney } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { MyStatCards } from '@/components/my-dashboard/MyStatCards';
 import { TaskDistributionChart } from '@/components/my-dashboard/TaskDistributionChart';
 import { TasksByProjectTable } from '@/components/my-dashboard/TasksByProjectTable';
 import { MyBugsTable } from '@/components/my-dashboard/MyBugsTable';
+import { QuickNavCards } from '@/components/shared/QuickNavCards';
+
+interface PersonalTask { id: string; status: 'pending' | 'in_progress' | 'done' | 'cancelled'; }
 
 export function MyDashboardClient() {
     const [data, setData] = useState<MeDashboard | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showQuickNav, setShowQuickNav] = useState(true);
+    const [journeys, setJourneys] = useState<AssignedJourney[]>([]);
+    const [pendingPersonalTasks, setPendingPersonalTasks] = useState(0);
     const { user } = useAuth();
     const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
 
@@ -19,8 +25,20 @@ export function MyDashboardClient() {
         try {
             setIsLoading(true);
             setError(null);
-            const result = await meDashboardApi.get();
+            const [result, meData, journeyData, personalTasksData] = await Promise.all([
+                meDashboardApi.get(),
+                fetchApi<{ user: { preferences?: { quick_nav_visible?: boolean } } }>('/auth/me').catch(() => null),
+                myJourneysApi.list().catch(() => [] as AssignedJourney[]),
+                fetchApi<PersonalTask[]>('/my-tasks').catch(() => [] as PersonalTask[]),
+            ]);
             setData(result);
+            if (meData?.user?.preferences?.quick_nav_visible === false) setShowQuickNav(false);
+            setJourneys(journeyData);
+            setPendingPersonalTasks(
+                (personalTasksData as PersonalTask[]).filter(
+                    t => t.status === 'pending' || t.status === 'in_progress'
+                ).length
+            );
         } catch (err: any) {
             if (err?.status === 404 || err?.message?.includes('No resource')) {
                 setError('no-resource');
@@ -86,6 +104,10 @@ export function MyDashboardClient() {
                         for organisation-wide analytics.
                     </p>
                 </div>
+            )}
+
+            {showQuickNav && (
+                <QuickNavCards journeys={journeys} pendingTasks={pendingPersonalTasks} />
             )}
 
             <MyStatCards summary={data.summary} />

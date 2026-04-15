@@ -14,12 +14,23 @@ export function Sidebar() {
 
     if (!user) return null;
 
-    const navLinks = getNavbarRoutes().filter(route => {
+    const rawNavLinks = getNavbarRoutes().filter(route => {
         if (route.requiresActivation && !user.activated) return false;
         if (route.adminOnly && !isAdmin) return false;
         if (route.permission && !hasPermission(route.permission)) return false;
         return true;
     });
+
+    const menuOrder: string[] = (user.preferences?.menu_order as string[] | undefined) || [];
+
+    const navLinks = menuOrder.length > 0
+        ? [
+            ...menuOrder
+                .map(path => rawNavLinks.find(r => r.path === path))
+                .filter((r): r is NonNullable<typeof r> => r != null),
+            ...rawNavLinks.filter(r => !menuOrder.includes(r.path)),
+        ]
+        : rawNavLinks;
 
     const logoHref = getLandingPage(user, permissions);
 

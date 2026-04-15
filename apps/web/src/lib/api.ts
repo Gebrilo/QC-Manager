@@ -524,14 +524,14 @@ export const healthApi = {
 // ============================================================================
 
 export interface UserPreferences {
-    theme?: 'light' | 'dark' | 'system';
+    theme?: 'light' | 'dark';
     quick_nav_visible?: boolean;
     default_page?: string;
-    notification_frequency?: 'immediate' | 'daily' | 'weekly';
     display_density?: 'compact' | 'comfortable';
     timezone?: string;
     language?: string;
     show_profile_to_team?: boolean;
+    menu_order?: string[];
 }
 
 export const profileApi = {
@@ -539,6 +539,32 @@ export const profileApi = {
         fetchApi<{ id: string; name: string; display_name: string | null; email: string; preferences: UserPreferences }>(
             '/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }
         ),
+};
+
+export const avatarApi = {
+    upload: async (file: File): Promise<{ avatar_url: string; avatar_type: string }> => {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.gebrils.cloud';
+        const { supabase } = await import('./supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
+
+        const form = new FormData();
+        form.append('avatar', file);
+
+        const res = await fetch(`${API_URL}/auth/profile/avatar`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Upload failed');
+        }
+        return res.json();
+    },
+
+    remove: (): Promise<{ avatar_url: null; avatar_type: string }> =>
+        fetchApi('/auth/profile/avatar', { method: 'DELETE' }),
 };
 
 // ============================================================================

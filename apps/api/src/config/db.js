@@ -1419,6 +1419,19 @@ const runMigrations = async () => {
             }
         }
 
+        // Migration 019: Avatar columns on app_user
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='avatar_url') THEN
+                    ALTER TABLE app_user ADD COLUMN avatar_url TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='app_user' AND column_name='avatar_type') THEN
+                    ALTER TABLE app_user ADD COLUMN avatar_type VARCHAR(10) CHECK (avatar_type IN ('initials', 'preset', 'upload')) DEFAULT 'initials';
+                END IF;
+            END $$;
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
