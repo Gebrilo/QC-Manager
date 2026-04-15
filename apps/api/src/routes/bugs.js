@@ -12,8 +12,17 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
     try {
         const project_id = validUUID(req.query.project_id);
 
-        const globalResult = await pool.query('SELECT * FROM v_bug_summary_global');
-        const totals = globalResult.rows[0] || {};
+        let totals;
+        if (project_id) {
+            const projectResult = await pool.query(
+                'SELECT * FROM v_bug_summary WHERE project_id = $1',
+                [project_id]
+            );
+            totals = projectResult.rows[0] || {};
+        } else {
+            const globalResult = await pool.query('SELECT * FROM v_bug_summary_global');
+            totals = globalResult.rows[0] || {};
+        }
 
         let byProjectQuery = 'SELECT * FROM v_bug_summary';
         const byProjectParams = [];
