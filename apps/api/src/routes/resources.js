@@ -89,7 +89,8 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
                 t.created_at DESC
         `, [id]);
 
-        // 5. Bugs owned by this resource (owner set once at first sync, immutable)
+        // 5. Bugs submitted by this resource
+        // submitted_by_resource_id is the canonical field; owner_resource_id is the legacy fallback
         const bugsResult = await db.query(`
             SELECT
                 b.id,
@@ -102,7 +103,7 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
                 b.reported_date AS creation_date
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
-            WHERE b.owner_resource_id = $1
+            WHERE (b.submitted_by_resource_id = $1 OR b.owner_resource_id = $1)
               AND b.deleted_at IS NULL
             ORDER BY b.reported_date DESC NULLS LAST, b.created_at DESC
         `, [id]);

@@ -404,6 +404,12 @@ router.post('/bug', async (req, res) => {
                 }
             }
 
+            // If email-based submitted_by lookup yielded nothing, fall back to ownerResourceId
+            // (same person — the reporter — resolved via name matching above)
+            if (!submittedByResourceId) {
+                submittedByResourceId = ownerResourceId;
+            }
+
             const bug_id = `TLP-${tuleap_artifact_id}`;
             const result = await pool.query(`
                 INSERT INTO bugs (
