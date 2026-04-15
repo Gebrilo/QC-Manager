@@ -99,7 +99,7 @@ const DEFAULT_PERMISSIONS = {
     ],
     contributor: [
         // Pages
-        'page:dashboard', 'page:tasks', 'page:my-tasks', 'page:my-dashboard',
+        'page:tasks', 'page:my-tasks', 'page:my-dashboard',
         // Task actions
         'action:tasks:edit',
         // Personal task actions
