@@ -245,7 +245,9 @@ router.post('/bug', async (req, res) => {
             assigned_to,
             reported_date,
             raw_tuleap_payload,
-            source = 'EXPLORATORY'
+            source = 'EXPLORATORY',
+            submitted_by_email = null,
+            submitted_by_username = null,
         } = req.body;
 
         if (!tuleap_artifact_id || !title) {
@@ -347,6 +349,18 @@ router.post('/bug', async (req, res) => {
             return res.json({ success: true, action: 'skipped', message: 'Bug is soft-deleted locally' });
         }
 
+        let submittedByResourceId = null;
+        if (submitted_by_email) {
+            const submitterRes = await pool.query(
+                `SELECT id FROM resources
+                 WHERE LOWER(email) = LOWER($1)
+                   AND deleted_at IS NULL
+                 LIMIT 1`,
+                [submitted_by_email]
+            );
+            submittedByResourceId = submitterRes.rows[0]?.id ?? null;
+        }
+
         if (isUpdate) {
             // Update existing bug
             const existingId = existingRes.rows[0].id;
@@ -398,8 +412,8 @@ router.post('/bug', async (req, res) => {
                     bug_type, component, project_id,
                     linked_test_case_ids, linked_test_execution_ids,
                     reported_by, assigned_to, reported_date, raw_tuleap_payload, source,
-                    owner_resource_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                    owner_resource_id, submitted_by_resource_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
                 RETURNING *
             `, [
                 tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
@@ -407,7 +421,8 @@ router.post('/bug', async (req, res) => {
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
                 reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource,
-                ownerResourceId
+                ownerResourceId,
+                submittedByResourceId
             ]);
             bug = result.rows[0];
             await auditLog('bugs', bug.id, 'CREATE', bug, null);

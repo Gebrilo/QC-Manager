@@ -103,9 +103,11 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
             SELECT
                 b.*,
                 p.project_name,
+                r.resource_name AS submitted_by_resource_name,
                 CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
+            LEFT JOIN resources r ON b.submitted_by_resource_id = r.id
             WHERE b.deleted_at IS NULL
         `;
         const params = [];

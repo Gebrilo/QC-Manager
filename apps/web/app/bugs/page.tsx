@@ -226,6 +226,7 @@ function BugsContent() {
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Severity</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-32">Status</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Project</th>
+                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Submitted By</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Updated By</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Assigned To</th>
                                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Reported</th>
@@ -236,9 +237,9 @@ function BugsContent() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
-                                <tr><td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
+                                <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
+                                <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
                             ) : filtered.map(bug => (
                                 <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
@@ -274,6 +275,9 @@ function BugsContent() {
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
                                         {bug.project_name || '\u2014'}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                                        {bug.submitted_by_resource_name || '\u2014'}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
                                         {bug.updated_by || bug.reported_by || '\u2014'}

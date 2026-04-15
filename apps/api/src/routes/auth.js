@@ -9,7 +9,7 @@ const DEFAULT_PERMISSIONS = {
         // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-        'page:my-tasks', 'page:task-history', 'page:roles',
+        'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:roles',
         'page:journeys', 'page:teams', 'page:bugs',
         // Journey actions
         'action:journeys:assign',
@@ -42,7 +42,7 @@ const DEFAULT_PERMISSIONS = {
         // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:governance', 'page:test-executions', 'page:reports',
-        'page:my-tasks', 'page:task-history', 'page:bugs',
+        'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:bugs',
         // Journey actions
         'action:journeys:view_team_progress',
         'action:journeys:assign',
@@ -73,7 +73,7 @@ const DEFAULT_PERMISSIONS = {
         // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
-        'page:my-tasks',
+        'page:my-tasks', 'page:my-dashboard',
         // Task actions
         'action:tasks:create', 'action:tasks:edit',
         // Report actions
@@ -93,13 +93,13 @@ const DEFAULT_PERMISSIONS = {
         // Pages
         'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
         'page:test-executions', 'page:reports',
-        'page:my-tasks',
+        'page:my-tasks', 'page:my-dashboard',
         // Personal task actions
         'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
     ],
     contributor: [
         // Pages
-        'page:dashboard', 'page:tasks', 'page:my-tasks',
+        'page:dashboard', 'page:tasks', 'page:my-tasks', 'page:my-dashboard',
         // Task actions
         'action:tasks:edit',
         // Personal task actions

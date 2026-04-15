@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug } from 'lucide-react';
 
 export interface RouteConfig {
     path: string;
@@ -23,6 +23,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
     { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map },
     { path: '/journeys/[id]', label: 'Journey Details', permission: 'page:my-tasks', requiresActivation: false },
+    { path: '/my-dashboard', label: 'My Dashboard', permission: 'page:my-dashboard', requiresActivation: false, showInNavbar: true, navOrder: 1.8, icon: LayoutGrid },
     { path: '/dashboard', label: 'Dashboard', permission: 'page:dashboard', requiresActivation: true, showInNavbar: true, navOrder: 2, icon: LayoutDashboard },
     { path: '/tasks', label: 'Tasks', permission: 'page:tasks', requiresActivation: true, showInNavbar: true, navOrder: 3, icon: ListTodo },
     { path: '/tasks/create', label: 'Create Task', permission: 'page:tasks', requiresActivation: true },

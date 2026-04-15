@@ -320,6 +320,7 @@ export interface Bug {
     tuleap_url?: string;
     has_test_link?: boolean;
     source?: 'TEST_CASE' | 'EXPLORATORY';
+    submitted_by_resource_name?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -349,6 +350,45 @@ export const bugsApi = {
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: Bug }>(`/bugs/${id}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
+// API Client - My Dashboard
+// ============================================================================
+
+export interface MeDashboard {
+    profile: {
+        resource_id: string;
+        resource_name: string;
+        department: string | null;
+    };
+    summary: {
+        total_tasks: number;
+        total_projects: number;
+        hours_variance: number;
+    };
+    task_distribution: Record<string, number>;
+    tasks_by_project: Array<{
+        project_id: string | null;
+        project_name: string;
+        total: number;
+        done: number;
+        in_progress: number;
+        backlog: number;
+    }>;
+    submitted_bugs: Array<{
+        id: string;
+        bug_id: string;
+        title: string;
+        status: string;
+        severity: string;
+        project_name: string | null;
+        creation_date: string | null;
+    }>;
+}
+
+export const meDashboardApi = {
+    get: () => fetchApi<MeDashboard>('/me/dashboard'),
 };
 
 // ============================================================================
