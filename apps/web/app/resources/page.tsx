@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { resourcesApi, type Resource } from '@/lib/api';
+import { resourcesApi, type Resource, fetchApi } from '@/lib/api';
 import { ResourceTable } from '@/components/resources/ResourceTable';
 import { ResourceForm } from '@/components/resources/ResourceForm';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ export default function ResourcesPage() {
     const [deleteTarget, setDeleteTarget] = useState<Resource | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [preparationCount, setPreparationCount] = useState(0);
     const { hasPermission, user } = useAuth();
 
     const canCreate = hasPermission('action:resources:create');
@@ -38,6 +39,9 @@ export default function ResourcesPage() {
 
     useEffect(() => {
         loadResources();
+        fetchApi<any[]>('/manager/team?status=PREPARATION')
+            .then(data => setPreparationCount(data.length))
+            .catch(() => setPreparationCount(0));
     }, []);
 
     const filteredResources = useMemo(() => {
@@ -177,6 +181,7 @@ export default function ResourcesPage() {
                 isLoading={isLoading}
                 onEdit={canEdit ? handleEdit : undefined}
                 onDelete={canDelete ? handleDelete : undefined}
+                preparationCount={preparationCount}
             />
 
             {/* Delete Confirmation Modal */}

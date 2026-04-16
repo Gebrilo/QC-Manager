@@ -22,6 +22,7 @@ interface ResourceTableProps {
     isLoading: boolean;
     onEdit?: (resource: Resource) => void;
     onDelete?: (resource: Resource) => void;
+    preparationCount?: number;
 }
 
 const columnHelper = createColumnHelper<Resource>();
@@ -31,6 +32,7 @@ export function ResourceTable({
     isLoading,
     onEdit,
     onDelete,
+    preparationCount,
 }: ResourceTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { user } = useAuth();
@@ -189,8 +191,26 @@ export function ResourceTable({
 
     if (resources.length === 0) {
         return (
-            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                No resources found. Click "Add Resource" to create one.
+            <div className="text-center py-20">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                {(preparationCount ?? 0) > 0 ? (
+                    <>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No Active Resources Yet</h3>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                            You have {preparationCount} user{preparationCount !== 1 ? 's' : ''} currently in preparation.
+                            Once they are activated, they will appear here.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No Resources</h3>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1">No active resources found.</p>
+                    </>
+                )}
             </div>
         );
     }
