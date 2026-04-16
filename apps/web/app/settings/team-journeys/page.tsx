@@ -12,7 +12,9 @@ interface TeamMember {
     role: string;
     active: boolean;
     onboarding_completed: boolean;
-    probation_completed: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+    team_membership_active: boolean;
+    ready_for_activation: boolean;
     is_resource: boolean;
     team_id?: string;
     total_xp?: number;
@@ -41,7 +43,6 @@ interface TeamJourney {
 
 export default function TeamJourneysPage() {
     const [team, setTeam] = useState<TeamMember[]>([]);
-    const [eligibleResources, setEligibleResources] = useState<TeamMember[]>([]);
     const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
     const [journeys, setJourneys] = useState<TeamJourney[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,45 +50,43 @@ export default function TeamJourneysPage() {
     const [error, setError] = useState('');
     const { isAdmin } = useAuth();
     const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set(['unassigned']));
-
-    const fetchEligibleResources = useCallback(() => {
-        fetchApi<TeamMember[]>('/manager/eligible-resources')
-            .then(data => setEligibleResources(data))
-            .catch(() => setEligibleResources([]));
-    }, []);
+    const [activateTarget, setActivateTarget] = useState<TeamMember | null>(null);
+    const [activating, setActivating] = useState(false);
+    const [activateError, setActivateError] = useState('');
 
     useEffect(() => {
-        fetchApi<TeamMember[]>('/manager/team')
+        fetchApi<TeamMember[]>('/manager/team?status=PREPARATION')
             .then(data => setTeam(data))
             .catch(err => setError(err.message || 'Failed to load team'))
             .finally(() => setLoading(false));
+    }, []);
 
-        fetchEligibleResources();
-    }, [fetchEligibleResources]);
-
-    const handleCompleteProbation = async (userId: string) => {
+    const handleMarkReady = async (userId: string, ready: boolean) => {
         try {
-            await fetchApi(`/manager/team/${userId}/probation`, {
+            await fetchApi(`/manager/team/${userId}/ready-for-activation`, {
                 method: 'PATCH',
-                body: JSON.stringify({ completed: true })
+                body: JSON.stringify({ ready }),
             });
-            setTeam(prev => prev.map(m => m.id === userId ? { ...m, probation_completed: true } : m));
-            if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev!, probation_completed: true }));
-            fetchEligibleResources();
+            setTeam(prev => prev.map(m => m.id === userId ? { ...m, ready_for_activation: ready } : m));
+            if (selectedUser?.id === userId) setSelectedUser(prev => prev ? { ...prev, ready_for_activation: ready } : prev);
         } catch (err: any) {
-            alert(err.message || 'Failed to complete probation');
+            alert(err.message || 'Failed to update status');
         }
     };
 
-    const handleAssignResource = async (userId: string) => {
-        if (!userId) return;
+    const handleActivate = async () => {
+        if (!activateTarget) return;
+        setActivating(true);
+        setActivateError('');
         try {
-            await fetchApi(`/manager/team/${userId}/make-resource`, { method: 'POST' });
-            setTeam(prev => prev.map(m => m.id === userId ? { ...m, is_resource: true } : m));
-            if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev!, is_resource: true }));
-            fetchEligibleResources();
+            await fetchApi(`/manager/team/${activateTarget.id}/activate`, { method: 'POST' });
+            setTeam(prev => prev.filter(m => m.id !== activateTarget.id));
+            if (selectedUser?.id === activateTarget.id) setSelectedUser(null);
+            setActivateTarget(null);
         } catch (err: any) {
-            alert(err.message || 'Failed to assign resource');
+            setActivateError(err.message || 'Activation failed');
+        } finally {
+            setActivating(false);
         }
     };
 
@@ -135,23 +134,6 @@ export default function TeamJourneysPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Team list */}
                     <div className="lg:col-span-1 border-slate-200 dark:border-slate-800">
-
-                        {/* Assign Resource Dropdown */}
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-6 p-4 space-y-2">
-                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Promote to Resource</p>
-                            <select
-                                className="flex-1 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm px-3 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                                onChange={(e) => {
-                                    handleAssignResource(e.target.value);
-                                    e.target.value = '';
-                                }}
-                            >
-                                <option value="">Assign eligible user as resource...</option>
-                                {eligibleResources.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name} ({r.email})</option>
-                                ))}
-                            </select>
-                        </div>
 
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                             <div className="p-4 border-b border-slate-200 dark:border-slate-800">
@@ -213,9 +195,12 @@ export default function TeamJourneysPage() {
                                                                         </div>
                                                                         <div className="flex items-center justify-between mt-0.5">
                                                                             <p className="text-xs text-slate-400 truncate">{member.email}</p>
-                                                                            {!member.probation_completed && (
-                                                                                <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 flex-shrink-0">Probation</span>
-                                                                            )}
+                                                                             {!member.ready_for_activation && (
+                                                                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 flex-shrink-0">Not Ready</span>
+                                                                             )}
+                                                                             {member.ready_for_activation && (
+                                                                                 <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex-shrink-0">Ready</span>
+                                                                             )}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -252,9 +237,12 @@ export default function TeamJourneysPage() {
                                                         </div>
                                                         <div className="flex items-center justify-between mt-0.5">
                                                             <p className="text-xs text-slate-400 truncate">{member.email}</p>
-                                                            {!member.probation_completed && (
-                                                                <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 flex-shrink-0">Probation</span>
-                                                            )}
+                                                             {!member.ready_for_activation && (
+                                                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 flex-shrink-0">Not Ready</span>
+                                                             )}
+                                                             {member.ready_for_activation && (
+                                                                 <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex-shrink-0">Ready</span>
+                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -290,22 +278,33 @@ export default function TeamJourneysPage() {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3">
                                                 <h2 className="font-bold text-slate-900 dark:text-white">{selectedUser.name}</h2>
-                                                {selectedUser.is_resource ? (
-                                                    <span className="text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 px-2 py-0.5 rounded">Resource</span>
+                                                {selectedUser.status === 'ACTIVE' ? (
+                                                    <span className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 px-2 py-0.5 rounded">Active</span>
                                                 ) : (
-                                                    <span className="text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded">Normal User</span>
+                                                    <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 px-2 py-0.5 rounded">In Preparation</span>
                                                 )}
                                             </div>
                                             <p className="text-sm text-slate-400 mt-1">{selectedUser.email} · {selectedUser.role}</p>
 
-                                            {!selectedUser.probation_completed && (
+                                            <div className="flex items-center gap-3 mt-3">
                                                 <button
-                                                    onClick={() => handleCompleteProbation(selectedUser.id)}
-                                                    className="mt-3 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-900/70 dark:text-amber-300 px-3 py-1.5 rounded transition-colors"
+                                                    onClick={() => handleMarkReady(selectedUser.id, !selectedUser.ready_for_activation)}
+                                                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                                                        selectedUser.ready_for_activation
+                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
+                                                            : 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800'
+                                                    }`}
                                                 >
-                                                    Mark Probation Complete
+                                                    {selectedUser.ready_for_activation ? '✓ Ready for Activation' : 'Mark as Ready'}
                                                 </button>
-                                            )}
+                                                <button
+                                                    onClick={() => setActivateTarget(selectedUser)}
+                                                    disabled={!selectedUser.ready_for_activation}
+                                                    className="text-xs font-medium px-4 py-1.5 rounded-lg border-none bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    Activate Resource →
+                                                </button>
+                                            </div>
                                         </div>
                                         {(selectedUser as any).total_xp !== undefined && (
                                             <div className="text-right">
@@ -379,6 +378,38 @@ export default function TeamJourneysPage() {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+            {activateTarget && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                            Activate {activateTarget.name} as a Resource?
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                            This will grant full system access, create a resource record, and notify the user.
+                            This action can only be reversed by an admin.
+                        </p>
+                        {activateError && (
+                            <p className="text-sm text-rose-600 dark:text-rose-400 mb-3">{activateError}</p>
+                        )}
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => { setActivateTarget(null); setActivateError(''); }}
+                                disabled={activating}
+                                className="text-sm px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleActivate}
+                                disabled={activating}
+                                className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-60"
+                            >
+                                {activating ? 'Activating…' : 'Yes, Activate'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
