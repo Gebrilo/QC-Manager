@@ -5,24 +5,35 @@ const { createResourceSchema, updateResourceSchema } = require('../schemas/resou
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, requireRole, requireStatus } = require('../middleware/authMiddleware');
+const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
 const { computeTaskTimeline } = require('../utils/workingDays');
 
 // ========================================
 // Resource Analytics Dashboard
 // ========================================
 
-// GET all resources with utilization metrics (from view)
+// GET all resources — admins/non-managers see all; managers see their team only
 router.get('/', requireAuth, requireStatus('ACTIVE'), requirePermission('page:resources'), async (req, res, next) => {
     try {
+        if (req.user.role !== 'manager') {
+            const result = await db.query(
+                `SELECT * FROM v_resources_with_utilization ORDER BY resource_name ASC`
+            );
+            return res.json(result.rows);
+        }
+
+        // Manager: scope to team. Resources with no user_id are excluded (inner JOIN is intentional).
+        const { teamId } = await getTeamScopeFilter(req.user);
+        if (!teamId) return res.json([]);
+
         const result = await db.query(`
-            SELECT * 
-            FROM v_resources_with_utilization 
-            ORDER BY resource_name ASC
-        `);
+            SELECT v.* FROM v_resources_with_utilization v
+            JOIN app_user u ON u.id = v.user_id
+            WHERE u.team_id = $1
+            ORDER BY v.resource_name ASC
+        `, [teamId]);
         res.json(result.rows);
-    } catch (err) {
-        next(err);
-    }
+    } catch (err) { next(err); }
 });
 
 // GET resource analytics dashboard (admin/manager only)
@@ -39,6 +50,15 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
             return res.status(404).json({ error: 'Resource not found' });
         }
         const resource = profileResult.rows[0];
+
+        if (req.user.role === 'manager') {
+            const allowed = resource.user_id
+                ? await canAccessUser(req.user, resource.user_id)
+                : false;
+            if (!allowed) {
+                return res.status(403).json({ error: 'Access restricted to your team' });
+            }
+        }
 
         // 2. Current week actuals (Monday–Sunday ISO week)
         const weekActualsResult = await db.query(`
@@ -179,7 +199,19 @@ router.get('/:id', requireAuth, requirePermission('page:resources'), async (req,
             return res.status(404).json({ error: 'Resource not found' });
         }
 
-        res.json(result.rows[0]);
+        const resource = result.rows[0];
+
+        if (req.user.role === 'manager') {
+            if (!resource.user_id) {
+                return res.status(403).json({ error: 'Access restricted to your team' });
+            }
+            const allowed = await canAccessUser(req.user, resource.user_id);
+            if (!allowed) {
+                return res.status(403).json({ error: 'Access restricted to your team' });
+            }
+        }
+
+        res.json(resource);
     } catch (err) {
         next(err);
     }
