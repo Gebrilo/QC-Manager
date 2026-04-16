@@ -29,7 +29,7 @@ async function requireAuth(req, res, next) {
 
             if (supabaseId) {
                 const result = await db.query(
-                    'SELECT id, email, name, role, active, activated FROM app_user WHERE supabase_id = $1',
+                    'SELECT id, email, name, role, active, status, team_membership_active FROM app_user WHERE supabase_id = $1',
                     [supabaseId]
                 );
                 if (result.rows.length > 0) {
@@ -47,7 +47,7 @@ async function requireAuth(req, res, next) {
             const decoded = jwt.verify(token, LEGACY_JWT_SECRET);
             if (decoded.id) {
                 const result = await db.query(
-                    'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
+                    'SELECT id, email, name, role, active, status, team_membership_active FROM app_user WHERE id = $1',
                     [decoded.id]
                 );
                 if (result.rows.length > 0) {
@@ -74,7 +74,8 @@ async function requireAuth(req, res, next) {
         name: user.name,
         role: user.role,
         active: user.active,
-        activated: user.activated,
+        status: user.status,
+        team_membership_active: user.team_membership_active,
     };
     next();
 }
@@ -115,7 +116,7 @@ async function optionalAuth(req, res, next) {
             const supabaseId = decoded.sub;
             if (supabaseId) {
                 const result = await db.query(
-                    'SELECT id, email, name, role, active, activated FROM app_user WHERE supabase_id = $1',
+                    'SELECT id, email, name, role, active, status, team_membership_active FROM app_user WHERE supabase_id = $1',
                     [supabaseId]
                 );
                 if (result.rows.length > 0 && result.rows[0].active) {
@@ -133,7 +134,7 @@ async function optionalAuth(req, res, next) {
             const decoded = jwt.verify(token, LEGACY_JWT_SECRET);
             if (decoded.id) {
                 const result = await db.query(
-                    'SELECT id, email, name, role, active, activated FROM app_user WHERE id = $1',
+                    'SELECT id, email, name, role, active, status, team_membership_active FROM app_user WHERE id = $1',
                     [decoded.id]
                 );
                 if (result.rows.length > 0 && result.rows[0].active) {
@@ -152,7 +153,8 @@ async function optionalAuth(req, res, next) {
             name: user.name,
             role: user.role,
             active: user.active,
-            activated: user.activated,
+            status: user.status,
+            team_membership_active: user.team_membership_active,
         };
     }
     next();
@@ -217,4 +219,20 @@ function requireAnyPermission(...permissionKeys) {
     };
 }
 
-module.exports = { requireAuth, requireRole, requirePermission, requireAnyPermission, optionalAuth };
+function requireStatus(...statuses) {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+        if (!statuses.includes(req.user.status)) {
+            return res.status(403).json({
+                error: 'Access restricted based on your account status.',
+                required: statuses,
+                current: req.user.status,
+            });
+        }
+        next();
+    };
+}
+
+module.exports = { requireAuth, requireRole, requirePermission, requireAnyPermission, optionalAuth, requireStatus };
