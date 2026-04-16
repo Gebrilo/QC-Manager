@@ -40,7 +40,7 @@ async function activateUser(userId, actorId, options = {}, actorRole = 'manager'
         await db.query(
             `INSERT INTO resources (resource_name, user_id, email, role, department, weekly_capacity_hrs)
              VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (user_id) WHERE deleted_at IS NULL
+             ON CONFLICT (user_id) WHERE deleted_at IS NULL AND user_id IS NOT NULL
              DO UPDATE SET is_active = true, updated_at = NOW()`,
             [user.name, userId, user.email, user.role, department, weekly_capacity_hrs]
         );
