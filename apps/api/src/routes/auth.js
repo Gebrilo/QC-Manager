@@ -221,7 +221,7 @@ router.post('/sync', async (req, res, next) => {
             return res.json({
                 user: {
                     id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
-                    role: user.role, activated: user.activated,
+                    role: user.role, status: user.status,
                     preferences: user.preferences || {},
                     avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                 },
@@ -260,7 +260,7 @@ router.post('/sync', async (req, res, next) => {
                     return res.json({
                         user: {
                             id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
-                            role: user.role, activated: user.activated,
+                            role: user.role, status: user.status,
                             preferences: user.preferences || {},
                             avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                         },
@@ -280,7 +280,7 @@ router.post('/sync', async (req, res, next) => {
         const userCount = await db.query('SELECT COUNT(*) as count FROM app_user');
         const isFirstUser = parseInt(userCount.rows[0].count) === 0;
         const role = isFirstUser ? 'admin' : 'viewer';
-        const activated = isFirstUser;
+        const initialStatus = isFirstUser ? 'ACTIVE' : 'PREPARATION';
 
         // Build name from Supabase user metadata or email
         const userMetadata = decoded.user_metadata || {};
@@ -288,15 +288,15 @@ router.post('/sync', async (req, res, next) => {
                      (email ? email.split('@')[0] : phone || 'User');
 
         const result = await db.query(
-            `INSERT INTO app_user (name, email, phone, role, active, activated, supabase_id, auth_provider)
+            `INSERT INTO app_user (name, email, phone, role, active, status, supabase_id, auth_provider)
              VALUES ($1, $2, $3, $4, true, $5, $6, $7)
-             RETURNING id, name, email, phone, role, active, activated, created_at`,
-            [name, email ? email.toLowerCase() : null, phone || null, role, activated, supabaseId, authProvider]
+             RETURNING id, name, email, phone, role, active, status, created_at`,
+            [name, email ? email.toLowerCase() : null, phone || null, role, initialStatus, supabaseId, authProvider]
         );
 
         const user = result.rows[0];
 
-        if (activated) {
+        if (initialStatus === 'ACTIVE') {
             await setDefaultPermissions(user.id, user.role);
         } else {
             await setInactivePermissions(user.id);
@@ -313,7 +313,7 @@ router.post('/sync', async (req, res, next) => {
         res.status(201).json({
             user: {
                 id: user.id, name: user.name, email: user.email, phone: user.phone,
-                role: user.role, activated: user.activated,
+                role: user.role, status: user.status,
                 preferences: {},
                 avatar_url: null, avatar_type: null,
             },
@@ -341,7 +341,7 @@ router.post('/sync', async (req, res, next) => {
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
         const result = await db.query(
-            'SELECT id, name, display_name, email, phone, role, active, activated, onboarding_completed, preferences, avatar_url, avatar_type, created_at, last_login FROM app_user WHERE id = $1',
+            'SELECT id, name, display_name, email, phone, role, active, status, team_membership_active, onboarding_completed, preferences, avatar_url, avatar_type, created_at, last_login FROM app_user WHERE id = $1',
             [req.user.id]
         );
 
