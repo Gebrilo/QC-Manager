@@ -281,15 +281,19 @@ router.delete('/:id', async (req, res, next) => {
             return res.status(400).json({ error: 'Cannot delete yourself' });
         }
 
-        const userCheck = await db.query('SELECT id, name, email FROM app_user WHERE id = $1', [id]);
+        const userCheck = await db.query('SELECT id, name, email, supabase_id FROM app_user WHERE id = $1', [id]);
         if (userCheck.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Delete permissions first
+        const supabaseId = userCheck.rows[0].supabase_id;
+
         await db.query('DELETE FROM user_permissions WHERE user_id = $1', [id]);
-        // Delete the user
         await db.query('DELETE FROM app_user WHERE id = $1', [id]);
+
+        if (supabaseId) {
+            await db.query('DELETE FROM auth.users WHERE id = $1', [supabaseId]).catch(() => {});
+        }
 
         res.status(204).send();
     } catch (err) {
