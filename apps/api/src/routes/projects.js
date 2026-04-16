@@ -4,7 +4,7 @@ const db = require('../config/db');
 const { createProjectSchema, updateProjectSchema } = require('../schemas/project');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireStatus } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 
 /**
@@ -26,7 +26,7 @@ async function buildTeamFilter(user) {
 }
 
 // GET all projects (from View), scoped by team for managers
-router.get('/', requireAuth, async (req, res, next) => {
+router.get('/', requireAuth, requireStatus('ACTIVE'), async (req, res, next) => {
     try {
         const { clause, params } = await buildTeamFilter(req.user);
 

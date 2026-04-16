@@ -4,7 +4,7 @@ const db = require('../config/db');
 const { createResourceSchema, updateResourceSchema } = require('../schemas/resource');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, requireRole } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireRole, requireStatus } = require('../middleware/authMiddleware');
 const { computeTaskTimeline } = require('../utils/workingDays');
 
 // ========================================
@@ -12,7 +12,7 @@ const { computeTaskTimeline } = require('../utils/workingDays');
 // ========================================
 
 // GET all resources with utilization metrics (from view)
-router.get('/', requireAuth, requirePermission('page:resources'), async (req, res, next) => {
+router.get('/', requireAuth, requireStatus('ACTIVE'), requirePermission('page:resources'), async (req, res, next) => {
     try {
         const result = await db.query(`
             SELECT * 
