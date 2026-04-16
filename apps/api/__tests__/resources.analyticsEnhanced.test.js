@@ -110,7 +110,7 @@ describe('GET /resources/:id/analytics — enhanced response', () => {
     test('T_ANA01: returns task_summary with correct by_status counts', async () => {
         setupMocks();
 
-        const mockReq = { params: { id: RESOURCE_ID } };
+        const mockReq = { params: { id: RESOURCE_ID }, user: { role: 'admin', id: 'admin-uuid' } };
         const mockRes = {
             statusCode: 200,
             status(code) { this.statusCode = code; return this; },
@@ -137,7 +137,7 @@ describe('GET /resources/:id/analytics — enhanced response', () => {
     test('T_ANA02: returns task_summary with by_priority and by_project', async () => {
         setupMocks();
 
-        const mockReq = { params: { id: RESOURCE_ID } };
+        const mockReq = { params: { id: RESOURCE_ID }, user: { role: 'admin', id: 'admin-uuid' } };
         const mockRes = {
             statusCode: 200,
             status(code) { this.statusCode = code; return this; },
@@ -163,7 +163,7 @@ describe('GET /resources/:id/analytics — enhanced response', () => {
     test('T_ANA03: returns bugs owned by resource with id, bug_id, title, source, status, severity, project_name, creation_date', async () => {
         setupMocks();
 
-        const mockReq = { params: { id: RESOURCE_ID } };
+        const mockReq = { params: { id: RESOURCE_ID }, user: { role: 'admin', id: 'admin-uuid' } };
         const mockRes = {
             statusCode: 200,
             status(code) { this.statusCode = code; return this; },
