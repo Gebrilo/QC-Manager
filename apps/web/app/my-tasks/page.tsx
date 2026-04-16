@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../src/components/providers/AuthProvider';
 import { ViewToggle } from '../../src/components/tasks/ViewToggle';
 import { TaskKanbanBoard } from '../../src/components/tasks/TaskKanbanBoard';
-import { TaskDetailModal } from '../../src/components/tasks/TaskDetailModal';
+import { TaskDetailModal, type TaskFormPayload } from '../../src/components/tasks/TaskDetailModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -38,7 +38,6 @@ export default function MyTasksPage() {
     const [tasks, setTasks] = useState<PersonalTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
 
     const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -87,22 +86,16 @@ export default function MyTasksPage() {
         setSelectedTask(null);
     };
 
-    const handleModalSave = async (data: { title: string; description: string | null; priority: 'low' | 'medium' | 'high'; due_date: string | null }, id?: string) => {
-        setSaving(true);
-        try {
-            const url = id ? `${API_URL}/my-tasks/${id}` : `${API_URL}/my-tasks`;
-            const method = id ? 'PATCH' : 'POST';
-            const res = await fetch(url, { method, headers, body: JSON.stringify(data) });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Failed to save task');
-            }
-            await fetchTasks();
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
+    const handleModalSave = async (data: TaskFormPayload, id?: string) => {
+        const url = id ? `${API_URL}/my-tasks/${id}` : `${API_URL}/my-tasks`;
+        const method = id ? 'PATCH' : 'POST';
+        const res = await fetch(url, { method, headers, body: JSON.stringify(data) });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as { error?: string }).error || 'Failed to save task');
         }
+        closeModal();
+        await fetchTasks();
     };
 
     const handleStatusChange = async (taskId: string, status: string) => {
@@ -207,7 +200,7 @@ export default function MyTasksPage() {
                                 <div className="space-y-2">
                                     <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active ({activeTasks.length})</h3>
                                     {activeTasks.map(task => (
-                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} />
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} />
                                     ))}
                                 </div>
                             )}
@@ -215,7 +208,7 @@ export default function MyTasksPage() {
                                 <div className="space-y-2">
                                     <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Completed ({completedTasks.length})</h3>
                                     {completedTasks.map(task => (
-                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} />
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} />
                                     ))}
                                 </div>
                             )}
@@ -231,7 +224,6 @@ export default function MyTasksPage() {
                     onClose={closeModal}
                     onSave={handleModalSave}
                     onDelete={handleDelete}
-                    onStatusChange={handleStatusChange}
                 />
             )}
 
@@ -273,11 +265,14 @@ export default function MyTasksPage() {
     );
 }
 
-function TaskCard({ task, onStatusChange, onOpen }: {
+function TaskCard({ task, onStatusChange, onOpen, onDelete }: {
     task: PersonalTask;
     onStatusChange: (id: string, status: string) => void;
     onOpen: (task: PersonalTask) => void;
+    onDelete: (id: string) => void;
 }) {
+    const [expanded, setExpanded] = useState(false);
+    const isLong = (task.description?.length ?? 0) > 120;
     const statusCfg = STATUS_CONFIG[task.status];
     const priorityCfg = PRIORITY_CONFIG[task.priority];
     const isDone = task.status === 'done' || task.status === 'cancelled';
@@ -311,13 +306,32 @@ function TaskCard({ task, onStatusChange, onOpen }: {
                         </span>
                     </div>
                     {task.description && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{task.description}</p>
+                        <div onClick={e => e.stopPropagation()}>
+                            <p className={`text-xs text-slate-500 dark:text-slate-400 mt-1 ${isLong && !expanded ? 'line-clamp-3' : ''}`}>
+                                {task.description}
+                            </p>
+                            {isLong && (
+                                <button
+                                    onClick={() => setExpanded(p => !p)}
+                                    className="text-[10px] text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-0.5 font-medium"
+                                >
+                                    {expanded ? 'Show less' : 'Show more'}
+                                </button>
+                            )}
+                        </div>
                     )}
                     {task.due_date && (
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                             Due: {new Date(task.due_date).toLocaleDateString()}
                         </p>
                     )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={e => { e.stopPropagation(); onDelete(task.id); }} className="p-1.5 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>

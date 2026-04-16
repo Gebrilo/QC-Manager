@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface PersonalTask {
     id: string;
     title: string;
@@ -40,6 +42,9 @@ function isOverdue(dueDate: string | null): boolean {
 }
 
 export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyTaskKanbanCardProps) {
+    const [expanded, setExpanded] = useState(false);
+    const isLong = (task.description?.length ?? 0) > 120;
+
     const handleDragStart = (e: React.DragEvent) => {
         e.dataTransfer.setData('taskId', task.id);
         e.dataTransfer.effectAllowed = 'move';
@@ -52,7 +57,9 @@ export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyT
             draggable
             onDragStart={handleDragStart}
             onClick={() => onOpen(task)}
-            className={`glass-card p-4 rounded-xl cursor-pointer active:cursor-grabbing hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200 group ${isDone ? 'opacity-60' : ''}`}
+            className={`glass-card p-4 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-200 group ${
+                isDone ? 'opacity-60' : 'hover:border-indigo-300 dark:hover:border-indigo-700'
+            }`}
         >
             {/* Title Row */}
             <div className="flex items-start gap-2 justify-between">
@@ -62,7 +69,7 @@ export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyT
                 {/* Delete Button */}
                 <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                        onClick={e => { e.stopPropagation(); onDelete(task.id); }}
                         className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,9 +79,21 @@ export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyT
                 </div>
             </div>
 
-            {/* Description */}
+            {/* Description with expand/collapse */}
             {task.description && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">{task.description}</p>
+                <div onClick={e => e.stopPropagation()}>
+                    <p className={`text-xs text-slate-500 dark:text-slate-400 mt-1.5 ${isLong && !expanded ? 'line-clamp-3' : ''}`}>
+                        {task.description}
+                    </p>
+                    {isLong && (
+                        <button
+                            onClick={() => setExpanded(p => !p)}
+                            className="text-[10px] text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-0.5 font-medium"
+                        >
+                            {expanded ? 'Show less' : 'Show more'}
+                        </button>
+                    )}
+                </div>
             )}
 
             {/* Bottom Row: Priority + Due Date */}
@@ -98,8 +117,8 @@ export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyT
             <select
                 className="md:hidden w-full mt-3 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/30"
                 value={task.status}
-                onChange={(e) => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+                onChange={e => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
             >
                 {STATUSES.map((s) => (
                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
