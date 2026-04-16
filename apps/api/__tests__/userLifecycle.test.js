@@ -42,9 +42,45 @@ describe('activateUser', () => {
     });
 
     test('throws 403 when manager does not manage user (non-admin)', async () => {
-        mockQuery.mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', team_id: 't1', ready_for_activation: true, manager_id: 'other-manager' }] });
+        // User is in team-A; actor's team will be team-B → mismatch
+        mockQuery.mockResolvedValueOnce({
+            rows: [{ id: userId, status: 'PREPARATION', team_id: 'team-A',
+                     ready_for_activation: true, manager_id: 'other-manager' }],
+        });
+        // getManagerTeamId → actor manages team-B
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'team-B', name: 'Team B', manager_id: managerId }] });
+
         await expect(activateUser(userId, managerId, {}, 'manager')).rejects.toMatchObject({
-            status: 403, message: 'You can only activate users directly managed by you',
+            status: 403, message: 'You can only activate users in your team',
+        });
+    });
+
+    test('throws 403 when manager belongs to a different team', async () => {
+        // Call 1: user lookup
+        mockQuery.mockResolvedValueOnce({
+            rows: [{ id: userId, name: 'Test', email: 't@t.com', role: 'user',
+                     status: 'PREPARATION', team_id: 'team-A',
+                     ready_for_activation: true, manager_id: 'other-mgr' }],
+        });
+        // Call 2: getManagerTeamId — actor manages team-B (mismatch with team-A)
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'team-B', name: 'Team B', manager_id: managerId }] });
+
+        await expect(activateUser(userId, managerId, {}, 'manager')).rejects.toMatchObject({
+            status: 403, message: 'You can only activate users in your team',
+        });
+    });
+
+    test('throws 403 when manager has no team assigned', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{ id: userId, name: 'Test', email: 't@t.com', role: 'user',
+                     status: 'PREPARATION', team_id: 'team-A',
+                     ready_for_activation: true, manager_id: null }],
+        });
+        // getManagerTeamId → no team found
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+
+        await expect(activateUser(userId, managerId, {}, 'manager')).rejects.toMatchObject({
+            status: 403,
         });
     });
 
@@ -62,11 +98,13 @@ describe('activateUser', () => {
     test('activates user and returns updated row', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: userId, name: 'Sara', email: 's@x.com', role: 'contributor', status: 'PREPARATION', team_id: 't1', ready_for_activation: true, manager_id: managerId }] })
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [{ id: userId, status: 'ACTIVE' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'r1' }] })
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] });
+            // NEW: getManagerTeamId — actor manages team 't1' (matches user's team_id)
+            .mockResolvedValueOnce({ rows: [{ id: 't1', name: 'Team A', manager_id: managerId }] })
+            .mockResolvedValueOnce({ rows: [] })                              // BEGIN
+            .mockResolvedValueOnce({ rows: [{ id: userId, status: 'ACTIVE' }] }) // UPDATE app_user
+            .mockResolvedValueOnce({ rows: [{ id: 'r1' }] })                 // INSERT resources
+            .mockResolvedValueOnce({ rows: [] })                              // INSERT notification
+            .mockResolvedValueOnce({ rows: [] });                             // COMMIT
         const result = await activateUser(userId, managerId, {}, 'manager');
         expect(result).toMatchObject({ id: userId, status: 'ACTIVE' });
     });
@@ -121,14 +159,41 @@ describe('markReadyForActivation', () => {
     });
 
     test('throws 403 when manager does not manage user (non-admin)', async () => {
-        mockQuery.mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', manager_id: 'other' }] });
-        await expect(markReadyForActivation(userId, managerId, true, 'manager')).rejects.toMatchObject({ status: 403 });
+        // User is in team-A; actor's team will be team-B
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', team_id: 'team-A' }] });
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'team-B', name: 'Team B', manager_id: managerId }] });
+
+        await expect(markReadyForActivation(userId, managerId, true, 'manager')).rejects.toMatchObject({
+            status: 403,
+        });
+    });
+
+    test('throws 403 when manager belongs to a different team', async () => {
+        // user SELECT now returns team_id instead of manager_id
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', team_id: 'team-A' }] });
+        // getManagerTeamId → actor manages team-B (mismatch)
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'team-B', name: 'Team B', manager_id: managerId }] });
+
+        await expect(markReadyForActivation(userId, managerId, true, 'manager')).rejects.toMatchObject({
+            status: 403,
+        });
+    });
+
+    test('throws 403 when manager has no team assigned', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', team_id: 'team-A' }] });
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // no team
+
+        await expect(markReadyForActivation(userId, managerId, true, 'manager')).rejects.toMatchObject({
+            status: 403,
+        });
     });
 
     test('sets ready_for_activation flag', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', manager_id: managerId }] })
-            .mockResolvedValueOnce({ rows: [{ id: userId, ready_for_activation: true }] });
+            .mockResolvedValueOnce({ rows: [{ id: userId, status: 'PREPARATION', team_id: 't1' }] })
+            // NEW: getManagerTeamId — actor manages team 't1' (match)
+            .mockResolvedValueOnce({ rows: [{ id: 't1', name: 'Team A', manager_id: managerId }] })
+            .mockResolvedValueOnce({ rows: [{ id: userId, ready_for_activation: true }] }); // UPDATE
         const result = await markReadyForActivation(userId, managerId, true, 'manager');
         expect(result.ready_for_activation).toBe(true);
     });

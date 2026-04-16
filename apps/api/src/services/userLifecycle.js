@@ -1,5 +1,6 @@
 'use strict';
 
+const { getManagerTeamId } = require('../middleware/teamAccess');
 const db = require('../config/db');
 
 function lifecycleError(status, message) {
@@ -23,8 +24,11 @@ async function activateUser(userId, actorId, options = {}, actorRole = 'manager'
     if (user.status === 'ACTIVE')       throw lifecycleError(409, 'User is already active');
     if (!user.team_id)                  throw lifecycleError(400, 'User must be assigned to a team before activation');
     if (!user.ready_for_activation)     throw lifecycleError(400, 'User is not marked as ready for activation');
-    if (actorRole !== 'admin' && user.manager_id !== actorId) {
-        throw lifecycleError(403, 'You can only activate users directly managed by you');
+    if (actorRole !== 'admin') {
+        const actorTeamId = await getManagerTeamId(actorId);
+        if (!actorTeamId || actorTeamId !== user.team_id) {
+            throw lifecycleError(403, 'You can only activate users in your team');
+        }
     }
 
     await db.query('BEGIN');
@@ -94,7 +98,7 @@ async function rollbackUser(userId, actorId) {
 
 async function markReadyForActivation(userId, actorId, ready, actorRole = 'manager') {
     const userResult = await db.query(
-        `SELECT id, status, manager_id FROM app_user WHERE id = $1`,
+        `SELECT id, status, team_id FROM app_user WHERE id = $1`,
         [userId]
     );
     if (userResult.rows.length === 0) throw lifecycleError(404, 'User not found');
@@ -103,8 +107,11 @@ async function markReadyForActivation(userId, actorId, ready, actorRole = 'manag
     if (user.status !== 'PREPARATION') {
         throw lifecycleError(400, 'Can only update ready_for_activation for users in PREPARATION status');
     }
-    if (actorRole !== 'admin' && user.manager_id !== actorId) {
-        throw lifecycleError(403, 'You can only update users directly managed by you');
+    if (actorRole !== 'admin') {
+        const actorTeamId = await getManagerTeamId(actorId);
+        if (!actorTeamId || actorTeamId !== user.team_id) {
+            throw lifecycleError(403, 'You can only update users in your team');
+        }
     }
 
     const result = await db.query(
