@@ -160,19 +160,8 @@ router.get('/team/:userId/journeys', requirePermission('action:journeys:view_tea
     try {
         const { userId } = req.params;
 
-        // Admins bypass scope check; managers must verify team membership
-        if (req.user.role !== 'admin') {
-            const team = await getManagerTeam(req.user.id);
-            if (!team) return res.status(403).json({ error: 'You are not assigned as a manager of any team' });
-
-            const check = await db.query(
-                `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
-                [userId, team.id]
-            );
-            if (check.rows.length === 0) {
-                return res.status(403).json({ error: 'This user is not in your team' });
-            }
-        }
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(404).json({ error: 'User not found in your team' });
 
         const assignments = await db.query(`
             SELECT uja.*, j.slug, j.title, j.description, j.sort_order
@@ -228,19 +217,8 @@ router.get('/team/:userId/journeys/:journeyId', requirePermission('action:journe
     try {
         const { userId, journeyId } = req.params;
 
-        // Verify manager controls this user
-        if (req.user.role !== 'admin') {
-            const team = await getManagerTeam(req.user.id);
-            if (!team) return res.status(403).json({ error: 'You are not assigned as a manager of any team' });
-
-            const check = await db.query(
-                `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
-                [userId, team.id]
-            );
-            if (check.rows.length === 0) {
-                return res.status(403).json({ error: 'This user is not in your team' });
-            }
-        }
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(404).json({ error: 'User not found in your team' });
 
         // Verify assignment
         const assignment = await db.query(
@@ -358,18 +336,8 @@ router.get('/team/:userId/journeys/:journeyId/tasks/:taskId/attachment', require
     try {
         const { userId, journeyId, taskId } = req.params;
 
-        if (req.user.role !== 'admin') {
-            const team = await getManagerTeam(req.user.id);
-            if (!team) return res.status(403).json({ error: 'You are not assigned as a manager of any team' });
-
-            const check = await db.query(
-                `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
-                [userId, team.id]
-            );
-            if (check.rows.length === 0) {
-                return res.status(403).json({ error: 'This user is not in your team' });
-            }
-        }
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(404).json({ error: 'User not found in your team' });
 
         const attachment = await db.query(
             `SELECT jta.* FROM journey_task_attachments jta
