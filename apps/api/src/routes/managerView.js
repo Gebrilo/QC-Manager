@@ -53,38 +53,6 @@ router.get('/team',
     }
 );
 
-// GET /manager/team/:userId — Get a single team member
-router.get('/team/:userId', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
-    try {
-        const { userId } = req.params;
-        let query = `
-            SELECT u.id, u.name, u.email, u.role, u.active, u.status,
-                   u.team_membership_active, u.ready_for_activation,
-                   u.onboarding_completed, u.team_id, u.manager_id,
-                   CASE WHEN r.id IS NOT NULL THEN true ELSE false END AS is_resource,
-                   -- Fetch total XP by summing valid journey XP
-                   (SELECT COALESCE(SUM(uja.total_xp), 0) 
-                    FROM user_journey_assignments uja 
-                    JOIN journeys j ON uja.journey_id = j.id AND j.deleted_at IS NULL 
-                    WHERE uja.user_id = u.id) AS total_xp
-            FROM app_user u
-            LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-            WHERE u.id = $1 AND u.active = true
-        `;
-        const params = [userId];
-
-        if (req.user.role !== 'admin') {
-            query += ` AND u.manager_id = $2`;
-            params.push(req.user.id);
-        }
-
-        const result = await db.query(query, params);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found in your team' });
-
-        res.json({ ...result.rows[0], total_xp: parseInt(result.rows[0].total_xp) || 0 });
-    } catch (err) { next(err); }
-});
-
 // PATCH /manager/team/:userId/ready-for-activation
 router.patch('/team/:userId/ready-for-activation', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
     try {
@@ -434,28 +402,22 @@ router.get('/team/:userId', requirePermission('action:journeys:view_team_progres
     try {
         const { userId } = req.params;
 
-        if (req.user.role !== 'admin') {
-            const team = await getManagerTeam(req.user.id);
-            if (!team) return res.status(403).json({ error: 'You are not assigned as a manager of any team' });
-
-            const check = await db.query(
-                `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
-                [userId, team.id]
-            );
-            if (check.rows.length === 0) {
-                return res.status(403).json({ error: 'This user is not in your team' });
-            }
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) {
+            return res.status(404).json({ error: 'User not found in your team' });
         }
 
         const userResult = await db.query(
-            `SELECT id, name, email, role, active, status, team_membership_active, ready_for_activation, onboarding_completed, manager_id, team_id
+            `SELECT id, name, email, role, active, status, team_membership_active,
+                    ready_for_activation, onboarding_completed, manager_id, team_id
              FROM app_user WHERE id = $1`,
             [userId]
         );
         if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
         const xpResult = await db.query(
-            `SELECT COALESCE(SUM(total_xp), 0) AS total_xp FROM user_journey_assignments WHERE user_id = $1`,
+            `SELECT COALESCE(SUM(total_xp), 0) AS total_xp
+             FROM user_journey_assignments WHERE user_id = $1`,
             [userId]
         );
 
