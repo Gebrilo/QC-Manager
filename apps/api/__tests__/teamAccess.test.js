@@ -26,7 +26,7 @@ describe('requireTeamScope', () => {
         const res = makeRes();
         const next = jest.fn();
 
-        await requireTeamScope()(req, res, next);
+        await requireTeamScope(req, res, next);
 
         expect(req.teamId).toBeNull();
         expect(next).toHaveBeenCalledWith();
@@ -41,7 +41,7 @@ describe('requireTeamScope', () => {
         const res = makeRes();
         const next = jest.fn();
 
-        await requireTeamScope()(req, res, next);
+        await requireTeamScope(req, res, next);
 
         expect(req.teamId).toBe('team-abc');
         expect(next).toHaveBeenCalledWith();
@@ -53,7 +53,7 @@ describe('requireTeamScope', () => {
         const res = makeRes();
         const next = jest.fn();
 
-        await requireTeamScope()(req, res, next);
+        await requireTeamScope(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith(
@@ -67,7 +67,7 @@ describe('requireTeamScope', () => {
         const res = makeRes();
         const next = jest.fn();
 
-        await requireTeamScope()(req, res, next);
+        await requireTeamScope(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith(
@@ -81,10 +81,20 @@ describe('requireTeamScope', () => {
         const res = makeRes();
         const next = jest.fn();
 
-        await requireTeamScope()(req, res, next);
+        await requireTeamScope(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(401);
         expect(next).not.toHaveBeenCalled();
+    });
+
+    test('calls next(err) when DB throws', async () => {
+        const dbError = new Error('DB down');
+        mockQuery.mockRejectedValueOnce(dbError);
+        const req = { user: { id: 'mgr-1', role: 'manager' } };
+        const res = makeRes();
+        const next = jest.fn();
+        await requireTeamScope(req, res, next);
+        expect(next).toHaveBeenCalledWith(dbError);
     });
 });
 

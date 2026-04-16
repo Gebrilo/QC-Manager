@@ -79,7 +79,8 @@ async function canAccessTask(user, taskId) {
 }
 
 /**
- * Verify that a resource/user belongs to the manager's team.
+ * @deprecated Use canAccessUser() instead, which also handles self-access
+ * and explicit role rejection.
  */
 async function canAccessTeamMember(user, memberId) {
     if (user.role === 'admin') return true;
@@ -100,31 +101,29 @@ async function canAccessTeamMember(user, memberId) {
  * Managers with no team and non-manager/non-admin roles receive 403.
  * Supersedes attachTeamScope (which silently passes null for unassigned managers).
  */
-function requireTeamScope() {
-    return async (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
+async function requireTeamScope(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (req.user.role === 'admin') {
+        req.teamId = null;
+        return next();
+    }
+    if (req.user.role !== 'manager') {
+        return res.status(403).json({ error: 'Manager or admin access required' });
+    }
+    try {
+        const teamId = await getManagerTeamId(req.user.id);
+        if (!teamId) {
+            return res.status(403).json({
+                error: 'You are not assigned as a manager of any team',
+            });
         }
-        if (req.user.role === 'admin') {
-            req.teamId = null;
-            return next();
-        }
-        if (req.user.role !== 'manager') {
-            return res.status(403).json({ error: 'Manager or admin access required' });
-        }
-        try {
-            const teamId = await getManagerTeamId(req.user.id);
-            if (!teamId) {
-                return res.status(403).json({
-                    error: 'You are not assigned as a manager of any team',
-                });
-            }
-            req.teamId = teamId;
-            next();
-        } catch (err) {
-            next(err);
-        }
-    };
+        req.teamId = teamId;
+        next();
+    } catch (err) {
+        next(err);
+    }
 }
 
 /**
@@ -161,6 +160,8 @@ async function canAccessUser(requestUser, targetUserId) {
  * @param {string} tableAlias - SQL alias for app_user table (default 'u')
  * @param {number} startIdx - first $N parameter index (default 1)
  * @returns {Promise<{ clause: string, params: any[], nextIdx: number, teamId: string|null }>}
+ * If the manager has no team, returns `AND 1=0` as a safe empty-result guard —
+ * callers do not need to handle the null-team case separately.
  */
 async function getTeamScopeFilter(user, tableAlias = 'u', startIdx = 1) {
     if (user.role === 'admin') {
