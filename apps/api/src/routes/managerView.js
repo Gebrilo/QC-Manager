@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { getManagerTeam, getManagerTeamId } = require('../middleware/teamAccess');
+const { activateUser, markReadyForActivation } = require('../services/userLifecycle');
 
 // All manager endpoints require authentication
 router.use(requireAuth);
@@ -14,31 +15,43 @@ router.use(requireAuth);
 // GET /manager/team — List all members of the manager's team
 router.get('/team', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
     try {
+        const { status } = req.query;
+        const VALID_STATUSES = ['PREPARATION', 'ACTIVE', 'SUSPENDED', 'ARCHIVED'];
+        const safeStatus = status ? status.toUpperCase() : null;
+        if (safeStatus && !VALID_STATUSES.includes(safeStatus)) {
+            return res.status(400).json({ error: 'Invalid status filter' });
+        }
+
         if (req.user.role === 'admin') {
-            // Admins: return all users
+            const params = [];
+            let where = 'u.active = true';
+            if (safeStatus) { where += ` AND u.status = $1`; params.push(safeStatus); }
             const result = await db.query(`
-                SELECT u.id, u.name, u.email, u.role, u.active, u.activated, 
-                       u.onboarding_completed, u.team_id, u.manager_id, u.probation_completed,
+                SELECT u.id, u.name, u.email, u.role, u.active, u.status,
+                       u.team_membership_active, u.ready_for_activation,
+                       u.onboarding_completed, u.team_id, u.manager_id,
                        CASE WHEN r.id IS NOT NULL THEN true ELSE false END AS is_resource
                 FROM app_user u
                 LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-                WHERE u.active = true 
+                WHERE ${where}
                 ORDER BY u.name
-            `);
+            `, params);
             return res.json(result.rows);
         }
 
-        // Managers strictly filtered to users where manager_id == req.user.id
+        const params = [req.user.id];
+        let where = 'u.manager_id = $1 AND u.active = true';
+        if (safeStatus) { where += ` AND u.status = $2`; params.push(safeStatus); }
         const result = await db.query(`
-            SELECT u.id, u.name, u.email, u.role, u.active, u.activated, 
-                   u.onboarding_completed, u.team_id, u.manager_id, u.probation_completed,
+            SELECT u.id, u.name, u.email, u.role, u.active, u.status,
+                   u.team_membership_active, u.ready_for_activation,
+                   u.onboarding_completed, u.team_id, u.manager_id,
                    CASE WHEN r.id IS NOT NULL THEN true ELSE false END AS is_resource
             FROM app_user u
             LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-            WHERE u.manager_id = $1 AND u.active = true
+            WHERE ${where}
             ORDER BY u.name
-        `, [req.user.id]);
-
+        `, params);
         res.json(result.rows);
     } catch (err) { next(err); }
 });
@@ -48,8 +61,9 @@ router.get('/team/:userId', requirePermission('action:journeys:view_team_progres
     try {
         const { userId } = req.params;
         let query = `
-            SELECT u.id, u.name, u.email, u.role, u.active, u.activated, 
-                   u.onboarding_completed, u.team_id, u.manager_id, u.probation_completed,
+            SELECT u.id, u.name, u.email, u.role, u.active, u.status,
+                   u.team_membership_active, u.ready_for_activation,
+                   u.onboarding_completed, u.team_id, u.manager_id,
                    CASE WHEN r.id IS NOT NULL THEN true ELSE false END AS is_resource,
                    -- Fetch total XP by summing valid journey XP
                    (SELECT COALESCE(SUM(uja.total_xp), 0) 
@@ -74,26 +88,38 @@ router.get('/team/:userId', requirePermission('action:journeys:view_team_progres
     } catch (err) { next(err); }
 });
 
-// PATCH /manager/team/:userId/probation — Toggle probation status
-router.patch('/team/:userId/probation', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+// PATCH /manager/team/:userId/ready-for-activation
+router.patch('/team/:userId/ready-for-activation', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const { completed } = req.body;
-
-        if (req.user.role !== 'admin') {
-            // Strictly enforce manager_id == req.user.id
-            const check = await db.query(`SELECT id FROM app_user WHERE id = $1 AND manager_id = $2`, [userId, req.user.id]);
-            if (check.rows.length === 0) {
-                return res.status(403).json({ error: 'This user is not directly managed by you.' });
-            }
+        const { ready } = req.body;
+        if (typeof ready !== 'boolean') {
+            return res.status(400).json({ error: '"ready" must be a boolean' });
         }
+        const result = await markReadyForActivation(userId, req.user.id, ready, req.user.role);
+        res.json(result);
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ error: err.message });
+        next(err);
+    }
+});
 
-        const result = await db.query(
-            `UPDATE app_user SET probation_completed = $1 WHERE id = $2 RETURNING *`,
-            [!!completed, userId]
+// POST /manager/team/:userId/activate
+router.post('/team/:userId/activate', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { weekly_capacity_hrs, department } = req.body;
+        const result = await activateUser(
+            userId,
+            req.user.id,
+            { weekly_capacity_hrs, department },
+            req.user.role
         );
-        res.json(result.rows[0]);
-    } catch (err) { next(err); }
+        res.json(result);
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ error: err.message });
+        next(err);
+    }
 });
 
 // GET /manager/eligible-resources — Dropdown list of users eligible to become resources
@@ -103,8 +129,9 @@ router.get('/eligible-resources', requirePermission('action:journeys:view_team_p
             SELECT u.id, u.name, u.email, u.role 
             FROM app_user u
             LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-            WHERE u.probation_completed = true 
-              AND u.active = true 
+            WHERE u.ready_for_activation = true
+              AND u.status = 'PREPARATION'
+              AND u.active = true
               AND r.id IS NULL
         `;
         const params = [];
@@ -424,7 +451,7 @@ router.get('/team/:userId', requirePermission('action:journeys:view_team_progres
         }
 
         const userResult = await db.query(
-            `SELECT id, name, email, role, active, activated, onboarding_completed, manager_id, team_id
+            `SELECT id, name, email, role, active, status, team_membership_active, ready_for_activation, onboarding_completed, manager_id, team_id
              FROM app_user WHERE id = $1`,
             [userId]
         );
