@@ -16,6 +16,8 @@ interface User {
     role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
     activated: boolean;
     onboarding_completed?: boolean;
+    avatar_url?: string | null;
+    avatar_type?: 'initials' | 'preset' | 'upload' | null;
     preferences?: {
         theme?: string;
         display_density?: string;

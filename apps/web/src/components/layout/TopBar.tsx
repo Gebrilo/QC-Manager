@@ -15,9 +15,12 @@ export function TopBar() {
 
     if (!user) return null;
 
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const logoHref = getLandingPage(user, permissions);
     const displayName = user.display_name || user.name;
     const userInitial = displayName?.charAt(0).toUpperCase() || 'U';
+    const rawAvatar = user.avatar_url;
+    const avatarSrc = rawAvatar?.startsWith('/uploads/') ? `${API_BASE}${rawAvatar}` : rawAvatar;
 
     const handleHamburger = () => {
         if (window.innerWidth < 768) {
@@ -70,9 +73,17 @@ export function TopBar() {
                         href="/preferences"
                         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
                     >
-                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-semibold text-xs">
-                            {userInitial}
-                        </div>
+                        {avatarSrc ? (
+                            <img
+                                src={avatarSrc}
+                                alt={displayName || 'User'}
+                                className="h-7 w-7 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                            />
+                        ) : (
+                            <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-semibold text-xs">
+                                {userInitial}
+                            </div>
+                        )}
                         <span className="hidden sm:inline text-[13px] font-medium text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
                             {displayName}
                         </span>
