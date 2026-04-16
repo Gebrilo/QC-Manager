@@ -87,31 +87,34 @@ router.post('/team/:userId/activate', requirePermission('action:journeys:view_te
     }
 });
 
-// GET /manager/eligible-resources — Dropdown list of users eligible to become resources
-router.get('/eligible-resources', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
-    try {
-        let query = `
-            SELECT u.id, u.name, u.email, u.role 
-            FROM app_user u
-            LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-            WHERE u.ready_for_activation = true
-              AND u.status = 'PREPARATION'
-              AND u.active = true
-              AND r.id IS NULL
-        `;
-        const params = [];
+// GET /manager/eligible-resources — Users ready for activation, scoped to manager's team
+router.get('/eligible-resources',
+    requirePermission('action:journeys:view_team_progress'),
+    requireTeamScope,
+    async (req, res, next) => {
+        try {
+            const params = [];
+            let teamFilter = '';
+            if (req.teamId) {
+                teamFilter = `AND u.team_id = $${params.length + 1}`;
+                params.push(req.teamId);
+            }
 
-        if (req.user.role !== 'admin') {
-            query += ` AND u.manager_id = $1`;
-            params.push(req.user.id);
-        }
-
-        query += ` ORDER BY u.name`;
-
-        const result = await db.query(query, params);
-        res.json(result.rows);
-    } catch (err) { next(err); }
-});
+            const result = await db.query(`
+                SELECT u.id, u.name, u.email, u.role
+                FROM app_user u
+                LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
+                WHERE u.ready_for_activation = true
+                  AND u.status = 'PREPARATION'
+                  AND u.active = true
+                  AND r.id IS NULL
+                  ${teamFilter}
+                ORDER BY u.name
+            `, params);
+            res.json(result.rows);
+        } catch (err) { next(err); }
+    }
+);
 
 // POST /manager/team/:userId/make-resource — Convert an eligible user to a resource
 router.post('/team/:userId/make-resource', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
@@ -119,11 +122,10 @@ router.post('/team/:userId/make-resource', requirePermission('action:journeys:vi
         const { userId } = req.params;
         const { weekly_capacity_hrs = 40, department = null } = req.body;
 
-        const userQuery = await db.query(`
-            SELECT id, name, email, role, probation_completed, manager_id 
-            FROM app_user 
-            WHERE id = $1 AND active = true
-        `, [userId]);
+        const userQuery = await db.query(
+            `SELECT id, name, email, role FROM app_user WHERE id = $1 AND active = true`,
+            [userId]
+        );
 
         if (userQuery.rows.length === 0) {
             return res.status(404).json({ error: 'User not found or inactive.' });
@@ -131,13 +133,9 @@ router.post('/team/:userId/make-resource', requirePermission('action:journeys:vi
 
         const user = userQuery.rows[0];
 
-        // Validations
-        if (req.user.role !== 'admin' && user.manager_id !== req.user.id) {
-            return res.status(403).json({ error: 'This user is not directly managed by you.' });
-        }
-
-        if (!user.probation_completed) {
-            return res.status(400).json({ error: 'User probation is not yet completed. Cannot assign as a resource.' });
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) {
+            return res.status(403).json({ error: 'This user is not in your team.' });
         }
 
         const resourceCheck = await db.query(`SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL`, [userId]);
