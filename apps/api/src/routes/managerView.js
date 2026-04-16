@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
-const { getManagerTeam, getManagerTeamId } = require('../middleware/teamAccess');
+const { getManagerTeam, getManagerTeamId, requireTeamScope, canAccessUser } = require('../middleware/teamAccess');
 const { activateUser, markReadyForActivation } = require('../services/userLifecycle');
 
 // All manager endpoints require authentication
@@ -12,20 +12,32 @@ router.use(requireAuth);
 // Team membership & progress
 // ──────────────────────────────────────────────────────────────────────────────
 
-// GET /manager/team — List all members of the manager's team
-router.get('/team', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
-    try {
-        const { status } = req.query;
-        const VALID_STATUSES = ['PREPARATION', 'ACTIVE', 'SUSPENDED', 'ARCHIVED'];
-        const safeStatus = status ? status.toUpperCase() : null;
-        if (safeStatus && !VALID_STATUSES.includes(safeStatus)) {
-            return res.status(400).json({ error: 'Invalid status filter' });
-        }
+// GET /manager/team — List members of the manager's team (team_id scoped for managers)
+router.get('/team',
+    requirePermission('action:journeys:view_team_progress'),
+    requireTeamScope,
+    async (req, res, next) => {
+        try {
+            const { status } = req.query;
+            const VALID_STATUSES = ['PREPARATION', 'ACTIVE', 'SUSPENDED', 'ARCHIVED'];
+            const safeStatus = status ? status.toUpperCase() : null;
+            if (safeStatus && !VALID_STATUSES.includes(safeStatus)) {
+                return res.status(400).json({ error: 'Invalid status filter' });
+            }
 
-        if (req.user.role === 'admin') {
+            // req.teamId is null for admins (no filter) and a UUID for managers
             const params = [];
             let where = 'u.active = true';
-            if (safeStatus) { where += ` AND u.status = $1`; params.push(safeStatus); }
+
+            if (req.teamId) {
+                where += ` AND u.team_id = $${params.length + 1}`;
+                params.push(req.teamId);
+            }
+            if (safeStatus) {
+                where += ` AND u.status = $${params.length + 1}`;
+                params.push(safeStatus);
+            }
+
             const result = await db.query(`
                 SELECT u.id, u.name, u.email, u.role, u.active, u.status,
                        u.team_membership_active, u.ready_for_activation,
@@ -36,25 +48,10 @@ router.get('/team', requirePermission('action:journeys:view_team_progress'), asy
                 WHERE ${where}
                 ORDER BY u.name
             `, params);
-            return res.json(result.rows);
-        }
-
-        const params = [req.user.id];
-        let where = 'u.manager_id = $1 AND u.active = true';
-        if (safeStatus) { where += ` AND u.status = $2`; params.push(safeStatus); }
-        const result = await db.query(`
-            SELECT u.id, u.name, u.email, u.role, u.active, u.status,
-                   u.team_membership_active, u.ready_for_activation,
-                   u.onboarding_completed, u.team_id, u.manager_id,
-                   CASE WHEN r.id IS NOT NULL THEN true ELSE false END AS is_resource
-            FROM app_user u
-            LEFT JOIN resources r ON u.id = r.user_id AND r.deleted_at IS NULL
-            WHERE ${where}
-            ORDER BY u.name
-        `, params);
-        res.json(result.rows);
-    } catch (err) { next(err); }
-});
+            res.json(result.rows);
+        } catch (err) { next(err); }
+    }
+);
 
 // GET /manager/team/:userId — Get a single team member
 router.get('/team/:userId', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
