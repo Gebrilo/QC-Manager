@@ -4,13 +4,15 @@ const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const { createNotification } = require('./notifications');
+const { rollbackUser } = require('../services/userLifecycle');
 
 router.use(requireAuth, requireRole('admin'));
 
 router.get('/', async (req, res, next) => {
     try {
         const result = await db.query(`
-            SELECT u.id, u.name, u.email, u.phone, u.role, u.active, u.activated,
+            SELECT u.id, u.name, u.email, u.phone, u.role, u.active,
+                   u.status, u.ready_for_activation, u.team_membership_active,
                    u.created_at, u.updated_at, u.last_login,
                    u.manager_id, u.team_id,
                    t.name AS team_name,
@@ -291,6 +293,21 @@ router.delete('/:id', async (req, res, next) => {
 
         res.status(204).send();
     } catch (err) {
+        next(err);
+    }
+});
+
+// POST /users/:id/rollback — Admin-only: revert ACTIVE user to PREPARATION
+router.post('/:id/rollback', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        if (id === req.user.id) {
+            return res.status(400).json({ error: 'Cannot rollback your own account' });
+        }
+        const result = await rollbackUser(id, req.user.id);
+        res.json(result);
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ error: err.message });
         next(err);
     }
 });
