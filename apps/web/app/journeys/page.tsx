@@ -3,11 +3,21 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { myJourneysApi, AssignedJourney } from '../../src/lib/api';
+import { useAuth } from '../../src/components/providers/AuthProvider';
 
 export default function JourneysPage() {
     const [journeys, setJourneys] = useState<AssignedJourney[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    const { userStatus } = useAuth();
+
+    const pageTitle   = userStatus === 'ACTIVE' ? 'My Development Plan' : 'My Journeys';
+    const pageSubtitle = userStatus === 'ACTIVE'
+        ? 'Your ongoing development journey as an active resource.'
+        : 'Track your onboarding progress and complete assigned tasks.';
+    const statusBadge = userStatus === 'ACTIVE'
+        ? { label: 'Active',         classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' }
+        : { label: 'In Preparation', classes: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' };
 
     useEffect(() => {
         async function load() {
@@ -48,8 +58,13 @@ export default function JourneysPage() {
     return (
         <div>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Journeys</h1>
-                <p className="text-slate-500 dark:text-slate-400 mt-1">Track your onboarding progress and complete assigned tasks.</p>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{pageTitle}</h1>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusBadge.classes}`}>
+                        {statusBadge.label}
+                    </span>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">{pageSubtitle}</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
