@@ -15,7 +15,7 @@ interface PersonalTask {
 interface MyTaskKanbanCardProps {
     task: PersonalTask;
     onStatusChange: (taskId: string, newStatus: string) => void;
-    onEdit: (task: PersonalTask) => void;
+    onOpen: (task: PersonalTask) => void;
     onDelete: (taskId: string) => void;
 }
 
@@ -39,7 +39,7 @@ function isOverdue(dueDate: string | null): boolean {
     return new Date(dueDate) < new Date();
 }
 
-export function MyTaskKanbanCard({ task, onStatusChange, onEdit, onDelete }: MyTaskKanbanCardProps) {
+export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyTaskKanbanCardProps) {
     const handleDragStart = (e: React.DragEvent) => {
         e.dataTransfer.setData('taskId', task.id);
         e.dataTransfer.effectAllowed = 'move';
@@ -51,25 +51,18 @@ export function MyTaskKanbanCard({ task, onStatusChange, onEdit, onDelete }: MyT
         <div
             draggable
             onDragStart={handleDragStart}
-            className={`glass-card p-4 rounded-xl cursor-grab active:cursor-grabbing hover:shadow-lg transition-all duration-200 group ${isDone ? 'opacity-60' : ''}`}
+            onClick={() => onOpen(task)}
+            className={`glass-card p-4 rounded-xl cursor-pointer active:cursor-grabbing hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200 group ${isDone ? 'opacity-60' : ''}`}
         >
             {/* Title Row */}
             <div className="flex items-start gap-2 justify-between">
                 <span className={`font-medium text-sm ${isDone ? 'line-through text-slate-400 dark:text-slate-600' : 'text-slate-900 dark:text-white'} line-clamp-2`}>
                     {task.title}
                 </span>
-                {/* Action Buttons */}
+                {/* Delete Button */}
                 <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                        onClick={() => onEdit(task)}
-                        className="p-1 rounded text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                    </button>
-                    <button
-                        onClick={() => onDelete(task.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
                         className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +98,8 @@ export function MyTaskKanbanCard({ task, onStatusChange, onEdit, onDelete }: MyT
             <select
                 className="md:hidden w-full mt-3 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/30"
                 value={task.status}
-                onChange={(e) => onStatusChange(task.id, e.target.value)}
+                onChange={(e) => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
+                onClick={(e) => e.stopPropagation()}
             >
                 {STATUSES.map((s) => (
                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
