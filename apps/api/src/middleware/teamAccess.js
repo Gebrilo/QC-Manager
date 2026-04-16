@@ -95,6 +95,90 @@ async function canAccessTeamMember(user, memberId) {
 }
 
 /**
+ * Middleware: Enforce team scope. Admins pass unrestricted (req.teamId = null).
+ * Managers must have a team; req.teamId is set to their team UUID.
+ * Managers with no team and non-manager/non-admin roles receive 403.
+ * Supersedes attachTeamScope (which silently passes null for unassigned managers).
+ */
+function requireTeamScope() {
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+        if (req.user.role === 'admin') {
+            req.teamId = null;
+            return next();
+        }
+        if (req.user.role !== 'manager') {
+            return res.status(403).json({ error: 'Manager or admin access required' });
+        }
+        try {
+            const teamId = await getManagerTeamId(req.user.id);
+            if (!teamId) {
+                return res.status(403).json({
+                    error: 'You are not assigned as a manager of any team',
+                });
+            }
+            req.teamId = teamId;
+            next();
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+
+/**
+ * Check whether requestUser can access a target user record.
+ * Admin → always true. Self-access → true. Manager → checks team_id match via DB.
+ * Other roles → false.
+ *
+ * @param {object} requestUser - req.user
+ * @param {string} targetUserId - UUID of the user being accessed
+ * @returns {Promise<boolean>}
+ */
+async function canAccessUser(requestUser, targetUserId) {
+    if (requestUser.role === 'admin') return true;
+    if (requestUser.id === targetUserId) return true;
+    if (requestUser.role !== 'manager') return false;
+
+    const teamId = await getManagerTeamId(requestUser.id);
+    if (!teamId) return false;
+
+    const result = await db.query(
+        `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
+        [targetUserId, teamId]
+    );
+    return result.rows.length > 0;
+}
+
+/**
+ * Build a SQL WHERE clause fragment scoping app_user queries to a manager's team.
+ * Follows the same pattern as projectTeamClause / taskTeamClause.
+ * Use this in routes that do NOT use requireTeamScope middleware (e.g. resources.js).
+ * Routes that already use requireTeamScope should read req.teamId directly.
+ *
+ * @param {object} user - req.user
+ * @param {string} tableAlias - SQL alias for app_user table (default 'u')
+ * @param {number} startIdx - first $N parameter index (default 1)
+ * @returns {Promise<{ clause: string, params: any[], nextIdx: number, teamId: string|null }>}
+ */
+async function getTeamScopeFilter(user, tableAlias = 'u', startIdx = 1) {
+    if (user.role === 'admin') {
+        return { clause: '', params: [], nextIdx: startIdx, teamId: null };
+    }
+    const teamId = await getManagerTeamId(user.id);
+    if (!teamId) {
+        return { clause: 'AND 1=0', params: [], nextIdx: startIdx, teamId: null };
+    }
+    return {
+        clause: `AND ${tableAlias}.team_id = $${startIdx}`,
+        params: [teamId],
+        nextIdx: startIdx + 1,
+        teamId,
+    };
+}
+
+/**
  * Middleware: Attach manager's team to req.teamId.
  * Admins get req.teamId = null (meaning no scope restriction).
  * Managers get req.teamId = their team's ID (or null if unassigned).
@@ -163,4 +247,7 @@ module.exports = {
     attachTeamScope,
     projectTeamClause,
     taskTeamClause,
+    requireTeamScope,
+    canAccessUser,
+    getTeamScopeFilter,
 };
