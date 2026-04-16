@@ -220,12 +220,13 @@ router.post('/sync', async (req, res, next) => {
 
             return res.json({
                 user: {
-                    id: user.id, name: user.name, email: user.email, phone: user.phone,
+                    id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
                     role: user.role, activated: user.activated,
                     preferences: user.preferences || {},
+                    avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                 },
                 permissions,
-                token: accessToken, // Use the Supabase token directly
+                token: accessToken,
             });
         }
 
@@ -258,9 +259,10 @@ router.post('/sync', async (req, res, next) => {
 
                     return res.json({
                         user: {
-                            id: user.id, name: user.name, email: user.email, phone: user.phone,
+                            id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
                             role: user.role, activated: user.activated,
                             preferences: user.preferences || {},
+                            avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                         },
                         permissions,
                         token: accessToken,
@@ -313,6 +315,7 @@ router.post('/sync', async (req, res, next) => {
                 id: user.id, name: user.name, email: user.email, phone: user.phone,
                 role: user.role, activated: user.activated,
                 preferences: {},
+                avatar_url: null, avatar_type: null,
             },
             permissions,
             token: accessToken,
