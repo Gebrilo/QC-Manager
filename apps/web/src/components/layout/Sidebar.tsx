@@ -15,7 +15,7 @@ export function Sidebar() {
     if (!user) return null;
 
     const rawNavLinks = getNavbarRoutes().filter(route => {
-        if (route.requiresActivation && !user.activated) return false;
+        if (route.requiresActivation && user.status !== 'ACTIVE') return false;
         if (route.adminOnly && !isAdmin) return false;
         if (route.permission && !hasPermission(route.permission)) return false;
         return true;

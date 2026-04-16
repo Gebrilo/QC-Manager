@@ -85,7 +85,7 @@ export function isPublicRoute(pathname: string): boolean {
 }
 
 interface UserForLanding {
-    activated: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     role?: string;
     preferences?: {
         default_page?: string;
@@ -107,7 +107,7 @@ const DEFAULT_LANDING = '/my-tasks';
  */
 export function getLandingPage(user: UserForLanding | null, permissions?: string[]): string {
     if (!user) return '/login';
-    if (!user.activated) return '/my-tasks';
+    if (user.status !== 'ACTIVE') return '/my-tasks';
 
     const preferredPage = user.preferences?.default_page;
 

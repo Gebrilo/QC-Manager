@@ -14,7 +14,8 @@ interface User {
     email: string;
     phone?: string;
     role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
-    activated: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+    team_membership_active: boolean;
     onboarding_completed?: boolean;
     avatar_url?: string | null;
     avatar_type?: 'initials' | 'preset' | 'upload' | null;
@@ -36,6 +37,8 @@ interface AuthContextType {
     logout: () => Promise<void>;
     hasPermission: (key: string) => boolean;
     isAdmin: boolean;
+    isManager: boolean;
+    userStatus: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' | null;
     refreshUser: () => Promise<void>;
 }
 
@@ -77,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             const data = await res.json();
             return {
-                user: { ...data.user, activated: data.user.activated ?? true },
+                user: { ...data.user },
                 permissions: data.permissions || [],
             };
         } catch (err) {
@@ -94,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!res.ok) throw new Error('Invalid token');
             const data = await res.json();
             applyPreferences(data.user.preferences);
-            setUser({ ...data.user, activated: data.user.activated ?? true });
+            setUser({ ...data.user });
             setPermissions(data.permissions || []);
             return true;
         } catch {
@@ -188,12 +191,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, permissions]);
 
     const isAdmin = user?.role === 'admin';
+    const isManager = user?.role === 'manager';
+    const userStatus = user?.status ?? null;
 
     return (
         <AuthContext.Provider value={{
             user, permissions, token, loading,
             signInWithPassword, signUp,
-            logout, hasPermission, isAdmin, refreshUser,
+            logout, hasPermission, isAdmin, isManager, userStatus, refreshUser,
         }}>
             {children}
         </AuthContext.Provider>

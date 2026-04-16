@@ -8,7 +8,7 @@ export function ActivationBanner() {
     const [dismissed, setDismissed] = useState(false);
     const [checking, setChecking] = useState(false);
 
-    if (!user || user.activated || dismissed) return null;
+    if (!user || user.status === 'ACTIVE' || dismissed) return null;
 
     const handleCheck = async () => {
         setChecking(true);

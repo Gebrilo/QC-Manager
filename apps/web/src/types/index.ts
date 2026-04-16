@@ -23,7 +23,7 @@ export interface TeamMember {
     email: string;
     role: string;
     active: boolean;
-    activated: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     team_id?: string;
 }
 

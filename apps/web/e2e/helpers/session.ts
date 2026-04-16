@@ -5,7 +5,7 @@ type MockUser = {
     name: string;
     email: string;
     role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
-    activated: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     preferences?: Record<string, unknown>;
 };
 
@@ -14,7 +14,7 @@ const defaultUser: MockUser = {
     name: 'E2E Admin',
     email: 'e2e-admin@example.com',
     role: 'admin',
-    activated: true,
+    status: 'ACTIVE',
     preferences: { default_page: '/dashboard' },
 };
 

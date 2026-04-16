@@ -15,7 +15,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         // Redirect authenticated users away from auth pages
         if (user && (pathname === '/login' || pathname === '/register')) {
-            console.log('[RouteGuard] redirect from auth page → landing', { role: user.role, activated: user.activated, landing: getLandingPage(user, permissions) });
+            console.log('[RouteGuard] redirect from auth page → landing', { role: user.role, status: user.status, landing: getLandingPage(user, permissions) });
             router.replace(getLandingPage(user, permissions));
             return;
         }
@@ -37,8 +37,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         // Permission-validated landing page based on user preferences
         const landing = getLandingPage(user, permissions);
 
-        if (route.requiresActivation && !user.activated) {
-            console.log('[RouteGuard] not activated → /my-tasks', { pathname, role: user.role, activated: user.activated });
+        if (route.requiresActivation && user.status !== 'ACTIVE') {
+            console.log('[RouteGuard] not activated → /my-tasks', { pathname, role: user.role, status: user.status });
             router.replace('/my-tasks');
             return;
         }
@@ -55,7 +55,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        console.log('[RouteGuard] access OK', { pathname, role: user.role, activated: user.activated, isAdmin });
+        console.log('[RouteGuard] access OK', { pathname, role: user.role, status: user.status, isAdmin });
     }, [loading, user, permissions, pathname, router, hasPermission, isAdmin]);
 
     if (loading) {
@@ -81,7 +81,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     const route = getRouteConfig(pathname || '');
     if (route) {
-        if (route.requiresActivation && !user.activated) return null;
+        if (route.requiresActivation && user.status !== 'ACTIVE') return null;
         if (route.adminOnly && !isAdmin) return null;
         if (route.permission && !hasPermission(route.permission)) return null;
     }

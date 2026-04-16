@@ -13,7 +13,7 @@ interface UserRecord {
     phone: string | null;
     role: string;
     active: boolean;
-    activated: boolean;
+    status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     created_at: string;
     last_login: string | null;
 }
@@ -231,7 +231,7 @@ export default function UsersPage() {
         try {
             const body: Record<string, any> = { active };
             if (activate) {
-                body.activated = true;
+                body.status = 'ACTIVE';
             }
             const res = await fetch(`${API_URL}/users/${userId}`, {
                 method: 'PATCH',
@@ -429,7 +429,7 @@ export default function UsersPage() {
                                 </select>
 
                                 {/* Activated Toggle */}
-                                {!u.activated && u.id !== currentUser?.id && (
+                                {u.status !== 'ACTIVE' && u.id !== currentUser?.id && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -441,7 +441,7 @@ export default function UsersPage() {
                                         Activate
                                     </button>
                                 )}
-                                {u.activated && (
+                                {u.status === 'ACTIVE' && (
                                     <span className="text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
                                         Activated
                                     </span>
@@ -478,7 +478,7 @@ export default function UsersPage() {
                                         </svg>
                                         Resource
                                     </span>
-                                ) : u.activated && u.id !== currentUser?.id ? (
+                                ) : u.status === 'ACTIVE' && u.id !== currentUser?.id ? (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();

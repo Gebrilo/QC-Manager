@@ -61,7 +61,7 @@ export default function PreferencesPage() {
             // Check admin-only restriction
             if (route.adminOnly) return false;
             // Check activation requirement
-            if (route.requiresActivation && !authUser?.activated) return false;
+            if (route.requiresActivation && authUser?.status !== 'ACTIVE') return false;
             // Check permission
             if (route.permission && !hasPermission(route.permission)) return false;
             return true;
@@ -71,7 +71,7 @@ export default function PreferencesPage() {
     const accessibleNavRoutes = useMemo(() => {
         return getNavbarRoutes().filter(route => {
             if (route.adminOnly && !isAdmin) return false;
-            if (route.requiresActivation && !authUser?.activated) return false;
+            if (route.requiresActivation && authUser?.status !== 'ACTIVE') return false;
             if (route.permission && !hasPermission(route.permission)) return false;
             return true;
         });
