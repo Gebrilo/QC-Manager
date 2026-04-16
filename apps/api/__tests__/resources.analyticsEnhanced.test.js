@@ -10,6 +10,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
     requireAuth: (req, res, next) => next(),
     requireRole: (...roles) => (req, res, next) => next(),
     requirePermission: (perm) => (req, res, next) => next(),
+    requireStatus: (...statuses) => (req, res, next) => next(),
 }));
 jest.mock('../src/utils/workingDays', () => ({
     computeTaskTimeline: (task) => ({
