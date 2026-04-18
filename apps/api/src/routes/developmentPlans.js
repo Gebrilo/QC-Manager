@@ -648,6 +648,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
             const c = completionMap.get(t.id);
             return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
         }).length;
+        const onHoldTasks = completions.filter(c => c.progress_status === 'ON_HOLD').length;
 
         res.json({
             user: userResult.rows[0],
@@ -659,6 +660,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                 overdue_tasks: overdueTasks,
                 on_time_completed: doneOnTime,
                 late_completed: doneLate,
+                on_hold_tasks: onHoldTasks,
             },
             objectives: objectivesReport,
         });

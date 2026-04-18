@@ -404,3 +404,27 @@ describe('GET /development-plans/:userId/report', () => {
         expect(res.body.plan.status).toBe('active');
     });
 });
+
+describe('GET /development-plans/:userId/report on_hold_tasks', () => {
+    test('summary.on_hold_tasks counts ON_HOLD completions across all objectives', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'user-1', name: 'Sara', email: 's@e.com' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2', created_at: '2026-01-01', is_active: true }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Obj', sort_order: 1 }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] })
+            .mockResolvedValueOnce({ rows: [
+                { id: 't-1', quest_id: 'q-1', title: 'A', is_mandatory: true, due_date: '2026-03-01' },
+                { id: 't-2', quest_id: 'q-1', title: 'B', is_mandatory: true, due_date: '2026-03-15' },
+            ] })
+            .mockResolvedValueOnce({ rows: [
+                { task_id: 't-1', progress_status: 'ON_HOLD', completed_at: null },
+                { task_id: 't-2', progress_status: 'DONE',    completed_at: new Date('2026-03-10T00:00:00Z') },
+            ] });
+
+        const res = await request(makeApp()).get('/development-plans/user-1/report');
+        expect(res.status).toBe(200);
+        expect(res.body.summary.on_hold_tasks).toBe(1);
+        expect(res.body.summary.completed_tasks).toBe(1);
+    });
+});
