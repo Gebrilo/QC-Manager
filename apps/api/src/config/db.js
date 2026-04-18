@@ -1474,6 +1474,10 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_owner_user ON journeys(owner_user_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_plan_type  ON journeys(plan_type)`);
 
+        await client.query(`COMMENT ON COLUMN journeys.plan_type IS 'onboarding = shared template; idp = per-user development plan'`);
+        await client.query(`COMMENT ON COLUMN journeys.owner_user_id IS 'For IDP plans only: the ACTIVE user this plan belongs to'`);
+        await client.query(`COMMENT ON COLUMN journeys.created_by_manager IS 'Manager who created this IDP plan'`);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
