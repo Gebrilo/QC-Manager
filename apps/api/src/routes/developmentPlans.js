@@ -264,4 +264,107 @@ router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin'
     } catch (err) { next(err); }
 });
 
+// ─── POST /:userId/objectives/:chapterId/tasks — add action item ──────────────
+
+router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, chapterId } = req.params;
+        const { title, description, due_date, priority, difficulty, is_mandatory = true, sort_order = 0 } = req.body;
+        if (!title) return res.status(400).json({ error: 'title is required' });
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+
+        const questResult = await db.query(
+            `SELECT jq.id FROM journey_quests jq
+             JOIN journey_chapters jc ON jq.chapter_id = jc.id
+             WHERE jq.chapter_id = $1 AND jc.journey_id = $2 LIMIT 1`,
+            [chapterId, plan.id]
+        );
+        if (questResult.rows.length === 0) return res.status(404).json({ error: 'Objective not found' });
+        const questId = questResult.rows[0].id;
+
+        const slug = `task-${Date.now()}`;
+        const taskResult = await db.query(
+            `INSERT INTO journey_tasks (quest_id, slug, title, description, due_date, priority, difficulty, is_mandatory, sort_order, validation_type, validation_config)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'none', '{}') RETURNING *`,
+            [questId, slug, title, description || null, due_date || null, priority || null, difficulty || null, is_mandatory, sort_order]
+        );
+        res.status(201).json(taskResult.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── PATCH /:userId/tasks/:taskId — update task ───────────────────────────────
+
+router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        const { title, description, due_date, priority, difficulty, is_mandatory, sort_order } = req.body;
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+
+        const fields = [];
+        const values = [];
+        let idx = 1;
+        if (title !== undefined)        { fields.push(`title = $${idx++}`);        values.push(title); }
+        if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description); }
+        if (due_date !== undefined)     { fields.push(`due_date = $${idx++}`);     values.push(due_date); }
+        if (priority !== undefined)     { fields.push(`priority = $${idx++}`);     values.push(priority); }
+        if (difficulty !== undefined)   { fields.push(`difficulty = $${idx++}`);   values.push(difficulty); }
+        if (is_mandatory !== undefined) { fields.push(`is_mandatory = $${idx++}`); values.push(is_mandatory); }
+        if (sort_order !== undefined)   { fields.push(`sort_order = $${idx++}`);   values.push(sort_order); }
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        fields.push(`updated_at = NOW()`);
+        values.push(taskId);
+
+        const result = await db.query(
+            `UPDATE journey_tasks SET ${fields.join(', ')}
+             WHERE id = $${idx}
+               AND quest_id IN (
+                 SELECT jq.id FROM journey_quests jq
+                 JOIN journey_chapters jc ON jq.chapter_id = jc.id
+                 WHERE jc.journey_id = $${idx + 1}
+               )
+             RETURNING *`,
+            [...values, plan.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found in this plan' });
+        res.json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── DELETE /:userId/tasks/:taskId — delete task ──────────────────────────────
+
+router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+
+        const check = await db.query(
+            `SELECT jt.id FROM journey_tasks jt
+             JOIN journey_quests jq ON jt.quest_id = jq.id
+             JOIN journey_chapters jc ON jq.chapter_id = jc.id
+             WHERE jt.id = $1 AND jc.journey_id = $2`,
+            [taskId, plan.id]
+        );
+        if (check.rows.length === 0) return res.status(404).json({ error: 'Task not found in this plan' });
+
+        await db.query(`DELETE FROM journey_tasks WHERE id = $1`, [taskId]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
 module.exports = router;

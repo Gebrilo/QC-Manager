@@ -207,3 +207,74 @@ describe('DELETE /development-plans/:userId/objectives/:chapterId', () => {
         expect(res.body.success).toBe(true);
     });
 });
+
+// ─── POST /:userId/objectives/:chapterId/tasks ────────────────────────────────
+
+describe('POST /development-plans/:userId/objectives/:chapterId/tasks', () => {
+    test('returns 404 when system quest not found for chapter', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
+            .mockResolvedValueOnce({ rows: [] }); // no system quest found
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/objectives/ch-1/tasks')
+            .send({ title: 'Read book' });
+        expect(res.status).toBe(404);
+    });
+
+    test('creates task and returns 201', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] }) // system quest
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Read book', quest_id: 'q-1' }] }); // INSERT task
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/objectives/ch-1/tasks')
+            .send({ title: 'Read book', due_date: '2026-05-01', priority: 'high' });
+        expect(res.status).toBe(201);
+        expect(res.body.title).toBe('Read book');
+    });
+});
+
+// ─── PATCH /:userId/tasks/:taskId ────────────────────────────────────────────
+
+describe('PATCH /development-plans/:userId/tasks/:taskId', () => {
+    test('returns 404 when task not in plan', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] }); // task not found
+        const res = await request(makeApp())
+            .patch('/development-plans/user-1/tasks/t-99')
+            .send({ title: 'Updated' });
+        expect(res.status).toBe(404);
+    });
+
+    test('updates task fields and returns 200', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Updated', priority: 'low' }] });
+        const res = await request(makeApp())
+            .patch('/development-plans/user-1/tasks/t-1')
+            .send({ title: 'Updated', priority: 'low' });
+        expect(res.status).toBe(200);
+        expect(res.body.priority).toBe('low');
+    });
+});
+
+// ─── DELETE /:userId/tasks/:taskId ───────────────────────────────────────────
+
+describe('DELETE /development-plans/:userId/tasks/:taskId', () => {
+    test('deletes task and returns 200', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] }) // task found
+            .mockResolvedValueOnce({ rows: [] }); // DELETE
+        const res = await request(makeApp())
+            .delete('/development-plans/user-1/tasks/t-1');
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+    });
+});
