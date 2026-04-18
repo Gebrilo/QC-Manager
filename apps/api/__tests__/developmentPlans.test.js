@@ -1,0 +1,130 @@
+'use strict';
+
+process.env.SUPABASE_JWT_SECRET = 'test-secret';
+
+const mockQuery = jest.fn();
+jest.mock('../src/config/db', () => ({ query: mockQuery }));
+
+jest.mock('jsonwebtoken', () => ({
+    verify: jest.fn().mockReturnValue({ sub: 'supabase-uid' }),
+}));
+
+jest.mock('../src/middleware/authMiddleware', () => ({
+    requireAuth: (req, _res, next) => next(),
+    requireRole: () => (req, _res, next) => next(),
+}));
+
+jest.mock('../src/middleware/teamAccess', () => ({
+    canAccessUser: jest.fn(),
+    getManagerTeamId: jest.fn(),
+}));
+
+const express = require('express');
+const request = require('supertest');
+const { canAccessUser } = require('../src/middleware/teamAccess');
+const router = require('../src/routes/developmentPlans');
+
+function makeApp() {
+    const app = express();
+    app.use(express.json());
+    // Inject authenticated manager user
+    app.use((req, _res, next) => {
+        req.user = { id: 'manager-1', role: 'manager' };
+        next();
+    });
+    app.use('/development-plans', router);
+    return app;
+}
+
+afterEach(() => jest.clearAllMocks());
+
+// ─── POST /:userId — create plan ─────────────────────────────────────────────
+
+describe('POST /development-plans/:userId', () => {
+    test('returns 404 when user not found', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // user lookup
+        const res = await request(makeApp())
+            .post('/development-plans/user-1')
+            .send({ title: 'Q2 Plan' });
+        expect(res.status).toBe(404);
+    });
+
+    test('returns 400 when user is not ACTIVE', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery.mockResolvedValueOnce({
+            rows: [{ id: 'user-1', status: 'PREPARATION', name: 'Sara' }],
+        });
+        const res = await request(makeApp())
+            .post('/development-plans/user-1')
+            .send({ title: 'Q2 Plan' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/ACTIVE/);
+    });
+
+    test('returns 409 when user already has an active IDP plan', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'existing-plan' }] }); // existing plan check
+        const res = await request(makeApp())
+            .post('/development-plans/user-1')
+            .send({ title: 'Q2 Plan' });
+        expect(res.status).toBe(409);
+        expect(res.body.error).toMatch(/already has/i);
+    });
+
+    test('returns 403 when manager cannot access user', async () => {
+        canAccessUser.mockResolvedValueOnce(false);
+        const res = await request(makeApp())
+            .post('/development-plans/user-1')
+            .send({ title: 'Q2 Plan' });
+        expect(res.status).toBe(403);
+    });
+
+    test('creates plan and returns 201 on success', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
+            .mockResolvedValueOnce({ rows: [] })  // no existing plan
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] }) // INSERT journey
+            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] }); // INSERT user_journey_assignments
+        const res = await request(makeApp())
+            .post('/development-plans/user-1')
+            .send({ title: 'Q2 Plan', description: 'Focus on leadership' });
+        expect(res.status).toBe(201);
+        expect(res.body.plan_type).toBe('idp');
+        expect(res.body.owner_user_id).toBe('user-1');
+    });
+});
+
+// ─── GET /:userId — get plan with progress ────────────────────────────────────
+
+describe('GET /development-plans/:userId', () => {
+    test('returns 404 when no active IDP plan exists', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // no plan
+        const res = await request(makeApp()).get('/development-plans/user-1');
+        expect(res.status).toBe(404);
+    });
+
+    test('returns plan with objectives and progress', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01', journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // system quest
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] }); // completions
+        const res = await request(makeApp()).get('/development-plans/user-1');
+        expect(res.status).toBe(200);
+        expect(res.body.objectives).toHaveLength(1);
+        expect(res.body.progress.completion_pct).toBe(100);
+    });
+
+    test('returns 403 when manager cannot access user', async () => {
+        canAccessUser.mockResolvedValueOnce(false);
+        const res = await request(makeApp()).get('/development-plans/user-1');
+        expect(res.status).toBe(403);
+    });
+});
