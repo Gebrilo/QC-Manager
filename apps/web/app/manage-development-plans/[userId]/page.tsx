@@ -237,11 +237,13 @@ export default function IDPBuilderPage() {
                                     {task.priority && (
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>{task.priority}</span>
                                     )}
-                                    {(task.start_date || task.due_date) && (
+                                    {task.progress_status === 'DONE' && task.completed_at ? (
+                                        <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
+                                    ) : (task.start_date || task.due_date) ? (
                                         <span className="text-xs text-slate-400">
                                             {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
                                         </span>
-                                    )}
+                                    ) : null}
                                     <button onClick={() => handleDeleteTask(task.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">×</button>
                                 </div>
                             ))}

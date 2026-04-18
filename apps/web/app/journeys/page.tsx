@@ -136,14 +136,15 @@ export default function JourneysPage() {
                                                 <span className={`flex-1 text-sm ${task.progress_status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                                     {task.title}
                                                 </span>
-                                                {task.is_overdue && (
+                                                {task.progress_status === 'DONE' && task.completed_at ? (
+                                                    <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
+                                                ) : task.is_overdue ? (
                                                     <span className="text-xs text-red-500">overdue</span>
-                                                )}
-                                                {task.due_date && !task.is_overdue && (
+                                                ) : (task.start_date || task.due_date) ? (
                                                     <span className="text-xs text-slate-400">
                                                         {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
                                                     </span>
-                                                )}
+                                                ) : null}
                                             </div>
                                         ))}
                                     </div>
