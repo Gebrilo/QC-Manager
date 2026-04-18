@@ -1432,6 +1432,48 @@ const runMigrations = async () => {
             END $$;
         `);
 
+        // =====================================================
+        // Migration 022: IDP support — extends journeys for per-user development plans
+        // =====================================================
+
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='journeys' AND column_name='plan_type') THEN
+                    ALTER TABLE journeys ADD COLUMN plan_type TEXT NOT NULL DEFAULT 'onboarding'
+                        CHECK (plan_type IN ('onboarding', 'idp'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='journeys' AND column_name='owner_user_id') THEN
+                    ALTER TABLE journeys ADD COLUMN owner_user_id UUID REFERENCES app_user(id) ON DELETE CASCADE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='journeys' AND column_name='created_by_manager') THEN
+                    ALTER TABLE journeys ADD COLUMN created_by_manager UUID REFERENCES app_user(id);
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`ALTER TABLE journey_chapters ADD COLUMN IF NOT EXISTS due_date DATE`);
+
+        await client.query(`
+            ALTER TABLE journey_tasks
+                ADD COLUMN IF NOT EXISTS due_date DATE,
+                ADD COLUMN IF NOT EXISTS priority TEXT CHECK (priority IN ('low', 'medium', 'high')),
+                ADD COLUMN IF NOT EXISTS difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard'))
+        `);
+
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_task_completions' AND column_name='progress_status') THEN
+                    ALTER TABLE user_task_completions ADD COLUMN progress_status TEXT NOT NULL DEFAULT 'DONE'
+                        CHECK (progress_status IN ('TODO', 'IN_PROGRESS', 'DONE'));
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_owner_user ON journeys(owner_user_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_plan_type  ON journeys(plan_type)`);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
