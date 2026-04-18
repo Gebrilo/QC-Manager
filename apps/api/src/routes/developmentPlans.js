@@ -13,12 +13,14 @@ function buildProgress(tasks, completions) {
     let done = 0;
     let mandatoryDone = 0;
     let overdue = 0;
+    let onHold = 0;
     const today = new Date().toISOString().slice(0, 10);
 
     for (const t of tasks) {
         const c = completionMap.get(t.id);
         const isDone = c?.progress_status === 'DONE';
         if (isDone) { done++; if (t.is_mandatory) mandatoryDone++; }
+        if (c?.progress_status === 'ON_HOLD') onHold++;
         if (!isDone && t.due_date && t.due_date < today) overdue++;
     }
 
@@ -29,7 +31,17 @@ function buildProgress(tasks, completions) {
         mandatory_tasks: mandatory,
         mandatory_done: mandatoryDone,
         overdue_tasks: overdue,
+        on_hold_tasks: onHold,
     };
+}
+
+function computeCompletedLate(task, completion) {
+    if (completion?.progress_status !== 'DONE') return null;
+    if (!task.due_date || !completion.completed_at) return null;
+    const completedDate = completion.completed_at instanceof Date
+        ? completion.completed_at.toISOString().slice(0, 10)
+        : String(completion.completed_at).slice(0, 10);
+    return completedDate > task.due_date;
 }
 
 async function getPlanForUser(userId) {
@@ -93,7 +105,8 @@ router.get('/my', requireAuth, async (req, res, next) => {
                 },
                 tasks: chTasks.map(t => {
                     const c = completionMap.get(t.id);
-                    const isOverdue = !c || c.progress_status !== 'DONE';
+                    const progressStatus = c?.progress_status || 'TODO';
+                    const notDone = progressStatus !== 'DONE';
                     return {
                         id: t.id,
                         title: t.title,
@@ -103,9 +116,11 @@ router.get('/my', requireAuth, async (req, res, next) => {
                         priority: t.priority,
                         difficulty: t.difficulty,
                         is_mandatory: t.is_mandatory,
-                        progress_status: c?.progress_status || 'TODO',
-                        is_overdue: isOverdue && t.due_date && t.due_date < today,
+                        progress_status: progressStatus,
+                        is_overdue: notDone && !!t.due_date && t.due_date < today,
                         completed_at: c?.completed_at || null,
+                        completed_late: computeCompletedLate(t, c),
+                        hold_reason: c?.hold_reason ?? null,
                     };
                 }),
             };
@@ -306,6 +321,8 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
                         is_mandatory: t.is_mandatory,
                         progress_status: c?.progress_status || 'TODO',
                         completed_at: c?.completed_at || null,
+                        completed_late: computeCompletedLate(t, c),
+                        hold_reason: c?.hold_reason ?? null,
                     };
                 }),
             };
