@@ -58,7 +58,9 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
             throw new Error(`${errorData.error || 'Validation Error'}: ${validationMessages}`);
         }
 
-        throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+        const err = new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+        (err as any).status = response.status;
+        throw err;
     }
 
     // Handle 204 No Content

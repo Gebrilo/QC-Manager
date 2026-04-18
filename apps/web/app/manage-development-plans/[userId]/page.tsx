@@ -33,7 +33,7 @@ export default function IDPBuilderPage() {
             const data = await developmentPlansApi.getForUser(userId);
             setPlan(data);
         } catch (err: any) {
-            if (err.message?.includes('404') || err.status === 404) setNoPlan(true);
+            if (err?.status === 404 || err?.message?.includes('404') || err?.message?.includes('No active')) setNoPlan(true);
         } finally {
             setIsLoading(false);
         }
