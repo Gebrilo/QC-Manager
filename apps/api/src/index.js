@@ -48,6 +48,7 @@ apiRouter.use('/roles', require('./routes/roles'));
 apiRouter.use('/journeys', require('./routes/journeys'));
 apiRouter.use('/my-journeys', require('./routes/myJourneys'));
 apiRouter.use('/manager', require('./routes/managerView'));
+apiRouter.use('/development-plans', require('./routes/developmentPlans'));
 apiRouter.use('/teams', require('./routes/teams'));
 
 // Serve uploaded files

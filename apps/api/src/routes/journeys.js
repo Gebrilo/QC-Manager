@@ -29,6 +29,7 @@ router.get('/', requireAuth, requireRole('admin', 'manager'), async (req, res, n
                     WHERE jc3.journey_id = j.id) AS task_count
             FROM journeys j
             WHERE j.deleted_at IS NULL
+              AND (j.plan_type = 'onboarding' OR j.plan_type IS NULL)
             ORDER BY j.sort_order, j.created_at
         `);
         res.json(result.rows);
