@@ -83,6 +83,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                 id: ch.id,
                 title: ch.title,
                 description: ch.description,
+                start_date: ch.start_date,
                 due_date: ch.due_date,
                 progress: {
                     total: chTasks.length,
@@ -97,6 +98,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                         id: t.id,
                         title: t.title,
                         description: t.description,
+                        start_date: t.start_date,
                         due_date: t.due_date,
                         priority: t.priority,
                         difficulty: t.difficulty,
@@ -256,6 +258,7 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
                 id: ch.id,
                 title: ch.title,
                 description: ch.description,
+                start_date: ch.start_date,
                 due_date: ch.due_date,
                 sort_order: ch.sort_order,
                 progress: {
@@ -270,6 +273,7 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
                         id: t.id,
                         title: t.title,
                         description: t.description,
+                        start_date: t.start_date,
                         due_date: t.due_date,
                         priority: t.priority,
                         difficulty: t.difficulty,
@@ -292,7 +296,7 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
 router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const { title, description, due_date, sort_order = 0 } = req.body;
+        const { title, description, start_date, due_date, sort_order = 0 } = req.body;
         if (!title) return res.status(400).json({ error: 'title is required' });
 
         const allowed = await canAccessUser(req.user, userId);
@@ -303,9 +307,9 @@ router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'),
 
         const slug = `obj-${Date.now()}`;
         const chapterResult = await db.query(
-            `INSERT INTO journey_chapters (journey_id, slug, title, description, due_date, sort_order, is_mandatory, xp_reward)
-             VALUES ($1, $2, $3, $4, $5, $6, true, 0) RETURNING *`,
-            [plan.id, slug, title, description || null, due_date || null, sort_order]
+            `INSERT INTO journey_chapters (journey_id, slug, title, description, start_date, due_date, sort_order, is_mandatory, xp_reward)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, true, 0) RETURNING *`,
+            [plan.id, slug, title, description || null, start_date || null, due_date || null, sort_order]
         );
         const chapter = chapterResult.rows[0];
 
@@ -325,7 +329,7 @@ router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'),
 router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
-        const { title, description, due_date, sort_order } = req.body;
+        const { title, description, start_date, due_date, sort_order } = req.body;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
@@ -338,6 +342,7 @@ router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin',
         let idx = 1;
         if (title !== undefined)       { fields.push(`title = $${idx++}`);       values.push(title); }
         if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+        if (start_date !== undefined)  { fields.push(`start_date = $${idx++}`);  values.push(start_date); }
         if (due_date !== undefined)    { fields.push(`due_date = $${idx++}`);    values.push(due_date); }
         if (sort_order !== undefined)  { fields.push(`sort_order = $${idx++}`);  values.push(sort_order); }
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -383,7 +388,7 @@ router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin'
 router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
-        const { title, description, due_date, priority, difficulty, is_mandatory = true, sort_order = 0 } = req.body;
+        const { title, description, start_date, due_date, priority, difficulty, is_mandatory = true, sort_order = 0 } = req.body;
         if (!title) return res.status(400).json({ error: 'title is required' });
 
         const allowed = await canAccessUser(req.user, userId);
@@ -403,9 +408,9 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
 
         const slug = `task-${Date.now()}`;
         const taskResult = await db.query(
-            `INSERT INTO journey_tasks (quest_id, slug, title, description, due_date, priority, difficulty, is_mandatory, sort_order, validation_type, validation_config)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'none', '{}') RETURNING *`,
-            [questId, slug, title, description || null, due_date || null, priority || null, difficulty || null, is_mandatory, sort_order]
+            `INSERT INTO journey_tasks (quest_id, slug, title, description, start_date, due_date, priority, difficulty, is_mandatory, sort_order, validation_type, validation_config)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'none', '{}') RETURNING *`,
+            [questId, slug, title, description || null, start_date || null, due_date || null, priority || null, difficulty || null, is_mandatory, sort_order]
         );
         res.status(201).json(taskResult.rows[0]);
     } catch (err) { next(err); }
@@ -416,7 +421,7 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
 router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
-        const { title, description, due_date, priority, difficulty, is_mandatory, sort_order } = req.body;
+        const { title, description, start_date, due_date, priority, difficulty, is_mandatory, sort_order } = req.body;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
@@ -429,6 +434,7 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
         let idx = 1;
         if (title !== undefined)        { fields.push(`title = $${idx++}`);        values.push(title); }
         if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description); }
+        if (start_date !== undefined)   { fields.push(`start_date = $${idx++}`);   values.push(start_date); }
         if (due_date !== undefined)     { fields.push(`due_date = $${idx++}`);     values.push(due_date); }
         if (priority !== undefined)     { fields.push(`priority = $${idx++}`);     values.push(priority); }
         if (difficulty !== undefined)   { fields.push(`difficulty = $${idx++}`);   values.push(difficulty); }
@@ -572,6 +578,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
 
             return {
                 title: ch.title,
+                start_date: ch.start_date,
                 due_date: ch.due_date,
                 completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
                 tasks: chTasks.map(t => {
@@ -583,6 +590,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                     return {
                         title: t.title,
                         status: c?.progress_status || 'TODO',
+                        start_date: t.start_date,
                         due_date: t.due_date,
                         completed_at: c?.completed_at || null,
                         on_time: onTime,

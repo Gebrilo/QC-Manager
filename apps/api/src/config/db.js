@@ -1453,6 +1453,7 @@ const runMigrations = async () => {
         `);
 
         await client.query(`ALTER TABLE journey_chapters ADD COLUMN IF NOT EXISTS due_date DATE`);
+        await client.query(`ALTER TABLE journey_chapters ADD COLUMN IF NOT EXISTS start_date DATE`);
 
         await client.query(`
             ALTER TABLE journey_tasks
@@ -1460,6 +1461,7 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS priority TEXT CHECK (priority IN ('low', 'medium', 'high')),
                 ADD COLUMN IF NOT EXISTS difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard'))
         `);
+        await client.query(`ALTER TABLE journey_tasks ADD COLUMN IF NOT EXISTS start_date DATE`);
 
         await client.query(`
             DO $$

@@ -10,15 +10,21 @@ ALTER TABLE journeys
   ADD COLUMN IF NOT EXISTS owner_user_id UUID REFERENCES app_user(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS created_by_manager UUID REFERENCES app_user(id);
 
--- 2. Objective-level due date (journey_chapters = Objectives in IDP)
+-- 2. Objective-level dates (journey_chapters = Objectives in IDP)
 ALTER TABLE journey_chapters
   ADD COLUMN IF NOT EXISTS due_date DATE;
 
--- 3. Task-level due date, priority, difficulty
+ALTER TABLE journey_chapters
+  ADD COLUMN IF NOT EXISTS start_date DATE;
+
+-- 3. Task-level dates, priority, difficulty
 ALTER TABLE journey_tasks
   ADD COLUMN IF NOT EXISTS due_date DATE,
   ADD COLUMN IF NOT EXISTS priority TEXT CHECK (priority IN ('low', 'medium', 'high')),
   ADD COLUMN IF NOT EXISTS difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard'));
+
+ALTER TABLE journey_tasks
+  ADD COLUMN IF NOT EXISTS start_date DATE;
 
 -- 4. Tri-state task progress for IDP (TODO / IN_PROGRESS / DONE).
 --    DEFAULT 'DONE' means all existing onboarding completion rows remain valid.
