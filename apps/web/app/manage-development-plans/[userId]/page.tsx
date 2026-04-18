@@ -7,6 +7,11 @@ import { developmentPlansApi, IDPPlan, IDPObjective } from '../../../src/lib/api
 function showError(msg: string) { alert(msg); }
 function showSuccess(msg: string) { console.log(msg); }
 
+function fmtDate(v?: string | null) {
+    if (!v) return '';
+    return v.slice(0, 10);
+}
+
 export default function IDPBuilderPage() {
     const params = useParams();
     const userId = params.userId as string;
@@ -214,7 +219,7 @@ export default function IDPBuilderPage() {
                         <div className="flex items-start justify-between mb-3">
                             <div>
                                 <h3 className="font-semibold text-slate-900 dark:text-white">{obj.title}</h3>
-                                {obj.due_date && <p className="text-xs text-slate-400 mt-0.5">Due {obj.due_date}</p>}
+                                {obj.due_date && <p className="text-xs text-slate-400 mt-0.5">Due {fmtDate(obj.due_date)}</p>}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-sm text-slate-500">{obj.progress.completion_pct}%</span>
@@ -230,7 +235,7 @@ export default function IDPBuilderPage() {
                                     {task.priority && (
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>{task.priority}</span>
                                     )}
-                                    {task.due_date && <span className="text-xs text-slate-400">{task.due_date}</span>}
+                                    {task.due_date && <span className="text-xs text-slate-400">{fmtDate(task.due_date)}</span>}
                                     <button onClick={() => handleDeleteTask(task.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">×</button>
                                 </div>
                             ))}

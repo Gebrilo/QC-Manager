@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import { myJourneysApi, developmentPlansApi, AssignedJourney, IDPPlan } from '../../src/lib/api';
 import { useAuth } from '../../src/components/providers/AuthProvider';
 
+function showError(msg: string) { alert(msg); }
+function showSuccess(msg: string) { console.log(msg); }
+
+function fmtDate(v?: string | null) {
+    if (!v) return '';
+    return v.slice(0, 10);
+}
+
 export default function JourneysPage() {
     const [journeys, setJourneys] = useState<AssignedJourney[]>([]);
     const [idpPlan, setIdpPlan] = useState<IDPPlan | null>(null);
@@ -104,7 +112,7 @@ export default function JourneysPage() {
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 className="font-semibold text-slate-900 dark:text-white">{obj.title}</h3>
-                                            {obj.due_date && <p className="text-xs text-slate-400 mt-0.5">Due {obj.due_date}</p>}
+                                            {obj.due_date && <p className="text-xs text-slate-400 mt-0.5">Due {fmtDate(obj.due_date)}</p>}
                                         </div>
                                         <span className="text-sm text-slate-500">{obj.progress.completion_pct}%</span>
                                     </div>
@@ -132,7 +140,7 @@ export default function JourneysPage() {
                                                     <span className="text-xs text-red-500">overdue</span>
                                                 )}
                                                 {task.due_date && !task.is_overdue && (
-                                                    <span className="text-xs text-slate-400">{task.due_date}</span>
+                                                    <span className="text-xs text-slate-400">{fmtDate(task.due_date)}</span>
                                                 )}
                                             </div>
                                         ))}
