@@ -374,3 +374,33 @@ describe('POST /development-plans/:userId/complete', () => {
         expect(res.body.success).toBe(true);
     });
 });
+
+// ─── GET /:userId/report ────────────────────────────────────────────────────
+
+describe('GET /development-plans/:userId/report', () => {
+    test('returns 404 when no plan exists', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'u-1', name: 'Sara', email: 's@test.com' }] }) // user
+            .mockResolvedValueOnce({ rows: [] }); // no plan
+        const res = await request(makeApp()).get('/development-plans/user-1/report');
+        expect(res.status).toBe(404);
+    });
+
+    test('returns report with summary and objectives', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'u-1', name: 'Sara', email: 's@test.com' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2', created_at: '2026-01-01', is_active: true }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01' }] }) // chapters
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // quests
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', is_mandatory: true }] }) // tasks
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE', completed_at: '2026-04-10' }] }); // completions
+        const res = await request(makeApp()).get('/development-plans/user-1/report');
+        expect(res.status).toBe(200);
+        expect(res.body.summary.total_tasks).toBe(1);
+        expect(res.body.summary.completed_tasks).toBe(1);
+        expect(res.body.objectives).toHaveLength(1);
+        expect(res.body.plan.status).toBe('active');
+    });
+});

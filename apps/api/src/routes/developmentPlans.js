@@ -75,6 +75,10 @@ router.get('/my', requireAuth, async (req, res, next) => {
             const chQuest = quests.find(q => q.chapter_id === ch.id);
             const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
             const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
+            const overdue = chTasks.filter(t => {
+                const c = completionMap.get(t.id);
+                return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
+            }).length;
             return {
                 id: ch.id,
                 title: ch.title,
@@ -84,6 +88,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                     total: chTasks.length,
                     done,
                     completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
+                    overdue,
                 },
                 tasks: chTasks.map(t => {
                     const c = completionMap.get(t.id);
@@ -595,7 +600,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
 
         res.json({
             user: userResult.rows[0],
-            plan: { title: plan.title, created_at: plan.created_at, is_active: plan.is_active },
+            plan: { title: plan.title, created_at: plan.created_at, status: plan.is_active ? 'active' : 'completed' },
             summary: {
                 total_tasks: totalTasks,
                 completed_tasks: completedTasks,
