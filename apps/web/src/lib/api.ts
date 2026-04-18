@@ -972,9 +972,21 @@ export interface IDPTask {
     priority?: 'low' | 'medium' | 'high';
     difficulty?: 'easy' | 'medium' | 'hard';
     is_mandatory: boolean;
-    progress_status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+    progress_status: 'TODO' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE';
     is_overdue?: boolean;
     completed_at?: string | null;
+    completed_late?: boolean | null;
+    hold_reason?: string | null;
+}
+
+export interface IDPTaskComment {
+    id: string;
+    user_id: string;
+    task_id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface IDPObjective {
@@ -1009,6 +1021,7 @@ export interface IDPPlan {
         mandatory_tasks: number;
         mandatory_done: number;
         overdue_tasks: number;
+        on_hold_tasks: number;
     };
 }
 
@@ -1022,6 +1035,7 @@ export interface IDPReport {
         overdue_tasks: number;
         on_time_completed: number;
         late_completed: number;
+        on_hold_tasks: number;
     };
     objectives: Array<{
         title: string;
@@ -1108,9 +1122,31 @@ export const developmentPlansApi = {
         fetchApi<IDPPlan>('/api/development-plans/my'),
 
     // User: update task status
-    updateMyTaskStatus: (taskId: string, status: 'TODO' | 'IN_PROGRESS' | 'DONE') =>
+    updateMyTaskStatus: (
+        taskId: string,
+        status: 'TODO' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE',
+        comment?: string
+    ) =>
         fetchApi<{ task_id: string; progress_status: string }>(`/api/development-plans/my/tasks/${taskId}/status`, {
             method: 'PATCH',
-            body: JSON.stringify({ status }),
+            body: JSON.stringify({ status, comment }),
+        }),
+
+    listMyTaskComments: (taskId: string) =>
+        fetchApi<IDPTaskComment[]>(`/api/development-plans/my/tasks/${taskId}/comments`),
+
+    addMyTaskComment: (taskId: string, body: string) =>
+        fetchApi<IDPTaskComment>(`/api/development-plans/my/tasks/${taskId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ body }),
+        }),
+
+    listTaskComments: (userId: string, taskId: string) =>
+        fetchApi<IDPTaskComment[]>(`/api/development-plans/${userId}/tasks/${taskId}/comments`),
+
+    addTaskComment: (userId: string, taskId: string, body: string) =>
+        fetchApi<IDPTaskComment>(`/api/development-plans/${userId}/tasks/${taskId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ body }),
         }),
 };
