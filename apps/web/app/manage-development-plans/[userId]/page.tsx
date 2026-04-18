@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { developmentPlansApi, IDPPlan, IDPObjective } from '../../../../src/lib/api';
+import { developmentPlansApi, IDPPlan, IDPObjective } from '../../../src/lib/api';
 
 function showError(msg: string) { alert(msg); }
 function showSuccess(msg: string) { console.log(msg); }
