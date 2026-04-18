@@ -128,3 +128,82 @@ describe('GET /development-plans/:userId', () => {
         expect(res.status).toBe(403);
     });
 });
+
+// ─── POST /:userId/objectives ─────────────────────────────────────────────────
+
+describe('POST /development-plans/:userId/objectives', () => {
+    test('returns 404 when no active plan exists', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // no plan
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/objectives')
+            .send({ title: 'Leadership' });
+        expect(res.status).toBe(404);
+    });
+
+    test('creates objective (chapter + system quest) and returns 201', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', plan_type: 'idp' }] }) // plan lookup
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', journey_id: 'plan-1' }] }) // INSERT chapter
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] }); // INSERT system quest
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/objectives')
+            .send({ title: 'Leadership', due_date: '2026-06-01' });
+        expect(res.status).toBe(201);
+        expect(res.body.id).toBe('ch-1');
+    });
+});
+
+// ─── PATCH /:userId/objectives/:chapterId ────────────────────────────────────
+
+describe('PATCH /development-plans/:userId/objectives/:chapterId', () => {
+    test('returns 404 when objective not found in plan', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
+            .mockResolvedValueOnce({ rows: [] }); // chapter not found
+        const res = await request(makeApp())
+            .patch('/development-plans/user-1/objectives/ch-99')
+            .send({ title: 'Updated' });
+        expect(res.status).toBe(404);
+    });
+
+    test('updates objective and returns 200', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Updated', due_date: '2026-07-01' }] });
+        const res = await request(makeApp())
+            .patch('/development-plans/user-1/objectives/ch-1')
+            .send({ title: 'Updated', due_date: '2026-07-01' });
+        expect(res.status).toBe(200);
+        expect(res.body.title).toBe('Updated');
+    });
+});
+
+// ─── DELETE /:userId/objectives/:chapterId ───────────────────────────────────
+
+describe('DELETE /development-plans/:userId/objectives/:chapterId', () => {
+    test('returns 404 when objective not found', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] }); // chapter not found
+        const res = await request(makeApp())
+            .delete('/development-plans/user-1/objectives/ch-99');
+        expect(res.status).toBe(404);
+    });
+
+    test('deletes objective and returns 200', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1' }] }) // chapter found
+            .mockResolvedValueOnce({ rows: [] }); // DELETE chapter
+        const res = await request(makeApp())
+            .delete('/development-plans/user-1/objectives/ch-1');
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+    });
+});
