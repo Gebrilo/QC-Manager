@@ -140,7 +140,9 @@ export default function JourneysPage() {
                                                     <span className="text-xs text-red-500">overdue</span>
                                                 )}
                                                 {task.due_date && !task.is_overdue && (
-                                                    <span className="text-xs text-slate-400">{fmtDate(task.due_date)}</span>
+                                                    <span className="text-xs text-slate-400">
+                                                        {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                                    </span>
                                                 )}
                                             </div>
                                         ))}

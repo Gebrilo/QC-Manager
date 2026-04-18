@@ -26,10 +26,12 @@ export default function IDPBuilderPage() {
 
     const [showObjForm, setShowObjForm] = useState(false);
     const [newObjTitle, setNewObjTitle] = useState('');
+    const [newObjStart, setNewObjStart] = useState('');
     const [newObjDue, setNewObjDue] = useState('');
 
     const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null);
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskStart, setNewTaskStart] = useState('');
     const [newTaskDue, setNewTaskDue] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
@@ -235,7 +237,11 @@ export default function IDPBuilderPage() {
                                     {task.priority && (
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>{task.priority}</span>
                                     )}
-                                    {task.due_date && <span className="text-xs text-slate-400">{fmtDate(task.due_date)}</span>}
+                                    {(task.start_date || task.due_date) && (
+                                        <span className="text-xs text-slate-400">
+                                            {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                        </span>
+                                    )}
                                     <button onClick={() => handleDeleteTask(task.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">×</button>
                                 </div>
                             ))}
@@ -249,13 +255,19 @@ export default function IDPBuilderPage() {
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
                                 />
-                                <input
-                                    type="date"
-                                    className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
-                                    value={newTaskDue}
-                                    onChange={e => setNewTaskDue(e.target.value)}
-                                />
-                                <select
+                        <input
+                            type="date"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                            value={newTaskStart}
+                            onChange={e => setNewTaskStart(e.target.value)}
+                        />
+                        <input
+                            type="date"
+                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                            value={newTaskDue}
+                            onChange={e => setNewTaskDue(e.target.value)}
+                        />
+                        <select
                                     className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
                                     value={newTaskPriority}
                                     onChange={e => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}

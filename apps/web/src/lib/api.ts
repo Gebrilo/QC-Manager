@@ -967,6 +967,7 @@ export interface IDPTask {
     id: string;
     title: string;
     description?: string;
+    start_date?: string;
     due_date?: string;
     priority?: 'low' | 'medium' | 'high';
     difficulty?: 'easy' | 'medium' | 'hard';
@@ -980,6 +981,7 @@ export interface IDPObjective {
     id: string;
     title: string;
     description?: string;
+    start_date?: string;
     due_date?: string;
     sort_order: number;
     progress: {
