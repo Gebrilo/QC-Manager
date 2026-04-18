@@ -278,3 +278,99 @@ describe('DELETE /development-plans/:userId/tasks/:taskId', () => {
         expect(res.body.success).toBe(true);
     });
 });
+
+// ─── User app — makeApp with user role ────────────────────────────────────────
+
+function makeUserApp(userId = 'user-1') {
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+        req.user = { id: userId, role: 'user' };
+        next();
+    });
+    app.use('/development-plans', router);
+    return app;
+}
+
+// ─── GET /my ─────────────────────────────────────────────────────────────────
+
+describe('GET /development-plans/my', () => {
+    test('returns 404 when user has no active IDP plan', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const res = await request(makeUserApp()).get('/development-plans/my');
+        expect(res.status).toBe(404);
+    });
+
+    test('returns plan with objectives for ACTIVE user', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
+            .mockResolvedValueOnce({ rows: [] }); // chapters (empty → no further queries)
+        const res = await request(makeUserApp()).get('/development-plans/my');
+        expect(res.status).toBe(200);
+        expect(res.body.title).toBe('Q2 Plan');
+    });
+});
+
+// ─── PATCH /my/tasks/:taskId/status ─────────────────────────────────────────
+
+describe('PATCH /development-plans/my/tasks/:taskId/status', () => {
+    test('returns 400 for invalid status value', async () => {
+        const res = await request(makeUserApp())
+            .patch('/development-plans/my/tasks/t-1/status')
+            .send({ status: 'INVALID' });
+        expect(res.status).toBe(400);
+    });
+
+    test('inserts IN_PROGRESS completion row', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
+            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] }) // task in plan
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'IN_PROGRESS' }] }); // upsert
+        const res = await request(makeUserApp())
+            .patch('/development-plans/my/tasks/t-1/status')
+            .send({ status: 'IN_PROGRESS' });
+        expect(res.status).toBe(200);
+        expect(res.body.progress_status).toBe('IN_PROGRESS');
+    });
+
+    test('deletes completion row when status is TODO', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] })
+            .mockResolvedValueOnce({ rows: [] }); // DELETE
+        const res = await request(makeUserApp())
+            .patch('/development-plans/my/tasks/t-1/status')
+            .send({ status: 'TODO' });
+        expect(res.status).toBe(200);
+        expect(res.body.progress_status).toBe('TODO');
+    });
+});
+
+// ─── POST /:userId/complete ───────────────────────────────────────────────────
+
+describe('POST /development-plans/:userId/complete', () => {
+    test('returns 400 when mandatory tasks are incomplete', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100 }] }) // plan
+            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '2' }] }); // incomplete check
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/complete');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/incomplete/i);
+    });
+
+    test('marks plan complete and awards XP', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100, owner_user_id: 'user-1' }] })
+            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '0' }] }) // all done
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE journeys is_active=false
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE user_journey_assignments total_xp
+            .mockResolvedValueOnce({ rows: [] }); // INSERT notification
+        const res = await request(makeApp())
+            .post('/development-plans/user-1/complete');
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+    });
+});
