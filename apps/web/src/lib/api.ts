@@ -956,3 +956,157 @@ export const teamsApi = {
     // Manager: get team summary
     getSummary: () => fetchApi<TeamSummaryApi>('/manager/summary'),
 };
+
+// ============================================================================
+// IDP — Individual Development Plan Types
+// ============================================================================
+
+export interface IDPTask {
+    id: string;
+    title: string;
+    description?: string;
+    due_date?: string;
+    priority?: 'low' | 'medium' | 'high';
+    difficulty?: 'easy' | 'medium' | 'hard';
+    is_mandatory: boolean;
+    progress_status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+    is_overdue?: boolean;
+    completed_at?: string | null;
+}
+
+export interface IDPObjective {
+    id: string;
+    title: string;
+    description?: string;
+    due_date?: string;
+    sort_order: number;
+    progress: {
+        total: number;
+        done: number;
+        completion_pct: number;
+        overdue?: number;
+    };
+    tasks: IDPTask[];
+}
+
+export interface IDPPlan {
+    id: string;
+    title: string;
+    description?: string;
+    plan_type: 'idp';
+    owner_user_id: string;
+    is_active: boolean;
+    created_at: string;
+    objectives: IDPObjective[];
+    progress: {
+        total_tasks: number;
+        done_tasks: number;
+        completion_pct: number;
+        mandatory_tasks: number;
+        mandatory_done: number;
+        overdue_tasks: number;
+    };
+}
+
+export interface IDPReport {
+    user: { id: string; name: string; email: string };
+    plan: { title: string; created_at: string; status: string };
+    summary: {
+        total_tasks: number;
+        completed_tasks: number;
+        completion_pct: number;
+        overdue_tasks: number;
+        on_time_completed: number;
+        late_completed: number;
+    };
+    objectives: Array<{
+        title: string;
+        due_date?: string;
+        completion_pct: number;
+        tasks: Array<{
+            title: string;
+            status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+            due_date?: string;
+            completed_at?: string | null;
+            on_time?: boolean | null;
+        }>;
+    }>;
+}
+
+// ============================================================================
+// IDP — API Client
+// ============================================================================
+
+export const developmentPlansApi = {
+    // Manager: get plan for a user
+    getForUser: (userId: string) =>
+        fetchApi<IDPPlan>(`/api/development-plans/${userId}`),
+
+    // Manager: create plan
+    create: (userId: string, data: { title: string; description?: string; required_xp?: number }) =>
+        fetchApi<IDPPlan>(`/api/development-plans/${userId}`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    // Manager: add objective
+    addObjective: (userId: string, data: { title: string; description?: string; due_date?: string }) =>
+        fetchApi<IDPObjective>(`/api/development-plans/${userId}/objectives`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    // Manager: update objective
+    updateObjective: (userId: string, chapterId: string, data: { title?: string; description?: string; due_date?: string }) =>
+        fetchApi<IDPObjective>(`/api/development-plans/${userId}/objectives/${chapterId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    // Manager: delete objective
+    deleteObjective: (userId: string, chapterId: string) =>
+        fetchApi<{ success: boolean }>(`/api/development-plans/${userId}/objectives/${chapterId}`, {
+            method: 'DELETE',
+        }),
+
+    // Manager: add task to objective
+    addTask: (userId: string, chapterId: string, data: { title: string; description?: string; due_date?: string; priority?: string; difficulty?: string; is_mandatory?: boolean }) =>
+        fetchApi<IDPTask>(`/api/development-plans/${userId}/objectives/${chapterId}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    // Manager: update task
+    updateTask: (userId: string, taskId: string, data: Partial<Pick<IDPTask, 'title' | 'description' | 'due_date' | 'priority' | 'difficulty' | 'is_mandatory'>>) =>
+        fetchApi<IDPTask>(`/api/development-plans/${userId}/tasks/${taskId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    // Manager: delete task
+    deleteTask: (userId: string, taskId: string) =>
+        fetchApi<{ success: boolean }>(`/api/development-plans/${userId}/tasks/${taskId}`, {
+            method: 'DELETE',
+        }),
+
+    // Manager: complete plan
+    completePlan: (userId: string) =>
+        fetchApi<{ success: boolean }>(`/api/development-plans/${userId}/complete`, {
+            method: 'POST',
+        }),
+
+    // Manager: get report
+    getReport: (userId: string) =>
+        fetchApi<IDPReport>(`/api/development-plans/${userId}/report`),
+
+    // User: get own plan
+    getMy: () =>
+        fetchApi<IDPPlan>('/api/development-plans/my'),
+
+    // User: update task status
+    updateMyTaskStatus: (taskId: string, status: 'TODO' | 'IN_PROGRESS' | 'DONE') =>
+        fetchApi<{ task_id: string; progress_status: string }>(`/api/development-plans/my/tasks/${taskId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        }),
+};
