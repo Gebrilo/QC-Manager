@@ -52,6 +52,17 @@ async function getPlanForUser(userId) {
     return planResult.rows[0] || null;
 }
 
+async function assertTaskInPlan(planId, taskId) {
+    const r = await db.query(
+        `SELECT jt.id FROM journey_tasks jt
+         JOIN journey_quests jq ON jt.quest_id = jq.id
+         JOIN journey_chapters jc ON jq.chapter_id = jc.id
+         WHERE jt.id = $1 AND jc.journey_id = $2`,
+        [taskId, planId]
+    );
+    return r.rows.length > 0;
+}
+
 // ─── GET /my — user views own IDP plan ───────────────────────────────────────
 
 router.get('/my', requireAuth, async (req, res, next) => {
@@ -194,6 +205,102 @@ router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => 
             [userId, taskId, status]
         );
         res.json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /my/tasks/:taskId/comments — list own task comments ─────────────────
+
+router.get('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { taskId } = req.params;
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        if (!(await assertTaskInPlan(plan.id, taskId))) {
+            return res.status(404).json({ error: 'Task not found in your plan' });
+        }
+        const result = await db.query(
+            `SELECT id, user_id, task_id, author_id, body, created_at, updated_at
+             FROM idp_task_comment
+             WHERE user_id = $1 AND task_id = $2
+             ORDER BY created_at ASC`,
+            [userId, taskId]
+        );
+        res.json(result.rows);
+    } catch (err) { next(err); }
+});
+
+// ─── POST /my/tasks/:taskId/comments — add own comment ───────────────────────
+
+router.post('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { taskId } = req.params;
+        const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+        if (body.length === 0) return res.status(400).json({ error: 'body is required' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        if (!(await assertTaskInPlan(plan.id, taskId))) {
+            return res.status(404).json({ error: 'Task not found in your plan' });
+        }
+        const result = await db.query(
+            `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, user_id, task_id, author_id, body, created_at, updated_at`,
+            [userId, taskId, userId, body]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /:userId/tasks/:taskId/comments — manager reads ─────────────────────
+
+router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        if (!(await assertTaskInPlan(plan.id, taskId))) {
+            return res.status(404).json({ error: 'Task not found in this plan' });
+        }
+        const result = await db.query(
+            `SELECT id, user_id, task_id, author_id, body, created_at, updated_at
+             FROM idp_task_comment
+             WHERE user_id = $1 AND task_id = $2
+             ORDER BY created_at ASC`,
+            [userId, taskId]
+        );
+        res.json(result.rows);
+    } catch (err) { next(err); }
+});
+
+// ─── POST /:userId/tasks/:taskId/comments — manager comments ─────────────────
+
+router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+        if (body.length === 0) return res.status(400).json({ error: 'body is required' });
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await getPlanForUser(userId);
+        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        if (!(await assertTaskInPlan(plan.id, taskId))) {
+            return res.status(404).json({ error: 'Task not found in this plan' });
+        }
+        const result = await db.query(
+            `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, user_id, task_id, author_id, body, created_at, updated_at`,
+            [userId, taskId, req.user.id, body]
+        );
+        res.status(201).json(result.rows[0]);
     } catch (err) { next(err); }
 });
 
