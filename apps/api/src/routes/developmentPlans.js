@@ -121,11 +121,16 @@ router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => 
     try {
         const userId = req.user.id;
         const { taskId } = req.params;
-        const { status } = req.body;
+        const { status, comment } = req.body;
 
-        const VALID = ['TODO', 'IN_PROGRESS', 'DONE'];
+        const VALID = ['TODO', 'IN_PROGRESS', 'ON_HOLD', 'DONE'];
         if (!VALID.includes(status)) {
             return res.status(400).json({ error: `status must be one of: ${VALID.join(', ')}` });
+        }
+
+        const trimmedComment = typeof comment === 'string' ? comment.trim() : '';
+        if (status === 'ON_HOLD' && trimmedComment.length === 0) {
+            return res.status(400).json({ error: 'A comment is required when placing a task On Hold' });
         }
 
         const plan = await getPlanForUser(userId);
@@ -142,13 +147,34 @@ router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => 
 
         if (status === 'TODO') {
             await db.query(`DELETE FROM user_task_completions WHERE user_id = $1 AND task_id = $2`, [userId, taskId]);
-            return res.json({ task_id: taskId, progress_status: 'TODO' });
+            return res.json({ task_id: taskId, progress_status: 'TODO', hold_reason: null });
+        }
+
+        if (status === 'ON_HOLD') {
+            const upsert = await db.query(
+                `INSERT INTO user_task_completions (user_id, task_id, progress_status, hold_reason)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (user_id, task_id)
+                 DO UPDATE SET progress_status = $3, hold_reason = $4, completed_at = NULL
+                 RETURNING *`,
+                [userId, taskId, 'ON_HOLD', trimmedComment]
+            );
+            await db.query(
+                `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
+                 VALUES ($1, $2, $3, $4)`,
+                [userId, taskId, userId, trimmedComment]
+            );
+            return res.json(upsert.rows[0]);
         }
 
         const result = await db.query(
-            `INSERT INTO user_task_completions (user_id, task_id, progress_status)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (user_id, task_id) DO UPDATE SET progress_status = $3, completed_at = CASE WHEN $3 = 'DONE' THEN NOW() ELSE null END
+            `INSERT INTO user_task_completions (user_id, task_id, progress_status, hold_reason)
+             VALUES ($1, $2, $3, NULL)
+             ON CONFLICT (user_id, task_id)
+             DO UPDATE SET
+                progress_status = $3,
+                hold_reason = NULL,
+                completed_at = CASE WHEN $3 = 'DONE' THEN NOW() ELSE NULL END
              RETURNING *`,
             [userId, taskId, status]
         );
