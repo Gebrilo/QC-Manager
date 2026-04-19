@@ -7,6 +7,9 @@ import { useToast } from '../../../src/components/ui/Toast';
 import { TaskStatusBadge, inferBadgeKind } from '../../../src/components/idp/TaskStatusBadge';
 import { TaskCommentsPanel } from '../../../src/components/idp/TaskCommentsPanel';
 import { useAuth } from '../../../src/components/providers/AuthProvider';
+import PlanTabs from '../../../src/components/idp/PlanTabs';
+import TaskLinks from '../../../src/components/idp/TaskLinks';
+import TaskAttachments from '../../../src/components/idp/TaskAttachments';
 
 function fmtDate(v?: string | null) {
     if (!v) return '';
@@ -19,17 +22,20 @@ export default function IDPBuilderPage() {
     const toast = useToast();
     const { user } = useAuth();
 
-    const [plan, setPlan] = useState<IDPPlan | null>(null);
+    const [plans, setPlans] = useState<IDPPlan[]>([]);
+    const [activePlanId, setActivePlanId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [noplan, setNoPlan] = useState(false);
+
+    const plan = plans.find(p => p.id === activePlanId) || plans[0] || null;
 
     const [newPlanTitle, setNewPlanTitle] = useState('');
     const [newPlanDesc, setNewPlanDesc] = useState('');
     const [creatingPlan, setCreatingPlan] = useState(false);
+    const [showNewPlanForm, setShowNewPlanForm] = useState(false);
 
     const [showObjForm, setShowObjForm] = useState(false);
     const [newObjTitle, setNewObjTitle] = useState('');
-    const [newObjStart, setNewObjStart] = useState('');
     const [newObjDue, setNewObjDue] = useState('');
 
     const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null);
@@ -37,13 +43,26 @@ export default function IDPBuilderPage() {
     const [newTaskStart, setNewTaskStart] = useState('');
     const [newTaskDue, setNewTaskDue] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+    const [newTaskRequiresAttachment, setNewTaskRequiresAttachment] = useState(false);
 
     const [commentsTask, setCommentsTask] = useState<IDPTask | null>(null);
+
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [titleDraft, setTitleDraft] = useState('');
 
     const loadPlan = useCallback(async () => {
         try {
             const data = await developmentPlansApi.getForUser(userId);
-            setPlan(Array.isArray(data) ? data.find(p => p.is_active) || data[0] || null : data);
+            const planArr = Array.isArray(data) ? data : data ? [data] : [];
+            if (planArr.length === 0) {
+                setNoPlan(true);
+            } else {
+                setNoPlan(false);
+                setPlans(planArr);
+                if (!activePlanId || !planArr.find(p => p.id === activePlanId)) {
+                    setActivePlanId(planArr.find(p => p.is_active)?.id || planArr[0].id);
+                }
+            }
         } catch (err: any) {
             if (err?.status === 404 || err?.message?.includes('404') || err?.message?.includes('No active')) setNoPlan(true);
         } finally {
@@ -53,13 +72,30 @@ export default function IDPBuilderPage() {
 
     useEffect(() => { loadPlan(); }, [loadPlan]);
 
+    async function handlePlanChange(planId: string) {
+        setActivePlanId(planId);
+        try {
+            const data = await developmentPlansApi.getForUser(userId, planId);
+            const fullPlan = Array.isArray(data) ? data[0] : data;
+            if (fullPlan) {
+                setPlans(prev => prev.map(p => p.id === planId ? fullPlan : p));
+            }
+        } catch (err: any) {
+            toast.error(err?.message || 'Could not load plan');
+        }
+    }
+
     async function handleCreatePlan() {
         if (!newPlanTitle.trim()) return;
         setCreatingPlan(true);
         try {
-            await developmentPlansApi.create(userId, { title: newPlanTitle, description: newPlanDesc });
+            const newPlan = await developmentPlansApi.create(userId, { title: newPlanTitle, description: newPlanDesc });
             setNoPlan(false);
+            setShowNewPlanForm(false);
+            setNewPlanTitle('');
+            setNewPlanDesc('');
             await loadPlan();
+            setActivePlanId(newPlan.id);
         } catch (err: any) { toast.error(err?.message || 'Could not create plan'); }
         finally { setCreatingPlan(false); }
     }
@@ -90,10 +126,12 @@ export default function IDPBuilderPage() {
                 title: newTaskTitle,
                 due_date: newTaskDue || undefined,
                 priority: newTaskPriority,
+                requires_attachment: newTaskRequiresAttachment || undefined,
             });
             setNewTaskTitle('');
             setNewTaskDue('');
             setNewTaskPriority('medium');
+            setNewTaskRequiresAttachment(false);
             setAddingTaskFor(null);
             await loadPlan();
         } catch (err: any) { toast.error(err?.message || 'Could not add task'); }
@@ -130,6 +168,18 @@ export default function IDPBuilderPage() {
         } catch (err: any) { toast.error(err?.message || 'Could not export report'); }
     }
 
+    async function handleSaveTitle() {
+        if (!plan || !titleDraft.trim()) { setEditingTitle(false); return; }
+        try {
+            await developmentPlansApi.updatePlan(userId, plan.id, { title: titleDraft });
+            setEditingTitle(false);
+            await loadPlan();
+        } catch (err: any) {
+            toast.error(err?.message || 'Could not update title');
+            setEditingTitle(false);
+        }
+    }
+
     const priorityColors: Record<string, string> = {
         low: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
         medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
@@ -151,7 +201,7 @@ export default function IDPBuilderPage() {
         );
     }
 
-    if (noplan) {
+    if (noplan || (!plan && plans.length === 0)) {
         return (
             <div className="max-w-xl mx-auto px-4 py-16">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Create Development Plan</h2>
@@ -190,7 +240,21 @@ export default function IDPBuilderPage() {
         <div className="max-w-4xl mx-auto px-4 py-8">
             <div className="flex items-start justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{plan.title}</h1>
+                    {editingTitle ? (
+                        <input value={titleDraft} onChange={e => setTitleDraft(e.target.value)}
+                            onBlur={handleSaveTitle}
+                            onKeyDown={async (e) => {
+                                if (e.key === 'Enter') { await handleSaveTitle(); }
+                                if (e.key === 'Escape') setEditingTitle(false);
+                            }}
+                            className="text-2xl font-bold text-slate-900 dark:text-white bg-transparent border-b-2 border-indigo-500 outline-none w-full"
+                            autoFocus
+                        />
+                    ) : (
+                        <h1 onClick={() => { setTitleDraft(plan.title); setEditingTitle(true); }} className="text-2xl font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-500 transition-colors">
+                            {plan.title}
+                        </h1>
+                    )}
                     {plan.description && <p className="text-slate-500 dark:text-slate-400 mt-1">{plan.description}</p>}
                     <div className="flex items-center gap-3 mt-3">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{plan.progress.completion_pct}% complete</span>
@@ -218,8 +282,49 @@ export default function IDPBuilderPage() {
                             Mark Complete
                         </button>
                     )}
+                    <button
+                        onClick={() => setShowNewPlanForm(true)}
+                        className="px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                    >
+                        + New Plan
+                    </button>
                 </div>
             </div>
+
+            {showNewPlanForm && (
+                <div className="mb-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+                    <h4 className="font-medium text-slate-900 dark:text-white mb-3">New Plan</h4>
+                    <div className="space-y-3">
+                        <input
+                            className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Plan title"
+                            value={newPlanTitle}
+                            onChange={e => setNewPlanTitle(e.target.value)}
+                        />
+                        <textarea
+                            className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                            placeholder="Description (optional)"
+                            rows={2}
+                            value={newPlanDesc}
+                            onChange={e => setNewPlanDesc(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                            <button onClick={handleCreatePlan} disabled={creatingPlan || !newPlanTitle.trim()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium">
+                                {creatingPlan ? 'Creating…' : 'Create'}
+                            </button>
+                            <button onClick={() => { setShowNewPlanForm(false); setNewPlanTitle(''); setNewPlanDesc(''); }} className="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <PlanTabs
+                plans={plans.map(p => ({ id: p.id, title: p.title, completion_pct: p.progress.completion_pct }))}
+                activePlanId={activePlanId || plan.id}
+                onPlanChange={handlePlanChange}
+            />
 
             <div className="space-y-6">
                 {plan.objectives.map((obj: IDPObjective) => (
@@ -236,59 +341,97 @@ export default function IDPBuilderPage() {
                         </div>
 
                         <div className="space-y-2 mb-3">
-                            {obj.tasks.map(task => (
-                                <div key={task.id} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                                    <span className={`text-xs font-mono ${statusColors[task.progress_status]}`}>
-                                        {task.progress_status}
-                                    </span>
-                                    <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
-                                        {task.title}
-                                    </span>
-                                    {(() => {
-                                        const kind = inferBadgeKind(task);
-                                        if (!['on_hold', 'overdue', 'done_late'].includes(kind)) return null;
-                                        const suffix = kind === 'done_late' && task.completed_at && task.due_date
-                                            ? (() => {
-                                                const due = new Date(task.due_date);
-                                                const done = new Date(task.completed_at!);
-                                                const days = Math.max(1, Math.round((done.getTime() - due.getTime()) / 86400000));
-                                                return `Late by ${days}d`;
-                                            })()
-                                            : undefined;
-                                        return <TaskStatusBadge kind={kind} suffix={suffix} />;
-                                    })()}
-                                    {task.progress_status === 'ON_HOLD' && task.hold_reason && (
-                                        <span
-                                            className="text-xs italic text-amber-600 dark:text-amber-300 truncate max-w-[200px]"
-                                            title={task.hold_reason}
-                                        >
-                                            &ldquo;{task.hold_reason}&rdquo;
-                                        </span>
-                                    )}
-                                    {task.priority && (
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>
-                                            {task.priority}
-                                        </span>
-                                    )}
-                                    {task.progress_status === 'DONE' && task.completed_at ? (
-                                        <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
-                                    ) : (task.start_date || task.due_date) ? (
-                                        <span className="text-xs text-slate-400">
-                                            {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
-                                        </span>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        aria-label={`Open comments for ${task.title}`}
-                                        onClick={() => setCommentsTask(task)}
-                                        className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
-                                        title="Comments"
-                                    >
-                                        💬
-                                    </button>
-                                    <button onClick={() => handleDeleteTask(task.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">×</button>
-                                </div>
-                            ))}
+                            {obj.tasks.map(task => {
+                                const isDone = task.progress_status === 'DONE';
+                                return (
+                                    <div key={task.id} className="py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-xs font-mono ${statusColors[task.progress_status]}`}>
+                                                {task.progress_status}
+                                            </span>
+                                            <span className={`flex-1 text-sm ${isDone ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                {task.title}
+                                            </span>
+                                            {task.requires_attachment && !task.attachments?.some(a => a.uploaded_by_role === 'resource') && (
+                                                <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded">
+                                                    Attachment required
+                                                </span>
+                                            )}
+                                            {isDone && (
+                                                <span className="text-xs text-slate-400" title="Reopen task first to edit">
+                                                    🔒
+                                                </span>
+                                            )}
+                                            {(() => {
+                                                const kind = inferBadgeKind(task);
+                                                if (!['on_hold', 'overdue', 'done_late'].includes(kind)) return null;
+                                                const suffix = kind === 'done_late' && task.completed_at && task.due_date
+                                                    ? (() => {
+                                                        const due = new Date(task.due_date);
+                                                        const done = new Date(task.completed_at!);
+                                                        const days = Math.max(1, Math.round((done.getTime() - due.getTime()) / 86400000));
+                                                        return `Late by ${days}d`;
+                                                    })()
+                                                    : undefined;
+                                                return <TaskStatusBadge kind={kind} suffix={suffix} />;
+                                            })()}
+                                            {task.progress_status === 'ON_HOLD' && task.hold_reason && (
+                                                <span
+                                                    className="text-xs italic text-amber-600 dark:text-amber-300 truncate max-w-[200px]"
+                                                    title={task.hold_reason}
+                                                >
+                                                    &ldquo;{task.hold_reason}&rdquo;
+                                                </span>
+                                            )}
+                                            {task.priority && (
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>
+                                                    {task.priority}
+                                                </span>
+                                            )}
+                                            {task.progress_status === 'DONE' && task.completed_at ? (
+                                                <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
+                                            ) : (task.start_date || task.due_date) ? (
+                                                <span className="text-xs text-slate-400">
+                                                    {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                                </span>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                aria-label={`Open comments for ${task.title}`}
+                                                onClick={() => setCommentsTask(task)}
+                                                className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                                title="Comments"
+                                            >
+                                                💬
+                                            </button>
+                                            <button onClick={() => handleDeleteTask(task.id)} disabled={isDone} className={`text-xs transition-colors ${isDone ? 'text-slate-300 cursor-not-allowed' : 'text-red-400 hover:text-red-600'}`} title={isDone ? 'Reopen task first to delete' : 'Delete task'}>×</button>
+                                        </div>
+                                        <TaskLinks links={task.links || []} isManager={true}
+                                            onAddLink={async (url, label) => {
+                                                await developmentPlansApi.addTaskLink(userId, task.id, url, label);
+                                                await loadPlan();
+                                            }}
+                                            onDeleteLink={async (linkId) => {
+                                                await developmentPlansApi.deleteTaskLink(userId, task.id, linkId);
+                                                await loadPlan();
+                                            }}
+                                        />
+                                        <TaskAttachments
+                                            attachments={task.attachments || []}
+                                            isManager={true}
+                                            currentUserId={user?.id ?? ''}
+                                            onUpload={async (file) => {
+                                                await developmentPlansApi.uploadTaskAttachment(userId, task.id, file);
+                                                await loadPlan();
+                                            }}
+                                            onDelete={async (attachmentId) => {
+                                                await developmentPlansApi.deleteAttachment(attachmentId);
+                                                await loadPlan();
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {addingTaskFor === obj.id ? (
@@ -299,19 +442,19 @@ export default function IDPBuilderPage() {
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
                                 />
-                        <input
-                            type="date"
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
-                            value={newTaskStart}
-                            onChange={e => setNewTaskStart(e.target.value)}
-                        />
-                        <input
-                            type="date"
-                            className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
-                            value={newTaskDue}
-                            onChange={e => setNewTaskDue(e.target.value)}
-                        />
-                        <select
+                                <input
+                                    type="date"
+                                    className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                                    value={newTaskStart}
+                                    onChange={e => setNewTaskStart(e.target.value)}
+                                />
+                                <input
+                                    type="date"
+                                    className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                                    value={newTaskDue}
+                                    onChange={e => setNewTaskDue(e.target.value)}
+                                />
+                                <select
                                     className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
                                     value={newTaskPriority}
                                     onChange={e => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high')}
@@ -320,8 +463,17 @@ export default function IDPBuilderPage() {
                                     <option value="medium">Medium</option>
                                     <option value="high">High</option>
                                 </select>
+                                <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={newTaskRequiresAttachment}
+                                        onChange={e => setNewTaskRequiresAttachment(e.target.checked)}
+                                        className="rounded border-slate-300"
+                                    />
+                                    Requires attachment
+                                </label>
                                 <button onClick={() => handleAddTask(obj.id)} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Add</button>
-                                <button onClick={() => setAddingTaskFor(null)} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">Cancel</button>
+                                <button onClick={() => { setAddingTaskFor(null); setNewTaskRequiresAttachment(false); }} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">Cancel</button>
                             </div>
                         ) : (
                             <button onClick={() => setAddingTaskFor(obj.id)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
