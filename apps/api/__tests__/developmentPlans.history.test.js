@@ -129,7 +129,8 @@ describe('GET /development-plans/my/history/:planId', () => {
             })
             .mockResolvedValueOnce({
                 rows: [{ task_id: 't-1', user_id: 'user-1', progress_status: 'DONE', completed_at: '2026-01-15', hold_reason: null }],
-            });
+            })
+            .mockResolvedValueOnce({ rows: [] }); // links
 
         const res = await request(makeApp())
             .get('/development-plans/my/history/plan-archived');

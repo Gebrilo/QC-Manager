@@ -249,7 +249,7 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [];
+        let quests = [], tasks = [], completions = [], linksByTask = {};
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
             const questIds = quests.map(q => q.id);
@@ -260,6 +260,14 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
                     completions = (await db.query(
                         `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
                     )).rows;
+                    const linksResult = await db.query(
+                        `SELECT id, task_id, url, label, created_at FROM idp_task_links WHERE task_id = ANY($1)`,
+                        [taskIds]
+                    );
+                    for (const l of linksResult.rows) {
+                        if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
+                        linksByTask[l.task_id].push(l);
+                    }
                 }
             }
         }
@@ -293,6 +301,7 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
                         completed_at: c?.completed_at || null,
                         completed_late: computeCompletedLate(t, c),
                         hold_reason: c?.hold_reason ?? null,
+                        links: linksByTask[t.id] || [],
                     };
                 }),
             };
@@ -322,7 +331,7 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [];
+        let quests = [], tasks = [], completions = [], linksByTask = {};
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
             const questIds = quests.map(q => q.id);
@@ -333,6 +342,14 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
                     completions = (await db.query(
                         `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
                     )).rows;
+                    const linksResult = await db.query(
+                        `SELECT id, task_id, url, label, created_at FROM idp_task_links WHERE task_id = ANY($1)`,
+                        [taskIds]
+                    );
+                    for (const l of linksResult.rows) {
+                        if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
+                        linksByTask[l.task_id].push(l);
+                    }
                 }
             }
         }
@@ -369,6 +386,7 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
                         progress_status: c?.progress_status || 'TODO',
                         completed_at: c?.completed_at || null,
                         hold_reason: c?.hold_reason || null,
+                        links: linksByTask[t.id] || [],
                     };
                 }),
             };
@@ -507,6 +525,101 @@ router.post('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) =>
             [inserted.rows[0].id]
         );
         res.status(201).json(full.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── POST /my/tasks/:taskId/links — resource cannot add links ────────────────
+
+router.post('/my/tasks/:taskId/links', requireAuth, (req, res) => {
+    res.status(403).json({ error: 'Only managers can add learning links' });
+});
+
+// ─── GET /my/tasks/:taskId/links — resource views links ──────────────────────
+
+router.get('/my/tasks/:taskId/links', requireAuth, async (req, res, next) => {
+    try {
+        const result = await db.query(
+            `SELECT l.id, l.url, l.label, l.created_at, u.name AS created_by_name
+             FROM idp_task_links l
+             JOIN app_user u ON u.id = l.created_by
+             WHERE l.task_id = $1
+             ORDER BY l.created_at ASC`,
+            [req.params.taskId]
+        );
+        res.json(result.rows);
+    } catch (err) { next(err); }
+});
+
+// ─── POST /:userId/tasks/:taskId/links — manager adds a link ─────────────────
+
+router.post('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        const { url, label } = req.body;
+
+        if (!url || !label || !/^https?:\/\/.+/.test(url)) {
+            return res.status(400).json({ error: 'Valid url and label are required' });
+        }
+        if (label.length > 500) {
+            return res.status(400).json({ error: 'Label must be 500 characters or less' });
+        }
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const task = await db.query(
+            `SELECT jt.id FROM journey_tasks jt
+             JOIN journey_quests jq ON jq.id = jt.quest_id
+             JOIN journey_chapters jc ON jc.id = jq.chapter_id
+             JOIN journeys j ON j.id = jc.journey_id
+             WHERE jt.id = $1 AND j.owner_user_id = $2 AND j.plan_type = 'idp'`,
+            [taskId, userId]
+        );
+        if (task.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+
+        const result = await db.query(
+            `INSERT INTO idp_task_links (task_id, url, label, created_by)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [taskId, url, label, req.user.id]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /:userId/tasks/:taskId/links — manager views links ──────────────────
+
+router.get('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const result = await db.query(
+            `SELECT l.id, l.url, l.label, l.created_at, u.name AS created_by_name
+             FROM idp_task_links l
+             JOIN app_user u ON u.id = l.created_by
+             WHERE l.task_id = $1
+             ORDER BY l.created_at ASC`,
+            [taskId]
+        );
+        res.json(result.rows);
+    } catch (err) { next(err); }
+});
+
+// ─── DELETE /:userId/tasks/:taskId/links/:linkId — manager deletes a link ────
+
+router.delete('/:userId/tasks/:taskId/links/:linkId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, taskId, linkId } = req.params;
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const result = await db.query(
+            `DELETE FROM idp_task_links WHERE id = $1 AND task_id = $2 RETURNING *`,
+            [linkId, taskId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Link not found' });
+        res.json({ deleted: true });
     } catch (err) { next(err); }
 });
 
@@ -1011,7 +1124,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [];
+        let quests = [], tasks = [], completions = [], linksByTask = {};
 
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
@@ -1023,6 +1136,14 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                     completions = (await db.query(
                         `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
                     )).rows;
+                    const linksResult = await db.query(
+                        `SELECT id, task_id, url, label, created_at FROM idp_task_links WHERE task_id = ANY($1)`,
+                        [taskIds]
+                    );
+                    for (const l of linksResult.rows) {
+                        if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
+                        linksByTask[l.task_id].push(l);
+                    }
                 }
             }
         }
@@ -1056,6 +1177,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                         due_date: t.due_date,
                         completed_at: c?.completed_at || null,
                         on_time: onTime,
+                        links: linksByTask[t.id] || [],
                     };
                 }),
             };
