@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { developmentPlansApi, IDPPlan, IDPTask } from '../../src/lib/api';
 import { useAuth } from '../../src/components/providers/AuthProvider';
@@ -8,6 +8,9 @@ import { useToast } from '../../src/components/ui/Toast';
 import { TaskStatusControl } from '../../src/components/idp/TaskStatusControl';
 import { TaskStatusBadge, inferBadgeKind } from '../../src/components/idp/TaskStatusBadge';
 import { TaskCommentsPanel } from '../../src/components/idp/TaskCommentsPanel';
+import PlanTabs from '../../src/components/idp/PlanTabs';
+import TaskLinks from '../../src/components/idp/TaskLinks';
+import TaskAttachments from '../../src/components/idp/TaskAttachments';
 
 function fmtDate(v?: string | null) {
     if (!v) return '';
@@ -22,19 +25,25 @@ function lateSuffix(dueDate: string, completedAt: string) {
 }
 
 export default function DevelopmentPlanPage() {
-    const [plan, setPlan] = useState<IDPPlan | null>(null);
+    const [plans, setPlans] = useState<IDPPlan[]>([]);
+    const [activePlanId, setActivePlanId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { user } = useAuth();
     const toast = useToast();
     const [commentsTask, setCommentsTask] = useState<IDPTask | null>(null);
 
+    const plan = plans.find(p => p.id === activePlanId) || plans[0] || null;
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
-                const plans = await developmentPlansApi.getMy();
-                const p = Array.isArray(plans) ? plans.find(pl => pl.is_active) || plans[0] || null : plans;
-                if (!cancelled) setPlan(p);
+                const planList = await developmentPlansApi.listMyPlans();
+                if (!cancelled && planList.length > 0) {
+                    setActivePlanId(planList[0].id);
+                    const fullPlan = await developmentPlansApi.getMyPlan(planList[0].id);
+                    if (!cancelled) setPlans([fullPlan]);
+                }
             } catch {
             } finally {
                 if (!cancelled) setIsLoading(false);
@@ -43,14 +52,46 @@ export default function DevelopmentPlanPage() {
         return () => { cancelled = true; };
     }, []);
 
-    async function reloadPlan() {
+    async function handlePlanChange(planId: string) {
+        setActivePlanId(planId);
         try {
-            const result = await developmentPlansApi.getMy();
-            const updated = Array.isArray(result) ? result.find(pl => pl.is_active) || result[0] || null : result;
-            setPlan(updated);
+            const fullPlan = await developmentPlansApi.getMyPlan(planId);
+            setPlans(prev => prev.map(p => p.id === planId ? fullPlan : p));
+        } catch (err: any) {
+            toast.error(err?.message || 'Could not load plan');
+        }
+    }
+
+    const reloadPlan = useCallback(async () => {
+        if (!activePlanId) {
+            try {
+                const planList = await developmentPlansApi.listMyPlans();
+                if (planList.length > 0) {
+                    setActivePlanId(planList[0].id);
+                    const fullPlan = await developmentPlansApi.getMyPlan(planList[0].id);
+                    setPlans([fullPlan]);
+                }
+            } catch (err: any) {
+                toast.error(err?.message || 'Could not refresh plan');
+            }
+            return;
+        }
+        try {
+            const updated = await developmentPlansApi.getMyPlan(activePlanId);
+            setPlans(prev => prev.map(p => p.id === activePlanId ? updated : p));
         } catch (err: any) {
             toast.error(err?.message || 'Could not refresh plan');
         }
+    }, [activePlanId, toast]);
+
+    async function handleUpload(taskId: string, file: File) {
+        await developmentPlansApi.uploadMyTaskAttachment(taskId, file);
+        await reloadPlan();
+    }
+
+    async function handleDelete(attachmentId: string) {
+        await developmentPlansApi.deleteAttachment(attachmentId);
+        await reloadPlan();
     }
 
     if (isLoading) {
@@ -67,9 +108,11 @@ export default function DevelopmentPlanPage() {
                 <div>
                     <div className="flex items-center gap-3 mb-1">
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Development Plan</h1>
-                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
-                            Active
-                        </span>
+                        {plan?.is_active && (
+                            <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                                Active
+                            </span>
+                        )}
                     </div>
                     <p className="text-slate-500 dark:text-slate-400">Your ongoing development journey as an active resource.</p>
                 </div>
@@ -88,6 +131,12 @@ export default function DevelopmentPlanPage() {
                 </div>
             ) : (
                 <div className="space-y-5">
+                    <PlanTabs
+                        plans={plans.map(p => ({ id: p.id, title: p.title, completion_pct: p.progress.completion_pct }))}
+                        activePlanId={activePlanId || plan.id}
+                        onPlanChange={handlePlanChange}
+                    />
+
                     <div className="flex items-center gap-4 mb-4">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {plan.progress.completion_pct}% complete
@@ -118,39 +167,56 @@ export default function DevelopmentPlanPage() {
                                     return (
                                         <div
                                             key={task.id}
-                                            className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0"
+                                            className="py-2 border-b border-slate-100 dark:border-slate-700 last:border-0"
                                         >
-                                            <TaskStatusControl task={task} onStatusChanged={reloadPlan} />
-                                            <span className={`flex-1 text-sm ${task.progress_status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                                {task.title}
-                                            </span>
-                                            {showBadge && (
-                                                <TaskStatusBadge
-                                                    kind={badgeKind}
-                                                    suffix={badgeKind === 'done_late' && task.completed_at && task.due_date
-                                                        ? lateSuffix(task.due_date, task.completed_at)
-                                                        : undefined}
-                                                />
-                                            )}
-                                            {task.progress_status === 'DONE' && badgeKind === 'done' && task.completed_at && (
-                                                <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                                                    Completed {fmtDate(task.completed_at)}
+                                            <div className="flex items-center gap-3">
+                                                <TaskStatusControl task={task} onStatusChanged={reloadPlan} />
+                                                <span className={`flex-1 text-sm ${task.progress_status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                    {task.title}
                                                 </span>
+                                                {task.requires_attachment && !task.attachments?.some(a => a.uploaded_by_role === 'resource') && (
+                                                    <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded">
+                                                        Attachment required
+                                                    </span>
+                                                )}
+                                                {showBadge && (
+                                                    <TaskStatusBadge
+                                                        kind={badgeKind}
+                                                        suffix={badgeKind === 'done_late' && task.completed_at && task.due_date
+                                                            ? lateSuffix(task.due_date, task.completed_at)
+                                                            : undefined}
+                                                    />
+                                                )}
+                                                {task.progress_status === 'DONE' && badgeKind === 'done' && task.completed_at && (
+                                                    <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                                        Completed {fmtDate(task.completed_at)}
+                                                    </span>
+                                                )}
+                                                {(task.start_date || task.due_date) && task.progress_status !== 'DONE' && badgeKind !== 'overdue' && badgeKind !== 'on_hold' && (
+                                                    <span className="text-xs text-slate-400">
+                                                        {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Open comments for ${task.title}`}
+                                                    onClick={() => setCommentsTask(task)}
+                                                    className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                                    title="Comments"
+                                                >
+                                                    💬
+                                                </button>
+                                            </div>
+                                            {(task.links && task.links.length > 0) && (
+                                                <TaskLinks links={task.links} isManager={false} />
                                             )}
-                                            {(task.start_date || task.due_date) && task.progress_status !== 'DONE' && badgeKind !== 'overdue' && badgeKind !== 'on_hold' && (
-                                                <span className="text-xs text-slate-400">
-                                                    {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
-                                                </span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                aria-label={`Open comments for ${task.title}`}
-                                                onClick={() => setCommentsTask(task)}
-                                                className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
-                                                title="Comments"
-                                            >
-                                                💬
-                                            </button>
+                                            <TaskAttachments
+                                                attachments={task.attachments || []}
+                                                isManager={false}
+                                                currentUserId={user?.id ?? ''}
+                                                onUpload={async (file) => handleUpload(task.id, file)}
+                                                onDelete={async (attachmentId) => handleDelete(attachmentId)}
+                                            />
                                         </div>
                                     );
                                 })}
