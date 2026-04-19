@@ -27,7 +27,6 @@ const router = require('../src/routes/developmentPlans');
 function makeApp() {
     const app = express();
     app.use(express.json());
-    // Inject authenticated manager user
     app.use((req, _res, next) => {
         req.user = { id: 'manager-1', role: 'manager' };
         next();
@@ -36,14 +35,14 @@ function makeApp() {
     return app;
 }
 
-afterEach(() => jest.clearAllMocks());
+afterEach(() => jest.resetAllMocks());
 
 // ─── POST /:userId — create plan ─────────────────────────────────────────────
 
 describe('POST /development-plans/:userId', () => {
     test('returns 404 when user not found', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery.mockResolvedValueOnce({ rows: [] }); // user lookup
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .post('/development-plans/user-1')
             .send({ title: 'Q2 Plan' });
@@ -66,8 +65,8 @@ describe('POST /development-plans/:userId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-2', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] }) // INSERT journey
-            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] }); // INSERT user_journey_assignments
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-2', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] });
         const res = await request(makeApp())
             .post('/development-plans/user-1')
             .send({ title: 'Q2 Plan', description: 'Focus on leadership' });
@@ -88,8 +87,8 @@ describe('POST /development-plans/:userId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] }) // INSERT journey
-            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] }); // INSERT user_journey_assignments
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] });
         const res = await request(makeApp())
             .post('/development-plans/user-1')
             .send({ title: 'Q2 Plan', description: 'Focus on leadership' });
@@ -99,26 +98,45 @@ describe('POST /development-plans/:userId', () => {
     });
 });
 
-// ─── GET /:userId — get plan with progress ────────────────────────────────────
+// ─── GET /:userId — get plans (array) or single plan with ?planId= ────────────
 
 describe('GET /development-plans/:userId', () => {
     test('returns 404 when no active IDP plan exists', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery.mockResolvedValueOnce({ rows: [] }); // no plan
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp()).get('/development-plans/user-1');
         expect(res.status).toBe(404);
     });
 
-    test('returns plan with objectives and progress', async () => {
+    test('returns array of plans with objectives', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
             .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01', journey_id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // system quest
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
-            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] }) // completions
-            .mockResolvedValueOnce({ rows: [] }); // attachments
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp()).get('/development-plans/user-1');
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0].objectives).toHaveLength(1);
+        expect(res.body[0].progress.completion_pct).toBe(100);
+    });
+
+    test('returns single plan with ?planId=', async () => {
+        canAccessUser.mockResolvedValueOnce(true);
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01', journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
+        const res = await request(makeApp()).get('/development-plans/user-1?planId=plan-1');
         expect(res.status).toBe(200);
         expect(res.body.objectives).toHaveLength(1);
         expect(res.body.progress.completion_pct).toBe(100);
@@ -136,7 +154,7 @@ describe('GET /development-plans/:userId', () => {
 describe('POST /development-plans/:userId/objectives', () => {
     test('returns 404 when no active plan exists', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery.mockResolvedValueOnce({ rows: [] }); // no plan
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .post('/development-plans/user-1/objectives')
             .send({ title: 'Leadership' });
@@ -146,9 +164,9 @@ describe('POST /development-plans/:userId/objectives', () => {
     test('creates objective (chapter + system quest) and returns 201', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', plan_type: 'idp' }] }) // plan lookup
-            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', journey_id: 'plan-1' }] }) // INSERT chapter
-            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] }); // INSERT system quest
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', plan_type: 'idp' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] });
         const res = await request(makeApp())
             .post('/development-plans/user-1/objectives')
             .send({ title: 'Leadership', due_date: '2026-06-01' });
@@ -162,9 +180,7 @@ describe('POST /development-plans/:userId/objectives', () => {
 describe('PATCH /development-plans/:userId/objectives/:chapterId', () => {
     test('returns 404 when objective not found in plan', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
-            .mockResolvedValueOnce({ rows: [] }); // chapter not found
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .patch('/development-plans/user-1/objectives/ch-99')
             .send({ title: 'Updated' });
@@ -174,7 +190,7 @@ describe('PATCH /development-plans/:userId/objectives/:chapterId', () => {
     test('updates objective and returns 200', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ journey_id: 'plan-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Updated', due_date: '2026-07-01' }] });
         const res = await request(makeApp())
             .patch('/development-plans/user-1/objectives/ch-1')
@@ -189,9 +205,7 @@ describe('PATCH /development-plans/:userId/objectives/:chapterId', () => {
 describe('DELETE /development-plans/:userId/objectives/:chapterId', () => {
     test('returns 404 when objective not found', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [] }); // chapter not found
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .delete('/development-plans/user-1/objectives/ch-99');
         expect(res.status).toBe(404);
@@ -200,9 +214,8 @@ describe('DELETE /development-plans/:userId/objectives/:chapterId', () => {
     test('deletes objective and returns 200', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'ch-1' }] }) // chapter found
-            .mockResolvedValueOnce({ rows: [] }); // DELETE chapter
+            .mockResolvedValueOnce({ rows: [{ journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .delete('/development-plans/user-1/objectives/ch-1');
         expect(res.status).toBe(200);
@@ -213,11 +226,9 @@ describe('DELETE /development-plans/:userId/objectives/:chapterId', () => {
 // ─── POST /:userId/objectives/:chapterId/tasks ────────────────────────────────
 
 describe('POST /development-plans/:userId/objectives/:chapterId/tasks', () => {
-    test('returns 404 when system quest not found for chapter', async () => {
+    test('returns 404 when objective not found for chapter', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
-            .mockResolvedValueOnce({ rows: [] }); // no system quest found
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .post('/development-plans/user-1/objectives/ch-1/tasks')
             .send({ title: 'Read book' });
@@ -227,9 +238,9 @@ describe('POST /development-plans/:userId/objectives/:chapterId/tasks', () => {
     test('creates task and returns 201', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] }) // system quest
-            .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Read book', quest_id: 'q-1' }] }); // INSERT task
+            .mockResolvedValueOnce({ rows: [{ journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Read book', quest_id: 'q-1' }] });
         const res = await request(makeApp())
             .post('/development-plans/user-1/objectives/ch-1/tasks')
             .send({ title: 'Read book', due_date: '2026-05-01', priority: 'high' });
@@ -241,12 +252,9 @@ describe('POST /development-plans/:userId/objectives/:chapterId/tasks', () => {
 // ─── PATCH /:userId/tasks/:taskId ────────────────────────────────────────────
 
 describe('PATCH /development-plans/:userId/tasks/:taskId', () => {
-    test('returns 404 when task not in plan', async () => {
+    test('returns 404 when task not found', async () => {
         canAccessUser.mockResolvedValueOnce(true);
-        mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [] }) // completion check (no row)
-            .mockResolvedValueOnce({ rows: [] }); // task not found
+        mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .patch('/development-plans/user-1/tasks/t-99')
             .send({ title: 'Updated' });
@@ -256,8 +264,8 @@ describe('PATCH /development-plans/:userId/tasks/:taskId', () => {
     test('updates task fields and returns 200', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [] }) // completion check (no row = not DONE)
+            .mockResolvedValueOnce({ rows: [{ journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Updated', priority: 'low' }] });
         const res = await request(makeApp())
             .patch('/development-plans/user-1/tasks/t-1')
@@ -273,10 +281,9 @@ describe('DELETE /development-plans/:userId/tasks/:taskId', () => {
     test('deletes task and returns 200', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [] }) // completion check (no row = not DONE)
-            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] }) // task found
-            .mockResolvedValueOnce({ rows: [] }); // DELETE
+            .mockResolvedValueOnce({ rows: [{ journey_id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
             .delete('/development-plans/user-1/tasks/t-1');
         expect(res.status).toBe(200);
@@ -310,7 +317,7 @@ describe('GET /development-plans/my', () => {
     test('returns array of plans with objectives for ACTIVE user', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
-            .mockResolvedValueOnce({ rows: [] }); // chapters (empty → no further queries)
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeUserApp()).get('/development-plans/my');
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
@@ -331,9 +338,9 @@ describe('PATCH /development-plans/my/tasks/:taskId/status', () => {
 
     test('inserts IN_PROGRESS completion row', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan
-            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] }) // task in plan
-            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'IN_PROGRESS' }] }); // upsert
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] })
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'IN_PROGRESS' }] });
         const res = await request(makeUserApp())
             .patch('/development-plans/my/tasks/t-1/status')
             .send({ status: 'IN_PROGRESS' });
@@ -345,7 +352,7 @@ describe('PATCH /development-plans/my/tasks/:taskId/status', () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 't-1' }] })
-            .mockResolvedValueOnce({ rows: [] }); // DELETE
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeUserApp())
             .patch('/development-plans/my/tasks/t-1/status')
             .send({ status: 'TODO' });
@@ -360,10 +367,12 @@ describe('POST /development-plans/:userId/complete', () => {
     test('returns 400 when mandatory tasks are incomplete', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100 }] }) // plan
-            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '2' }] }); // incomplete check
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100 }] })
+            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '2' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100, owner_user_id: 'user-1' }] });
         const res = await request(makeApp())
-            .post('/development-plans/user-1/complete');
+            .post('/development-plans/user-1/complete')
+            .send({});
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/incomplete/i);
     });
@@ -372,12 +381,13 @@ describe('POST /development-plans/:userId/complete', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', required_xp: 100, owner_user_id: 'user-1' }] })
-            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '0' }] }) // all done
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE journeys is_active=false
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE user_journey_assignments total_xp
-            .mockResolvedValueOnce({ rows: [] }); // INSERT notification
+            .mockResolvedValueOnce({ rows: [{ incomplete_mandatory: '0' }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp())
-            .post('/development-plans/user-1/complete');
+            .post('/development-plans/user-1/complete')
+            .send({ planId: 'plan-1' });
         expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
     });
@@ -389,8 +399,8 @@ describe('GET /development-plans/:userId/report', () => {
     test('returns 404 when no plan exists', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'u-1', name: 'Sara', email: 's@test.com' }] }) // user
-            .mockResolvedValueOnce({ rows: [] }); // no plan
+            .mockResolvedValueOnce({ rows: [{ id: 'u-1', name: 'Sara', email: 's@test.com' }] })
+            .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp()).get('/development-plans/user-1/report');
         expect(res.status).toBe(404);
     });
@@ -400,13 +410,13 @@ describe('GET /development-plans/:userId/report', () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'u-1', name: 'Sara', email: 's@test.com' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2', created_at: '2026-01-01', is_active: true }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01' }] }) // chapters
-            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // quests
-            .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', is_mandatory: true }] }) // tasks
-            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE', completed_at: '2026-04-10' }] }) // completions
-            .mockResolvedValueOnce({ rows: [] }) // links
-            .mockResolvedValueOnce({ rows: [] }); // attachments
-        const res = await request(makeApp()).get('/development-plans/user-1/report');
+            .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', is_mandatory: true }] })
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE', completed_at: '2026-04-10' }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
+        const res = await request(makeApp()).get('/development-plans/user-1/report?planId=plan-1');
         expect(res.status).toBe(200);
         expect(res.body.summary.total_tasks).toBe(1);
         expect(res.body.summary.completed_tasks).toBe(1);
@@ -431,10 +441,10 @@ describe('GET /development-plans/:userId/report on_hold_tasks', () => {
                 { task_id: 't-1', progress_status: 'ON_HOLD', completed_at: null },
                 { task_id: 't-2', progress_status: 'DONE',    completed_at: new Date('2026-03-10T00:00:00Z') },
             ] })
-            .mockResolvedValueOnce({ rows: [] }) // links
-            .mockResolvedValueOnce({ rows: [] }); // attachments
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
 
-        const res = await request(makeApp()).get('/development-plans/user-1/report');
+        const res = await request(makeApp()).get('/development-plans/user-1/report?planId=plan-1');
         expect(res.body.summary.on_hold_tasks).toBe(1);
         expect(res.body.summary.completed_tasks).toBe(1);
     });
