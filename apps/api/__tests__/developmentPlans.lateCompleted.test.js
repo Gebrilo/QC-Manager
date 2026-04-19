@@ -43,6 +43,10 @@ function stubIDPFixture({ completion }) {
     mockQuery.mockResolvedValueOnce({ rows: [completion] });
 }
 
+function firstPlan(res) {
+    return res.body[0];
+}
+
 describe('GET /development-plans/my — hold_reason + completed_late surface', () => {
     test('completed_late=true when DONE and completed_at > due_date', async () => {
         stubIDPFixture({
@@ -55,8 +59,8 @@ describe('GET /development-plans/my — hold_reason + completed_late surface', (
         });
         const res = await request(makeUserApp()).get('/development-plans/my');
         expect(res.status).toBe(200);
-        expect(res.body.objectives[0].tasks[0].completed_late).toBe(true);
-        expect(res.body.objectives[0].tasks[0].hold_reason).toBeNull();
+        expect(firstPlan(res).objectives[0].tasks[0].completed_late).toBe(true);
+        expect(firstPlan(res).objectives[0].tasks[0].hold_reason).toBeNull();
     });
 
     test('completed_late=false when DONE and completed_at <= due_date', async () => {
@@ -69,7 +73,7 @@ describe('GET /development-plans/my — hold_reason + completed_late surface', (
             },
         });
         const res = await request(makeUserApp()).get('/development-plans/my');
-        expect(res.body.objectives[0].tasks[0].completed_late).toBe(false);
+        expect(firstPlan(res).objectives[0].tasks[0].completed_late).toBe(false);
     });
 
     test('completed_late=null when task is not DONE', async () => {
@@ -82,7 +86,7 @@ describe('GET /development-plans/my — hold_reason + completed_late surface', (
             },
         });
         const res = await request(makeUserApp()).get('/development-plans/my');
-        const task = res.body.objectives[0].tasks[0];
+        const task = firstPlan(res).objectives[0].tasks[0];
         expect(task.completed_late).toBeNull();
         expect(task.hold_reason).toBe('Blocked on Bob');
         expect(task.progress_status).toBe('ON_HOLD');
@@ -98,6 +102,6 @@ describe('GET /development-plans/my — hold_reason + completed_late surface', (
             },
         });
         const res = await request(makeUserApp()).get('/development-plans/my');
-        expect(res.body.progress.on_hold_tasks).toBe(1);
+        expect(firstPlan(res).progress.on_hold_tasks).toBe(1);
     });
 });

@@ -52,6 +52,14 @@ async function getPlanForUser(userId) {
     return planResult.rows[0] || null;
 }
 
+async function getActivePlansForUser(userId) {
+    const result = await db.query(
+        `SELECT * FROM journeys WHERE owner_user_id = $1 AND plan_type = 'idp' AND is_active = true AND deleted_at IS NULL ORDER BY created_at ASC`,
+        [userId]
+    );
+    return result.rows;
+}
+
 async function assertTaskInPlan(planId, taskId) {
     const r = await db.query(
         `SELECT jt.id FROM journey_tasks jt
@@ -63,81 +71,102 @@ async function assertTaskInPlan(planId, taskId) {
     return r.rows.length > 0;
 }
 
-// ─── GET /my — user views own IDP plan ───────────────────────────────────────
+// ─── GET /my/plans — user views own IDP plan summaries ─────────────────────
+
+router.get('/my/plans', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const plans = await db.query(
+            `SELECT j.id, j.title, j.description, j.is_active, j.created_at, j.updated_at
+             FROM journeys j
+             WHERE j.owner_user_id = $1 AND j.plan_type = 'idp' AND j.is_active = true AND j.deleted_at IS NULL
+             ORDER BY j.created_at ASC`,
+            [userId]
+        );
+        res.json(plans.rows);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /my — user views own IDP plan(s) ────────────────────────────────────
 
 router.get('/my', requireAuth, async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        const plans = await getActivePlansForUser(userId);
+        if (plans.length === 0) return res.json([]);
 
-        const chapters = await db.query(
-            `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
-        );
-        const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [];
+        const results = [];
+        for (const plan of plans) {
+            const chapters = await db.query(
+                `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
+            );
+            const chapterIds = chapters.rows.map(c => c.id);
+            let quests = [], tasks = [], completions = [];
 
-        if (chapterIds.length > 0) {
-            quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
-            const questIds = quests.map(q => q.id);
-            if (questIds.length > 0) {
-                tasks = (await db.query(`SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds])).rows;
-                const taskIds = tasks.map(t => t.id);
-                if (taskIds.length > 0) {
-                    completions = (await db.query(
-                        `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
-                    )).rows;
+            if (chapterIds.length > 0) {
+                quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
+                const questIds = quests.map(q => q.id);
+                if (questIds.length > 0) {
+                    tasks = (await db.query(`SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds])).rows;
+                    const taskIds = tasks.map(t => t.id);
+                    if (taskIds.length > 0) {
+                        completions = (await db.query(
+                            `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
+                        )).rows;
+                    }
                 }
             }
+
+            const completionMap = new Map(completions.map(c => [c.task_id, c]));
+            const today = new Date().toISOString().slice(0, 10);
+
+            const objectives = chapters.rows.map(ch => {
+                const chQuest = quests.find(q => q.chapter_id === ch.id);
+                const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
+                const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
+                const overdue = chTasks.filter(t => {
+                    const c = completionMap.get(t.id);
+                    return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
+                }).length;
+                return {
+                    id: ch.id,
+                    title: ch.title,
+                    description: ch.description,
+                    start_date: ch.start_date,
+                    due_date: ch.due_date,
+                    progress: {
+                        total: chTasks.length,
+                        done,
+                        completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
+                        overdue,
+                    },
+                    tasks: chTasks.map(t => {
+                        const c = completionMap.get(t.id);
+                        const progressStatus = c?.progress_status || 'TODO';
+                        const notDone = progressStatus !== 'DONE';
+                        return {
+                            id: t.id,
+                            title: t.title,
+                            description: t.description,
+                            start_date: t.start_date,
+                            due_date: t.due_date,
+                            priority: t.priority,
+                            difficulty: t.difficulty,
+                            is_mandatory: t.is_mandatory,
+                            progress_status: progressStatus,
+                            is_overdue: notDone && !!t.due_date && t.due_date < today,
+                            completed_at: c?.completed_at || null,
+                            completed_late: computeCompletedLate(t, c),
+                            hold_reason: c?.hold_reason ?? null,
+                        };
+                    }),
+                };
+            });
+
+            results.push({ ...plan, objectives, progress: buildProgress(tasks, completions) });
         }
 
-        const completionMap = new Map(completions.map(c => [c.task_id, c]));
-        const today = new Date().toISOString().slice(0, 10);
-
-        const objectives = chapters.rows.map(ch => {
-            const chQuest = quests.find(q => q.chapter_id === ch.id);
-            const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
-            const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
-            const overdue = chTasks.filter(t => {
-                const c = completionMap.get(t.id);
-                return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
-            }).length;
-            return {
-                id: ch.id,
-                title: ch.title,
-                description: ch.description,
-                start_date: ch.start_date,
-                due_date: ch.due_date,
-                progress: {
-                    total: chTasks.length,
-                    done,
-                    completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
-                    overdue,
-                },
-                tasks: chTasks.map(t => {
-                    const c = completionMap.get(t.id);
-                    const progressStatus = c?.progress_status || 'TODO';
-                    const notDone = progressStatus !== 'DONE';
-                    return {
-                        id: t.id,
-                        title: t.title,
-                        description: t.description,
-                        start_date: t.start_date,
-                        due_date: t.due_date,
-                        priority: t.priority,
-                        difficulty: t.difficulty,
-                        is_mandatory: t.is_mandatory,
-                        progress_status: progressStatus,
-                        is_overdue: notDone && !!t.due_date && t.due_date < today,
-                        completed_at: c?.completed_at || null,
-                        completed_late: computeCompletedLate(t, c),
-                        hold_reason: c?.hold_reason ?? null,
-                    };
-                }),
-            };
-        });
-
-        res.json({ ...plan, objectives, progress: buildProgress(tasks, completions) });
+        res.json(results);
     } catch (err) { next(err); }
 });
 
@@ -200,6 +229,75 @@ router.get('/my/history', requireAuth, async (req, res, next) => {
         });
 
         res.json(body);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /my/plan/:planId — user views single active plan detail ────────────
+
+router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { planId } = req.params;
+        const planResult = await db.query(
+            `SELECT * FROM journeys WHERE id = $1 AND owner_user_id = $2 AND plan_type = 'idp' AND is_active = true AND deleted_at IS NULL`,
+            [planId, userId]
+        );
+        if (planResult.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+        const plan = planResult.rows[0];
+
+        const chapters = await db.query(
+            `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
+        );
+        const chapterIds = chapters.rows.map(c => c.id);
+        let quests = [], tasks = [], completions = [];
+        if (chapterIds.length > 0) {
+            quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
+            const questIds = quests.map(q => q.id);
+            if (questIds.length > 0) {
+                tasks = (await db.query(`SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds])).rows;
+                const taskIds = tasks.map(t => t.id);
+                if (taskIds.length > 0) {
+                    completions = (await db.query(
+                        `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
+                    )).rows;
+                }
+            }
+        }
+        const completionMap = new Map(completions.map(c => [c.task_id, c]));
+        const today = new Date().toISOString().slice(0, 10);
+        const objectives = chapters.rows.map(ch => {
+            const chQuest = quests.find(q => q.chapter_id === ch.id);
+            const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
+            const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
+            const overdue = chTasks.filter(t => {
+                const c = completionMap.get(t.id);
+                return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
+            }).length;
+            return {
+                id: ch.id,
+                title: ch.title,
+                description: ch.description,
+                start_date: ch.start_date,
+                due_date: ch.due_date,
+                sort_order: ch.sort_order,
+                progress: { total: chTasks.length, done, completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0, overdue },
+                tasks: chTasks.map(t => {
+                    const c = completionMap.get(t.id);
+                    return {
+                        id: t.id, title: t.title, description: t.description,
+                        start_date: t.start_date, due_date: t.due_date,
+                        priority: t.priority, difficulty: t.difficulty,
+                        is_mandatory: t.is_mandatory, requires_attachment: t.requires_attachment || false,
+                        progress_status: c?.progress_status || 'TODO',
+                        is_overdue: (c?.progress_status || 'TODO') !== 'DONE' && !!t.due_date && t.due_date < today,
+                        completed_at: c?.completed_at || null,
+                        completed_late: computeCompletedLate(t, c),
+                        hold_reason: c?.hold_reason ?? null,
+                    };
+                }),
+            };
+        });
+        res.json({ ...plan, plan_type: 'idp', objectives, progress: buildProgress(tasks, completions) });
     } catch (err) { next(err); }
 });
 
@@ -472,6 +570,44 @@ router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin',
     } catch (err) { next(err); }
 });
 
+// ─── PATCH /:userId/plan/:planId — edit plan-level fields ──────────────────
+
+router.patch('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, planId } = req.params;
+        const { title, description } = req.body;
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const updates = [];
+        const values = [];
+        let paramIdx = 1;
+
+        if (title !== undefined) { updates.push(`title = $${paramIdx++}`); values.push(title); }
+        if (description !== undefined) { updates.push(`description = $${paramIdx++}`); values.push(description); }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        updates.push(`updated_at = NOW()`);
+        values.push(planId, userId);
+        const result = await db.query(
+            `UPDATE journeys SET ${updates.join(', ')}
+             WHERE id = $${paramIdx++} AND owner_user_id = $${paramIdx++} AND plan_type = 'idp'
+             RETURNING id, title, description, updated_at`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Plan not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) { next(err); }
+});
+
 router.post('/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
@@ -491,14 +627,6 @@ router.post('/:userId', requireAuth, requireRole('admin', 'manager'), async (req
         const user = userResult.rows[0];
         if (user.status !== 'ACTIVE') {
             return res.status(400).json({ error: 'IDP plans can only be created for ACTIVE users' });
-        }
-
-        const existingPlan = await db.query(
-            `SELECT id FROM journeys WHERE owner_user_id = $1 AND plan_type = 'idp' AND is_active = true AND deleted_at IS NULL`,
-            [userId]
-        );
-        if (existingPlan.rows.length > 0) {
-            return res.status(409).json({ error: 'User already has an active IDP plan' });
         }
 
         const slug = `idp-${userId}-${Date.now()}`;
@@ -747,6 +875,14 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
         const plan = await getPlanForUser(userId);
         if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
 
+        const completion = await db.query(
+            `SELECT progress_status FROM user_task_completions WHERE user_id = $1 AND task_id = $2`,
+            [userId, taskId]
+        );
+        if (completion.rows.length > 0 && completion.rows[0].progress_status === 'DONE') {
+            return res.status(409).json({ error: 'Cannot edit a completed task. Reopen it first.' });
+        }
+
         const fields = [];
         const values = [];
         let idx = 1;
@@ -790,6 +926,14 @@ router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manag
 
         const plan = await getPlanForUser(userId);
         if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+
+        const completion = await db.query(
+            `SELECT progress_status FROM user_task_completions WHERE user_id = $1 AND task_id = $2`,
+            [userId, taskId]
+        );
+        if (completion.rows.length > 0 && completion.rows[0].progress_status === 'DONE') {
+            return res.status(409).json({ error: 'Cannot edit a completed task. Reopen it first.' });
+        }
 
         const check = await db.query(
             `SELECT jt.id FROM journey_tasks jt

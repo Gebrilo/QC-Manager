@@ -62,16 +62,18 @@ describe('POST /development-plans/:userId', () => {
         expect(res.body.error).toMatch(/ACTIVE/);
     });
 
-    test('returns 409 when user already has an active IDP plan', async () => {
+    test('creates a second plan (multi-plan) and returns 201', async () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'existing-plan' }] }); // existing plan check
+            .mockResolvedValueOnce({ rows: [{ id: 'plan-2', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] }) // INSERT journey
+            .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] }); // INSERT user_journey_assignments
         const res = await request(makeApp())
             .post('/development-plans/user-1')
-            .send({ title: 'Q2 Plan' });
-        expect(res.status).toBe(409);
-        expect(res.body.error).toMatch(/already has/i);
+            .send({ title: 'Q2 Plan', description: 'Focus on leadership' });
+        expect(res.status).toBe(201);
+        expect(res.body.plan_type).toBe('idp');
+        expect(res.body.owner_user_id).toBe('user-1');
     });
 
     test('returns 403 when manager cannot access user', async () => {
@@ -86,7 +88,6 @@ describe('POST /development-plans/:userId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'user-1', status: 'ACTIVE', name: 'Sara' }] })
-            .mockResolvedValueOnce({ rows: [] })  // no existing plan
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1' }] }) // INSERT journey
             .mockResolvedValueOnce({ rows: [{ id: 'assign-1' }] }); // INSERT user_journey_assignments
         const res = await request(makeApp())
@@ -243,6 +244,7 @@ describe('PATCH /development-plans/:userId/tasks/:taskId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] }) // completion check (no row)
             .mockResolvedValueOnce({ rows: [] }); // task not found
         const res = await request(makeApp())
             .patch('/development-plans/user-1/tasks/t-99')
@@ -254,6 +256,7 @@ describe('PATCH /development-plans/:userId/tasks/:taskId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] }) // completion check (no row = not DONE)
             .mockResolvedValueOnce({ rows: [{ id: 't-1', title: 'Updated', priority: 'low' }] });
         const res = await request(makeApp())
             .patch('/development-plans/user-1/tasks/t-1')
@@ -270,6 +273,7 @@ describe('DELETE /development-plans/:userId/tasks/:taskId', () => {
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
+            .mockResolvedValueOnce({ rows: [] }) // completion check (no row = not DONE)
             .mockResolvedValueOnce({ rows: [{ id: 't-1' }] }) // task found
             .mockResolvedValueOnce({ rows: [] }); // DELETE
         const res = await request(makeApp())
@@ -295,19 +299,22 @@ function makeUserApp(userId = 'user-1') {
 // ─── GET /my ─────────────────────────────────────────────────────────────────
 
 describe('GET /development-plans/my', () => {
-    test('returns 404 when user has no active IDP plan', async () => {
+    test('returns empty array when user has no active IDP plan', async () => {
         mockQuery.mockResolvedValueOnce({ rows: [] });
         const res = await request(makeUserApp()).get('/development-plans/my');
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([]);
     });
 
-    test('returns plan with objectives for ACTIVE user', async () => {
+    test('returns array of plans with objectives for ACTIVE user', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Q2 Plan', plan_type: 'idp', owner_user_id: 'user-1', is_active: true }] })
             .mockResolvedValueOnce({ rows: [] }); // chapters (empty → no further queries)
         const res = await request(makeUserApp()).get('/development-plans/my');
         expect(res.status).toBe(200);
-        expect(res.body.title).toBe('Q2 Plan');
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0].title).toBe('Q2 Plan');
     });
 });
 
