@@ -43,7 +43,7 @@ export default function IDPBuilderPage() {
     const loadPlan = useCallback(async () => {
         try {
             const data = await developmentPlansApi.getForUser(userId);
-            setPlan(data);
+            setPlan(Array.isArray(data) ? data.find(p => p.is_active) || data[0] || null : data);
         } catch (err: any) {
             if (err?.status === 404 || err?.message?.includes('404') || err?.message?.includes('No active')) setNoPlan(true);
         } finally {

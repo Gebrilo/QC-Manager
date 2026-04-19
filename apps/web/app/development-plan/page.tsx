@@ -32,7 +32,8 @@ export default function DevelopmentPlanPage() {
         let cancelled = false;
         (async () => {
             try {
-                const p = await developmentPlansApi.getMy();
+                const plans = await developmentPlansApi.getMy();
+                const p = Array.isArray(plans) ? plans.find(pl => pl.is_active) || plans[0] || null : plans;
                 if (!cancelled) setPlan(p);
             } catch {
             } finally {
@@ -44,7 +45,8 @@ export default function DevelopmentPlanPage() {
 
     async function reloadPlan() {
         try {
-            const updated = await developmentPlansApi.getMy();
+            const result = await developmentPlansApi.getMy();
+            const updated = Array.isArray(result) ? result.find(pl => pl.is_active) || result[0] || null : result;
             setPlan(updated);
         } catch (err: any) {
             toast.error(err?.message || 'Could not refresh plan');

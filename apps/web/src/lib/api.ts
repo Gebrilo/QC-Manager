@@ -977,6 +977,30 @@ export interface IDPTask {
     completed_at?: string | null;
     completed_late?: boolean | null;
     hold_reason?: string | null;
+    requires_attachment: boolean;
+    links: IDPTaskLink[];
+    attachments: IDPTaskAttachment[];
+}
+
+export interface IDPTaskLink {
+    id: string;
+    task_id: string;
+    url: string;
+    label: string;
+    created_by: string;
+    created_by_name?: string;
+    created_at: string;
+}
+
+export interface IDPTaskAttachment {
+    id: string;
+    task_id: string;
+    user_id: string;
+    original_name: string;
+    mime_type: string;
+    size_bytes: number;
+    uploaded_by_role: 'manager' | 'resource';
+    uploaded_at: string;
 }
 
 export interface IDPTaskComment {
@@ -1030,6 +1054,7 @@ export interface IDPPlan {
     owner_user_id: string;
     is_active: boolean;
     created_at: string;
+    updated_at?: string;
     objectives: IDPObjective[];
     progress: {
         total_tasks: number;
@@ -1074,8 +1099,8 @@ export interface IDPReport {
 
 export const developmentPlansApi = {
     // Manager: get plan for a user
-    getForUser: (userId: string) =>
-        fetchApi<IDPPlan>(`/api/development-plans/${userId}`),
+    getForUser: (userId: string, planId?: string) =>
+        fetchApi<IDPPlan | IDPPlan[]>(`/api/development-plans/${userId}${planId ? `?planId=${planId}` : ''}`),
 
     // Manager: create plan
     create: (userId: string, data: { title: string; description?: string; required_xp?: number }) =>
@@ -1105,14 +1130,14 @@ export const developmentPlansApi = {
         }),
 
     // Manager: add task to objective
-    addTask: (userId: string, chapterId: string, data: { title: string; description?: string; due_date?: string; priority?: string; difficulty?: string; is_mandatory?: boolean }) =>
+    addTask: (userId: string, chapterId: string, data: { title: string; description?: string; due_date?: string; priority?: string; difficulty?: string; is_mandatory?: boolean; requires_attachment?: boolean }) =>
         fetchApi<IDPTask>(`/api/development-plans/${userId}/objectives/${chapterId}/tasks`, {
             method: 'POST',
             body: JSON.stringify(data),
         }),
 
     // Manager: update task
-    updateTask: (userId: string, taskId: string, data: Partial<Pick<IDPTask, 'title' | 'description' | 'due_date' | 'priority' | 'difficulty' | 'is_mandatory'>>) =>
+    updateTask: (userId: string, taskId: string, data: Partial<Pick<IDPTask, 'title' | 'description' | 'due_date' | 'priority' | 'difficulty' | 'is_mandatory' | 'requires_attachment'>>) =>
         fetchApi<IDPTask>(`/api/development-plans/${userId}/tasks/${taskId}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
@@ -1136,7 +1161,7 @@ export const developmentPlansApi = {
 
     // User: get own plan
     getMy: () =>
-        fetchApi<IDPPlan>('/api/development-plans/my'),
+        fetchApi<IDPPlan[]>('/api/development-plans/my'),
 
     // User: list own archived plans
     listMyHistory: () =>
@@ -1173,5 +1198,78 @@ export const developmentPlansApi = {
         fetchApi<IDPTaskComment>(`/api/development-plans/${userId}/tasks/${taskId}/comments`, {
             method: 'POST',
             body: JSON.stringify({ body }),
+        }),
+
+    listMyPlans: () =>
+        fetchApi<Array<{ id: string; title: string; description?: string; is_active: boolean; created_at: string; updated_at: string; progress: { total_tasks: number; done_tasks: number; completion_pct: number } }>>('/api/development-plans/my/plans'),
+
+    getMyPlan: (planId: string) =>
+        fetchApi<IDPPlan>(`/api/development-plans/my/plan/${planId}`),
+
+    updatePlan: (userId: string, planId: string, data: { title?: string; description?: string }) =>
+        fetchApi<{ id: string; title: string; description: string; updated_at: string }>(`/api/development-plans/${userId}/plan/${planId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    addTaskLink: (userId: string, taskId: string, url: string, label: string) =>
+        fetchApi<IDPTaskLink>(`/api/development-plans/${userId}/tasks/${taskId}/links`, {
+            method: 'POST',
+            body: JSON.stringify({ url, label }),
+        }),
+
+    deleteTaskLink: (userId: string, taskId: string, linkId: string) =>
+        fetchApi<{ deleted: boolean }>(`/api/development-plans/${userId}/tasks/${taskId}/links/${linkId}`, {
+            method: 'DELETE',
+        }),
+
+    listTaskLinks: (userId: string, taskId: string) =>
+        fetchApi<IDPTaskLink[]>(`/api/development-plans/${userId}/tasks/${taskId}/links`),
+
+    listMyTaskLinks: (taskId: string) =>
+        fetchApi<IDPTaskLink[]>(`/api/development-plans/my/tasks/${taskId}/links`),
+
+    uploadTaskAttachment: async (userId: string, taskId: string, file: File): Promise<IDPTaskAttachment> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { supabase } = await import('./supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const response = await fetch(`${API_URL}/development-plans/${userId}/tasks/${taskId}/attachments`, {
+            method: 'POST', headers, body: formData,
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Upload failed' }));
+            throw new Error(err.error || 'Upload failed');
+        }
+        return response.json();
+    },
+
+    uploadMyTaskAttachment: async (taskId: string, file: File): Promise<IDPTaskAttachment> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { supabase } = await import('./supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const response = await fetch(`${API_URL}/development-plans/my/tasks/${taskId}/attachments`, {
+            method: 'POST', headers, body: formData,
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Upload failed' }));
+            throw new Error(err.error || 'Upload failed');
+        }
+        return response.json();
+    },
+
+    getAttachmentUrl: (attachmentId: string) =>
+        fetchApi<{ url: string; original_name: string; mime_type: string; size_bytes: number }>(`/api/development-plans/attachments/${attachmentId}`),
+
+    deleteAttachment: (attachmentId: string) =>
+        fetchApi<{ deleted: boolean }>(`/api/development-plans/attachments/${attachmentId}`, {
+            method: 'DELETE',
         }),
 };

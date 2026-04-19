@@ -34,7 +34,9 @@ export default function ManageDevelopmentPlansPage() {
                 );
                 setMembers(team.map((m, i) => ({
                     ...m,
-                    plan: planResults[i].status === 'fulfilled' ? planResults[i].value : null,
+                    plan: planResults[i].status === 'fulfilled'
+                        ? (Array.isArray(planResults[i].value) ? (planResults[i].value as IDPPlan[]).find(p => p.is_active) || (planResults[i].value as IDPPlan[])[0] || null : planResults[i].value as IDPPlan)
+                        : null,
                     planLoading: false,
                 })));
             } catch {
