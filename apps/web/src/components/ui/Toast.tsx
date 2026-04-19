@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 
 type ToastVariant = 'info' | 'success' | 'warning' | 'error';
 
@@ -93,13 +93,15 @@ function ToastRow({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => voi
 
 export function useToast() {
     const ctx = useContext(ToastContext);
+    const push = ctx?.push;
+    const memo = useMemo(() => ({
+        info:    (msg: string) => push?.('info', msg),
+        success: (msg: string) => push?.('success', msg),
+        warning: (msg: string) => push?.('warning', msg),
+        error:   (msg: string) => push?.('error', msg),
+    }), [push]);
     if (!ctx) {
         throw new Error('useToast must be used inside <ToastProvider>');
     }
-    return {
-        info:    (msg: string) => ctx.push('info', msg),
-        success: (msg: string) => ctx.push('success', msg),
-        warning: (msg: string) => ctx.push('warning', msg),
-        error:   (msg: string) => ctx.push('error', msg),
-    };
+    return memo;
 }
