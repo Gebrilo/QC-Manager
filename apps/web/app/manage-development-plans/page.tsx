@@ -12,7 +12,7 @@ interface TeamMember {
 }
 
 interface MemberWithPlan extends TeamMember {
-    plan: IDPPlan | null;
+    plans: IDPPlan[];
     planLoading: boolean;
 }
 
@@ -25,7 +25,7 @@ export default function ManageDevelopmentPlansPage() {
         async function load() {
             try {
                 const team = await fetchApi<TeamMember[]>('/api/manager/team?status=ACTIVE');
-                const withPlans: MemberWithPlan[] = team.map(m => ({ ...m, plan: null, planLoading: true }));
+                const withPlans: MemberWithPlan[] = team.map(m => ({ ...m, plans: [], planLoading: true }));
                 setMembers(withPlans);
                 setIsLoading(false);
 
@@ -34,9 +34,9 @@ export default function ManageDevelopmentPlansPage() {
                 );
                 setMembers(team.map((m, i) => ({
                     ...m,
-                    plan: planResults[i].status === 'fulfilled'
-                        ? (Array.isArray(planResults[i].value) ? (planResults[i].value as IDPPlan[]).find(p => p.is_active) || (planResults[i].value as IDPPlan[])[0] || null : planResults[i].value as IDPPlan)
-                        : null,
+                    plans: planResults[i].status === 'fulfilled'
+                        ? (Array.isArray(planResults[i].value) ? planResults[i].value : planResults[i].value ? [planResults[i].value] : [])
+                        : [],
                     planLoading: false,
                 })));
             } catch {
@@ -75,23 +75,21 @@ export default function ManageDevelopmentPlansPage() {
                             <div className="flex-1 min-w-0">
                                 {member.planLoading ? (
                                     <div className="h-2 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
-                                ) : member.plan ? (
+                                ) : member.plans.length > 0 ? (
                                     <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                                {member.plan.progress.completion_pct}%
-                                            </span>
-                                            {member.plan.progress.overdue_tasks > 0 && (
-                                                <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full">
-                                                    {member.plan.progress.overdue_tasks} overdue
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                                            <div
-                                                className="bg-indigo-500 h-1.5 rounded-full transition-all"
-                                                style={{ width: `${member.plan.progress.completion_pct}%` }}
-                                            />
+                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                            {member.plans.length} Active {member.plans.length === 1 ? 'Plan' : 'Plans'}
+                                        </span>
+                                        <div className="mt-1 space-y-1">
+                                            {member.plans.slice(0, 3).map(p => (
+                                                <div key={p.id} className="flex items-center gap-2">
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[120px]">{p.title}</span>
+                                                    <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-1">
+                                                        <div className="bg-indigo-500 h-1 rounded-full" style={{ width: `${p.progress.completion_pct}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-slate-500">{p.progress.completion_pct}%</span>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 ) : (
@@ -103,7 +101,7 @@ export default function ManageDevelopmentPlansPage() {
                                 onClick={() => router.push(`/manage-development-plans/${member.id}`)}
                                 className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                             >
-                                {member.plan ? 'View Plan' : 'Create Plan'}
+                                {member.plans.length > 0 ? 'View Plans' : 'Create Plan'}
                             </button>
                         </div>
                     ))}
