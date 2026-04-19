@@ -70,7 +70,7 @@ router.get('/', async (req, res, next) => {
             SELECT uja.*, j.slug, j.title, j.description, j.sort_order, j.next_journey_id, j.required_xp
             FROM user_journey_assignments uja
             JOIN journeys j ON uja.journey_id = j.id
-            WHERE uja.user_id = $1 AND j.deleted_at IS NULL
+            WHERE uja.user_id = $1 AND j.deleted_at IS NULL AND (j.plan_type IS NULL OR j.plan_type != 'idp')
             ORDER BY j.sort_order
         `, [userId]);
 

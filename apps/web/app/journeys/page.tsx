@@ -2,16 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { myJourneysApi, AssignedJourney } from '../../src/lib/api';
-import { useAuth } from '../../src/components/providers/AuthProvider';
 
 export default function JourneysPage() {
     const [journeys, setJourneys] = useState<AssignedJourney[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
-    const { userStatus } = useAuth();
-    const isActive = userStatus === 'ACTIVE';
 
     useEffect(() => {
         (async () => {
@@ -37,12 +33,7 @@ export default function JourneysPage() {
     return (
         <div>
             <div className="mb-6">
-                <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Journeys</h1>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'}`}>
-                        {isActive ? 'Active' : 'In Preparation'}
-                    </span>
-                </div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Journeys</h1>
                 <p className="text-slate-500 dark:text-slate-400">Track your onboarding progress and complete assigned tasks.</p>
             </div>
 
