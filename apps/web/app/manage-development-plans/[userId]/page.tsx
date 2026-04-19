@@ -94,8 +94,19 @@ export default function IDPBuilderPage() {
             setShowNewPlanForm(false);
             setNewPlanTitle('');
             setNewPlanDesc('');
-            await loadPlan();
+            const placeholderPlan = {
+                ...newPlan,
+                plan_type: 'idp' as const,
+                objectives: [],
+                progress: { total_tasks: 0, done_tasks: 0, completion_pct: 0, mandatory_tasks: 0, mandatory_done: 0, overdue_tasks: 0, on_hold_tasks: 0 },
+            };
+            setPlans(prev => [...prev, placeholderPlan]);
             setActivePlanId(newPlan.id);
+            const data = await developmentPlansApi.getForUser(userId, newPlan.id);
+            const fullPlan = Array.isArray(data) ? data[0] : data;
+            if (fullPlan) {
+                setPlans(prev => prev.map(p => p.id === newPlan.id ? fullPlan : p));
+            }
         } catch (err: any) { toast.error(err?.message || 'Could not create plan'); }
         finally { setCreatingPlan(false); }
     }
@@ -159,8 +170,13 @@ export default function IDPBuilderPage() {
         try {
             await developmentPlansApi.deletePlan(userId, plan.id);
             toast.success('Plan deleted');
-            setPlans(prev => prev.filter(p => p.id !== plan.id));
-            await loadPlan();
+            const remaining = plans.filter(p => p.id !== plan.id);
+            setPlans(remaining);
+            if (remaining.length > 0) {
+                setActivePlanId(remaining[0].id);
+            } else {
+                setNoPlan(true);
+            }
         } catch (err: any) { toast.error(err?.message || 'Could not delete plan'); }
     }
 
