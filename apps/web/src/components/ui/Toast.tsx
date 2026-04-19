@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 
 type ToastVariant = 'info' | 'success' | 'warning' | 'error';
 
@@ -21,13 +21,33 @@ let nextId = 1;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+    const dismiss = useCallback((id: number) => {
+        const timer = timersRef.current.get(id);
+        if (timer !== undefined) {
+            clearTimeout(timer);
+            timersRef.current.delete(id);
+        }
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
 
     const push = useCallback((variant: ToastVariant, message: string) => {
         const id = nextId++;
         setToasts(prev => [...prev, { id, variant, message }]);
-        window.setTimeout(() => {
+        const timer = setTimeout(() => {
+            timersRef.current.delete(id);
             setToasts(prev => prev.filter(t => t.id !== id));
         }, AUTO_DISMISS_MS);
+        timersRef.current.set(id, timer);
+    }, []);
+
+    useEffect(() => {
+        const timers = timersRef.current;
+        return () => {
+            timers.forEach(t => clearTimeout(t));
+            timers.clear();
+        };
     }, []);
 
     return (
@@ -38,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 aria-atomic="true"
                 className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
             >
-                {toasts.map(t => <ToastRow key={t.id} toast={t} onDismiss={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />)}
+                {toasts.map(t => <ToastRow key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />)}
             </div>
         </ToastContext.Provider>
     );
