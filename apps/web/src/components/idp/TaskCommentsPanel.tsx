@@ -9,6 +9,7 @@ interface TaskCommentsPanelProps {
     taskId: string | null;
     taskTitle: string;
     currentUserId: string;
+    managerUserId?: string;
     onClose: () => void;
 }
 
@@ -21,7 +22,7 @@ function fmtTime(iso: string) {
     }
 }
 
-export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, onClose }: TaskCommentsPanelProps) {
+export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, managerUserId, onClose }: TaskCommentsPanelProps) {
     const [comments, setComments] = useState<IDPTaskComment[]>([]);
     const [loading, setLoading] = useState(false);
     const [draft, setDraft] = useState('');
@@ -46,12 +47,15 @@ export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, onCl
         if (!open || !taskId) return;
         let cancelled = false;
         setLoading(true);
-        developmentPlansApi.listMyTaskComments(taskId)
-            .then(list => { if (!cancelled) setComments(list); })
+        const list = managerUserId
+            ? developmentPlansApi.listTaskComments(managerUserId, taskId)
+            : developmentPlansApi.listMyTaskComments(taskId);
+        list
+            .then(data => { if (!cancelled) setComments(data); })
             .catch((err: any) => { if (!cancelled) toast.error(err?.message || 'Could not load comments'); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [open, taskId, toast]);
+    }, [open, taskId, managerUserId, toast]);
 
     async function submit() {
         if (!taskId) return;
@@ -59,7 +63,9 @@ export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, onCl
         if (body.length === 0 || posting) return;
         setPosting(true);
         try {
-            const created = await developmentPlansApi.addMyTaskComment(taskId, body);
+            const created = managerUserId
+                ? await developmentPlansApi.addTaskComment(managerUserId, taskId, body)
+                : await developmentPlansApi.addMyTaskComment(taskId, body);
             setComments(prev => [...prev, created]);
             setDraft('');
         } catch (err: any) {
@@ -108,9 +114,14 @@ export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, onCl
                     {comments.map(c => {
                         const isMe = c.author_id === currentUserId;
                         return (
-                            <div key={c.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2">
+                            <div key={c.id} className={`rounded-lg px-3 py-2 ${isMe ? 'bg-indigo-50 dark:bg-indigo-900/20 ml-6' : 'bg-slate-50 dark:bg-slate-800/60'}`}>
                                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-1">
-                                    <span className="font-medium text-slate-700 dark:text-slate-200">{isMe ? 'You' : 'Manager'}</span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                                        {c.author_name || 'Unknown'}
+                                        {c.author_role === 'manager' && (
+                                            <span className="ml-1 text-[10px] uppercase tracking-wide text-indigo-500">Manager</span>
+                                        )}
+                                    </span>
                                     <span>·</span>
                                     <span>{fmtTime(c.created_at)}</span>
                                 </div>

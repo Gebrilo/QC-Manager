@@ -69,7 +69,7 @@ export default function PreferencesPage() {
     }, [authUser, permissions, isAdmin, hasPermission]);
 
     const accessibleNavRoutes = useMemo(() => {
-        return getNavbarRoutes().filter(route => {
+        return getNavbarRoutes(authUser?.status).filter(route => {
             if (route.adminOnly && !isAdmin) return false;
             if (route.requiresActivation && authUser?.status !== 'ACTIVE') return false;
             if (route.permission && !hasPermission(route.permission)) return false;

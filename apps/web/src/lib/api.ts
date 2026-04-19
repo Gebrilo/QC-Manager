@@ -984,9 +984,26 @@ export interface IDPTaskComment {
     user_id: string;
     task_id: string;
     author_id: string;
+    author_name: string | null;
+    author_role: string | null;
     body: string;
     created_at: string;
     updated_at: string;
+}
+
+export interface IDPHistoryEntry {
+    id: string;
+    title: string;
+    description?: string | null;
+    created_at: string;
+    archived_at: string;
+    progress: {
+        total_tasks: number;
+        done_tasks: number;
+        completion_pct: number;
+        mandatory_tasks: number;
+        mandatory_done: number;
+    };
 }
 
 export interface IDPObjective {
@@ -1120,6 +1137,14 @@ export const developmentPlansApi = {
     // User: get own plan
     getMy: () =>
         fetchApi<IDPPlan>('/api/development-plans/my'),
+
+    // User: list own archived plans
+    listMyHistory: () =>
+        fetchApi<IDPHistoryEntry[]>('/api/development-plans/my/history'),
+
+    // User: read an archived plan by id
+    getMyHistoryPlan: (planId: string) =>
+        fetchApi<IDPPlan>(`/api/development-plans/my/history/${planId}`),
 
     // User: update task status
     updateMyTaskStatus: (

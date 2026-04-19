@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { developmentPlansApi, IDPPlan, IDPObjective } from '../../../src/lib/api';
-
-function showError(msg: string) { alert(msg); }
-function showSuccess(msg: string) { console.log(msg); }
+import { developmentPlansApi, IDPPlan, IDPObjective, IDPTask } from '../../../src/lib/api';
+import { useToast } from '../../../src/components/ui/Toast';
+import { TaskStatusBadge, inferBadgeKind } from '../../../src/components/idp/TaskStatusBadge';
+import { TaskCommentsPanel } from '../../../src/components/idp/TaskCommentsPanel';
+import { useAuth } from '../../../src/components/providers/AuthProvider';
 
 function fmtDate(v?: string | null) {
     if (!v) return '';
@@ -15,6 +16,8 @@ function fmtDate(v?: string | null) {
 export default function IDPBuilderPage() {
     const params = useParams();
     const userId = params.userId as string;
+    const toast = useToast();
+    const { user } = useAuth();
 
     const [plan, setPlan] = useState<IDPPlan | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +37,8 @@ export default function IDPBuilderPage() {
     const [newTaskStart, setNewTaskStart] = useState('');
     const [newTaskDue, setNewTaskDue] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+    const [commentsTask, setCommentsTask] = useState<IDPTask | null>(null);
 
     const loadPlan = useCallback(async () => {
         try {
@@ -55,7 +60,7 @@ export default function IDPBuilderPage() {
             await developmentPlansApi.create(userId, { title: newPlanTitle, description: newPlanDesc });
             setNoPlan(false);
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not create plan'); }
         finally { setCreatingPlan(false); }
     }
 
@@ -67,7 +72,7 @@ export default function IDPBuilderPage() {
             setNewObjDue('');
             setShowObjForm(false);
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not add objective'); }
     }
 
     async function handleDeleteObjective(chapterId: string) {
@@ -75,7 +80,7 @@ export default function IDPBuilderPage() {
         try {
             await developmentPlansApi.deleteObjective(userId, chapterId);
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not delete objective'); }
     }
 
     async function handleAddTask(chapterId: string) {
@@ -91,7 +96,7 @@ export default function IDPBuilderPage() {
             setNewTaskPriority('medium');
             setAddingTaskFor(null);
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not add task'); }
     }
 
     async function handleDeleteTask(taskId: string) {
@@ -99,16 +104,16 @@ export default function IDPBuilderPage() {
         try {
             await developmentPlansApi.deleteTask(userId, taskId);
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not delete task'); }
     }
 
     async function handleCompletePlan() {
         if (!plan || !confirm('Mark this plan as complete? This action cannot be undone.')) return;
         try {
             await developmentPlansApi.completePlan(userId);
-            showSuccess('Plan marked as complete!');
+            toast.success('Plan marked as complete!');
             await loadPlan();
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not complete plan'); }
     }
 
     async function handleExportReport() {
@@ -122,7 +127,7 @@ export default function IDPBuilderPage() {
             a.download = `idp-report-${userId}.json`;
             a.click();
             URL.revokeObjectURL(url);
-        } catch (err: any) { showError(err.message); }
+        } catch (err: any) { toast.error(err?.message || 'Could not export report'); }
     }
 
     const priorityColors: Record<string, string> = {
@@ -134,6 +139,7 @@ export default function IDPBuilderPage() {
     const statusColors: Record<string, string> = {
         TODO: 'text-slate-400',
         IN_PROGRESS: 'text-indigo-500',
+        ON_HOLD: 'text-amber-500 dark:text-amber-300',
         DONE: 'text-emerald-500',
     };
 
@@ -232,10 +238,37 @@ export default function IDPBuilderPage() {
                         <div className="space-y-2 mb-3">
                             {obj.tasks.map(task => (
                                 <div key={task.id} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                                    <span className={`text-xs font-mono ${statusColors[task.progress_status]}`}>{task.progress_status}</span>
-                                    <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">{task.title}</span>
+                                    <span className={`text-xs font-mono ${statusColors[task.progress_status]}`}>
+                                        {task.progress_status}
+                                    </span>
+                                    <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
+                                        {task.title}
+                                    </span>
+                                    {(() => {
+                                        const kind = inferBadgeKind(task);
+                                        if (!['on_hold', 'overdue', 'done_late'].includes(kind)) return null;
+                                        const suffix = kind === 'done_late' && task.completed_at && task.due_date
+                                            ? (() => {
+                                                const due = new Date(task.due_date);
+                                                const done = new Date(task.completed_at!);
+                                                const days = Math.max(1, Math.round((done.getTime() - due.getTime()) / 86400000));
+                                                return `Late by ${days}d`;
+                                            })()
+                                            : undefined;
+                                        return <TaskStatusBadge kind={kind} suffix={suffix} />;
+                                    })()}
+                                    {task.progress_status === 'ON_HOLD' && task.hold_reason && (
+                                        <span
+                                            className="text-xs italic text-amber-600 dark:text-amber-300 truncate max-w-[200px]"
+                                            title={task.hold_reason}
+                                        >
+                                            &ldquo;{task.hold_reason}&rdquo;
+                                        </span>
+                                    )}
                                     {task.priority && (
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>{task.priority}</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[task.priority]}`}>
+                                            {task.priority}
+                                        </span>
                                     )}
                                     {task.progress_status === 'DONE' && task.completed_at ? (
                                         <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
@@ -244,6 +277,15 @@ export default function IDPBuilderPage() {
                                             {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
                                         </span>
                                     ) : null}
+                                    <button
+                                        type="button"
+                                        aria-label={`Open comments for ${task.title}`}
+                                        onClick={() => setCommentsTask(task)}
+                                        className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                        title="Comments"
+                                    >
+                                        💬
+                                    </button>
                                     <button onClick={() => handleDeleteTask(task.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">×</button>
                                 </div>
                             ))}
@@ -318,6 +360,15 @@ export default function IDPBuilderPage() {
                     + Add Objective
                 </button>
             )}
+
+            <TaskCommentsPanel
+                open={commentsTask !== null}
+                taskId={commentsTask?.id ?? null}
+                taskTitle={commentsTask?.title ?? ''}
+                currentUserId={user?.id ?? ''}
+                managerUserId={userId}
+                onClose={() => setCommentsTask(null)}
+            />
         </div>
     );
 }

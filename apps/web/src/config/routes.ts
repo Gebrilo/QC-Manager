@@ -11,6 +11,7 @@ export interface RouteConfig {
     icon?: LucideIcon;
     onboardingStep?: number;
     onboardingGroup?: string;
+    statusVisibility?: 'PREPARATION' | 'ACTIVE';
 }
 
 const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
@@ -21,8 +22,11 @@ const ROUTES: RouteConfig[] = [
     { path: '/auth/callback', label: 'Auth Callback' },
     { path: '/auth/reset-password', label: 'Reset Password' },
     { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
-    { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map },
+    { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map, statusVisibility: 'PREPARATION' },
     { path: '/journeys/[id]', label: 'Journey Details', permission: 'page:my-tasks', requiresActivation: false },
+    { path: '/development-plan', label: 'My Development Plan', permission: 'page:my-tasks', requiresActivation: true, showInNavbar: true, navOrder: 1.5, icon: GraduationCap, statusVisibility: 'ACTIVE' },
+    { path: '/development-plan/history', label: 'Plan History', permission: 'page:my-tasks', requiresActivation: true, showInNavbar: true, navOrder: 1.6, icon: History, statusVisibility: 'ACTIVE' },
+    { path: '/development-plan/history/[planId]', label: 'Archived Plan', permission: 'page:my-tasks', requiresActivation: true },
     { path: '/my-dashboard', label: 'My Dashboard', permission: 'page:my-dashboard', requiresActivation: false, showInNavbar: true, navOrder: 1.8, icon: LayoutGrid },
     { path: '/dashboard', label: 'Dashboard', permission: 'page:dashboard', requiresActivation: true, showInNavbar: true, navOrder: 2, icon: LayoutDashboard },
     { path: '/tasks', label: 'Tasks', permission: 'page:tasks', requiresActivation: true, showInNavbar: true, navOrder: 3, icon: ListTodo },
@@ -76,9 +80,13 @@ export function getRouteConfig(pathname: string): RouteConfig | undefined {
     });
 }
 
-export function getNavbarRoutes(): RouteConfig[] {
+export function getNavbarRoutes(userStatus?: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED'): RouteConfig[] {
     return ROUTES
         .filter(r => r.showInNavbar)
+        .filter(r => {
+            if (!r.statusVisibility) return true;
+            return r.statusVisibility === userStatus;
+        })
         .sort((a, b) => (a.navOrder || 99) - (b.navOrder || 99));
 }
 

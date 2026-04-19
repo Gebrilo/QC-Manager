@@ -141,6 +141,154 @@ router.get('/my', requireAuth, async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// ─── GET /my/history — user views own archived IDP plans ─────────────────────
+
+router.get('/my/history', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+
+        const plansResult = await db.query(
+            `SELECT id, title, description, created_at, updated_at AS archived_at
+             FROM journeys
+             WHERE owner_user_id = $1
+               AND plan_type = 'idp'
+               AND is_active = false
+               AND deleted_at IS NULL
+             ORDER BY updated_at DESC`,
+            [userId]
+        );
+
+        if (plansResult.rows.length === 0) return res.json([]);
+
+        const planIds = plansResult.rows.map(p => p.id);
+
+        const summaryResult = await db.query(
+            `SELECT jc.journey_id AS plan_id,
+                    COUNT(jt.id) AS total_tasks,
+                    SUM(CASE WHEN jt.is_mandatory THEN 1 ELSE 0 END) AS mandatory_tasks,
+                    SUM(CASE WHEN utc.progress_status = 'DONE' THEN 1 ELSE 0 END) AS done_tasks,
+                    SUM(CASE WHEN jt.is_mandatory AND utc.progress_status = 'DONE' THEN 1 ELSE 0 END) AS mandatory_done
+             FROM journey_chapters jc
+             JOIN journey_quests jq ON jq.chapter_id = jc.id
+             JOIN journey_tasks jt ON jt.quest_id = jq.id
+             LEFT JOIN user_task_completions utc ON utc.task_id = jt.id AND utc.user_id = $1
+             WHERE jc.journey_id = ANY($2)
+             GROUP BY jc.journey_id`,
+            [userId, planIds]
+        );
+
+        const summaryMap = new Map(summaryResult.rows.map(r => [r.plan_id, r]));
+
+        const body = plansResult.rows.map(p => {
+            const s = summaryMap.get(p.id);
+            const total = Number(s?.total_tasks) || 0;
+            const done = Number(s?.done_tasks) || 0;
+            return {
+                id: p.id,
+                title: p.title,
+                description: p.description,
+                created_at: p.created_at,
+                archived_at: p.archived_at,
+                progress: {
+                    total_tasks: total,
+                    done_tasks: done,
+                    completion_pct: total > 0 ? Math.round((done / total) * 100) : 0,
+                    mandatory_tasks: Number(s?.mandatory_tasks) || 0,
+                    mandatory_done: Number(s?.mandatory_done) || 0,
+                },
+            };
+        });
+
+        res.json(body);
+    } catch (err) { next(err); }
+});
+
+// ─── GET /my/history/:planId — single archived plan detail ───────────────────
+
+router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { planId } = req.params;
+
+        const planResult = await db.query(
+            `SELECT * FROM journeys
+             WHERE id = $1 AND owner_user_id = $2 AND plan_type = 'idp'
+               AND is_active = false AND deleted_at IS NULL
+             LIMIT 1`,
+            [planId, userId]
+        );
+        if (planResult.rows.length === 0) return res.status(404).json({ error: 'Archived plan not found' });
+        const plan = planResult.rows[0];
+
+        const chapters = await db.query(
+            `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
+        );
+        const chapterIds = chapters.rows.map(c => c.id);
+        let quests = [], tasks = [], completions = [];
+        if (chapterIds.length > 0) {
+            quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
+            const questIds = quests.map(q => q.id);
+            if (questIds.length > 0) {
+                tasks = (await db.query(`SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds])).rows;
+                const taskIds = tasks.map(t => t.id);
+                if (taskIds.length > 0) {
+                    completions = (await db.query(
+                        `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
+                    )).rows;
+                }
+            }
+        }
+
+        const completionMap = new Map(completions.map(c => [c.task_id, c]));
+
+        const objectives = chapters.rows.map(ch => {
+            const chQuest = quests.find(q => q.chapter_id === ch.id);
+            const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
+            const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
+            return {
+                id: ch.id,
+                title: ch.title,
+                description: ch.description,
+                start_date: ch.start_date,
+                due_date: ch.due_date,
+                sort_order: ch.sort_order,
+                progress: {
+                    total_tasks: chTasks.length,
+                    done_tasks: done,
+                    completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
+                },
+                tasks: chTasks.map(t => {
+                    const c = completionMap.get(t.id);
+                    return {
+                        id: t.id,
+                        title: t.title,
+                        description: t.description,
+                        start_date: t.start_date,
+                        due_date: t.due_date,
+                        priority: t.priority,
+                        difficulty: t.difficulty,
+                        is_mandatory: t.is_mandatory,
+                        progress_status: c?.progress_status || 'TODO',
+                        completed_at: c?.completed_at || null,
+                        hold_reason: c?.hold_reason || null,
+                    };
+                }),
+            };
+        });
+
+        res.json({
+            id: plan.id,
+            title: plan.title,
+            description: plan.description,
+            is_active: false,
+            archived_at: plan.updated_at,
+            created_at: plan.created_at,
+            progress: buildProgress(tasks, completions),
+            objectives,
+        });
+    } catch (err) { next(err); }
+});
+
 // ─── PATCH /my/tasks/:taskId/status — update task status ─────────────────────
 
 router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => {
@@ -220,10 +368,12 @@ router.get('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) => 
             return res.status(404).json({ error: 'Task not found in your plan' });
         }
         const result = await db.query(
-            `SELECT id, user_id, task_id, author_id, body, created_at, updated_at
-             FROM idp_task_comment
-             WHERE user_id = $1 AND task_id = $2
-             ORDER BY created_at ASC`,
+            `SELECT c.id, c.user_id, c.task_id, c.author_id, c.body, c.created_at, c.updated_at,
+                    u.name AS author_name, u.role AS author_role
+             FROM idp_task_comment c
+             LEFT JOIN app_user u ON u.id = c.author_id
+             WHERE c.user_id = $1 AND c.task_id = $2
+             ORDER BY c.created_at ASC`,
             [userId, taskId]
         );
         res.json(result.rows);
@@ -244,13 +394,21 @@ router.post('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) =>
         if (!(await assertTaskInPlan(plan.id, taskId))) {
             return res.status(404).json({ error: 'Task not found in your plan' });
         }
-        const result = await db.query(
+        const inserted = await db.query(
             `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, user_id, task_id, author_id, body, created_at, updated_at`,
+             RETURNING id`,
             [userId, taskId, userId, body]
         );
-        res.status(201).json(result.rows[0]);
+        const full = await db.query(
+            `SELECT c.id, c.user_id, c.task_id, c.author_id, c.body, c.created_at, c.updated_at,
+                    u.name AS author_name, u.role AS author_role
+             FROM idp_task_comment c
+             LEFT JOIN app_user u ON u.id = c.author_id
+             WHERE c.id = $1`,
+            [inserted.rows[0].id]
+        );
+        res.status(201).json(full.rows[0]);
     } catch (err) { next(err); }
 });
 
@@ -268,10 +426,12 @@ router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 
             return res.status(404).json({ error: 'Task not found in this plan' });
         }
         const result = await db.query(
-            `SELECT id, user_id, task_id, author_id, body, created_at, updated_at
-             FROM idp_task_comment
-             WHERE user_id = $1 AND task_id = $2
-             ORDER BY created_at ASC`,
+            `SELECT c.id, c.user_id, c.task_id, c.author_id, c.body, c.created_at, c.updated_at,
+                    u.name AS author_name, u.role AS author_role
+             FROM idp_task_comment c
+             LEFT JOIN app_user u ON u.id = c.author_id
+             WHERE c.user_id = $1 AND c.task_id = $2
+             ORDER BY c.created_at ASC`,
             [userId, taskId]
         );
         res.json(result.rows);
@@ -294,13 +454,21 @@ router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin',
         if (!(await assertTaskInPlan(plan.id, taskId))) {
             return res.status(404).json({ error: 'Task not found in this plan' });
         }
-        const result = await db.query(
+        const inserted = await db.query(
             `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, user_id, task_id, author_id, body, created_at, updated_at`,
+             RETURNING id`,
             [userId, taskId, req.user.id, body]
         );
-        res.status(201).json(result.rows[0]);
+        const full = await db.query(
+            `SELECT c.id, c.user_id, c.task_id, c.author_id, c.body, c.created_at, c.updated_at,
+                    u.name AS author_name, u.role AS author_role
+             FROM idp_task_comment c
+             LEFT JOIN app_user u ON u.id = c.author_id
+             WHERE c.id = $1`,
+            [inserted.rows[0].id]
+        );
+        res.status(201).json(full.rows[0]);
     } catch (err) { next(err); }
 });
 
