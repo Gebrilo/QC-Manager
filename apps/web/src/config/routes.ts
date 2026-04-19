@@ -22,7 +22,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/auth/callback', label: 'Auth Callback' },
     { path: '/auth/reset-password', label: 'Reset Password' },
     { path: '/my-tasks', label: 'My Tasks', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1, icon: CheckSquare },
-    { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map, statusVisibility: 'PREPARATION' },
+    { path: '/journeys', label: 'My Journeys', permission: 'page:my-tasks', requiresActivation: false, showInNavbar: true, navOrder: 1.5, icon: Map },
     { path: '/journeys/[id]', label: 'Journey Details', permission: 'page:my-tasks', requiresActivation: false },
     { path: '/development-plan', label: 'My Development Plan', permission: 'page:my-tasks', requiresActivation: true, showInNavbar: true, navOrder: 1.5, icon: GraduationCap, statusVisibility: 'ACTIVE' },
     { path: '/development-plan/history', label: 'Plan History', permission: 'page:my-tasks', requiresActivation: true, showInNavbar: true, navOrder: 1.6, icon: History, statusVisibility: 'ACTIVE' },

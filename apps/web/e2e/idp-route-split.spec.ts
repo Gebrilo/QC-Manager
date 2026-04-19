@@ -18,7 +18,7 @@ const prepUser = {
 };
 
 test.describe('IDP route split', () => {
-    test('ACTIVE user sees Development Plan in nav, not Journeys', async ({ page }) => {
+    test('ACTIVE user sees both Development Plan and Journeys in nav', async ({ page }) => {
         await mockAuthenticatedSession(page, {
             user: activeUser,
             permissions: ['page:my-tasks'],
@@ -35,27 +35,23 @@ test.describe('IDP route split', () => {
 
         await page.goto('/development-plan');
         await expect(page.getByRole('heading', { name: 'My Development Plan' })).toBeVisible();
-        await expect(page.getByRole('link', { name: /My Journeys/i })).toHaveCount(0);
+        await expect(page.getByRole('link', { name: /My Journeys/i }).first()).toBeVisible();
         await expect(page.getByRole('link', { name: /Development Plan/i }).first()).toBeVisible();
     });
 
-    test('ACTIVE user visiting /journeys is redirected to /development-plan', async ({ page }) => {
+    test('ACTIVE user can view /journeys without redirect', async ({ page }) => {
         await mockAuthenticatedSession(page, {
             user: activeUser,
             permissions: ['page:my-tasks'],
         });
-        await page.route('**/api/development-plans/my', r => r.fulfill({
+        await page.route('**/api/my-journeys', r => r.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify({
-                id: 'plan-1', title: 'Current', description: '', is_active: true,
-                progress: { total_tasks: 0, done_tasks: 0, completion_pct: 0, mandatory_tasks: 0, mandatory_done: 0, overdue_tasks: 0, on_hold_tasks: 0 },
-                objectives: [],
-            }),
+            body: JSON.stringify([{ id: 'a1', journey_id: 'j1', title: 'Onboarding Journey' }]),
         }));
 
         await page.goto('/journeys');
-        await page.waitForURL('**/development-plan');
-        await expect(page.getByRole('heading', { name: 'My Development Plan' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'My Journeys' })).toBeVisible();
+        await expect(page.getByText('Onboarding Journey')).toBeVisible();
     });
 
     test('PREPARATION user keeps /journeys page', async ({ page }) => {
