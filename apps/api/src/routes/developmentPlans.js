@@ -5,6 +5,30 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { canAccessUser } = require('../middleware/teamAccess');
+const multer = require('multer');
+const storage = require('../config/storage');
+
+const idpUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/pdf',
+            'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain', 'text/csv',
+            'application/zip',
+        ];
+        if (allowed.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error(`File type ${file.mimetype} not allowed`));
+        }
+    },
+});
 
 function buildProgress(tasks, completions) {
     const completionMap = new Map(completions.map(c => [c.task_id, c]));
@@ -101,7 +125,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                 `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
             );
             const chapterIds = chapters.rows.map(c => c.id);
-            let quests = [], tasks = [], completions = [];
+            let quests = [], tasks = [], completions = [], attachmentsByTask = {};
 
             if (chapterIds.length > 0) {
                 quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
@@ -113,6 +137,16 @@ router.get('/my', requireAuth, async (req, res, next) => {
                         completions = (await db.query(
                             `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
                         )).rows;
+                        const attsResult = await db.query(
+                            `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                             FROM journey_task_attachments WHERE task_id = ANY($1)
+                             ORDER BY uploaded_at ASC`,
+                            [taskIds]
+                        );
+                        for (const a of attsResult.rows) {
+                            if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                            attachmentsByTask[a.task_id].push(a);
+                        }
                     }
                 }
             }
@@ -153,11 +187,13 @@ router.get('/my', requireAuth, async (req, res, next) => {
                             priority: t.priority,
                             difficulty: t.difficulty,
                             is_mandatory: t.is_mandatory,
+                            requires_attachment: t.requires_attachment || false,
                             progress_status: progressStatus,
                             is_overdue: notDone && !!t.due_date && t.due_date < today,
                             completed_at: c?.completed_at || null,
                             completed_late: computeCompletedLate(t, c),
                             hold_reason: c?.hold_reason ?? null,
+                            attachments: attachmentsByTask[t.id] || [],
                         };
                     }),
                 };
@@ -249,7 +285,7 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [], linksByTask = {};
+        let quests = [], tasks = [], completions = [], linksByTask = {}, attachmentsByTask = {};
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
             const questIds = quests.map(q => q.id);
@@ -267,6 +303,16 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
                     for (const l of linksResult.rows) {
                         if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
                         linksByTask[l.task_id].push(l);
+                    }
+                    const attsResult = await db.query(
+                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                         FROM journey_task_attachments WHERE task_id = ANY($1)
+                         ORDER BY uploaded_at ASC`,
+                        [taskIds]
+                    );
+                    for (const a of attsResult.rows) {
+                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                        attachmentsByTask[a.task_id].push(a);
                     }
                 }
             }
@@ -302,6 +348,7 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
                         completed_late: computeCompletedLate(t, c),
                         hold_reason: c?.hold_reason ?? null,
                         links: linksByTask[t.id] || [],
+                        attachments: attachmentsByTask[t.id] || [],
                     };
                 }),
             };
@@ -331,7 +378,7 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [], linksByTask = {};
+        let quests = [], tasks = [], completions = [], linksByTask = {}, attachmentsByTask = {};
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
             const questIds = quests.map(q => q.id);
@@ -349,6 +396,16 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
                     for (const l of linksResult.rows) {
                         if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
                         linksByTask[l.task_id].push(l);
+                    }
+                    const attsResult = await db.query(
+                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                         FROM journey_task_attachments WHERE task_id = ANY($1)
+                         ORDER BY uploaded_at ASC`,
+                        [taskIds]
+                    );
+                    for (const a of attsResult.rows) {
+                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                        attachmentsByTask[a.task_id].push(a);
                     }
                 }
             }
@@ -383,10 +440,12 @@ router.get('/my/history/:planId', requireAuth, async (req, res, next) => {
                         priority: t.priority,
                         difficulty: t.difficulty,
                         is_mandatory: t.is_mandatory,
+                        requires_attachment: t.requires_attachment || false,
                         progress_status: c?.progress_status || 'TODO',
                         completed_at: c?.completed_at || null,
                         hold_reason: c?.hold_reason || null,
                         links: linksByTask[t.id] || [],
+                        attachments: attachmentsByTask[t.id] || [],
                     };
                 }),
             };
@@ -434,6 +493,22 @@ router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => 
             [taskId, plan.id]
         );
         if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Task not found in your plan' });
+
+        if (status === 'DONE') {
+            const taskInfo = await db.query(
+                `SELECT requires_attachment FROM journey_tasks WHERE id = $1`,
+                [taskId]
+            );
+            if (taskInfo.rows.length > 0 && taskInfo.rows[0].requires_attachment) {
+                const hasAttachment = await db.query(
+                    `SELECT id FROM journey_task_attachments WHERE task_id = $1 AND user_id = $2 AND uploaded_by_role = 'resource'`,
+                    [taskId, userId]
+                );
+                if (hasAttachment.rows.length === 0) {
+                    return res.status(400).json({ error: 'This task requires an attachment before it can be marked as done' });
+                }
+            }
+        }
 
         if (status === 'TODO') {
             await db.query(`DELETE FROM user_task_completions WHERE user_id = $1 AND task_id = $2`, [userId, taskId]);
@@ -550,6 +625,112 @@ router.get('/my/tasks/:taskId/links', requireAuth, async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// ─── POST /my/tasks/:taskId/attachments — resource uploads submission ─────────
+
+router.post('/my/tasks/:taskId/attachments', requireAuth, idpUpload.single('file'), async (req, res, next) => {
+    try {
+        const { taskId } = req.params;
+        const userId = req.user.id;
+        if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+        const task = await db.query(
+            `SELECT jt.id FROM journey_tasks jt
+             JOIN journey_quests jq ON jq.id = jt.quest_id
+             JOIN journey_chapters jc ON jc.id = jq.chapter_id
+             JOIN journeys j ON j.id = jc.journey_id
+             WHERE jt.id = $1 AND j.owner_user_id = $2 AND j.plan_type = 'idp' AND j.is_active = true`,
+            [taskId, userId]
+        );
+        if (task.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+
+        const storagePath = `idp/${userId}/${taskId}/${userId}-${Date.now()}-${req.file.originalname}`;
+        await storage.uploadFile(storagePath, req.file.buffer, req.file.mimetype);
+
+        const result = await db.query(
+            `INSERT INTO journey_task_attachments (task_id, user_id, filename, original_name, mime_type, size_bytes, uploaded_by_role, storage_path, bucket_name)
+             VALUES ($1, $2, $3, $4, $5, $6, 'resource', $7, $8)
+             RETURNING id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at`,
+            [taskId, userId, storagePath, req.file.originalname, req.file.mimetype, req.file.size, storagePath, storage.IDP_ATTACHMENTS_BUCKET]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        if (err.message && err.message.includes('not allowed')) {
+            return res.status(400).json({ error: err.message });
+        }
+        next(err);
+    }
+});
+
+// ─── GET /attachments/:attachmentId — download (signed URL) ───────────────────
+
+router.get('/attachments/:attachmentId', requireAuth, async (req, res, next) => {
+    try {
+        const { attachmentId } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        const att = await db.query(
+            `SELECT a.*, j.owner_user_id
+             FROM journey_task_attachments a
+             JOIN journey_tasks jt ON jt.id = a.task_id
+             JOIN journey_quests jq ON jq.id = jt.quest_id
+             JOIN journey_chapters jc ON jc.id = jq.chapter_id
+             JOIN journeys j ON j.id = jc.journey_id
+             WHERE a.id = $1`,
+            [attachmentId]
+        );
+        if (att.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
+
+        const file = att.rows[0];
+        if (userRole !== 'admin' && userRole !== 'manager') {
+            if (file.owner_user_id !== userId) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+        }
+
+        const signedUrl = await storage.createSignedUrl(file.storage_path, 300);
+        res.json({ url: signedUrl, original_name: file.original_name, mime_type: file.mime_type, size_bytes: file.size_bytes });
+    } catch (err) { next(err); }
+});
+
+// ─── DELETE /attachments/:attachmentId — delete attachment ─────────────────────
+
+router.delete('/attachments/:attachmentId', requireAuth, async (req, res, next) => {
+    try {
+        const { attachmentId } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        const att = await db.query(
+            `SELECT a.*, j.owner_user_id
+             FROM journey_task_attachments a
+             JOIN journey_tasks jt ON jt.id = a.task_id
+             JOIN journey_quests jq ON jq.id = jt.quest_id
+             JOIN journey_chapters jc ON jc.id = jq.chapter_id
+             JOIN journeys j ON j.id = jc.journey_id
+             WHERE a.id = $1`,
+            [attachmentId]
+        );
+        if (att.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
+
+        const file = att.rows[0];
+
+        if (userRole === 'admin' || userRole === 'manager') {
+            // Manager can delete any file
+        } else {
+            if (file.uploaded_by_role !== 'resource' || file.user_id !== userId) {
+                return res.status(403).json({ error: 'You can only delete your own uploads' });
+            }
+        }
+
+        if (file.storage_path) {
+            try { await storage.deleteFile(file.storage_path); } catch (e) { /* ignore storage errors */ }
+        }
+        await db.query(`DELETE FROM journey_task_attachments WHERE id = $1`, [attachmentId]);
+        res.json({ deleted: true });
+    } catch (err) { next(err); }
+});
+
 // ─── POST /:userId/tasks/:taskId/links — manager adds a link ─────────────────
 
 router.post('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
@@ -621,6 +802,44 @@ router.delete('/:userId/tasks/:taskId/links/:linkId', requireAuth, requireRole('
         if (result.rows.length === 0) return res.status(404).json({ error: 'Link not found' });
         res.json({ deleted: true });
     } catch (err) { next(err); }
+});
+
+// ─── POST /:userId/tasks/:taskId/attachments — manager uploads material ──────
+
+router.post('/:userId/tasks/:taskId/attachments', requireAuth, requireRole('admin', 'manager'), idpUpload.single('file'), async (req, res, next) => {
+    try {
+        const { userId, taskId } = req.params;
+        if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const task = await db.query(
+            `SELECT jt.id FROM journey_tasks jt
+             JOIN journey_quests jq ON jq.id = jt.quest_id
+             JOIN journey_chapters jc ON jc.id = jq.chapter_id
+             JOIN journeys j ON j.id = jc.journey_id
+             WHERE jt.id = $1 AND j.owner_user_id = $2 AND j.plan_type = 'idp'`,
+            [taskId, userId]
+        );
+        if (task.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+
+        const storagePath = `idp/${userId}/${taskId}/${req.user.id}-${Date.now()}-${req.file.originalname}`;
+        await storage.uploadFile(storagePath, req.file.buffer, req.file.mimetype);
+
+        const result = await db.query(
+            `INSERT INTO journey_task_attachments (task_id, user_id, filename, original_name, mime_type, size_bytes, uploaded_by_role, storage_path, bucket_name)
+             VALUES ($1, $2, $3, $4, $5, $6, 'manager', $7, $8)
+             RETURNING id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at`,
+            [taskId, req.user.id, storagePath, req.file.originalname, req.file.mimetype, req.file.size, storagePath, storage.IDP_ATTACHMENTS_BUCKET]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        if (err.message && err.message.includes('not allowed')) {
+            return res.status(400).json({ error: err.message });
+        }
+        next(err);
+    }
 });
 
 // ─── GET /:userId/tasks/:taskId/comments — manager reads ─────────────────────
@@ -778,6 +997,7 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
         let quests = [];
         let tasks = [];
         let completions = [];
+        let attachmentsByTask = {};
 
         if (chapterIds.length > 0) {
             quests = (await db.query(
@@ -794,6 +1014,16 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
                         `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`,
                         [userId, taskIds]
                     )).rows;
+                    const attsResult = await db.query(
+                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                         FROM journey_task_attachments WHERE task_id = ANY($1)
+                         ORDER BY uploaded_at ASC`,
+                        [taskIds]
+                    );
+                    for (const a of attsResult.rows) {
+                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                        attachmentsByTask[a.task_id].push(a);
+                    }
                 }
             }
         }
@@ -835,10 +1065,12 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
                         priority: t.priority,
                         difficulty: t.difficulty,
                         is_mandatory: t.is_mandatory,
+                        requires_attachment: t.requires_attachment || false,
                         progress_status: c?.progress_status || 'TODO',
                         completed_at: c?.completed_at || null,
                         completed_late: computeCompletedLate(t, c),
                         hold_reason: c?.hold_reason ?? null,
+                        attachments: attachmentsByTask[t.id] || [],
                     };
                 }),
             };
@@ -947,7 +1179,7 @@ router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin'
 router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
-        const { title, description, start_date, due_date, priority, difficulty, is_mandatory = true, sort_order = 0 } = req.body;
+        const { title, description, start_date, due_date, priority, difficulty, is_mandatory = true, requires_attachment = false, sort_order = 0 } = req.body;
         if (!title) return res.status(400).json({ error: 'title is required' });
 
         const allowed = await canAccessUser(req.user, userId);
@@ -967,9 +1199,9 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
 
         const slug = `task-${Date.now()}`;
         const taskResult = await db.query(
-            `INSERT INTO journey_tasks (quest_id, slug, title, description, start_date, due_date, priority, difficulty, is_mandatory, sort_order, validation_type, validation_config)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'none', '{}') RETURNING *`,
-            [questId, slug, title, description || null, start_date || null, due_date || null, priority || null, difficulty || null, is_mandatory, sort_order]
+            `INSERT INTO journey_tasks (quest_id, slug, title, description, start_date, due_date, priority, difficulty, is_mandatory, requires_attachment, sort_order, validation_type, validation_config)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'none', '{}') RETURNING *`,
+            [questId, slug, title, description || null, start_date || null, due_date || null, priority || null, difficulty || null, is_mandatory, requires_attachment, sort_order]
         );
         res.status(201).json(taskResult.rows[0]);
     } catch (err) { next(err); }
@@ -980,7 +1212,7 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
 router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
-        const { title, description, start_date, due_date, priority, difficulty, is_mandatory, sort_order } = req.body;
+        const { title, description, start_date, due_date, priority, difficulty, is_mandatory, requires_attachment, sort_order } = req.body;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
@@ -1006,6 +1238,7 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
         if (priority !== undefined)     { fields.push(`priority = $${idx++}`);     values.push(priority); }
         if (difficulty !== undefined)   { fields.push(`difficulty = $${idx++}`);   values.push(difficulty); }
         if (is_mandatory !== undefined) { fields.push(`is_mandatory = $${idx++}`); values.push(is_mandatory); }
+        if (requires_attachment !== undefined) { fields.push(`requires_attachment = $${idx++}`); values.push(requires_attachment); }
         if (sort_order !== undefined)   { fields.push(`sort_order = $${idx++}`);   values.push(sort_order); }
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
@@ -1124,7 +1357,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
             `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
         );
         const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [], linksByTask = {};
+        let quests = [], tasks = [], completions = [], linksByTask = {}, attachmentsByTask = {};
 
         if (chapterIds.length > 0) {
             quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
@@ -1143,6 +1376,16 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                     for (const l of linksResult.rows) {
                         if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
                         linksByTask[l.task_id].push(l);
+                    }
+                    const attsResult = await db.query(
+                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                         FROM journey_task_attachments WHERE task_id = ANY($1)
+                         ORDER BY uploaded_at ASC`,
+                        [taskIds]
+                    );
+                    for (const a of attsResult.rows) {
+                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                        attachmentsByTask[a.task_id].push(a);
                     }
                 }
             }
@@ -1178,6 +1421,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
                         completed_at: c?.completed_at || null,
                         on_time: onTime,
                         links: linksByTask[t.id] || [],
+                        attachments: attachmentsByTask[t.id] || [],
                     };
                 }),
             };

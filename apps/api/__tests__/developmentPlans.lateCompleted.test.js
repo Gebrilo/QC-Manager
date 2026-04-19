@@ -41,6 +41,7 @@ function stubIDPFixture({ completion }) {
         rows: [{ id: 'task-1', quest_id: 'q-1', title: 'Ship X', due_date: '2026-03-01', is_mandatory: true }],
     });
     mockQuery.mockResolvedValueOnce({ rows: [completion] });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // attachments
 }
 
 function firstPlan(res) {

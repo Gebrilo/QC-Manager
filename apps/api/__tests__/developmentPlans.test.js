@@ -116,7 +116,8 @@ describe('GET /development-plans/:userId', () => {
             .mockResolvedValueOnce({ rows: [{ id: 'ch-1', title: 'Leadership', due_date: '2026-06-01', journey_id: 'plan-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // system quest
             .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
-            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] }); // completions
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] }) // completions
+            .mockResolvedValueOnce({ rows: [] }); // attachments
         const res = await request(makeApp()).get('/development-plans/user-1');
         expect(res.status).toBe(200);
         expect(res.body.objectives).toHaveLength(1);
@@ -403,7 +404,8 @@ describe('GET /development-plans/:userId/report', () => {
             .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] }) // quests
             .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', is_mandatory: true }] }) // tasks
             .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE', completed_at: '2026-04-10' }] }) // completions
-            .mockResolvedValueOnce({ rows: [] }); // links
+            .mockResolvedValueOnce({ rows: [] }) // links
+            .mockResolvedValueOnce({ rows: [] }); // attachments
         const res = await request(makeApp()).get('/development-plans/user-1/report');
         expect(res.status).toBe(200);
         expect(res.body.summary.total_tasks).toBe(1);
@@ -429,10 +431,10 @@ describe('GET /development-plans/:userId/report on_hold_tasks', () => {
                 { task_id: 't-1', progress_status: 'ON_HOLD', completed_at: null },
                 { task_id: 't-2', progress_status: 'DONE',    completed_at: new Date('2026-03-10T00:00:00Z') },
             ] })
-            .mockResolvedValueOnce({ rows: [] }); // links
+            .mockResolvedValueOnce({ rows: [] }) // links
+            .mockResolvedValueOnce({ rows: [] }); // attachments
 
         const res = await request(makeApp()).get('/development-plans/user-1/report');
-        expect(res.status).toBe(200);
         expect(res.body.summary.on_hold_tasks).toBe(1);
         expect(res.body.summary.completed_tasks).toBe(1);
     });

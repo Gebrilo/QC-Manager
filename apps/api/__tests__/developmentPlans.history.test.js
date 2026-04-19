@@ -127,10 +127,9 @@ describe('GET /development-plans/my/history/:planId', () => {
             .mockResolvedValueOnce({
                 rows: [{ id: 't-1', title: 'Task 1', description: null, start_date: null, due_date: '2026-02-01', priority: null, difficulty: null, is_mandatory: true, sort_order: 0, quest_id: 'q-1' }],
             })
-            .mockResolvedValueOnce({
-                rows: [{ task_id: 't-1', user_id: 'user-1', progress_status: 'DONE', completed_at: '2026-01-15', hold_reason: null }],
-            })
-            .mockResolvedValueOnce({ rows: [] }); // links
+            .mockResolvedValueOnce({ rows: [{ task_id: 't-1', user_id: 'user-1', progress_status: 'DONE', completed_at: '2026-01-15', hold_reason: null }] })
+            .mockResolvedValueOnce({ rows: [] }) // links
+            .mockResolvedValueOnce({ rows: [] }); // attachments
 
         const res = await request(makeApp())
             .get('/development-plans/my/history/plan-archived');
