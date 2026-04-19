@@ -1,0 +1,190 @@
+<h2>Frontend Changes</h2>
+<p class="subtitle">Three areas change — click to explore each</p>
+
+<div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+  <button onclick="showPanel('journeys')" id="tab-journeys" style="padding: 8px 18px; border-radius: 8px; border: 2px solid #6366f1; background: #6366f1; color: white; font-weight: 600; font-size: 13px; cursor: pointer;">1. Dynamic Journey Header</button>
+  <button onclick="showPanel('team')" id="tab-team" style="padding: 8px 18px; border-radius: 8px; border: 2px solid #e2e8f0; background: white; color: #374151; font-weight: 600; font-size: 13px; cursor: pointer;">2. Team Journeys Page</button>
+  <button onclick="showPanel('resources')" id="tab-resources" style="padding: 8px 18px; border-radius: 8px; border: 2px solid #e2e8f0; background: white; color: #374151; font-weight: 600; font-size: 13px; cursor: pointer;">3. Resource Screen</button>
+</div>
+
+<!-- Panel 1: Dynamic journey header -->
+<div id="panel-journeys" style="display: block;">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="background: #eef2ff; color: #3730a3;">status = PREPARATION → /journeys</div>
+      <div class="mockup-body" style="padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+          <span style="font-size: 20px; font-weight: 800; color: #1e1b4b;">My Journeys</span>
+          <span style="background: #e0e7ff; color: #3730a3; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em;">In Preparation</span>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; margin-bottom: 16px;">Track your onboarding progress and complete assigned tasks.</p>
+        <div style="display: grid; gap: 10px;">
+          <div style="border: 1px solid #e0e7ff; border-radius: 10px; padding: 12px; background: white;">
+            <div style="font-weight: 600; color: #1e1b4b; font-size: 13px;">Onboarding — Week 1</div>
+            <div style="height: 6px; background: #e0e7ff; border-radius: 3px; margin-top: 8px; overflow: hidden;">
+              <div style="width: 60%; height: 100%; background: #6366f1; border-radius: 3px;"></div>
+            </div>
+            <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">3/5 tasks · 60%</div>
+          </div>
+          <div style="border: 1px solid #e0e7ff; border-radius: 10px; padding: 12px; background: #f8fafc; opacity: 0.7;">
+            <div style="font-weight: 600; color: #6b7280; font-size: 13px;">🔒 Tools & Workflows</div>
+            <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">Complete previous journey to unlock</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="background: #ecfdf5; color: #065f46;">status = ACTIVE → /journeys</div>
+      <div class="mockup-body" style="padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+          <span style="font-size: 20px; font-weight: 800; color: #065f46;">My Development Plan</span>
+          <span style="background: #d1fae5; color: #065f46; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em;">Active</span>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; margin-bottom: 16px;">Your ongoing development journey as an active resource.</p>
+        <div style="display: grid; gap: 10px;">
+          <div style="border: 1px solid #a7f3d0; border-radius: 10px; padding: 12px; background: white;">
+            <div style="font-weight: 600; color: #065f46; font-size: 13px;">Advanced QA Techniques</div>
+            <div style="height: 6px; background: #d1fae5; border-radius: 3px; margin-top: 8px; overflow: hidden;">
+              <div style="width: 30%; height: 100%; background: #10b981; border-radius: 3px;"></div>
+            </div>
+            <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">3/10 tasks · 30%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel 2: Team Journeys Page -->
+<div id="panel-team" style="display: none;">
+  <div class="mockup">
+    <div class="mockup-header">Team Journey Progress — Manager view (shows PREPARATION users)</div>
+    <div class="mockup-body" style="padding: 16px; display: grid; grid-template-columns: 220px 1fr; gap: 16px;">
+      <!-- Left: user list -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;">
+        <div style="background: #f8fafc; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase;">In Preparation (2)</div>
+        <div style="padding: 10px 12px; background: #eef2ff; border-bottom: 1px solid #e0e7ff; cursor: pointer;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #1e1b4b;">Ahmed Khalil</div>
+              <div style="font-size: 10px; color: #9ca3af;">ahmed@company.com</div>
+            </div>
+            <span style="background: #fef3c7; color: #92400e; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 10px;">Not ready</span>
+          </div>
+        </div>
+        <div style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; cursor: pointer;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #374151;">Sara Nasser</div>
+              <div style="font-size: 10px; color: #9ca3af;">sara@company.com</div>
+            </div>
+            <span style="background: #d1fae5; color: #065f46; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 10px;">Ready</span>
+          </div>
+        </div>
+        <div style="background: #f0fdf4; padding: 10px 12px; border-top: 1px solid #e2e8f0;">
+          <div style="font-size: 10px; color: #6b7280; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Active (not shown)</div>
+          <div style="font-size: 10px; color: #9ca3af;">Active users appear in the Resource screen</div>
+        </div>
+      </div>
+      <!-- Right: user detail + activate button -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <div style="font-size: 15px; font-weight: 700; color: #374151;">Sara Nasser</div>
+              <div style="font-size: 11px; color: #9ca3af;">sara@company.com · contributor</div>
+            </div>
+            <span style="background: #d1fae5; color: #065f46; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px;">Ready for Activation</span>
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+            <!-- Mark ready toggle (already ready) -->
+            <button style="font-size: 11px; padding: 5px 12px; border-radius: 7px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #065f46; font-weight: 600; cursor: pointer;">✓ Mark as Ready</button>
+            <!-- Activate button (enabled since ready_for_activation = true) -->
+            <button style="font-size: 12px; padding: 6px 16px; border-radius: 7px; border: none; background: #6366f1; color: white; font-weight: 700; cursor: pointer; box-shadow: 0 1px 4px rgba(99,102,241,0.3);">Activate Resource →</button>
+          </div>
+        </div>
+        <!-- Confirmation modal preview -->
+        <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 14px; background: #fafafa; position: relative;">
+          <div style="font-size: 11px; font-weight: 700; color: #6366f1; text-transform: uppercase; margin-bottom: 8px;">Confirmation modal</div>
+          <div style="font-size: 13px; font-weight: 700; color: #1e1b4b; margin-bottom: 6px;">Activate Sara Nasser as a Resource?</div>
+          <p style="font-size: 11px; color: #6b7280; margin-bottom: 12px;">This will grant full system access and create a resource record. Sara will be notified.</p>
+          <div style="display: flex; gap: 8px;">
+            <button style="font-size: 11px; padding: 5px 14px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; color: #374151; cursor: pointer;">Cancel</button>
+            <button style="font-size: 11px; padding: 5px 14px; border-radius: 6px; border: none; background: #6366f1; color: white; font-weight: 600; cursor: pointer;">Yes, Activate</button>
+          </div>
+        </div>
+        <!-- Journey list -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;">
+          <div style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 10px;">Journey Progress</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 12px; font-weight: 600; color: #374151;">Onboarding — Week 1</span>
+            <span style="font-size: 10px; color: #6366f1; font-weight: 600;">80%</span>
+          </div>
+          <div style="height: 5px; background: #e0e7ff; border-radius: 3px; overflow: hidden;">
+            <div style="width: 80%; height: 100%; background: #6366f1; border-radius: 3px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel 3: Resource Screen -->
+<div id="panel-resources" style="display: none;">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="background: #fef2f2; color: #991b1b;">Current: shows ALL users with resource record</div>
+      <div class="mockup-body" style="padding: 14px;">
+        <div style="display: grid; gap: 8px;">
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600;">Ahmed Khalil</span>
+            <span style="background: #fef3c7; color: #92400e; font-size: 9px; padding: 2px 6px; border-radius: 10px;">Probation done</span>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600;">Sara Nasser</span>
+            <span style="background: #d1fae5; color: #065f46; font-size: 9px; padding: 2px 6px; border-radius: 10px;">Active</span>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600;">Basel Ahmed</span>
+            <span style="background: #d1fae5; color: #065f46; font-size: 9px; padding: 2px 6px; border-radius: 10px;">Active</span>
+          </div>
+        </div>
+        <div style="margin-top: 10px; font-size: 10px; color: #ef4444;">⚠ Newcomers mixed in with active resources</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="background: #ecfdf5; color: #065f46;">New: status = ACTIVE only</div>
+      <div class="mockup-body" style="padding: 14px;">
+        <div style="display: grid; gap: 8px;">
+          <div style="border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600; color: #065f46;">Sara Nasser</span>
+            <span style="background: #d1fae5; color: #065f46; font-size: 9px; padding: 2px 6px; border-radius: 10px;">Active</span>
+          </div>
+          <div style="border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600; color: #065f46;">Basel Ahmed</span>
+            <span style="background: #d1fae5; color: #065f46; font-size: 9px; padding: 2px 6px; border-radius: 10px;">Active</span>
+          </div>
+        </div>
+        <!-- Empty state when 0 active but has preparation users -->
+        <div style="margin-top: 16px; border: 1px dashed #a7f3d0; border-radius: 8px; padding: 12px; background: #f0fdf4; text-align: center;">
+          <div style="font-size: 11px; font-weight: 600; color: #065f46; margin-bottom: 4px;">Empty state (when 0 active)</div>
+          <div style="font-size: 10px; color: #6b7280;">"You have 2 users currently in preparation. Once activated, they will appear here."</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showPanel(name) {
+  ['journeys','team','resources'].forEach(p => {
+    document.getElementById('panel-' + p).style.display = p === name ? 'block' : 'none';
+    const btn = document.getElementById('tab-' + p);
+    if (p === name) {
+      btn.style.background = '#6366f1'; btn.style.color = 'white'; btn.style.borderColor = '#6366f1';
+    } else {
+      btn.style.background = 'white'; btn.style.color = '#374151'; btn.style.borderColor = '#e2e8f0';
+    }
+  });
+}
+</script>

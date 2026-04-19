@@ -77,7 +77,17 @@
       "Bash(npx tsc:*)",
       "Skill(playwright-cli)",
       "Skill(playwright-cli:*)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git restore *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git *)",
+      "Bash(npx jest *)",
+      "Bash(python3 -c \"from graphify.watch import _rebuild_code; from pathlib import Path; _rebuild_code\\(Path\\('.'\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\('deps:'\\); [print\\(' ',k,v\\) for k,v in {**p.get\\('dependencies',{}\\),**p.get\\('devDependencies',{}\\)}.items\\(\\) if any\\(x in k.lower\\(\\) for x in ['toast','dialog','radix','headless','popover','sonner','hot-toast']\\)]\")",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\('test scripts:'\\); [print\\(' ',k,'=',v\\) for k,v in p.get\\('scripts',{}\\).items\\(\\) if 'test' in k.lower\\(\\) or 'playwright' in k.lower\\(\\)]\")",
+      "Bash(npx playwright *)",
+      "Bash(gh run *)"
     ]
   }
 }

@@ -1,0 +1,109 @@
+<h2>Lifecycle State Machine</h2>
+<p class="subtitle">Core transitions for this iteration — SUSPENDED and ARCHIVED are scaffolded but not triggered</p>
+
+<div style="display: flex; justify-content: center; margin: 24px 0;">
+<svg viewBox="0 0 780 420" width="760" height="410" style="font-family: inherit;">
+
+  <!-- PREPARATION -->
+  <rect x="40" y="160" width="180" height="80" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="2.5"/>
+  <text x="130" y="195" text-anchor="middle" fill="#4338ca" font-weight="700" font-size="14">PREPARATION</text>
+  <text x="130" y="214" text-anchor="middle" fill="#6366f1" font-size="11">Onboarding journeys</text>
+  <text x="130" y="228" text-anchor="middle" fill="#6366f1" font-size="11">"My Journeys"</text>
+
+  <!-- ACTIVE -->
+  <rect x="300" y="160" width="180" height="80" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2.5"/>
+  <text x="390" y="195" text-anchor="middle" fill="#065f46" font-weight="700" font-size="14">ACTIVE</text>
+  <text x="390" y="214" text-anchor="middle" fill="#059669" font-size="11">Full system access</text>
+  <text x="390" y="228" text-anchor="middle" fill="#059669" font-size="11">"My Development Plan"</text>
+
+  <!-- SUSPENDED -->
+  <rect x="560" y="60" width="170" height="70" rx="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
+  <text x="645" y="90" text-anchor="middle" fill="#92400e" font-weight="600" font-size="13">SUSPENDED</text>
+  <text x="645" y="108" text-anchor="middle" fill="#b45309" font-size="10">Future iteration</text>
+
+  <!-- ARCHIVED -->
+  <rect x="560" y="270" width="170" height="70" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
+  <text x="645" y="300" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="13">ARCHIVED</text>
+  <text x="645" y="318" text-anchor="middle" fill="#b91c1c" font-size="10">Future iteration</text>
+
+  <!-- START dot -->
+  <circle cx="130" cy="100" r="10" fill="#1e1b4b"/>
+  <line x1="130" y1="110" x2="130" y2="158" stroke="#1e1b4b" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <text x="145" y="134" fill="#374151" font-size="10">register</text>
+
+  <!-- PREP → ACTIVE -->
+  <path d="M 220 200 L 298 200" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrow-green)" fill="none"/>
+  <text x="259" y="188" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">Activate Resource</text>
+  <text x="259" y="200" text-anchor="middle" fill="#059669" font-size="9">(ready_for_activation = true</text>
+  <text x="259" y="211" text-anchor="middle" fill="#059669" font-size="9">+ team assigned)</text>
+
+  <!-- ACTIVE → PREP rollback (curved) -->
+  <path d="M 360 240 Q 290 310 220 240" stroke="#6366f1" stroke-width="1.8" stroke-dasharray="5,3" fill="none" marker-end="url(#arrow-indigo)"/>
+  <text x="285" y="302" text-anchor="middle" fill="#4338ca" font-size="9" font-weight="600">Rollback (admin only)</text>
+
+  <!-- ACTIVE → SUSPENDED (future) -->
+  <path d="M 480 180 Q 530 120 558 110" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#arrow-amber)" opacity="0.6"/>
+  <text x="538" y="135" text-anchor="middle" fill="#92400e" font-size="9" opacity="0.7">future</text>
+
+  <!-- PREP → SUSPENDED (future) -->
+  <path d="M 175 162 Q 340 60 558 82" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,4" fill="none" opacity="0.4"/>
+
+  <!-- SUSPENDED → ACTIVE (future) -->
+  <path d="M 560 115 Q 490 130 480 175" stroke="#10b981" stroke-width="1" stroke-dasharray="4,4" fill="none" opacity="0.4"/>
+
+  <!-- ACTIVE → ARCHIVED (future) -->
+  <path d="M 480 220 Q 530 270 558 295" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#arrow-red)" opacity="0.5"/>
+  <text x="545" y="262" text-anchor="middle" fill="#991b1b" font-size="9" opacity="0.6">future</text>
+
+  <!-- Markers -->
+  <defs>
+    <marker id="arrow-dark" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#1e1b4b"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+    </marker>
+    <marker id="arrow-indigo" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#f59e0b"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <!-- Legend -->
+  <rect x="40" y="355" width="700" height="45" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <line x1="60" y1="377" x2="100" y2="377" stroke="#10b981" stroke-width="2.5"/>
+  <text x="108" y="381" fill="#374151" font-size="10">Built this iteration</text>
+  <line x1="220" y1="377" x2="260" y2="377" stroke="#6366f1" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <text x="268" y="381" fill="#374151" font-size="10">Admin rollback</text>
+  <line x1="360" y1="377" x2="400" y2="377" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="408" y="381" fill="#374151" font-size="10">Scaffolded only (future)</text>
+  <rect x="555" y="369" width="10" height="10" rx="2" fill="none" stroke="#e2e8f0" stroke-dasharray="3,2"/>
+  <text x="572" y="381" fill="#374151" font-size="10">ENUM value exists in DB</text>
+</svg>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
+  <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 14px;">
+    <div style="font-weight: 700; color: #3730a3; margin-bottom: 8px; font-size: 13px;">Activation prerequisites</div>
+    <ul style="margin: 0; padding-left: 16px; color: #4338ca; font-size: 12px; line-height: 1.8;">
+      <li>User status = PREPARATION</li>
+      <li>User has a team assigned (team_id IS NOT NULL)</li>
+      <li>ready_for_activation = true (manager-set flag)</li>
+      <li>No existing active resource record for this user</li>
+    </ul>
+  </div>
+  <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 14px;">
+    <div style="font-weight: 700; color: #065f46; margin-bottom: 8px; font-size: 13px;">Activation side effects (atomic)</div>
+    <ul style="margin: 0; padding-left: 16px; color: #047857; font-size: 12px; line-height: 1.8;">
+      <li>app_user.status → 'ACTIVE'</li>
+      <li>app_user.team_membership_active → true</li>
+      <li>INSERT into resources (upsert)</li>
+      <li>Notification created for user</li>
+    </ul>
+  </div>
+</div>

@@ -95,6 +95,39 @@ async function assertTaskInPlan(planId, taskId) {
     return r.rows.length > 0;
 }
 
+async function getPlanForUserOrId(userId, planId) {
+    if (planId) {
+        const r = await db.query(
+            `SELECT * FROM journeys WHERE id = $1 AND owner_user_id = $2 AND plan_type = 'idp' AND is_active = true AND deleted_at IS NULL`,
+            [planId, userId]
+        );
+        return r.rows[0] || null;
+    }
+    return getPlanForUser(userId);
+}
+
+async function verifyTaskOwnsUser(taskId, userId) {
+    const r = await db.query(
+        `SELECT jc.journey_id FROM journey_tasks jt
+         JOIN journey_quests jq ON jt.quest_id = jq.id
+         JOIN journey_chapters jc ON jq.chapter_id = jc.id
+         JOIN journeys j ON j.id = jc.journey_id
+         WHERE jt.id = $1 AND j.owner_user_id = $2 AND j.plan_type = 'idp' AND j.is_active = true AND j.deleted_at IS NULL`,
+        [taskId, userId]
+    );
+    return r.rows[0] || null;
+}
+
+async function verifyChapterOwnsUser(chapterId, userId) {
+    const r = await db.query(
+        `SELECT jc.journey_id FROM journey_chapters jc
+         JOIN journeys j ON j.id = jc.journey_id
+         WHERE jc.id = $1 AND j.owner_user_id = $2 AND j.plan_type = 'idp' AND j.is_active = true AND j.deleted_at IS NULL`,
+        [chapterId, userId]
+    );
+    return r.rows[0] || null;
+}
+
 // ─── GET /my/plans — user views own IDP plan summaries ─────────────────────
 
 router.get('/my/plans', requireAuth, async (req, res, next) => {
@@ -279,81 +312,8 @@ router.get('/my/plan/:planId', requireAuth, async (req, res, next) => {
             [planId, userId]
         );
         if (planResult.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
-        const plan = planResult.rows[0];
-
-        const chapters = await db.query(
-            `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
-        );
-        const chapterIds = chapters.rows.map(c => c.id);
-        let quests = [], tasks = [], completions = [], linksByTask = {}, attachmentsByTask = {};
-        if (chapterIds.length > 0) {
-            quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
-            const questIds = quests.map(q => q.id);
-            if (questIds.length > 0) {
-                tasks = (await db.query(`SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds])).rows;
-                const taskIds = tasks.map(t => t.id);
-                if (taskIds.length > 0) {
-                    completions = (await db.query(
-                        `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`, [userId, taskIds]
-                    )).rows;
-                    const linksResult = await db.query(
-                        `SELECT id, task_id, url, label, created_at FROM idp_task_links WHERE task_id = ANY($1)`,
-                        [taskIds]
-                    );
-                    for (const l of linksResult.rows) {
-                        if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
-                        linksByTask[l.task_id].push(l);
-                    }
-                    const attsResult = await db.query(
-                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
-                         FROM journey_task_attachments WHERE task_id = ANY($1)
-                         ORDER BY uploaded_at ASC`,
-                        [taskIds]
-                    );
-                    for (const a of attsResult.rows) {
-                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
-                        attachmentsByTask[a.task_id].push(a);
-                    }
-                }
-            }
-        }
-        const completionMap = new Map(completions.map(c => [c.task_id, c]));
-        const today = new Date().toISOString().slice(0, 10);
-        const objectives = chapters.rows.map(ch => {
-            const chQuest = quests.find(q => q.chapter_id === ch.id);
-            const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
-            const done = chTasks.filter(t => completionMap.get(t.id)?.progress_status === 'DONE').length;
-            const overdue = chTasks.filter(t => {
-                const c = completionMap.get(t.id);
-                return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
-            }).length;
-            return {
-                id: ch.id,
-                title: ch.title,
-                description: ch.description,
-                start_date: ch.start_date,
-                due_date: ch.due_date,
-                sort_order: ch.sort_order,
-                progress: { total: chTasks.length, done, completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0, overdue },
-                tasks: chTasks.map(t => {
-                    const c = completionMap.get(t.id);
-                    return {
-                        id: t.id, title: t.title, description: t.description,
-                        start_date: t.start_date, due_date: t.due_date,
-                        priority: t.priority, difficulty: t.difficulty,
-                        is_mandatory: t.is_mandatory, requires_attachment: t.requires_attachment || false,
-                        progress_status: c?.progress_status || 'TODO',
-                        is_overdue: (c?.progress_status || 'TODO') !== 'DONE' && !!t.due_date && t.due_date < today,
-                        completed_at: c?.completed_at || null,
-                        completed_late: computeCompletedLate(t, c),
-                        hold_reason: c?.hold_reason ?? null,
-                        links: linksByTask[t.id] || [],
-                        attachments: attachmentsByTask[t.id] || [],
-                    };
-                }),
-            };
-        });
-        res.json({ ...plan, plan_type: 'idp', objectives, progress: buildProgress(tasks, completions) });
+        const detail = await buildPlanDetail(planResult.rows[0], userId);
+        res.json(detail);
     } catch (err) { next(err); }
 });
 
@@ -997,107 +957,136 @@ router.post('/:userId', requireAuth, requireRole('admin', 'manager'), async (req
     } catch (err) { next(err); }
 });
 
+async function buildPlanDetail(plan, userId) {
+    const chapters = await db.query(
+        `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`,
+        [plan.id]
+    );
+    const chapterIds = chapters.rows.map(c => c.id);
+
+    let quests = [];
+    let tasks = [];
+    let completions = [];
+    let attachmentsByTask = {};
+    let linksByTask = {};
+
+    if (chapterIds.length > 0) {
+        quests = (await db.query(
+            `SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds]
+        )).rows;
+        const questIds = quests.map(q => q.id);
+        if (questIds.length > 0) {
+            tasks = (await db.query(
+                `SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds]
+            )).rows;
+            const taskIds = tasks.map(t => t.id);
+            if (taskIds.length > 0) {
+                completions = (await db.query(
+                    `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`,
+                    [userId, taskIds]
+                )).rows;
+                const attsResult = await db.query(
+                    `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
+                     FROM journey_task_attachments WHERE task_id = ANY($1)
+                     ORDER BY uploaded_at ASC`,
+                    [taskIds]
+                );
+                for (const a of attsResult.rows) {
+                    if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
+                    attachmentsByTask[a.task_id].push(a);
+                }
+                const linksResult = await db.query(
+                    `SELECT id, task_id, url, label, created_at FROM idp_task_links WHERE task_id = ANY($1) ORDER BY created_at ASC`,
+                    [taskIds]
+                );
+                for (const l of linksResult.rows) {
+                    if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
+                    linksByTask[l.task_id].push(l);
+                }
+            }
+        }
+    }
+
+    const completionMap = new Map(completions.map(c => [c.task_id, c]));
+    const today = new Date().toISOString().slice(0, 10);
+
+    const objectives = chapters.rows.map(ch => {
+        const chQuest = quests.find(q => q.chapter_id === ch.id);
+        const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
+        const chCompletions = chTasks.map(t => completionMap.get(t.id)).filter(Boolean);
+        const done = chCompletions.filter(c => c.progress_status === 'DONE').length;
+        const overdue = chTasks.filter(t => {
+            const c = completionMap.get(t.id);
+            return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
+        }).length;
+
+        return {
+            id: ch.id,
+            title: ch.title,
+            description: ch.description,
+            start_date: ch.start_date,
+            due_date: ch.due_date,
+            sort_order: ch.sort_order,
+            progress: {
+                total: chTasks.length,
+                done,
+                completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
+                overdue,
+            },
+            tasks: chTasks.map(t => {
+                const c = completionMap.get(t.id);
+                return {
+                    id: t.id,
+                    title: t.title,
+                    description: t.description,
+                    start_date: t.start_date,
+                    due_date: t.due_date,
+                    priority: t.priority,
+                    difficulty: t.difficulty,
+                    is_mandatory: t.is_mandatory,
+                    requires_attachment: t.requires_attachment || false,
+                    progress_status: c?.progress_status || 'TODO',
+                    completed_at: c?.completed_at || null,
+                    completed_late: computeCompletedLate(t, c),
+                    hold_reason: c?.hold_reason ?? null,
+                    attachments: attachmentsByTask[t.id] || [],
+                    links: linksByTask[t.id] || [],
+                };
+            }),
+        };
+    });
+
+    const allProgress = buildProgress(tasks, completions);
+
+    return { ...plan, plan_type: 'idp', objectives, progress: allProgress };
+}
+
 router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
+        const { planId } = req.query;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found for this user' });
-
-        const chapters = await db.query(
-            `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`,
-            [plan.id]
-        );
-        const chapterIds = chapters.rows.map(c => c.id);
-
-        let quests = [];
-        let tasks = [];
-        let completions = [];
-        let attachmentsByTask = {};
-
-        if (chapterIds.length > 0) {
-            quests = (await db.query(
-                `SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds]
-            )).rows;
-            const questIds = quests.map(q => q.id);
-            if (questIds.length > 0) {
-                tasks = (await db.query(
-                    `SELECT * FROM journey_tasks WHERE quest_id = ANY($1) ORDER BY sort_order`, [questIds]
-                )).rows;
-                const taskIds = tasks.map(t => t.id);
-                if (taskIds.length > 0) {
-                    completions = (await db.query(
-                        `SELECT * FROM user_task_completions WHERE user_id = $1 AND task_id = ANY($2)`,
-                        [userId, taskIds]
-                    )).rows;
-                    const attsResult = await db.query(
-                        `SELECT id, task_id, original_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, user_id
-                         FROM journey_task_attachments WHERE task_id = ANY($1)
-                         ORDER BY uploaded_at ASC`,
-                        [taskIds]
-                    );
-                    for (const a of attsResult.rows) {
-                        if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
-                        attachmentsByTask[a.task_id].push(a);
-                    }
-                }
-            }
+        if (planId) {
+            const plan = await db.query(
+                `SELECT * FROM journeys WHERE id = $1 AND owner_user_id = $2 AND plan_type = 'idp' AND is_active = true AND deleted_at IS NULL`,
+                [planId, userId]
+            );
+            if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+            const detail = await buildPlanDetail(plan.rows[0], userId);
+            return res.json(detail);
         }
 
-        const completionMap = new Map(completions.map(c => [c.task_id, c]));
-        const today = new Date().toISOString().slice(0, 10);
+        const allPlans = await getActivePlansForUser(userId);
+        if (allPlans.length === 0) return res.status(404).json({ error: 'No active IDP plan found for this user' });
 
-        const objectives = chapters.rows.map(ch => {
-            const chQuest = quests.find(q => q.chapter_id === ch.id);
-            const chTasks = chQuest ? tasks.filter(t => t.quest_id === chQuest.id) : [];
-            const chCompletions = chTasks.map(t => completionMap.get(t.id)).filter(Boolean);
-            const done = chCompletions.filter(c => c.progress_status === 'DONE').length;
-            const overdue = chTasks.filter(t => {
-                const c = completionMap.get(t.id);
-                return (!c || c.progress_status !== 'DONE') && t.due_date && t.due_date < today;
-            }).length;
-
-            return {
-                id: ch.id,
-                title: ch.title,
-                description: ch.description,
-                start_date: ch.start_date,
-                due_date: ch.due_date,
-                sort_order: ch.sort_order,
-                progress: {
-                    total: chTasks.length,
-                    done,
-                    completion_pct: chTasks.length > 0 ? Math.round((done / chTasks.length) * 100) : 0,
-                    overdue,
-                },
-                tasks: chTasks.map(t => {
-                    const c = completionMap.get(t.id);
-                    return {
-                        id: t.id,
-                        title: t.title,
-                        description: t.description,
-                        start_date: t.start_date,
-                        due_date: t.due_date,
-                        priority: t.priority,
-                        difficulty: t.difficulty,
-                        is_mandatory: t.is_mandatory,
-                        requires_attachment: t.requires_attachment || false,
-                        progress_status: c?.progress_status || 'TODO',
-                        completed_at: c?.completed_at || null,
-                        completed_late: computeCompletedLate(t, c),
-                        hold_reason: c?.hold_reason ?? null,
-                        attachments: attachmentsByTask[t.id] || [],
-                    };
-                }),
-            };
-        });
-
-        const allProgress = buildProgress(tasks, completions);
-
-        res.json({ ...plan, objectives, progress: allProgress });
+        const result = [];
+        for (const p of allPlans) {
+            result.push(await buildPlanDetail(p, userId));
+        }
+        res.json(result);
     } catch (err) { next(err); }
 });
 
@@ -1106,13 +1095,13 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
 router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const { title, description, start_date, due_date, sort_order = 0 } = req.body;
+        const { title, description, start_date, due_date, sort_order = 0, planId } = req.body;
         if (!title) return res.status(400).json({ error: 'title is required' });
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
+        const plan = await getPlanForUserOrId(userId, planId);
         if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
 
         const slug = `obj-${Date.now()}`;
@@ -1144,8 +1133,9 @@ router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin',
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        const planRow = await verifyChapterOwnsUser(chapterId, userId);
+        if (!planRow) return res.status(404).json({ error: 'Objective not found' });
+        const planId = planRow.journey_id;
 
         const fields = [];
         const values = [];
@@ -1158,7 +1148,7 @@ router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin',
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
         fields.push(`updated_at = NOW()`);
-        values.push(chapterId, plan.id);
+        values.push(chapterId, planId);
         const result = await db.query(
             `UPDATE journey_chapters SET ${fields.join(', ')} WHERE id = $${idx} AND journey_id = $${idx + 1} RETURNING *`,
             values
@@ -1177,14 +1167,8 @@ router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin'
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-
-        // Verify chapter belongs to this plan
-        const check = await db.query(
-            `SELECT id FROM journey_chapters WHERE id = $1 AND journey_id = $2`, [chapterId, plan.id]
-        );
-        if (check.rows.length === 0) return res.status(404).json({ error: 'Objective not found' });
+        const planRow = await verifyChapterOwnsUser(chapterId, userId);
+        if (!planRow) return res.status(404).json({ error: 'Objective not found' });
 
         // Cascade: delete chapter (quests and tasks cascade via FK in DB)
         await db.query(`DELETE FROM journey_chapters WHERE id = $1`, [chapterId]);
@@ -1204,14 +1188,14 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        const planRow = await verifyChapterOwnsUser(chapterId, userId);
+        if (!planRow) return res.status(404).json({ error: 'Objective not found' });
 
         const questResult = await db.query(
             `SELECT jq.id FROM journey_quests jq
              JOIN journey_chapters jc ON jq.chapter_id = jc.id
              WHERE jq.chapter_id = $1 AND jc.journey_id = $2 LIMIT 1`,
-            [chapterId, plan.id]
+            [chapterId, planRow.journey_id]
         );
         if (questResult.rows.length === 0) return res.status(404).json({ error: 'Objective not found' });
         const questId = questResult.rows[0].id;
@@ -1236,8 +1220,8 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        const taskPlan = await verifyTaskOwnsUser(taskId, userId);
+        if (!taskPlan) return res.status(404).json({ error: 'Task not found' });
 
         const completion = await db.query(
             `SELECT progress_status FROM user_task_completions WHERE user_id = $1 AND task_id = $2`,
@@ -1273,7 +1257,7 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
                  WHERE jc.journey_id = $${idx + 1}
                )
              RETURNING *`,
-            [...values, plan.id]
+            [...values, taskPlan.journey_id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found in this plan' });
         res.json(result.rows[0]);
@@ -1289,25 +1273,16 @@ router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manag
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
+        const taskPlan = await verifyTaskOwnsUser(taskId, userId);
+        if (!taskPlan) return res.status(404).json({ error: 'Task not found' });
 
         const completion = await db.query(
             `SELECT progress_status FROM user_task_completions WHERE user_id = $1 AND task_id = $2`,
             [userId, taskId]
         );
         if (completion.rows.length > 0 && completion.rows[0].progress_status === 'DONE') {
-            return res.status(409).json({ error: 'Cannot edit a completed task. Reopen it first.' });
+            return res.status(409).json({ error: 'Cannot delete a completed task. Reopen it first.' });
         }
-
-        const check = await db.query(
-            `SELECT jt.id FROM journey_tasks jt
-             JOIN journey_quests jq ON jt.quest_id = jq.id
-             JOIN journey_chapters jc ON jq.chapter_id = jc.id
-             WHERE jt.id = $1 AND jc.journey_id = $2`,
-            [taskId, plan.id]
-        );
-        if (check.rows.length === 0) return res.status(404).json({ error: 'Task not found in this plan' });
 
         await db.query(`DELETE FROM journey_tasks WHERE id = $1`, [taskId]);
         res.json({ success: true });
@@ -1319,11 +1294,12 @@ router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manag
 router.post('/:userId/complete', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
+        const { planId } = req.body;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
+        const plan = await getPlanForUserOrId(userId, planId);
         if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
 
         const incompleteResult = await db.query(
@@ -1362,6 +1338,7 @@ router.post('/:userId/complete', requireAuth, requireRole('admin', 'manager'), a
 router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
+        const { planId } = req.query;
 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
@@ -1369,7 +1346,7 @@ router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), asyn
         const userResult = await db.query(`SELECT id, name, email FROM app_user WHERE id = $1`, [userId]);
         if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
-        const plan = await getPlanForUser(userId);
+        const plan = await getPlanForUserOrId(userId, planId);
         if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
 
         const chapters = await db.query(

@@ -56,15 +56,22 @@ export default function IDPBuilderPage() {
             const planArr = Array.isArray(data) ? data : data ? [data] : [];
             if (planArr.length === 0) {
                 setNoPlan(true);
+                setPlans([]);
             } else {
                 setNoPlan(false);
                 setPlans(planArr);
-                if (!activePlanId || !planArr.find(p => p.id === activePlanId)) {
-                    setActivePlanId(planArr.find(p => p.is_active)?.id || planArr[0].id);
-                }
+                setActivePlanId(prev => {
+                    if (!prev || !planArr.find(p => p.id === prev)) {
+                        return planArr.find(p => p.is_active)?.id || planArr[0].id;
+                    }
+                    return prev;
+                });
             }
         } catch (err: any) {
-            if (err?.status === 404 || err?.message?.includes('404') || err?.message?.includes('No active')) setNoPlan(true);
+            if (err?.status === 404 || err?.message?.includes('404') || err?.message?.includes('No active')) {
+                setNoPlan(true);
+                setPlans([]);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -78,7 +85,13 @@ export default function IDPBuilderPage() {
             const data = await developmentPlansApi.getForUser(userId, planId);
             const fullPlan = Array.isArray(data) ? data[0] : data;
             if (fullPlan) {
-                setPlans(prev => prev.map(p => p.id === planId ? fullPlan : p));
+                setPlans(prev => {
+                    const exists = prev.find(p => p.id === planId);
+                    if (exists) {
+                        return prev.map(p => p.id === planId ? fullPlan : p);
+                    }
+                    return [...prev, fullPlan];
+                });
             }
         } catch (err: any) {
             toast.error(err?.message || 'Could not load plan');
@@ -114,7 +127,7 @@ export default function IDPBuilderPage() {
     async function handleAddObjective() {
         if (!plan || !newObjTitle.trim()) return;
         try {
-            await developmentPlansApi.addObjective(userId, { title: newObjTitle, due_date: newObjDue || undefined });
+            await developmentPlansApi.addObjective(userId, { title: newObjTitle, due_date: newObjDue || undefined, planId: plan?.id });
             setNewObjTitle('');
             setNewObjDue('');
             setShowObjForm(false);
@@ -159,7 +172,7 @@ export default function IDPBuilderPage() {
     async function handleCompletePlan() {
         if (!plan || !confirm('Mark this plan as complete? This action cannot be undone.')) return;
         try {
-            await developmentPlansApi.completePlan(userId);
+            await developmentPlansApi.completePlan(userId, plan?.id);
             toast.success('Plan marked as complete!');
             await loadPlan();
         } catch (err: any) { toast.error(err?.message || 'Could not complete plan'); }

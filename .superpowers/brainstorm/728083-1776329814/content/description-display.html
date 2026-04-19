@@ -1,0 +1,128 @@
+<h2>Description display on task cards</h2>
+<p class="subtitle">No more "…". Short descriptions show fully. Long ones have an expand toggle — right on the card.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">
+
+  <!-- LEFT: The solution -->
+  <div>
+    <p class="label" style="margin-bottom:10px;">How it works — List view</p>
+
+    <!-- Short description card (fully visible, no toggle) -->
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all 0.15s;" onmouseenter="this.style.borderColor='#a5b4fc';this.style.boxShadow='0 4px 12px rgba(99,102,241,0.1)'" onmouseleave="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;margin-top:1px;"></div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:500;color:#0f172a;">Write unit tests for auth module</span>
+            <span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;">In Progress</span>
+            <span style="font-size:9px;font-weight:500;color:#f59e0b;">Medium</span>
+          </div>
+          <!-- Short description — fully visible, NO toggle -->
+          <p style="font-size:11px;color:#64748b;margin-top:4px;">Cover login, logout, and token refresh flows.</p>
+          <p style="font-size:9px;color:#94a3b8;margin-top:3px;">Due: Apr 20, 2026</p>
+        </div>
+      </div>
+      <div style="margin-top:6px;text-align:right;">
+        <span style="font-size:9px;color:#94a3b8;">✓ short description — shown in full, no toggle needed</span>
+      </div>
+    </div>
+
+    <!-- Long description card — collapsed state -->
+    <div id="long-card" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all 0.15s;" onmouseenter="this.style.borderColor='#a5b4fc';this.style.boxShadow='0 4px 12px rgba(99,102,241,0.1)'" onmouseleave="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;margin-top:1px;"></div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:500;color:#0f172a;">Prepare regression test suite for v2.1</span>
+            <span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:#fff1f2;color:#e11d48;border:1px solid #fecdd3;">High</span>
+          </div>
+          <!-- Long description — clamped to 3 lines -->
+          <p id="desc-collapsed" style="font-size:11px;color:#64748b;margin-top:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">
+            Cover all edge cases identified during the sprint review. Include mobile viewport tests and ensure all critical paths have assertions. Coordinate with dev team for environment setup. Add smoke tests for the payment flow and the user registration path.
+          </p>
+          <p id="desc-expanded" style="font-size:11px;color:#64748b;margin-top:4px;display:none;">
+            Cover all edge cases identified during the sprint review. Include mobile viewport tests and ensure all critical paths have assertions. Coordinate with dev team for environment setup. Add smoke tests for the payment flow and the user registration path.
+          </p>
+          <!-- Show more toggle -->
+          <button id="show-more-btn" onclick="event.stopPropagation(); toggleDesc()" style="font-size:10px;color:#6366f1;font-weight:600;background:none;border:none;padding:0;margin-top:3px;cursor:pointer;">Show more ↓</button>
+          <p style="font-size:9px;color:#94a3b8;margin-top:3px;">Due: Apr 24, 2026</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function toggleDesc() {
+        const collapsed = document.getElementById('desc-collapsed');
+        const expanded = document.getElementById('desc-expanded');
+        const btn = document.getElementById('show-more-btn');
+        if (collapsed.style.display !== 'none') {
+          collapsed.style.display = 'none';
+          expanded.style.display = 'block';
+          btn.textContent = 'Show less ↑';
+        } else {
+          collapsed.style.display = '-webkit-box';
+          expanded.style.display = 'none';
+          btn.textContent = 'Show more ↓';
+        }
+      }
+    </script>
+
+    <p style="font-size:11px;color:#64748b;margin-top:4px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;">
+      ↑ Try clicking <strong>"Show more"</strong> on the card above
+    </p>
+  </div>
+
+  <!-- RIGHT: Rules + modal comparison -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <div>
+      <p class="label" style="margin-bottom:8px;">The rule</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>
+            <div>
+              <span style="font-size:12px;font-weight:600;color:#0f172a;">Short description (≤ 120 chars)</span>
+              <p style="font-size:11px;color:#64748b;margin-top:2px;">Shown in full. No toggle. No truncation.</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#6366f1;flex-shrink:0;"></div>
+            <div>
+              <span style="font-size:12px;font-weight:600;color:#0f172a;">Long description (&gt; 120 chars)</span>
+              <p style="font-size:11px;color:#64748b;margin-top:2px;">Shows 3 lines + "Show more ↓" link. One click to see everything.</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#94a3b8;flex-shrink:0;"></div>
+            <div>
+              <span style="font-size:12px;font-weight:600;color:#0f172a;">No description</span>
+              <p style="font-size:11px;color:#64748b;margin-top:2px;">Nothing rendered. No empty space.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="label" style="margin-bottom:8px;">Modal — always full text</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+        <p style="font-size:11px;color:#475569;">When you click the card to open the modal, the description textarea shows <strong>every word</strong> with no truncation. You can read and edit the full text there.</p>
+        <div style="margin-top:10px;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:11px;color:#475569;line-height:1.6;">
+          Cover all edge cases identified during the sprint review. Include mobile viewport tests and ensure all critical paths have assertions. Coordinate with dev team for environment setup. Add smoke tests for the payment flow and the user registration path.
+        </div>
+        <p style="font-size:10px;color:#6366f1;margin-top:6px;font-weight:500;">↑ No "…". Full text. Scrollable if very long.</p>
+      </div>
+    </div>
+
+    <div>
+      <p class="label" style="margin-bottom:8px;">Kanban cards — same behaviour</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+        <p style="font-size:11px;color:#475569;">The same expand/collapse logic applies to kanban cards. Show more / Show less works the same way. Clicking anywhere else on the card still opens the modal.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;text-align:center;">Does this solve the problem? Click "Show more" above to try it.</p>

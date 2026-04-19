@@ -1,0 +1,106 @@
+<h2>How should the task detail open?</h2>
+<p class="subtitle">3 approaches — pick the one that feels right. I've marked my recommendation.</p>
+
+<div class="cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px;">
+
+  <!-- Option A: Slide-over -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px 8px 0 0;">
+      <div style="display:flex;gap:8px;height:180px;">
+        <!-- Task list (dimmed) -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;opacity:0.4;">
+          <div style="height:14px;background:#cbd5e1;border-radius:4px;"></div>
+          <div style="height:14px;background:#cbd5e1;border-radius:4px;width:80%;"></div>
+          <div style="height:14px;background:#cbd5e1;border-radius:4px;width:60%;"></div>
+          <div style="height:14px;background:#cbd5e1;border-radius:4px;"></div>
+        </div>
+        <!-- Slide-over panel -->
+        <div style="width:60%;background:white;border-radius:8px;border:2px solid #6366f1;padding:10px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 20px rgba(99,102,241,0.15);">
+          <div style="height:12px;background:#1e293b;border-radius:3px;width:70%;"></div>
+          <div style="height:8px;background:#94a3b8;border-radius:3px;width:100%;"></div>
+          <div style="height:8px;background:#94a3b8;border-radius:3px;width:90%;"></div>
+          <div style="height:8px;background:#94a3b8;border-radius:3px;width:80%;"></div>
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <div style="height:20px;width:50px;background:#e0e7ff;border-radius:4px;"></div>
+            <div style="height:20px;width:50px;background:#fef3c7;border-radius:4px;"></div>
+          </div>
+          <div style="height:28px;background:#6366f1;border-radius:6px;margin-top:auto;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Slide-over panel</h3>
+      <p>Panel slides in from the right. Task list stays visible on the left (dimmed). Good if you want context while editing.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros" style="font-size:11px;"><h4>Pros</h4><ul><li>List context stays visible</li><li>Feels modern (Linear, Notion style)</li></ul></div>
+        <div class="cons" style="font-size:11px;"><h4>Cons</h4><ul><li>Cramped on mobile</li><li>More complex animation</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: Centered Modal — RECOMMENDED -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)" style="cursor:pointer;border:2px solid #6366f1;position:relative;">
+    <div style="position:absolute;top:-1px;right:12px;background:#6366f1;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:0.05em;">RECOMMENDED</div>
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px 8px 0 0;">
+      <div style="position:relative;height:180px;display:flex;align-items:center;justify-content:center;">
+        <!-- Dimmed background -->
+        <div style="position:absolute;inset:0;background:rgba(15,23,42,0.4);border-radius:8px;backdrop-filter:blur(2px);"></div>
+        <!-- Centered modal -->
+        <div style="position:relative;background:white;border-radius:12px;padding:14px;width:80%;box-shadow:0 20px 40px rgba(0,0,0,0.25);display:flex;flex-direction:column;gap:6px;">
+          <div style="height:12px;background:#1e293b;border-radius:3px;width:65%;"></div>
+          <div style="height:8px;background:#94a3b8;border-radius:3px;width:100%;margin-top:4px;"></div>
+          <div style="height:8px;background:#94a3b8;border-radius:3px;width:85%;"></div>
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <div style="height:18px;width:48px;background:#e0e7ff;border-radius:4px;"></div>
+            <div style="height:18px;width:48px;background:#fef3c7;border-radius:4px;"></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px;justify-content:flex-end;">
+            <div style="height:24px;width:48px;background:#f1f5f9;border-radius:6px;"></div>
+            <div style="height:24px;width:60px;background:#6366f1;border-radius:6px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Centered modal ⭐</h3>
+      <p>Standard centered dialog with backdrop blur. Matches the existing delete confirm modal pattern exactly.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros" style="font-size:11px;"><h4>Pros</h4><ul><li>Matches existing patterns</li><li>Works on mobile</li><li>Clean focus on the task</li></ul></div>
+        <div class="cons" style="font-size:11px;"><h4>Cons</h4><ul><li>Hides the task list</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option C: Inline expand -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px 8px 0 0;">
+      <div style="display:flex;flex-direction:column;gap:6px;height:180px;">
+        <!-- Collapsed card -->
+        <div style="height:32px;background:#e2e8f0;border-radius:6px;"></div>
+        <!-- Expanded card (highlighted) -->
+        <div style="flex:1;background:white;border-radius:6px;border:2px solid #6366f1;padding:8px;display:flex;flex-direction:column;gap:5px;">
+          <div style="height:10px;background:#1e293b;border-radius:3px;width:60%;"></div>
+          <div style="height:7px;background:#94a3b8;border-radius:3px;width:100%;"></div>
+          <div style="height:7px;background:#94a3b8;border-radius:3px;width:75%;"></div>
+          <div style="display:flex;gap:4px;margin-top:auto;">
+            <div style="height:16px;width:40px;background:#e0e7ff;border-radius:4px;"></div>
+            <div style="height:16px;width:52px;background:#6366f1;border-radius:4px;"></div>
+          </div>
+        </div>
+        <!-- Another collapsed card -->
+        <div style="height:32px;background:#e2e8f0;border-radius:6px;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Inline expand</h3>
+      <p>The card expands in place. No overlay. Other cards stay visible above and below.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros" style="font-size:11px;"><h4>Pros</h4><ul><li>No context switch</li><li>No overlay to dismiss</li></ul></div>
+        <div class="cons" style="font-size:11px;"><h4>Cons</h4><ul><li>Awkward in kanban view</li><li>No consistent position for edits</li><li>Shifts layout</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:20px;text-align:center;">Click an option to select it, then let me know in the terminal.</p>

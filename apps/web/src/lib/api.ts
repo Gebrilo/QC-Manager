@@ -1110,7 +1110,7 @@ export const developmentPlansApi = {
         }),
 
     // Manager: add objective
-    addObjective: (userId: string, data: { title: string; description?: string; due_date?: string }) =>
+    addObjective: (userId: string, data: { title: string; description?: string; due_date?: string; planId?: string }) =>
         fetchApi<IDPObjective>(`/api/development-plans/${userId}/objectives`, {
             method: 'POST',
             body: JSON.stringify(data),
@@ -1150,9 +1150,10 @@ export const developmentPlansApi = {
         }),
 
     // Manager: complete plan
-    completePlan: (userId: string) =>
+    completePlan: (userId: string, planId?: string) =>
         fetchApi<{ success: boolean }>(`/api/development-plans/${userId}/complete`, {
             method: 'POST',
+            body: JSON.stringify({ planId }),
         }),
 
     // Manager: get report
