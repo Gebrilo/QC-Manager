@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { myJourneysApi, developmentPlansApi, AssignedJourney, IDPPlan } from '../../src/lib/api';
+import { myJourneysApi, developmentPlansApi, AssignedJourney, IDPPlan, IDPTask } from '../../src/lib/api';
 import { useAuth } from '../../src/components/providers/AuthProvider';
-
-function showError(msg: string) { alert(msg); }
-function showSuccess(msg: string) { console.log(msg); }
+import { useToast } from '../../src/components/ui/Toast';
+import { TaskStatusControl } from '../../src/components/idp/TaskStatusControl';
+import { TaskStatusBadge, inferBadgeKind } from '../../src/components/idp/TaskStatusBadge';
+import { TaskCommentsPanel } from '../../src/components/idp/TaskCommentsPanel';
 
 function fmtDate(v?: string | null) {
     if (!v) return '';
     return v.slice(0, 10);
+}
+
+function lateSuffix(dueDate: string, completedAt: string) {
+    const due = new Date(dueDate);
+    const done = new Date(completedAt);
+    const days = Math.max(1, Math.round((done.getTime() - due.getTime()) / 86400000));
+    return `Late by ${days}d`;
 }
 
 export default function JourneysPage() {
@@ -18,7 +26,9 @@ export default function JourneysPage() {
     const [idpPlan, setIdpPlan] = useState<IDPPlan | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
-    const { userStatus } = useAuth();
+    const { userStatus, user } = useAuth();
+    const toast = useToast();
+    const [commentsTask, setCommentsTask] = useState<IDPTask | null>(null);
 
     const isActive = userStatus === 'ACTIVE';
     const pageTitle   = isActive ? 'My Development Plan' : 'My Journeys';
@@ -52,14 +62,12 @@ export default function JourneysPage() {
         load();
     }, [isActive]);
 
-    async function handleUpdateTaskStatus(taskId: string, currentStatus: string) {
-        const next = currentStatus === 'TODO' ? 'IN_PROGRESS' : currentStatus === 'IN_PROGRESS' ? 'DONE' : 'TODO';
+    async function reloadPlan() {
         try {
-            await developmentPlansApi.updateMyTaskStatus(taskId, next as 'TODO' | 'IN_PROGRESS' | 'DONE');
             const updated = await developmentPlansApi.getMy();
             setIdpPlan(updated);
-        } catch (err) {
-            console.error('Failed to update task status:', err);
+        } catch (err: any) {
+            toast.error(err?.message || 'Could not refresh plan');
         }
     }
 
@@ -117,36 +125,48 @@ export default function JourneysPage() {
                                         <span className="text-sm text-slate-500">{obj.progress.completion_pct}%</span>
                                     </div>
                                     <div className="space-y-2">
-                                        {obj.tasks.map(task => (
-                                            <div key={task.id} className={`flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0 ${task.is_overdue ? 'opacity-80' : ''}`}>
-                                                <button
-                                                    onClick={() => handleUpdateTaskStatus(task.id, task.progress_status)}
-                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors
-                                                        ${task.progress_status === 'DONE' ? 'bg-emerald-500 border-emerald-500' :
-                                                          task.progress_status === 'IN_PROGRESS' ? 'bg-indigo-200 border-indigo-500' :
-                                                          'border-slate-300 dark:border-slate-600'}`}
-                                                    title={`Click to advance: ${task.progress_status}`}
+                                        {obj.tasks.map(task => {
+                                            const badgeKind = inferBadgeKind(task);
+                                            const showBadge = ['on_hold', 'overdue', 'done_late'].includes(badgeKind);
+                                            return (
+                                                <div
+                                                    key={task.id}
+                                                    className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0"
                                                 >
-                                                    {task.progress_status === 'DONE' && (
-                                                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                                                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <span className={`flex-1 text-sm ${task.progress_status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                                    {task.title}
-                                                </span>
-                                                {task.progress_status === 'DONE' && task.completed_at ? (
-                                                    <span className="text-xs text-emerald-500">Completed {fmtDate(task.completed_at)}</span>
-                                                ) : task.is_overdue ? (
-                                                    <span className="text-xs text-red-500">overdue</span>
-                                                ) : (task.start_date || task.due_date) ? (
-                                                    <span className="text-xs text-slate-400">
-                                                        {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                                    <TaskStatusControl task={task} onStatusChanged={reloadPlan} />
+                                                    <span className={`flex-1 text-sm ${task.progress_status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                        {task.title}
                                                     </span>
-                                                ) : null}
-                                            </div>
-                                        ))}
+                                                    {showBadge && (
+                                                        <TaskStatusBadge
+                                                            kind={badgeKind}
+                                                            suffix={badgeKind === 'done_late' && task.completed_at && task.due_date
+                                                                ? lateSuffix(task.due_date, task.completed_at)
+                                                                : undefined}
+                                                        />
+                                                    )}
+                                                    {task.progress_status === 'DONE' && badgeKind === 'done' && task.completed_at && (
+                                                        <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                                            Completed {fmtDate(task.completed_at)}
+                                                        </span>
+                                                    )}
+                                                    {(task.start_date || task.due_date) && task.progress_status !== 'DONE' && badgeKind !== 'overdue' && badgeKind !== 'on_hold' && (
+                                                        <span className="text-xs text-slate-400">
+                                                            {task.start_date ? fmtDate(task.start_date) : ''}{task.start_date && task.due_date ? ' → ' : ''}{task.due_date ? fmtDate(task.due_date) : ''}
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Open comments for ${task.title}`}
+                                                        onClick={() => setCommentsTask(task)}
+                                                        className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                                        title="Comments"
+                                                    >
+                                                        💬
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             ))}
@@ -176,6 +196,14 @@ export default function JourneysPage() {
                     ))}
                 </div>
             )}
+
+            <TaskCommentsPanel
+                open={commentsTask !== null}
+                taskId={commentsTask?.id ?? null}
+                taskTitle={commentsTask?.title ?? ''}
+                currentUserId={user?.id ?? ''}
+                onClose={() => setCommentsTask(null)}
+            />
         </div>
     );
 }
