@@ -154,6 +154,16 @@ export default function IDPBuilderPage() {
         } catch (err: any) { toast.error(err?.message || 'Could not complete plan'); }
     }
 
+    async function handleDeletePlan() {
+        if (!plan || !confirm('Delete this plan and all its objectives and tasks? This cannot be undone.')) return;
+        try {
+            await developmentPlansApi.deletePlan(userId, plan.id);
+            toast.success('Plan deleted');
+            setPlans(prev => prev.filter(p => p.id !== plan.id));
+            await loadPlan();
+        } catch (err: any) { toast.error(err?.message || 'Could not delete plan'); }
+    }
+
     async function handleExportReport() {
         if (!plan) return;
         try {
@@ -282,6 +292,12 @@ export default function IDPBuilderPage() {
                             Mark Complete
                         </button>
                     )}
+                    <button
+                        onClick={handleDeletePlan}
+                        className="px-3 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                        Delete Plan
+                    </button>
                     <button
                         onClick={() => setShowNewPlanForm(true)}
                         className="px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"

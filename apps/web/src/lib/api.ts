@@ -1212,6 +1212,11 @@ export const developmentPlansApi = {
             body: JSON.stringify(data),
         }),
 
+    deletePlan: (userId: string, planId: string) =>
+        fetchApi<{ deleted: boolean }>(`/api/development-plans/${userId}/plan/${planId}`, {
+            method: 'DELETE',
+        }),
+
     addTaskLink: (userId: string, taskId: string, url: string, label: string) =>
         fetchApi<IDPTaskLink>(`/api/development-plans/${userId}/tasks/${taskId}/links`, {
             method: 'POST',

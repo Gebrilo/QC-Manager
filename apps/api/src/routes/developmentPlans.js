@@ -940,6 +940,25 @@ router.patch('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager
     } catch (err) { next(err); }
 });
 
+router.delete('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+    try {
+        const { userId, planId } = req.params;
+
+        const allowed = await canAccessUser(req.user, userId);
+        if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
+
+        const plan = await db.query(
+            `SELECT id FROM journeys WHERE id = $1 AND owner_user_id = $2 AND plan_type = 'idp'`,
+            [planId, userId]
+        );
+        if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+
+        await db.query(`DELETE FROM journeys WHERE id = $1`, [planId]);
+
+        res.json({ deleted: true });
+    } catch (err) { next(err); }
+});
+
 router.post('/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
