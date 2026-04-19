@@ -38,11 +38,10 @@ export default function DevelopmentPlanPage() {
         let cancelled = false;
         (async () => {
             try {
-                const planList = await developmentPlansApi.listMyPlans();
-                if (!cancelled && planList.length > 0) {
-                    setActivePlanId(planList[0].id);
-                    const fullPlan = await developmentPlansApi.getMyPlan(planList[0].id);
-                    if (!cancelled) setPlans([fullPlan]);
+                const allPlans = await developmentPlansApi.getMy();
+                if (!cancelled && allPlans.length > 0) {
+                    setPlans(allPlans);
+                    setActivePlanId(allPlans[0].id);
                 }
             } catch {
             } finally {
@@ -63,26 +62,21 @@ export default function DevelopmentPlanPage() {
     }
 
     const reloadPlan = useCallback(async () => {
-        if (!activePlanId) {
-            try {
-                const planList = await developmentPlansApi.listMyPlans();
-                if (planList.length > 0) {
-                    setActivePlanId(planList[0].id);
-                    const fullPlan = await developmentPlansApi.getMyPlan(planList[0].id);
-                    setPlans([fullPlan]);
-                }
-            } catch (err: any) {
-                toast.error(err?.message || 'Could not refresh plan');
-            }
-            return;
-        }
         try {
-            const updated = await developmentPlansApi.getMyPlan(activePlanId);
-            setPlans(prev => prev.map(p => p.id === activePlanId ? updated : p));
+            const allPlans = await developmentPlansApi.getMy();
+            setPlans(allPlans);
+            if (allPlans.length > 0) {
+                setActivePlanId(prev => {
+                    if (!prev || !allPlans.find(p => p.id === prev)) {
+                        return allPlans[0].id;
+                    }
+                    return prev;
+                });
+            }
         } catch (err: any) {
             toast.error(err?.message || 'Could not refresh plan');
         }
-    }, [activePlanId, toast]);
+    }, [toast]);
 
     async function handleUpload(taskId: string, file: File) {
         await developmentPlansApi.uploadMyTaskAttachment(taskId, file);
