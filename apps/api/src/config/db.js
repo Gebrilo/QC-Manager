@@ -1480,6 +1480,99 @@ const runMigrations = async () => {
         await client.query(`COMMENT ON COLUMN journeys.owner_user_id IS 'For IDP plans only: the ACTIVE user this plan belongs to'`);
         await client.query(`COMMENT ON COLUMN journeys.created_by_manager IS 'Manager who created this IDP plan'`);
 
+        // =====================================================
+        // Migration 023: IDP hold and comments
+        // =====================================================
+
+        await client.query(`
+            ALTER TABLE user_task_completions
+                DROP CONSTRAINT IF EXISTS user_task_completions_progress_status_check
+        `);
+
+        await client.query(`
+            ALTER TABLE user_task_completions
+                ADD CONSTRAINT user_task_completions_progress_status_check
+                CHECK (progress_status IN ('TODO', 'IN_PROGRESS', 'ON_HOLD', 'DONE'))
+        `);
+
+        await client.query(`
+            ALTER TABLE user_task_completions
+                ADD COLUMN IF NOT EXISTS hold_reason TEXT
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS idp_task_comment (
+                id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID        NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                task_id     UUID        NOT NULL REFERENCES journey_tasks(id) ON DELETE CASCADE,
+                author_id   UUID        NOT NULL REFERENCES app_user(id) ON DELETE RESTRICT,
+                body        TEXT        NOT NULL CHECK (length(body) > 0),
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_idp_task_comment_user_task ON idp_task_comment(user_id, task_id, created_at DESC)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_idp_task_comment_author ON idp_task_comment(author_id)`);
+
+        // =====================================================
+        // Migration 024: IDP enhancements — links, attachment ownership, requires_attachment
+        // =====================================================
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS idp_task_links (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id UUID NOT NULL REFERENCES journey_tasks(id) ON DELETE CASCADE,
+                url TEXT NOT NULL,
+                label VARCHAR(500) NOT NULL,
+                created_by UUID NOT NULL REFERENCES app_user(id),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_idp_task_links_task ON idp_task_links(task_id)`);
+
+        await client.query(`
+            ALTER TABLE journey_task_attachments
+                ADD COLUMN IF NOT EXISTS uploaded_by_role VARCHAR(20) NOT NULL DEFAULT 'resource'
+                    CHECK (uploaded_by_role IN ('manager', 'resource'))
+        `);
+
+        await client.query(`
+            ALTER TABLE journey_task_attachments
+                ADD COLUMN IF NOT EXISTS storage_path TEXT,
+                ADD COLUMN IF NOT EXISTS bucket_name VARCHAR(100)
+        `);
+
+        await client.query(`
+            ALTER TABLE journey_tasks
+                ADD COLUMN IF NOT EXISTS requires_attachment BOOLEAN NOT NULL DEFAULT false
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.updated_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql
+        `);
+
+        await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON journey_chapters`);
+        await client.query(`
+            CREATE TRIGGER set_updated_at
+                BEFORE UPDATE ON journey_chapters
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+        `);
+
+        await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON journey_tasks`);
+        await client.query(`
+            CREATE TRIGGER set_updated_at
+                BEFORE UPDATE ON journey_tasks
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
