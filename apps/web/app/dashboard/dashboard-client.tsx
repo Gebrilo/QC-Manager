@@ -188,22 +188,18 @@ export function DashboardClient() {
             )}
             {/* Metrics Summary Cards — skeleton while loading */}
             {isLoading && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 animate-pulse">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
-                                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
-                                </div>
-                            </div>
+                        <div key={i} className="glass-card rounded-xl p-5 animate-pulse">
+                            <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-3" />
+                            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-2" />
+                            <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
                         </div>
                     ))}
                 </div>
             )}
             {!isLoading && metrics && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <StatCard
                         title="Total Tasks"
                         value={metrics.total_tasks || 0}
@@ -259,7 +255,7 @@ export function DashboardClient() {
                 <div className="space-y-6">
                     {/* Row 1: Task Distribution & Projects */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Card className="flex flex-col items-center shadow-md hover:shadow-lg transition-shadow duration-300">
+                        <Card className="flex flex-col items-center hover:shadow-md transition-shadow duration-300">
                             <CardHeader className="self-start w-full flex flex-row items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Task Distribution</CardTitle>
@@ -286,7 +282,7 @@ export function DashboardClient() {
                             </CardContent>
                         </Card>
 
-                        <Card className="md:col-span-2 shadow-md hover:shadow-lg transition-shadow duration-300">
+                        <Card className="md:col-span-2 hover:shadow-md transition-shadow duration-300">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tasks per Project</CardTitle>
@@ -319,7 +315,8 @@ export function DashboardClient() {
             )}
 
             <section>
-                <div className="flex items-center justify-between mb-4">
+                <div className="glass-card rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                         Task List
                         {!isLoading && (searchQuery || Object.values(activeFilters).some(Boolean)) && (
@@ -328,6 +325,9 @@ export function DashboardClient() {
                             </span>
                         )}
                     </h2>
+                    <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                        {filteredTasks.length} tasks
+                    </span>
                 </div>
                 <TaskTable
                     tasks={filteredTasks}
@@ -335,6 +335,7 @@ export function DashboardClient() {
                     pagination={{ total: filteredTasks.length, limit: 10, offset: 0 }}
                     onPageChange={() => { }}
                 />
+                </div>
             </section>
         </div>
     );
