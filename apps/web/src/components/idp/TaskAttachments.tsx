@@ -66,7 +66,7 @@ export default function TaskAttachments({ attachments, isManager, currentUserId,
                                 </button>
                                 <span className="text-gray-400">{formatFileSize(att.size_bytes)}</span>
                                 {canDelete(att) && (
-                                    <button onClick={() => onDelete(att.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity" title="Delete">
+                                    <button onClick={() => onDelete(att.id)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 transition-opacity" title="Delete">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 )}
@@ -80,14 +80,14 @@ export default function TaskAttachments({ attachments, isManager, currentUserId,
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Submissions</p>
                     <div className="space-y-1">
                         {resourceFiles.map((att) => (
-                            <div key={att.id} className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1.5 rounded-md group">
-                                <svg className="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <button onClick={() => handleDownload(att)} disabled={downloading === att.id} className="text-green-700 dark:text-green-300 hover:underline truncate flex-1 text-left disabled:opacity-50">
+                            <div key={att.id} className="flex items-center gap-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1.5 rounded-md group">
+                                <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <button onClick={() => handleDownload(att)} disabled={downloading === att.id} className="text-emerald-700 dark:text-emerald-300 hover:underline truncate flex-1 text-left disabled:opacity-50">
                                     {att.original_name}
                                 </button>
                                 <span className="text-gray-400">{formatFileSize(att.size_bytes)}</span>
                                 {canDelete(att) && (
-                                    <button onClick={() => onDelete(att.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity" title="Delete">
+                                    <button onClick={() => onDelete(att.id)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 transition-opacity" title="Delete">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 )}

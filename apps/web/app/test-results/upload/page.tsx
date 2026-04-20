@@ -234,8 +234,8 @@ export default function UploadTestResultsPage() {
 
             {/* Error Display */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
+              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-4">
+                <p className="text-sm text-rose-800 dark:text-rose-400">{error}</p>
               </div>
             )}
 
@@ -266,8 +266,8 @@ export default function UploadTestResultsPage() {
         <div className="space-y-6">
           <Card className="p-6">
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full mb-4">
-                <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 dark:bg-emerald-900/20 rounded-full mb-4">
+                <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -287,8 +287,8 @@ export default function UploadTestResultsPage() {
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Total</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                   {uploadResult.summary.imported}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Imported</div>
@@ -299,8 +299,8 @@ export default function UploadTestResultsPage() {
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Updated</div>
               </div>
-              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+              <div className="bg-rose-50 dark:bg-rose-900/20 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
                   {uploadResult.summary.errors}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Errors</div>
@@ -318,7 +318,7 @@ export default function UploadTestResultsPage() {
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
-                  className="bg-green-600 h-2 rounded-full transition-all"
+                  className="bg-emerald-600 h-2 rounded-full transition-all"
                   style={{ width: uploadResult.summary.success_rate }}
                 />
               </div>
@@ -330,9 +330,9 @@ export default function UploadTestResultsPage() {
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Errors ({uploadResult.details.errors.length})
                 </h3>
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 max-h-60 overflow-y-auto">
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-4 max-h-60 overflow-y-auto">
                   {uploadResult.details.errors.map((err, index) => (
-                    <div key={index} className="text-sm text-red-800 dark:text-red-400 mb-2">
+                    <div key={index} className="text-sm text-rose-800 dark:text-rose-400 mb-2">
                       Row {err.row}: {err.test_case_id} - {err.error}
                     </div>
                   ))}

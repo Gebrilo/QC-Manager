@@ -66,7 +66,7 @@ export default function RiskIndicatorsWidget({
         return (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Quality Risks</h3>
-                <div className="text-red-600 dark:text-red-400">
+                <div className="text-rose-600 dark:text-rose-400">
                     {error || 'No data available'}
                 </div>
             </div>
@@ -85,8 +85,8 @@ export default function RiskIndicatorsWidget({
     };
 
     const getTrendColor = () => {
-        if (data.pass_rate_change > 5) return 'text-green-600 dark:text-green-400';
-        if (data.pass_rate_change < -5) return 'text-red-600 dark:text-red-400';
+        if (data.pass_rate_change > 5) return 'text-emerald-600 dark:text-emerald-400';
+        if (data.pass_rate_change < -5) return 'text-rose-600 dark:text-rose-400';
         return 'text-slate-600 dark:text-slate-400';
     };
 
@@ -156,10 +156,10 @@ export default function RiskIndicatorsWidget({
                                 return (
                                     <div
                                         key={flag}
-                                        className="flex items-start p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"
+                                        className="flex items-start p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg"
                                         title={description}
                                     >
-                                        <span className="inline-flex items-center justify-center w-6 h-6 bg-yellow-500 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
+                                        <span className="inline-flex items-center justify-center w-6 h-6 bg-amber-500 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
                                             !
                                         </span>
                                         <div className="flex-1">

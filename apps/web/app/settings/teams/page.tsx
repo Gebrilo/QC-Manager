@@ -245,13 +245,13 @@ export default function TeamsAdminPage() {
             {(success || error) && (
             <div className="space-y-2">
                 {success && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         {success}
                     </div>
                 )}
                 {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+                    <div className="p-3 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-sm flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         {error}
                     </div>
@@ -288,7 +288,7 @@ export default function TeamsAdminPage() {
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleDelete(team); }}
-                                    className="text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors flex-shrink-0"
+                                    className="text-slate-300 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 transition-colors flex-shrink-0"
                                     title="Delete team"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -371,7 +371,7 @@ export default function TeamsAdminPage() {
                                             </div>
                                             <button
                                                 onClick={() => handleRemoveMember(m.id, m.name)}
-                                                className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                                                className="text-xs text-slate-400 hover:text-rose-500 transition-colors"
                                             >
                                                 Remove
                                             </button>
@@ -408,7 +408,7 @@ export default function TeamsAdminPage() {
                                             </div>
                                             <button
                                                 onClick={() => handleUnassignProject(p.id, p.project_name)}
-                                                className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                                                className="text-xs text-slate-400 hover:text-rose-500 transition-colors"
                                             >
                                                 Unassign
                                             </button>
@@ -520,8 +520,8 @@ export default function TeamsAdminPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4">
                         <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                 </svg>
                             </div>
@@ -538,7 +538,7 @@ export default function TeamsAdminPage() {
                                 Cancel
                             </button>
                             <button onClick={confirmDelete} disabled={isDeleting}
-                                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
+                                className="px-4 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 transition-colors">
                                 {isDeleting ? 'Deleting…' : 'Delete Team'}
                             </button>
                         </div>

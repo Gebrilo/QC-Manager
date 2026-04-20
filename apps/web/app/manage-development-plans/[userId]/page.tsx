@@ -221,8 +221,8 @@ export default function IDPBuilderPage() {
 
     const priorityColors: Record<string, string> = {
         low: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-        medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-        high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        high: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
     };
 
     const statusColors: Record<string, string> = {
@@ -298,7 +298,7 @@ export default function IDPBuilderPage() {
                     <div className="flex items-center gap-3 mt-3">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{plan.progress.completion_pct}% complete</span>
                         {plan.progress.overdue_tasks > 0 && (
-                            <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 px-2 py-0.5 rounded-full">
                                 {plan.progress.overdue_tasks} overdue
                             </span>
                         )}
@@ -323,7 +323,7 @@ export default function IDPBuilderPage() {
                     )}
                     <button
                         onClick={handleDeletePlan}
-                        className="px-3 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        className="px-3 py-2 text-sm font-medium rounded-lg border border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                     >
                         Delete Plan
                     </button>
@@ -381,7 +381,7 @@ export default function IDPBuilderPage() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-sm text-slate-500">{obj.progress.completion_pct}%</span>
-                                <button onClick={() => handleDeleteObjective(obj.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                                <button onClick={() => handleDeleteObjective(obj.id)} className="text-xs text-rose-400 hover:text-rose-600 transition-colors">Delete</button>
                             </div>
                         </div>
 
@@ -398,7 +398,7 @@ export default function IDPBuilderPage() {
                                                 {task.title}
                                             </span>
                                             {task.requires_attachment && !task.attachments?.some(a => a.uploaded_by_role === 'resource') && (
-                                                <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded">
+                                                <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded">
                                                     Attachment required
                                                 </span>
                                             )}
@@ -444,12 +444,15 @@ export default function IDPBuilderPage() {
                                                 type="button"
                                                 aria-label={`Open comments for ${task.title}`}
                                                 onClick={() => setCommentsTask(task)}
-                                                className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                                className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
                                                 title="Comments"
                                             >
                                                 💬
+                                                {(task.comment_count ?? 0) > 0 && (
+                                                    <span className="font-medium text-indigo-500">{task.comment_count}</span>
+                                                )}
                                             </button>
-                                            <button onClick={() => handleDeleteTask(task.id)} disabled={isDone} className={`text-xs transition-colors ${isDone ? 'text-slate-300 cursor-not-allowed' : 'text-red-400 hover:text-red-600'}`} title={isDone ? 'Reopen task first to delete' : 'Delete task'}>×</button>
+                                            <button onClick={() => handleDeleteTask(task.id)} disabled={isDone} className={`text-xs transition-colors ${isDone ? 'text-slate-300 cursor-not-allowed' : 'text-rose-400 hover:text-rose-600'}`} title={isDone ? 'Reopen task first to delete' : 'Delete task'}>×</button>
                                         </div>
                                         <TaskLinks links={task.links || []} isManager={true}
                                             onAddLink={async (url, label) => {

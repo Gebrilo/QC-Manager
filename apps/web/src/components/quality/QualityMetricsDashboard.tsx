@@ -74,7 +74,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
   if (error) {
     return (
       <Card className="p-6">
-        <div className="text-center text-red-600 dark:text-red-400">
+        <div className="text-center text-rose-600 dark:text-rose-400">
           {error}
         </div>
       </Card>
@@ -127,9 +127,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           {/* Pass Rate */}
           <div className="text-center">
             <div className={`text-3xl font-bold ${
-              metrics.latest_pass_rate_pct >= 95 ? 'text-green-600 dark:text-green-400' :
-              metrics.latest_pass_rate_pct >= 80 ? 'text-yellow-600 dark:text-yellow-400' :
-              'text-red-600 dark:text-red-400'
+              metrics.latest_pass_rate_pct >= 95 ? 'text-emerald-600 dark:text-emerald-400' :
+              metrics.latest_pass_rate_pct >= 80 ? 'text-amber-600 dark:text-amber-400' :
+              'text-rose-600 dark:text-rose-400'
             }`}>
               {metrics.latest_pass_rate_pct.toFixed(1)}%
             </div>
@@ -139,9 +139,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           {/* Fail Rate */}
           <div className="text-center">
             <div className={`text-3xl font-bold ${
-              metrics.latest_fail_rate_pct <= 5 ? 'text-green-600 dark:text-green-400' :
-              metrics.latest_fail_rate_pct <= 15 ? 'text-yellow-600 dark:text-yellow-400' :
-              'text-red-600 dark:text-red-400'
+              metrics.latest_fail_rate_pct <= 5 ? 'text-emerald-600 dark:text-emerald-400' :
+              metrics.latest_fail_rate_pct <= 15 ? 'text-amber-600 dark:text-amber-400' :
+              'text-rose-600 dark:text-rose-400'
             }`}>
               {metrics.latest_fail_rate_pct.toFixed(1)}%
             </div>
@@ -151,9 +151,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           {/* Not Run % */}
           <div className="text-center">
             <div className={`text-3xl font-bold ${
-              metrics.latest_not_run_pct <= 5 ? 'text-green-600 dark:text-green-400' :
-              metrics.latest_not_run_pct <= 10 ? 'text-yellow-600 dark:text-yellow-400' :
-              'text-red-600 dark:text-red-400'
+              metrics.latest_not_run_pct <= 5 ? 'text-emerald-600 dark:text-emerald-400' :
+              metrics.latest_not_run_pct <= 10 ? 'text-amber-600 dark:text-amber-400' :
+              'text-rose-600 dark:text-rose-400'
             }`}>
               {metrics.latest_not_run_pct.toFixed(1)}%
             </div>
@@ -163,9 +163,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           {/* Test Coverage */}
           <div className="text-center">
             <div className={`text-3xl font-bold ${
-              metrics.test_coverage_pct >= 80 ? 'text-green-600 dark:text-green-400' :
-              metrics.test_coverage_pct >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
-              'text-red-600 dark:text-red-400'
+              metrics.test_coverage_pct >= 80 ? 'text-emerald-600 dark:text-emerald-400' :
+              metrics.test_coverage_pct >= 60 ? 'text-amber-600 dark:text-amber-400' :
+              'text-rose-600 dark:text-rose-400'
             }`}>
               {metrics.test_coverage_pct.toFixed(1)}%
             </div>
@@ -197,9 +197,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Freshness</span>
               <span className={`text-sm font-medium ${
-                (metrics.days_since_latest_execution || 0) <= 7 ? 'text-green-600 dark:text-green-400' :
-                (metrics.days_since_latest_execution || 0) <= 14 ? 'text-yellow-600 dark:text-yellow-400' :
-                'text-red-600 dark:text-red-400'
+                (metrics.days_since_latest_execution || 0) <= 7 ? 'text-emerald-600 dark:text-emerald-400' :
+                (metrics.days_since_latest_execution || 0) <= 14 ? 'text-amber-600 dark:text-amber-400' :
+                'text-rose-600 dark:text-rose-400'
               }`}>
                 {metrics.days_since_latest_execution} day{metrics.days_since_latest_execution !== 1 ? 's' : ''} ago
               </span>
@@ -215,7 +215,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
                 <span className="text-sm text-gray-600 dark:text-gray-400">Passed</span>
               </div>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -224,7 +224,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                <div className="w-3 h-3 rounded-full bg-rose-500 mr-2"></div>
                 <span className="text-sm text-gray-600 dark:text-gray-400">Failed</span>
               </div>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -242,7 +242,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                <div className="w-3 h-3 rounded-full bg-amber-500 mr-2"></div>
                 <span className="text-sm text-gray-600 dark:text-gray-400">Blocked</span>
               </div>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -287,9 +287,9 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${
-                    metrics.test_coverage_pct >= 80 ? 'bg-green-600' :
-                    metrics.test_coverage_pct >= 60 ? 'bg-yellow-600' :
-                    'bg-red-600'
+                    metrics.test_coverage_pct >= 80 ? 'bg-emerald-600' :
+                    metrics.test_coverage_pct >= 60 ? 'bg-amber-600' :
+                    'bg-rose-600'
                   }`}
                   style={{ width: `${Math.min(metrics.test_coverage_pct, 100)}%` }}
                 />
@@ -317,16 +317,16 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
                   </span>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <span className="text-xs text-green-600 dark:text-green-400">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">
                     ✓ {trend.passed_count}
                   </span>
-                  <span className="text-xs text-red-600 dark:text-red-400">
+                  <span className="text-xs text-rose-600 dark:text-rose-400">
                     ✗ {trend.failed_count}
                   </span>
                   <span className={`text-sm font-medium ${
-                    trend.daily_pass_rate_pct >= 95 ? 'text-green-600 dark:text-green-400' :
-                    trend.daily_pass_rate_pct >= 80 ? 'text-yellow-600 dark:text-yellow-400' :
-                    'text-red-600 dark:text-red-400'
+                    trend.daily_pass_rate_pct >= 95 ? 'text-emerald-600 dark:text-emerald-400' :
+                    trend.daily_pass_rate_pct >= 80 ? 'text-amber-600 dark:text-amber-400' :
+                    'text-rose-600 dark:text-rose-400'
                   }`}>
                     {trend.daily_pass_rate_pct.toFixed(1)}%
                   </span>

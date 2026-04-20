@@ -73,7 +73,7 @@ export function TestExecutionSummaryWidget() {
     if (error) {
         return (
             <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <p className="text-red-500">Error loading test execution data: {error}</p>
+                <p className="text-rose-500">Error loading test execution data: {error}</p>
             </div>
         );
     }
@@ -167,12 +167,12 @@ export function TestExecutionSummaryWidget() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 ml-4">
-                                            <span className={`text-sm font-bold ${run.pass_rate >= 80 ? 'text-green-600' :
-                                                run.pass_rate >= 60 ? 'text-yellow-600' : 'text-red-600'
+                                            <span className={`text-sm font-bold ${run.pass_rate >= 80 ? 'text-emerald-600' :
+                                                run.pass_rate >= 60 ? 'text-amber-600' : 'text-rose-600'
                                                 }`}>
                                                 {run.pass_rate}%
                                             </span>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${run.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${run.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
                                                 run.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
                                                     'bg-slate-100 text-slate-800'
                                                 }`}>
@@ -197,17 +197,17 @@ export function TestExecutionSummaryWidget() {
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
     const colorClasses: Record<string, string> = {
         indigo: 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800',
-        green: 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800',
-        red: 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800',
-        yellow: 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800',
+        green: 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800',
+        red: 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800',
+        yellow: 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800',
         amber: 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800',
     };
 
     const textColors: Record<string, string> = {
         indigo: 'text-indigo-700 dark:text-indigo-300',
-        green: 'text-green-700 dark:text-green-300',
-        red: 'text-red-700 dark:text-red-300',
-        yellow: 'text-yellow-700 dark:text-yellow-300',
+        green: 'text-emerald-700 dark:text-emerald-300',
+        red: 'text-rose-700 dark:text-rose-300',
+        yellow: 'text-amber-700 dark:text-amber-300',
         amber: 'text-amber-700 dark:text-amber-300',
     };
 

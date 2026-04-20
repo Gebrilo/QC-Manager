@@ -302,8 +302,8 @@ const TASK_BOARD_COLUMNS = [
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
-    High:   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    Medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    High:   'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+    Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
 };
 

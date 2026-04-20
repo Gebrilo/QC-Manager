@@ -3,16 +3,16 @@ import { InfoTooltip } from '@/components/ui/Tooltip';
 import { MeDashboard } from '@/lib/api';
 
 const SEVERITY_COLORS: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400',
+    critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
     high:     'bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-400',
-    medium:   'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400',
+    medium:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     low:      'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
 };
 
 const STATUS_COLORS: Record<string, string> = {
     Open:          'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400',
     'In Progress': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-400',
-    Resolved:      'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400',
+    Resolved:      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
     Closed:        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     Reopened:      'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400',
 };

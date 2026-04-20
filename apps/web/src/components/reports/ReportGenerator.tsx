@@ -210,7 +210,7 @@ export function ReportGenerator({ projects = [] }: ReportGeneratorProps) {
                         <div className="flex items-center justify-between">
                             <h4 className="text-lg font-semibold text-slate-900 dark:text-white">Report Status</h4>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                currentJob.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                currentJob.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
                                 currentJob.status === 'failed' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
                                 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse'
                             }`}>
@@ -249,7 +249,7 @@ export function ReportGenerator({ projects = [] }: ReportGeneratorProps) {
                             <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
                                 <Button
                                     onClick={() => window.open(currentJob.download_url!, '_blank')}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

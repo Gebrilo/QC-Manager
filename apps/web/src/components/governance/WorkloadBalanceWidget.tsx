@@ -29,7 +29,7 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
     }, []);
 
     if (loading) return <div className="animate-pulse h-48 bg-slate-100 dark:bg-slate-800 rounded-xl" />;
-    if (error) return <div className="text-red-500 text-sm">{error}</div>;
+    if (error) return <div className="text-rose-500 text-sm">{error}</div>;
 
     return (
         <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 ${className}`}>
@@ -49,9 +49,9 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
                     const displayRatio = Math.min(ratio, 100);
 
                     let statusColor = "bg-slate-200";
-                    if (item.balance_status === 'BALANCED') statusColor = "bg-green-500";
-                    if (item.balance_status === 'UNDER_TESTED') statusColor = "bg-yellow-500";
-                    if (item.balance_status === 'NO_TESTS') statusColor = "bg-red-500";
+                    if (item.balance_status === 'BALANCED') statusColor = "bg-emerald-500";
+                    if (item.balance_status === 'UNDER_TESTED') statusColor = "bg-amber-500";
+                    if (item.balance_status === 'NO_TESTS') statusColor = "bg-rose-500";
 
                     return (
                         <div key={item.project_id} className="space-y-2">

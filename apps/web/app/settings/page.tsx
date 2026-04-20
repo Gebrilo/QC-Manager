@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '../../src/components/ui/Button';
+import { ArrowLeft } from 'lucide-react';
 
 interface GlobalSettings {
     min_pass_rate_green: number;
@@ -119,24 +121,17 @@ export default function SettingsPage() {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
                                 Quality Gate Settings
                             </h1>
                             <p className="text-sm text-slate-500 dark:text-slate-400">
                                 Configure global thresholds for release readiness and risk assessment
                             </p>
                         </div>
-                        <button
-                            onClick={() => router.push('/governance')}
-                            className="group px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-lg text-sm font-medium text-white hover:from-indigo-700 hover:to-violet-700 transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
-                        >
-                            <span className="flex items-center gap-2">
-                                <svg className="w-4 h-4 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                                Dashboard
-                            </span>
-                        </button>
+                        <Button variant="outline" size="sm" onClick={() => router.push('/governance')}>
+                            <ArrowLeft className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
+                            Dashboard
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -145,7 +140,7 @@ export default function SettingsPage() {
 
                 {/* Success/Error Messages */}
                 {success && (
-                    <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl text-green-700 dark:text-green-300 text-sm flex items-center gap-3 animate-slideIn">
+                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm flex items-center gap-3 animate-slideIn">
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -154,7 +149,7 @@ export default function SettingsPage() {
                 )}
 
                 {error && (
-                    <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-center gap-3">
+                    <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-sm flex items-center gap-3">
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -163,10 +158,10 @@ export default function SettingsPage() {
                 )}
 
                 {/* Release Readiness - GREEN Status */}
-                <section className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 border border-slate-200/50 dark:border-slate-700/50 p-6">
+                <section className="glass-card p-6">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                            <div className="w-4 h-4 bg-green-500 rounded-full" />
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                            <div className="w-4 h-4 bg-emerald-500 rounded-full" />
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white">GREEN Status (Ready for Release)</h2>
@@ -219,7 +214,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Release Readiness - AMBER Status */}
-                <section className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 border border-slate-200/50 dark:border-slate-700/50 p-6">
+                <section className="glass-card p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
                             <div className="w-4 h-4 bg-amber-500 rounded-full" />
@@ -262,10 +257,10 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Risk Assessment Triggers */}
-                <section className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 border border-slate-200/50 dark:border-slate-700/50 p-6">
+                <section className="glass-card p-6">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
+                            <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                         </div>
@@ -331,20 +326,13 @@ export default function SettingsPage() {
 
                 {/* Actions */}
                 <div className="flex justify-between items-center">
-                    <button
-                        onClick={handleReset}
-                        className="px-6 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 transition-all"
-                    >
+                    <Button variant="ghost" onClick={handleReset}>
                         Reset to Defaults
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-400 disabled:to-slate-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 transition-all disabled:shadow-none hover:shadow-indigo-500/50 hover:-translate-y-0.5 disabled:cursor-not-allowed"
-                    >
+                    </Button>
+                    <Button variant="primary" onClick={handleSave} disabled={saving}>
                         {saving ? (
                             <span className="flex items-center gap-2">
-                                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
@@ -353,7 +341,7 @@ export default function SettingsPage() {
                         ) : (
                             'Save Settings'
                         )}
-                    </button>
+                    </Button>
                 </div>
             </main>
 

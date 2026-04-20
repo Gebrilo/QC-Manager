@@ -119,7 +119,7 @@ export function QualityGateSettings({ projectId }: QualityGateSettingsProps) {
                         <p className="text-sm text-emerald-600 dark:text-emerald-400">Settings saved successfully.</p>
                     )}
                     {saveStatus === 'error' && (
-                        <p className="text-sm text-red-600 dark:text-red-400">Failed to save settings. Try again.</p>
+                        <p className="text-sm text-rose-600 dark:text-rose-400">Failed to save settings. Try again.</p>
                     )}
                     <AdminOnly fallback={
                         <p className="text-sm text-slate-400 italic">Only admins can change quality gate settings.</p>

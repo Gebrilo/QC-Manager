@@ -80,8 +80,8 @@ export function MyDashboardClient() {
 
     if (error || !data) {
         return (
-            <div className="rounded-2xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-6 text-center">
-                <p className="text-red-700 dark:text-red-400 font-medium">Failed to load your dashboard.</p>
+            <div className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-6 text-center">
+                <p className="text-rose-700 dark:text-rose-400 font-medium">Failed to load your dashboard.</p>
                 <button onClick={load} className="mt-3 text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                     Try again
                 </button>

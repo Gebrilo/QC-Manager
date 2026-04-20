@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Rocket, TrendingUp, Scale, FileSpreadsheet, Printer } from 'lucide-react';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import {
     ReleaseReadinessWidget,
@@ -159,21 +160,21 @@ export default function ReportsPage() {
                     <ReportCard
                         title="Release Readiness Report"
                         description="Detailed status of all projects targeting the upcoming release window. Includes risk assessment and go/no-go status."
-                        icon="🚀"
+                        icon={<Rocket className="w-7 h-7" strokeWidth={1.75} />}
                         active={selectedReport === 'READINESS'}
                         onClick={() => handleSelectReport('READINESS')}
                     />
                     <ReportCard
                         title="Weekly Quality Health"
                         description="High-level summary of pass rates, execution trends, and critical defects over the last 7 days."
-                        icon="📈"
+                        icon={<TrendingUp className="w-7 h-7" strokeWidth={1.75} />}
                         active={selectedReport === 'WEEKLY_HEALTH'}
                         onClick={() => handleSelectReport('WEEKLY_HEALTH')}
                     />
                             <ReportCard
                                 title="Test Coverage & Workload"
                                 description="Analysis of test coverage gaps vs total tasks, and tester workload distribution."
-                                icon="⚖️"
+                                icon={<Scale className="w-7 h-7" strokeWidth={1.75} />}
                                 active={selectedReport === 'COVERAGE_GAP'}
                                 onClick={() => handleSelectReport('COVERAGE_GAP')}
                             />
@@ -186,11 +187,11 @@ export default function ReportsPage() {
                                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Report Preview</h2>
                                     <div className="flex gap-2">
                                         <Button onClick={handleExportExcel} variant="outline" className="flex items-center gap-2">
-                                            <span className="text-green-600">📊</span>
+                                            <FileSpreadsheet className="w-4 h-4" strokeWidth={1.75} />
                                             Export Excel
                                         </Button>
                                         <Button onClick={handlePrint} variant="primary" className="flex items-center gap-2">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                            <Printer className="w-4 h-4" strokeWidth={1.75} />
                                             Print / Save PDF
                                         </Button>
                                     </div>
@@ -218,8 +219,8 @@ export default function ReportsPage() {
                                     {/* Report Body */}
                                     {loading ? (
                                         <div className="py-20 text-center">
-                                            <div className="animate-spin text-4xl mb-4">⌛</div>
-                                            <p>Loading report data...</p>
+                                            <div className="animate-spin h-8 w-8 border-2 border-indigo-400 border-t-transparent rounded-full mx-auto mb-4" />
+                                            <p className="text-slate-500">Loading report data...</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-8">
@@ -230,7 +231,7 @@ export default function ReportsPage() {
                                                         <h3 className="font-semibold text-lg mb-2">Executive Summary</h3>
                                                         <p className="text-slate-700">
                                                             This report outlines the current readiness status of all active projects.
-                                                            Projects marked as <span className="font-bold text-red-600">RED</span> have critical blocking issues preventing release.
+                                                            Projects marked as <span className="font-bold text-rose-600">RED</span> have critical blocking issues preventing release.
                                                         </p>
                                                     </div>
 
@@ -249,9 +250,9 @@ export default function ReportsPage() {
                                                                 <tr key={p.project_id}>
                                                                     <td className="py-3 font-medium">{p.project_name}</td>
                                                                     <td className="py-3">
-                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${p.overall_health_status === 'GREEN' ? 'bg-green-100 text-green-800' :
-                                                                            p.overall_health_status === 'AMBER' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                'bg-red-100 text-red-800'
+                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${p.overall_health_status === 'GREEN' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            p.overall_health_status === 'AMBER' ? 'bg-amber-100 text-amber-700' :
+                                                                                'bg-rose-100 text-rose-700'
                                                                             }`}>
                                                                             {p.overall_health_status}
                                                                         </span>
@@ -277,8 +278,8 @@ export default function ReportsPage() {
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-8">
-                                                        <div className="bg-green-50 p-6 rounded-lg border border-green-100">
-                                                            <h3 className="text-green-800 font-bold text-lg mb-2">Top Performers</h3>
+                                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                                                            <h3 className="text-emerald-800 dark:text-emerald-300 font-bold text-lg mb-2">Top Performers</h3>
                                                             <ul className="space-y-2">
                                                                 {(reportData.health as ProjectHealth[])
                                                                     .filter(p => p.overall_health_status === 'GREEN')
@@ -291,8 +292,8 @@ export default function ReportsPage() {
                                                                     ))}
                                                             </ul>
                                                         </div>
-                                                        <div className="bg-red-50 p-6 rounded-lg border border-red-100">
-                                                            <h3 className="text-red-800 font-bold text-lg mb-2">Projects at Risk</h3>
+                                                        <div className="bg-rose-50 dark:bg-rose-900/20 p-6 rounded-lg border border-rose-100 dark:border-rose-900">
+                                                            <h3 className="text-rose-800 dark:text-rose-300 font-bold text-lg mb-2">Projects at Risk</h3>
                                                             <ul className="space-y-2">
                                                                 {(reportData.health as ProjectHealth[])
                                                                     .filter(p => p.overall_health_status === 'RED')
@@ -332,9 +333,9 @@ export default function ReportsPage() {
                                                                     <td className="py-3">{w.total_tests}</td>
                                                                     <td className="py-3 font-bold">{w.tests_per_task_ratio}</td>
                                                                     <td className="py-3">
-                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${w.balance_status === 'BALANCED' ? 'bg-green-100 text-green-800' :
-                                                                            w.balance_status === 'UNDER_TESTED' ? 'bg-red-100 text-red-800' :
-                                                                                'bg-blue-100 text-blue-800'
+                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${w.balance_status === 'BALANCED' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            w.balance_status === 'UNDER_TESTED' ? 'bg-rose-100 text-rose-700' :
+                                                                                'bg-blue-100 text-blue-700'
                                                                             }`}>
                                                                             {w.balance_status}
                                                                         </span>
@@ -363,14 +364,16 @@ export default function ReportsPage() {
     );
 }
 
-function ReportCard({ title, description, icon, onClick, active }: any) {
+function ReportCard({ title, description, icon, onClick, active }: { title: string; description: string; icon: React.ReactNode; onClick: () => void; active: boolean }) {
     return (
         <Card
-            className={`cursor-pointer transition-all hover:shadow-md border-2 ${active ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-transparent hover:border-slate-200'}`}
+            className={`cursor-pointer transition-all hover:shadow-md border-2 ${active ? 'border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900' : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700'}`}
             onClick={onClick}
         >
             <div className="p-6">
-                <div className="text-3xl mb-4">{icon}</div>
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">
+                    {icon}
+                </div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{title}</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">{description}</p>
             </div>

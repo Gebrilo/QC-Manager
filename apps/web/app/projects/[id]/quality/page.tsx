@@ -80,7 +80,7 @@ export default function ProjectQualityDetailsPage() {
   if (!project && !loading) {
     return (
       <div className="p-8 text-center">
-        <h2 className="text-xl font-bold text-red-600 mb-4">Project not found</h2>
+        <h2 className="text-xl font-bold text-rose-600 mb-4">Project not found</h2>
         <p className="text-slate-500">Could not find project with ID: {projectId}</p>
         <button onClick={() => router.back()} className="mt-4 text-indigo-600 hover:underline">Go Back</button>
       </div>
@@ -103,7 +103,7 @@ export default function ProjectQualityDetailsPage() {
             <div>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                 {project?.name || projectId}
-                <span className={`text-sm px-3 py-1 rounded-full border ${project?.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-slate-100 text-slate-800'
+                <span className={`text-sm px-3 py-1 rounded-full border ${project?.status === 'active' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-800'
                   }`}>
                   {project?.status}
                 </span>

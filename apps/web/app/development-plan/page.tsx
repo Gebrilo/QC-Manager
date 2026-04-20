@@ -139,7 +139,7 @@ export default function DevelopmentPlanPage() {
                             <div className="bg-indigo-500 h-2 rounded-full transition-all" style={{ width: `${plan.progress.completion_pct}%` }} />
                         </div>
                         {plan.progress.overdue_tasks > 0 && (
-                            <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 px-2 py-0.5 rounded-full">
                                 {plan.progress.overdue_tasks} overdue
                             </span>
                         )}
@@ -169,7 +169,7 @@ export default function DevelopmentPlanPage() {
                                                     {task.title}
                                                 </span>
                                                 {task.requires_attachment && !task.attachments?.some(a => a.uploaded_by_role === 'resource') && (
-                                                    <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 px-1.5 py-0.5 rounded">
+                                                    <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded">
                                                         Attachment required
                                                     </span>
                                                 )}
@@ -180,6 +180,14 @@ export default function DevelopmentPlanPage() {
                                                             ? lateSuffix(task.due_date, task.completed_at)
                                                             : undefined}
                                                     />
+                                                )}
+                                                {task.progress_status === 'ON_HOLD' && task.hold_reason && (
+                                                    <span
+                                                        className="text-xs italic text-amber-600 dark:text-amber-300 truncate max-w-[200px]"
+                                                        title={task.hold_reason}
+                                                    >
+                                                        &ldquo;{task.hold_reason}&rdquo;
+                                                    </span>
                                                 )}
                                                 {task.progress_status === 'DONE' && badgeKind === 'done' && task.completed_at && (
                                                     <span className="text-xs text-emerald-600 dark:text-emerald-400">
@@ -195,10 +203,13 @@ export default function DevelopmentPlanPage() {
                                                     type="button"
                                                     aria-label={`Open comments for ${task.title}`}
                                                     onClick={() => setCommentsTask(task)}
-                                                    className="text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
+                                                    className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-500 px-1.5 py-1 rounded"
                                                     title="Comments"
                                                 >
                                                     💬
+                                                    {(task.comment_count ?? 0) > 0 && (
+                                                        <span className="font-medium text-indigo-500">{task.comment_count}</span>
+                                                    )}
                                                 </button>
                                             </div>
                                             {(task.links && task.links.length > 0) && (

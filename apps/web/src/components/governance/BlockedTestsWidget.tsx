@@ -19,7 +19,7 @@ export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
                 <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center justify-between">
                     Blocked Test Analysis
                     {pivotModules.length > 0 && (
-                        <span className="text-xs font-normal px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                        <span className="text-xs font-normal px-2 py-1 bg-rose-100 text-rose-700 rounded-full">
                             {pivotModules.length} pivot required
                         </span>
                     )}
@@ -31,14 +31,14 @@ export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
                         {pivotModules.map(m => (
                             <div
                                 key={`${m.project_id}-${m.module_name}`}
-                                className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+                                className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg"
                             >
-                                <span className="text-red-500 mt-0.5">⚠</span>
+                                <span className="text-rose-500 mt-0.5">⚠</span>
                                 <div>
-                                    <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                                    <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
                                         PIVOT REQUIRED — {m.project_name} / {m.module_name}
                                     </p>
-                                    <p className="text-xs text-red-600 dark:text-red-400">
+                                    <p className="text-xs text-rose-600 dark:text-rose-400">
                                         {m.blocked_count} of {m.total_tests} tests blocked ({m.blocked_pct}%).
                                         Reassign tester to unblocked modules.
                                     </p>
@@ -75,7 +75,7 @@ export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
                                         <td className="py-2 px-2 text-right text-slate-600 dark:text-slate-400">{row.total_tests}</td>
                                         <td className="py-2 px-2 text-right text-slate-600 dark:text-slate-400">{row.blocked_count}</td>
                                         <td className="py-2 px-2 text-right">
-                                            <span className={`font-semibold ${parseFloat(row.blocked_pct) >= 50 ? 'text-red-600' : parseFloat(row.blocked_pct) >= 25 ? 'text-amber-600' : 'text-slate-600 dark:text-slate-400'}`}>
+                                            <span className={`font-semibold ${parseFloat(row.blocked_pct) >= 50 ? 'text-rose-600' : parseFloat(row.blocked_pct) >= 25 ? 'text-amber-600' : 'text-slate-600 dark:text-slate-400'}`}>
                                                 {row.blocked_pct}%
                                             </span>
                                         </td>
@@ -84,7 +84,7 @@ export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
                                         </td>
                                         <td className="py-2 pl-2 text-right">
                                             {row.pivot_required ? (
-                                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">PIVOT</span>
+                                                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs font-medium">PIVOT</span>
                                             ) : (
                                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 rounded text-xs">OK</span>
                                             )}

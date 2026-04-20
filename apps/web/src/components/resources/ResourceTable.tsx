@@ -99,17 +99,17 @@ export function ResourceTable({
                 header: 'Utilization',
                 cell: (info) => {
                     const utilization = Number(info.getValue() || 0);
-                    let color = 'bg-green-500';
-                    if (utilization > 100) color = 'bg-red-500';
-                    else if (utilization > 80) color = 'bg-yellow-500';
+                    let color = 'bg-emerald-500';
+                    if (utilization > 100) color = 'bg-rose-500';
+                    else if (utilization > 80) color = 'bg-amber-500';
 
                     return (
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                                 <ProgressBar value={Math.min(utilization, 100)} max={100} color={color} />
-                                <span className={`text-sm font-medium ${utilization > 100 ? 'text-red-600 dark:text-red-400' :
-                                    utilization > 80 ? 'text-yellow-600 dark:text-yellow-400' :
-                                        'text-green-600 dark:text-green-400'
+                                <span className={`text-sm font-medium ${utilization > 100 ? 'text-rose-600 dark:text-rose-400' :
+                                    utilization > 80 ? 'text-amber-600 dark:text-amber-400' :
+                                        'text-emerald-600 dark:text-emerald-400'
                                     }`}>
                                     {utilization.toFixed(0)}%
                                 </span>

@@ -131,7 +131,7 @@ export default function TaskHistoryPage() {
             </div>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-300">
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-4 text-rose-700 dark:text-rose-300">
                     Error loading task history: {error}
                 </div>
             )}
@@ -351,7 +351,7 @@ export default function TaskHistoryPage() {
                     </div>
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Rejected (New)</p>
-                        <p className="text-2xl font-bold text-red-600 mt-1">
+                        <p className="text-2xl font-bold text-rose-600 mt-1">
                             {history.filter(h => h.action === 'rejected_new').length}
                         </p>
                     </div>

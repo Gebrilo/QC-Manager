@@ -38,7 +38,7 @@ export default function TaskLinks({ links, isManager, onAddLink, onDeleteLink }:
                             <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" /></svg>
                             <a href={link.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[150px]">{link.label}</a>
                             {isManager && onDeleteLink && (
-                                <button onClick={() => onDeleteLink(link.id)} className="opacity-0 group-hover:opacity-100 ml-0.5 text-blue-400 hover:text-red-500 transition-opacity" title="Remove link">
+                                <button onClick={() => onDeleteLink(link.id)} className="opacity-0 group-hover:opacity-100 ml-0.5 text-blue-400 hover:text-rose-500 transition-opacity" title="Remove link">
                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             )}

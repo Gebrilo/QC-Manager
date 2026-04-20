@@ -56,17 +56,17 @@ export default function ProjectHealthHeatmap({
 
     const getHealthBgColor = (status: HealthStatus): string => {
         switch (status) {
-            case 'GREEN': return 'bg-green-100 hover:bg-green-200 border-green-300';
-            case 'AMBER': return 'bg-yellow-100 hover:bg-yellow-200 border-yellow-300';
-            case 'RED': return 'bg-red-100 hover:bg-red-200 border-red-300';
+            case 'GREEN': return 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300';
+            case 'AMBER': return 'bg-amber-100 hover:bg-amber-200 border-amber-300';
+            case 'RED': return 'bg-rose-100 hover:bg-rose-200 border-rose-300';
         }
     };
 
     const getHealthTextColor = (status: HealthStatus): string => {
         switch (status) {
-            case 'GREEN': return 'text-green-800';
-            case 'AMBER': return 'text-yellow-800';
-            case 'RED': return 'text-red-800';
+            case 'GREEN': return 'text-emerald-800';
+            case 'AMBER': return 'text-amber-700';
+            case 'RED': return 'text-rose-800';
         }
     };
 
@@ -97,7 +97,7 @@ export default function ProjectHealthHeatmap({
         return (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Project Health Overview</h2>
-                <div className="text-red-600 dark:text-red-400">{error}</div>
+                <div className="text-rose-600 dark:text-rose-400">{error}</div>
             </div>
         );
     }
@@ -128,7 +128,7 @@ export default function ProjectHealthHeatmap({
                     <button
                         onClick={() => setSelectedFilter('RED')}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedFilter === 'RED'
-                            ? 'bg-red-600 text-white'
+                            ? 'bg-rose-600 text-white'
                             : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600'
                             }`}
                     >
@@ -172,7 +172,7 @@ export default function ProjectHealthHeatmap({
                                     cursor-pointer text-left p-5 rounded-xl border transition-all duration-200 hover:shadow-md
                                     ${project.overall_health_status === 'GREEN' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : ''}
                                     ${project.overall_health_status === 'AMBER' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : ''}
-                                    ${project.overall_health_status === 'RED' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : ''}
+                                    ${project.overall_health_status === 'RED' ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' : ''}
                                 `}
                             >
                                 {/* Project Name and Status */}
@@ -180,14 +180,14 @@ export default function ProjectHealthHeatmap({
                                     <h3 className={`font-bold text-lg pr-2
                                         ${project.overall_health_status === 'GREEN' ? 'text-emerald-800 dark:text-emerald-300' : ''}
                                         ${project.overall_health_status === 'AMBER' ? 'text-amber-800 dark:text-amber-300' : ''}
-                                        ${project.overall_health_status === 'RED' ? 'text-red-800 dark:text-red-300' : ''}
+                                        ${project.overall_health_status === 'RED' ? 'text-rose-800 dark:text-rose-300' : ''}
                                     `}>
                                         {project.project_name}
                                     </h3>
                                     <span className={`text-xl
                                         ${project.overall_health_status === 'GREEN' ? 'text-emerald-600 dark:text-emerald-400' : ''}
                                         ${project.overall_health_status === 'AMBER' ? 'text-amber-600 dark:text-amber-400' : ''}
-                                        ${project.overall_health_status === 'RED' ? 'text-red-600 dark:text-red-400' : ''}
+                                        ${project.overall_health_status === 'RED' ? 'text-rose-600 dark:text-rose-400' : ''}
                                     `}>
                                         {getHealthIcon(project.overall_health_status)}
                                     </span>
@@ -200,7 +200,7 @@ export default function ProjectHealthHeatmap({
                                         <span className={`font-bold
                                             ${project.overall_health_status === 'GREEN' ? 'text-emerald-700 dark:text-emerald-300' : ''}
                                             ${project.overall_health_status === 'AMBER' ? 'text-amber-700 dark:text-amber-300' : ''}
-                                            ${project.overall_health_status === 'RED' ? 'text-red-700 dark:text-red-300' : ''}
+                                            ${project.overall_health_status === 'RED' ? 'text-rose-700 dark:text-rose-300' : ''}
                                         `}>
                                             {formatPassRate(project.latest_pass_rate_pct)}
                                         </span>
@@ -224,14 +224,14 @@ export default function ProjectHealthHeatmap({
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
                                         ${project.readiness_status === 'GREEN' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100' : ''}
                                         ${project.readiness_status === 'AMBER' ? 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100' : ''}
-                                        ${project.readiness_status === 'RED' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' : ''}
+                                        ${project.readiness_status === 'RED' ? 'bg-rose-100 text-rose-800 dark:bg-rose-800 dark:text-rose-100' : ''}
                                     `}>
                                         {project.readiness_status}
                                     </span>
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
                                         ${project.risk_level === 'NORMAL' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100' : ''}
                                         ${project.risk_level === 'WARNING' ? 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100' : ''}
-                                        ${project.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' : ''}
+                                        ${project.risk_level === 'CRITICAL' ? 'bg-rose-100 text-rose-800 dark:bg-rose-800 dark:text-rose-100' : ''}
                                     `}>
                                         {project.risk_level}
                                     </span>
@@ -241,7 +241,7 @@ export default function ProjectHealthHeatmap({
                                 {project.action_items && project.action_items.length > 0 && (
                                     <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
                                         <div className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center">
-                                            <span className="w-2 h-2 rounded-full bg-red-400 mr-2 animate-pulse"></span>
+                                            <span className="w-2 h-2 rounded-full bg-rose-400 mr-2 animate-pulse"></span>
                                             {project.action_items.length} action item{project.action_items.length !== 1 ? 's' : ''}
                                         </div>
                                     </div>

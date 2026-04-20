@@ -26,7 +26,7 @@ export function TrendAnalysisWidget({ data, title = "Execution Trend (Last 30 Da
                 <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex justify-between items-center">
                     {title}
                     <div className="flex gap-2">
-                        <span className="text-xs font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">Pass Rate</span>
+                        <span className="text-xs font-normal px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full">Pass Rate</span>
                     </div>
                 </CardTitle>
             </CardHeader>

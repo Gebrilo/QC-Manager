@@ -46,6 +46,7 @@ export function TaskCommentsPanel({ open, taskId, taskTitle, currentUserId, mana
     useEffect(() => {
         if (!open || !taskId) return;
         let cancelled = false;
+        setComments([]);
         setLoading(true);
         const list = managerUserId
             ? developmentPlansApi.listTaskComments(managerUserId, taskId)

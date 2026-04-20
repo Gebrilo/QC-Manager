@@ -158,7 +158,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                 `SELECT * FROM journey_chapters WHERE journey_id = $1 ORDER BY sort_order`, [plan.id]
             );
             const chapterIds = chapters.rows.map(c => c.id);
-            let quests = [], tasks = [], completions = [], attachmentsByTask = {};
+            let quests = [], tasks = [], completions = [], attachmentsByTask = {}, commentCountByTask = {};
 
             if (chapterIds.length > 0) {
                 quests = (await db.query(`SELECT * FROM journey_quests WHERE chapter_id = ANY($1)`, [chapterIds])).rows;
@@ -179,6 +179,15 @@ router.get('/my', requireAuth, async (req, res, next) => {
                         for (const a of attsResult.rows) {
                             if (!attachmentsByTask[a.task_id]) attachmentsByTask[a.task_id] = [];
                             attachmentsByTask[a.task_id].push(a);
+                        }
+                        const commentCountResult = await db.query(
+                            `SELECT task_id, COUNT(*)::int AS comment_count
+                             FROM idp_task_comment WHERE user_id = $1 AND task_id = ANY($2)
+                             GROUP BY task_id`,
+                            [userId, taskIds]
+                        );
+                        for (const r of commentCountResult.rows) {
+                            commentCountByTask[r.task_id] = r.comment_count;
                         }
                     }
                 }
@@ -226,6 +235,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
                             completed_at: c?.completed_at || null,
                             completed_late: computeCompletedLate(t, c),
                             hold_reason: c?.hold_reason ?? null,
+                            comment_count: commentCountByTask[t.id] || 0,
                             attachments: attachmentsByTask[t.id] || [],
                         };
                     }),
@@ -442,17 +452,8 @@ router.patch('/my/tasks/:taskId/status', requireAuth, async (req, res, next) => 
             return res.status(400).json({ error: 'A comment is required when placing a task On Hold' });
         }
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-
-        const taskCheck = await db.query(
-            `SELECT jt.id FROM journey_tasks jt
-             JOIN journey_quests jq ON jt.quest_id = jq.id
-             JOIN journey_chapters jc ON jq.chapter_id = jc.id
-             WHERE jt.id = $1 AND jc.journey_id = $2`,
-            [taskId, plan.id]
-        );
-        if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Task not found in your plan' });
+        const taskOwner = await verifyTaskOwnsUser(taskId, userId);
+        if (!taskOwner) return res.status(404).json({ error: 'Task not found in your plan' });
 
         if (status === 'DONE') {
             const taskInfo = await db.query(
@@ -513,9 +514,7 @@ router.get('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) => 
     try {
         const userId = req.user.id;
         const { taskId } = req.params;
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-        if (!(await assertTaskInPlan(plan.id, taskId))) {
+        if (!(await verifyTaskOwnsUser(taskId, userId))) {
             return res.status(404).json({ error: 'Task not found in your plan' });
         }
         const result = await db.query(
@@ -540,9 +539,7 @@ router.post('/my/tasks/:taskId/comments', requireAuth, async (req, res, next) =>
         const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
         if (body.length === 0) return res.status(400).json({ error: 'body is required' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-        if (!(await assertTaskInPlan(plan.id, taskId))) {
+        if (!(await verifyTaskOwnsUser(taskId, userId))) {
             return res.status(404).json({ error: 'Task not found in your plan' });
         }
         const inserted = await db.query(
@@ -969,6 +966,7 @@ async function buildPlanDetail(plan, userId) {
     let completions = [];
     let attachmentsByTask = {};
     let linksByTask = {};
+    let commentCountByTask = {};
 
     if (chapterIds.length > 0) {
         quests = (await db.query(
@@ -1002,6 +1000,15 @@ async function buildPlanDetail(plan, userId) {
                 for (const l of linksResult.rows) {
                     if (!linksByTask[l.task_id]) linksByTask[l.task_id] = [];
                     linksByTask[l.task_id].push(l);
+                }
+                const commentCountResult = await db.query(
+                    `SELECT task_id, COUNT(*)::int AS comment_count
+                     FROM idp_task_comment WHERE user_id = $1 AND task_id = ANY($2)
+                     GROUP BY task_id`,
+                    [userId, taskIds]
+                );
+                for (const r of commentCountResult.rows) {
+                    commentCountByTask[r.task_id] = r.comment_count;
                 }
             }
         }
@@ -1049,6 +1056,7 @@ async function buildPlanDetail(plan, userId) {
                     completed_at: c?.completed_at || null,
                     completed_late: computeCompletedLate(t, c),
                     hold_reason: c?.hold_reason ?? null,
+                    comment_count: commentCountByTask[t.id] || 0,
                     attachments: attachmentsByTask[t.id] || [],
                     links: linksByTask[t.id] || [],
                 };

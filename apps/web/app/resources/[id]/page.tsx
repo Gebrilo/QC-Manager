@@ -116,7 +116,7 @@ const BADGE_CLASSES: Record<string, string> = {
     amber:    'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
     slate:    'bg-slate-50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400',
     rose:     'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400',
-    red:      'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+    red:      'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400',
     violet:   'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400',
     orange:   'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
 };

@@ -58,7 +58,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
     if (error) {
         return (
             <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <p className="text-red-500">Error loading bug data: {error}</p>
+                <p className="text-rose-500">Error loading bug data: {error}</p>
             </div>
         );
     }
@@ -91,7 +91,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <BugIcon className="w-5 h-5 text-red-500" />
+                            <BugIcon className="w-5 h-5 text-rose-500" />
                             Bug Summary
                         </h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -100,7 +100,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                     </div>
                     {totals && totals.open_bugs > 0 && (
                         <div className="flex items-center gap-2">
-                            <span className="text-2xl font-bold text-red-600">{totals.open_bugs}</span>
+                            <span className="text-2xl font-bold text-rose-600">{totals.open_bugs}</span>
                             <span className="text-sm text-slate-500">Open</span>
                         </div>
                     )}
@@ -224,16 +224,16 @@ function StatCard({
         slate: 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600',
         blue: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800',
         purple: 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800',
-        red: 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800',
-        green: 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800',
+        red: 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800',
+        green: 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800',
     };
 
     const textColors: Record<string, string> = {
         slate: 'text-slate-700 dark:text-slate-300',
         blue: 'text-blue-700 dark:text-blue-300',
         purple: 'text-purple-700 dark:text-purple-300',
-        red: 'text-red-700 dark:text-red-300',
-        green: 'text-green-700 dark:text-green-300',
+        red: 'text-rose-700 dark:text-rose-300',
+        green: 'text-emerald-700 dark:text-emerald-300',
     };
 
     return (

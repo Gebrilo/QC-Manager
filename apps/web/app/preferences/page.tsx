@@ -308,7 +308,7 @@ export default function PreferencesPage() {
                                     <button
                                         onClick={handleAvatarRemove}
                                         disabled={avatarSaving}
-                                        className="text-xs px-2.5 py-1 border border-red-200 dark:border-red-900 rounded-lg text-red-500 hover:border-red-400 transition-colors disabled:opacity-50"
+                                        className="text-xs px-2.5 py-1 border border-rose-200 dark:border-rose-900 rounded-lg text-rose-500 hover:border-rose-400 transition-colors disabled:opacity-50"
                                     >
                                         Remove
                                     </button>

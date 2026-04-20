@@ -108,8 +108,8 @@ export default function PassRateTrendChart({ trends, days = 30 }: PassRateTrendC
         {/* Data points */}
         {points.map((point, index) => {
           const passRate = point.trend.daily_pass_rate_pct;
-          const color = passRate >= 95 ? 'text-green-600' :
-                       passRate >= 80 ? 'text-yellow-600' : 'text-red-600';
+          const color = passRate >= 95 ? 'text-emerald-600' :
+                       passRate >= 80 ? 'text-amber-600' : 'text-rose-600';
 
           return (
             <g key={index}>
@@ -176,15 +176,15 @@ export default function PassRateTrendChart({ trends, days = 30 }: PassRateTrendC
       {/* Legend */}
       <div className="flex justify-center gap-6 mt-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-600"></div>
+          <div className="w-3 h-3 rounded-full bg-emerald-600"></div>
           <span className="text-gray-600 dark:text-gray-400">≥95% Pass</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
+          <div className="w-3 h-3 rounded-full bg-amber-600"></div>
           <span className="text-gray-600 dark:text-gray-400">80-94% Pass</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-600"></div>
+          <div className="w-3 h-3 rounded-full bg-rose-600"></div>
           <span className="text-gray-600 dark:text-gray-400">&lt;80% Pass</span>
         </div>
       </div>
@@ -199,13 +199,13 @@ export default function PassRateTrendChart({ trends, days = 30 }: PassRateTrendC
         </div>
         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Best</div>
-          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {Math.max(...trends.map(t => t.daily_pass_rate_pct)).toFixed(1)}%
           </div>
         </div>
         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Worst</div>
-          <div className="text-lg font-bold text-red-600 dark:text-red-400">
+          <div className="text-lg font-bold text-rose-600 dark:text-rose-400">
             {Math.min(...trends.map(t => t.daily_pass_rate_pct)).toFixed(1)}%
           </div>
         </div>

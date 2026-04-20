@@ -14,6 +14,9 @@ import {
 } from '../../src/components/governance';
 import { getDashboardSummary, getQualityRisks, getExecutionTrend, getQualityMetrics, getBlockedAnalysis, getExecutionProgress } from '../../src/services/governanceApi';
 import type { DashboardSummary, QualityRisk, TrendData, QualityMetrics, BlockedModuleAnalysis, ExecutionProgress } from '../../src/types/governance';
+import { Button } from '../../src/components/ui/Button';
+import { Badge } from '../../src/components/ui/Badge';
+import { FolderOpen, CheckCircle2, ShieldAlert, AlertCircle, RefreshCw, FileText } from 'lucide-react';
 
 export default function GovernanceDashboardPage() {
     const router = useRouter();
@@ -66,12 +69,14 @@ export default function GovernanceDashboardPage() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Quality health monitoring and release readiness</p>
                 </div>
                 <div className="flex gap-3">
-                    <button onClick={loadData} className="px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+                    <Button variant="outline" size="sm" onClick={loadData}>
+                        <RefreshCw className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
                         Refresh
-                    </button>
-                    <button onClick={() => router.push('/reports')} className="px-3 py-2 bg-indigo-600 rounded-lg text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm">
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => router.push('/reports')}>
+                        <FileText className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
                         Export Report
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -81,26 +86,26 @@ export default function GovernanceDashboardPage() {
                     <SummaryCard
                         title="Total Projects"
                         value={summary.total_projects}
-                        icon="📂"
+                        icon={<FolderOpen className="w-5 h-5" strokeWidth={1.75} />}
                         color="indigo"
                     />
                     <SummaryCard
                         title="Ready for Release"
                         value={summary.ready_for_release}
-                        icon="🚀"
-                        color="green"
+                        icon={<CheckCircle2 className="w-5 h-5" strokeWidth={1.75} />}
+                        color="emerald"
                     />
                     <SummaryCard
                         title="Critical Risks"
                         value={summary.critical_risk_count}
-                        icon="🚨"
-                        color="red"
+                        icon={<ShieldAlert className="w-5 h-5" strokeWidth={1.75} />}
+                        color="rose"
                     />
                     <SummaryCard
                         title="Warning State"
                         value={summary.warning_risk_count}
-                        icon="⚠️"
-                        color="yellow"
+                        icon={<AlertCircle className="w-5 h-5" strokeWidth={1.75} />}
+                        color="amber"
                     />
                 </div>
             )}
@@ -145,7 +150,7 @@ export default function GovernanceDashboardPage() {
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Test Execution Summary</h2>
                     <button
                         onClick={() => router.push('/reports?tab=executions')}
-                        className="text-sm text-indigo-600 hover:text-indigo-800"
+                        className="text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
                     >
                         View All Test Runs →
                     </button>
@@ -183,32 +188,32 @@ export default function GovernanceDashboardPage() {
                         ) : topRisks.length > 0 ? (
                             <div className="space-y-4">
                                 {topRisks.map(risk => (
-                                    <div key={risk.project_id} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border-l-4 border-red-500">
+                                    <div key={risk.project_id} className="glass-card p-4 border-l-4 border-rose-500">
                                         <div className="flex justify-between items-start">
                                             <h3
-                                                className="font-semibold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600"
+                                                className="font-semibold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                                                 onClick={() => handleProjectClick(risk.project_id)}
                                             >
                                                 {risk.project_name}
                                             </h3>
-                                            <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-medium">Critical</span>
+                                            <Badge variant="atrisk">Critical</Badge>
                                         </div>
                                         <div className="mt-2 space-y-1">
                                             {risk.risk_flags.map(flag => (
-                                                <div key={flag} className="text-xs text-slate-500 flex items-center">
-                                                    <span className="mr-2 text-red-500">•</span>
+                                                <div key={flag} className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                                    <span className="text-rose-500">•</span>
                                                     {flag.replace(/_/g, ' ')}
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 ))}
-                                <button className="w-full text-center text-sm text-indigo-600 hover:text-indigo-800 py-2">
+                                <button className="w-full text-center text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 py-2 transition-colors">
                                     View All Risks
                                 </button>
                             </div>
                         ) : (
-                            <div className="bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-slate-500">
+                            <div className="glass-card p-8 text-center text-slate-500 dark:text-slate-400">
                                 No critical risks detected.
                             </div>
                         )}
@@ -219,22 +224,29 @@ export default function GovernanceDashboardPage() {
     );
 }
 
-function SummaryCard({ title, value, icon, color }: { title: string, value: string | number, icon: string, color: string }) {
+interface SummaryCardProps {
+    title: string;
+    value: string | number;
+    icon: React.ReactNode;
+    color: 'indigo' | 'emerald' | 'rose' | 'amber';
+}
+
+function SummaryCard({ title, value, icon, color }: SummaryCardProps) {
     const colorClasses: Record<string, string> = {
-        indigo: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
-        green: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
-        red: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
-        yellow: 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+        indigo: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400',
+        emerald: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+        rose: 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400',
+        amber: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-xl mr-4 ${colorClasses[color]}`}>
+        <div className="glass-card p-5 flex items-center gap-4">
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClasses[color]}`}>
                 {icon}
             </div>
             <div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">{title}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white leading-none mt-0.5">{value}</p>
             </div>
         </div>
     );

@@ -977,6 +977,7 @@ export interface IDPTask {
     completed_at?: string | null;
     completed_late?: boolean | null;
     hold_reason?: string | null;
+    comment_count?: number;
     requires_attachment: boolean;
     links: IDPTaskLink[];
     attachments: IDPTaskAttachment[];

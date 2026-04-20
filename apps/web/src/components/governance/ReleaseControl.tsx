@@ -89,7 +89,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
         <div className="space-y-6">
 
             {/* Gate Status Card */}
-            <Card className={allPassed ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20"}>
+            <Card className={allPassed ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20" : "border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-900/20"}>
                 <CardHeader>
                     <CardTitle className="flex justify-between items-center">
                         <span>Release Gate Status</span>
@@ -105,8 +105,8 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                             const borderClass = isNA
                                 ? 'border-slate-200 dark:border-slate-700'
                                 : g.passed
-                                    ? 'border-green-100 dark:border-green-800'
-                                    : 'border-red-200 dark:border-red-800';
+                                    ? 'border-emerald-100 dark:border-emerald-800'
+                                    : 'border-rose-200 dark:border-rose-800';
                             return (
                                 <div key={idx} className={`p-4 rounded-lg border bg-white dark:bg-slate-800 ${borderClass}`}>
                                     <div className="text-sm text-slate-500 mb-1">{g.name}</div>
@@ -155,13 +155,13 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setAction('APPROVED')}
-                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'APPROVED' ? 'bg-green-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'APPROVED' ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                     >
                                         APPROVE
                                     </button>
                                     <button
                                         onClick={() => setAction('REJECTED')}
-                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'REJECTED' ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                        className={`flex-1 p-2 rounded text-sm font-bold ${action === 'REJECTED' ? 'bg-rose-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                                     >
                                         REJECT
                                     </button>
@@ -179,7 +179,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
                             />
                         </div>
                         {!allPassed && action === 'APPROVED' && (
-                            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 p-3 rounded text-sm border border-yellow-200 dark:border-yellow-800">
+                            <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-3 rounded text-sm border border-amber-200 dark:border-amber-800">
                                 <strong>Warning:</strong> You are approving a release that has failed Quality Gates. This will be logged as an exception.
                             </div>
                         )}

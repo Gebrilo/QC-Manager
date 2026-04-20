@@ -368,7 +368,7 @@ export default function TestExecutionsPage() {
                             {/* Project Selection */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    Select Project <span className="text-red-500">*</span>
+                                    Select Project <span className="text-rose-500">*</span>
                                 </label>
                                 <select
                                     value={selectedProject}
@@ -413,7 +413,7 @@ export default function TestExecutionsPage() {
                             {/* File Upload - Drag & Drop */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    Excel/CSV File <span className="text-red-500">*</span>
+                                    Excel/CSV File <span className="text-rose-500">*</span>
                                 </label>
                                 <div
                                     onDragOver={handleDragOver}
@@ -423,7 +423,7 @@ export default function TestExecutionsPage() {
                                     className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${isDragOver
                                             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 scale-[1.02]'
                                             : file
-                                                ? 'border-green-400 bg-green-50 dark:bg-green-900/20'
+                                                ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
                                                 : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                                         }`}
                                 >
@@ -437,8 +437,8 @@ export default function TestExecutionsPage() {
 
                                     {file ? (
                                         <div className="space-y-2">
-                                            <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                                                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </div>
@@ -446,7 +446,7 @@ export default function TestExecutionsPage() {
                                             <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                                                className="text-xs text-red-500 hover:text-red-700 underline"
+                                                className="text-xs text-rose-500 hover:text-rose-700 underline"
                                             >
                                                 Remove file
                                             </button>
@@ -511,7 +511,7 @@ export default function TestExecutionsPage() {
                             </button>
 
                             {error && (
-                                <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm flex items-start gap-3 animate-shake">
+                                <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-sm flex items-start gap-3 animate-shake">
                                     <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
@@ -546,7 +546,7 @@ export default function TestExecutionsPage() {
                                         <tr className="border-b border-slate-200 dark:border-slate-600">
                                             <td className="px-2 py-2 font-mono text-slate-600 dark:text-slate-300">TC-001</td>
                                             <td className="px-2 py-2 text-slate-600 dark:text-slate-300">Login Test</td>
-                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold">Pass</span></td>
+                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-semibold">Pass</span></td>
                                             <td className="px-2 py-2 text-slate-400">-</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">Authentication</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">REQ-001</td>
@@ -556,7 +556,7 @@ export default function TestExecutionsPage() {
                                         <tr className="border-b border-slate-200 dark:border-slate-600">
                                             <td className="px-2 py-2 font-mono text-slate-600 dark:text-slate-300">TC-002</td>
                                             <td className="px-2 py-2 text-slate-600 dark:text-slate-300">Checkout Flow</td>
-                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold">Fail</span></td>
+                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[10px] font-semibold">Fail</span></td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">Bug #123</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">Checkout</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">REQ-002</td>
@@ -576,7 +576,7 @@ export default function TestExecutionsPage() {
                                         <tr>
                                             <td className="px-2 py-2 font-mono text-slate-600 dark:text-slate-300">TC-005</td>
                                             <td className="px-2 py-2 text-slate-600 dark:text-slate-300">Search Function</td>
-                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold">Pass</span></td>
+                                            <td className="px-2 py-2"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-semibold">Pass</span></td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">Retested</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">Search</td>
                                             <td className="px-2 py-2 text-slate-500 dark:text-slate-400">REQ-005</td>
@@ -611,16 +611,16 @@ export default function TestExecutionsPage() {
 
                 {/* Upload Result */}
                 {uploadResult && (
-                    <section className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl shadow-xl border border-green-200 dark:border-green-800 p-6 animate-slideIn">
+                    <section className="bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/30 rounded-2xl shadow-xl border border-emerald-200 dark:border-emerald-800 p-6 animate-slideIn">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+                                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-green-700 dark:text-green-400">{uploadResult.message}</h3>
-                                <p className="text-sm text-green-600 dark:text-green-500">
+                                <h3 className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{uploadResult.message}</h3>
+                                <p className="text-sm text-emerald-600 dark:text-emerald-500">
                                     Test Run: <span className="font-mono font-semibold">{uploadResult.test_run.run_id}</span> - {uploadResult.test_run.name}
                                 </p>
                             </div>
@@ -732,8 +732,8 @@ export default function TestExecutionsPage() {
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-green-600 uppercase tracking-wider">Pass</th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-red-600 uppercase tracking-wider">Fail</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider">Pass</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-rose-600 uppercase tracking-wider">Fail</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-amber-600 uppercase tracking-wider">Blocked</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pass Rate</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
@@ -747,13 +747,13 @@ export default function TestExecutionsPage() {
                                             <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-medium max-w-xs truncate">{run.name}</td>
                                             <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">{run.project_name || '-'}</td>
                                             <td className="px-4 py-4 text-sm text-center font-semibold text-slate-700 dark:text-slate-300">{run.total_cases}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-green-600">{run.passed}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-red-600">{run.failed}</td>
+                                            <td className="px-4 py-4 text-sm text-center font-semibold text-emerald-600">{run.passed}</td>
+                                            <td className="px-4 py-4 text-sm text-center font-semibold text-rose-600">{run.failed}</td>
                                             <td className="px-4 py-4 text-sm text-center font-semibold text-amber-600">{run.blocked}</td>
                                             <td className="px-4 py-4 text-sm text-center">
-                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${run.pass_rate >= 80 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                                                        run.pass_rate >= 60 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                                            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${run.pass_rate >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                        run.pass_rate >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                            'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
                                                     }`}>
                                                     {run.pass_rate}%
                                                 </span>
@@ -767,7 +767,7 @@ export default function TestExecutionsPage() {
                                                         <button
                                                             onClick={() => handleDeleteRun(run.id)}
                                                             disabled={deleting}
-                                                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-medium disabled:opacity-50"
+                                                            className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded font-medium disabled:opacity-50"
                                                         >
                                                             {deleting ? '...' : 'Yes'}
                                                         </button>
@@ -781,7 +781,7 @@ export default function TestExecutionsPage() {
                                                 ) : (
                                                     <button
                                                         onClick={() => setDeleteConfirm(run.id)}
-                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                                         title="Delete test run"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

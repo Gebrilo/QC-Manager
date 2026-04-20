@@ -69,7 +69,7 @@ export default function ReleaseReadinessWidget({
                 <CardHeader>
                     <CardTitle>Release Readiness</CardTitle>
                 </CardHeader>
-                <div className="text-red-600 dark:text-red-400">
+                <div className="text-rose-600 dark:text-rose-400">
                     {error || 'No data available'}
                 </div>
             </Card>
@@ -153,7 +153,7 @@ export default function ReleaseReadinessWidget({
                         <ul className="space-y-2">
                             {data.blocking_issues.map((issue, index) => (
                                 <li key={index} className="flex items-start">
-                                    <span className="inline-block w-2 h-2 bg-red-500 rounded-full mt-1.5 mr-3 flex-shrink-0"></span>
+                                    <span className="inline-block w-2 h-2 bg-rose-500 rounded-full mt-1.5 mr-3 flex-shrink-0"></span>
                                     <span className="text-sm text-slate-700 dark:text-slate-300">{issue}</span>
                                 </li>
                             ))}
