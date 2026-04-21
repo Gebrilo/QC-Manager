@@ -48,7 +48,7 @@ export default function JourneysPage() {
     return (
         <div>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Journeys</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">My Journeys</h1>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Track your onboarding progress and complete assigned tasks.</p>
             </div>
 

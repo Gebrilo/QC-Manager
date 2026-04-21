@@ -101,7 +101,7 @@ export default function ProjectDetailPage() {
                         ← Back
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
                             {project.project_name}
                             <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${isCompleted ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' :
                                 project.dynamic_status === 'At Risk' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
@@ -135,7 +135,7 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Main Info */}
                 <div className="md:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                    <div className="glass-card rounded-2xl p-6">
                         <div className="flex items-start gap-4 mb-4">
                             <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 shrink-0 border border-slate-200 dark:border-slate-700">
                                 {logo ? (
@@ -155,7 +155,7 @@ export default function ProjectDetailPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                    <div className="glass-card rounded-2xl p-6">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Metrics</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                             <StatBox label="Total Weight" value={project.total_weight} />
@@ -168,7 +168,7 @@ export default function ProjectDetailPage() {
 
                 {/* Sidebar - Quick Stats from Backend Aggregation */}
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                    <div className="glass-card rounded-2xl p-6">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Progress</h3>
                         <div className="space-y-4">
                             <StatRow label="Est Hours" value={(Number(project.task_hrs_est) || 0).toFixed(1)} />

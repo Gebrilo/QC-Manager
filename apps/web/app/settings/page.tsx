@@ -121,7 +121,7 @@ export default function SettingsPage() {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                                 Quality Gate Settings
                             </h1>
                             <p className="text-sm text-slate-500 dark:text-slate-400">

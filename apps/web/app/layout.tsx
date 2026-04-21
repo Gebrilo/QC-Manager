@@ -78,9 +78,14 @@ export default function RootLayout({
                                         {isAuthPage ? (
                                             children
                                         ) : (
-                                            <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+                                            <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 transition-colors duration-200 relative">
+                                                {/* Global decorative orbs */}
+                                                <div aria-hidden="true" className="fixed inset-0 pointer-events-none overflow-hidden">
+                                                    <div className="absolute -top-24 -right-24 w-[400px] h-[400px] rounded-full opacity-20 dark:opacity-25" style={{ background: '#6366f1', filter: 'blur(100px)' }} />
+                                                    <div className="absolute top-1/2 -left-32 w-[400px] h-[400px] rounded-full opacity-20 dark:opacity-25" style={{ background: '#7c3aed', filter: 'blur(100px)' }} />
+                                                </div>
                                                 <Sidebar />
-                                                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                                                <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
                                                     <TopBar />
                                                     <ActivationBanner />
                                                     <main className="flex-1 min-h-0 overflow-y-auto">

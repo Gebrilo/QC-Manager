@@ -72,7 +72,7 @@ export default function TaskDetailPage() {
                     </Button>
                     <div>
                         <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{task.task_name}</h1>
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{task.task_name}</h1>
                             <Badge variant={variant === 'complete' ? 'complete' : variant === 'ontrack' ? 'inprogress' : 'default'}>
                                 {task.status}
                             </Badge>

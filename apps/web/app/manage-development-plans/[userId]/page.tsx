@@ -286,11 +286,11 @@ export default function IDPBuilderPage() {
                                 if (e.key === 'Enter') { await handleSaveTitle(); }
                                 if (e.key === 'Escape') setEditingTitle(false);
                             }}
-                            className="text-2xl font-bold text-slate-900 dark:text-white bg-transparent border-b-2 border-indigo-500 outline-none w-full"
+                            className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white bg-transparent border-b-2 border-indigo-500 outline-none w-full"
                             autoFocus
                         />
                     ) : (
-                        <h1 onClick={() => { setTitleDraft(plan.title); setEditingTitle(true); }} className="text-2xl font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-500 transition-colors">
+                        <h1 onClick={() => { setTitleDraft(plan.title); setEditingTitle(true); }} className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white cursor-pointer hover:text-indigo-500 transition-colors">
                             {plan.title}
                         </h1>
                     )}

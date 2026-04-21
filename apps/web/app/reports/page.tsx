@@ -106,7 +106,7 @@ export default function ReportsPage() {
             <div className="print:hidden">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports & Exports</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Reports & Exports</h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Generate and export quality governance reports</p>
                     </div>
                 </div>

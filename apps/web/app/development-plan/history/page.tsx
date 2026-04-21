@@ -44,7 +44,7 @@ export default function DevelopmentPlanHistoryPage() {
                 <Link href="/development-plan" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                     ← Current plan
                 </Link>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Plan History</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Plan History</h1>
             </div>
 
             {plans.length === 0 ? (

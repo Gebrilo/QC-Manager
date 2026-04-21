@@ -114,7 +114,7 @@ export default function ResourcesPage() {
         <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Resources</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Resources</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
                         Manage team members and track utilization.
                     </p>

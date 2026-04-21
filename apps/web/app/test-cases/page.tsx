@@ -110,7 +110,7 @@ export default function TestCasesPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Test Cases</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Test Cases</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your test case registry
           </p>
@@ -136,7 +136,7 @@ export default function TestCasesPage() {
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search test cases by ID, title, or description..."
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
           <Button onClick={handleSearchSubmit}>Search</Button>
         </div>
@@ -149,7 +149,7 @@ export default function TestCasesPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as TestCategory | 'all')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white"
             >
               <option value="all">All Categories</option>
               <option value="smoke">Smoke</option>
@@ -170,7 +170,7 @@ export default function TestCasesPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as TestCaseStatus | 'all')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -239,7 +239,7 @@ export default function TestCasesPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      <div className="text-sm font-medium text-slate-900 dark:text-white">
                         {testCase.title}
                       </div>
                       {testCase.project_name && (
@@ -254,7 +254,7 @@ export default function TestCasesPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 dark:text-white capitalize">
+                      <span className="text-sm text-slate-900 dark:text-white capitalize">
                         {testCase.priority}
                       </span>
                     </td>

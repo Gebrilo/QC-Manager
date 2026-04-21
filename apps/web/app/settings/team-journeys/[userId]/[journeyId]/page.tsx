@@ -256,7 +256,7 @@ export default function TeamJourneyDetailsPage() {
 
             <div className="space-y-6">
                 {journey.chapters.map((chapter, cIdx) => (
-                    <div key={chapter.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                    <div key={chapter.id} className="glass-card rounded-xl overflow-hidden shadow-sm">
                         <div className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-5">
                             <div className="flex items-start justify-between">
                                 <div>

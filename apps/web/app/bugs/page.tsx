@@ -139,7 +139,7 @@ function BugsContent() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Bugs</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Bugs</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
                         Defects synced from Tuleap. Total: <span className="font-semibold">{total}</span>
                     </p>
@@ -215,7 +215,7 @@ function BugsContent() {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>

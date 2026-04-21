@@ -101,7 +101,7 @@ export default function DevelopmentPlanPage() {
             <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Development Plan</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">My Development Plan</h1>
                         {plan?.is_active && (
                             <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
                                 Active

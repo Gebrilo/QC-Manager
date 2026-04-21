@@ -48,7 +48,7 @@ export default function EditProjectPage() {
         <div className="max-w-3xl mx-auto py-8 px-4">
             <header className="mb-8 flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Edit Project</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Edit Project</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Update project metadata.</p>
                 </div>
                 <button

@@ -279,7 +279,7 @@ function ChapterEditor({ chapter, journeyId, onChanged }: { chapter: JourneyChap
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+        <div className="glass-card rounded-xl overflow-hidden">
             <div className="flex items-center justify-between p-4">
                 <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 flex-1 text-left">
                     <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

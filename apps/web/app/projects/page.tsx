@@ -142,7 +142,7 @@ export default function ProjectsPage() {
         <div className="space-y-8 py-6 px-4 max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Projects Registry</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Projects Registry</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Overview of all active portfolios and their health.</p>
                 </div>
                 {hasPermission('action:projects:create') && (
@@ -153,7 +153,7 @@ export default function ProjectsPage() {
             </div>
 
             {!isLoading && projects.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-3">
+                <div className="glass-card rounded-xl p-4 flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1 min-w-0">
                         <input
                             type="text"

@@ -125,7 +125,7 @@ export default function TasksPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Tasks</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Tasks</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Manage all tasks across projects.</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -141,7 +141,7 @@ export default function TasksPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+            <div className="glass-card rounded-xl p-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                     {/* Search Input */}
                     <div className="relative flex-1 min-w-0">

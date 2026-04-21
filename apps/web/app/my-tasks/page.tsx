@@ -144,7 +144,7 @@ export default function MyTasksPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Tasks</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">My Tasks</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Your personal to-do list</p>
                 </div>
                 <div className="flex items-center gap-3">

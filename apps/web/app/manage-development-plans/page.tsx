@@ -56,7 +56,7 @@ export default function ManageDevelopmentPlansPage() {
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Development Plans</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Development Plans</h1>
             <p className="text-slate-500 dark:text-slate-400 mb-8">Manage individual development plans for your active team members.</p>
 
             {members.length === 0 ? (

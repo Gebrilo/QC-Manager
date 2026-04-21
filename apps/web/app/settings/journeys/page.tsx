@@ -77,7 +77,7 @@ export default function AdminJourneysPage() {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Manage Journeys</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Manage Journeys</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage onboarding journeys for employees.</p>
                 </div>
                 <button
@@ -172,7 +172,7 @@ export default function AdminJourneysPage() {
             )}
 
             {/* Journeys table */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+            <div className="glass-card rounded-xl overflow-hidden">
                 <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-800/50">
                         <tr>

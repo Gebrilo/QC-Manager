@@ -86,7 +86,7 @@ export default function JourneyDetailPage() {
                     Back to Journeys
                 </button>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{journey.title}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{journey.title}</h1>
                     {maxXp > 0 && (
                         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
                             <svg className="w-4 h-4 text-violet-500" fill="currentColor" viewBox="0 0 20 20">

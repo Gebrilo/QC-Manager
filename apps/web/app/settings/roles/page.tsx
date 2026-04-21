@@ -236,7 +236,7 @@ const RoleCard = memo(function RoleCard({
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="glass-card rounded-2xl overflow-hidden">
             {/* Clickable header – toggles accordion */}
             <div
                 className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${role.is_protected ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
@@ -406,7 +406,7 @@ export default function RolesPage() {
             <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
                 <div className="text-center">
                     <div className="text-6xl mb-4">🔒</div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Admin Only</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Admin Only</h2>
                     <p className="text-slate-500 dark:text-slate-400 mb-6">Only administrators can manage roles and permissions.</p>
                     <Link href="/my-tasks" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
                         Back to My Tasks
@@ -442,7 +442,7 @@ export default function RolesPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Role Management</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Role Management</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage roles and their permission assignments</p>
                 </div>
                 <button
@@ -456,7 +456,7 @@ export default function RolesPage() {
 
             {/* Create Role Panel */}
             {showCreate && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
+                <div className="glass-card rounded-2xl p-6 space-y-4">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Create Custom Role</h3>
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-1">

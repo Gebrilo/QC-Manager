@@ -65,7 +65,7 @@ export default function GovernanceDashboardPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Governance</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Governance</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Quality health monitoring and release readiness</p>
                 </div>
                 <div className="flex gap-3">
@@ -246,7 +246,7 @@ function SummaryCard({ title, value, icon, color }: SummaryCardProps) {
             </div>
             <div>
                 <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">{title}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white leading-none mt-0.5">{value}</p>
+                <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none mt-0.5">{value}</p>
             </div>
         </div>
     );

@@ -116,7 +116,7 @@ export default function TeamJourneysPage() {
     return (
         <div>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Team Journey Progress</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Team Journey Progress</h1>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor your direct reports&apos; journey completion, XP, and audit history. Read-only.</p>
             </div>
 
@@ -135,7 +135,7 @@ export default function TeamJourneysPage() {
                     {/* Team list */}
                     <div className="lg:col-span-1 border-slate-200 dark:border-slate-800">
 
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                        <div className="glass-card rounded-xl overflow-hidden">
                             <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                                 <h2 className="font-semibold text-slate-900 dark:text-white text-sm">
                                     {isAdmin ? 'All Teams' : 'Direct Reports'} ({team.length})

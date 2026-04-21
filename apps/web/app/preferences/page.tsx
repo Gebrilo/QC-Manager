@@ -266,7 +266,7 @@ export default function PreferencesPage() {
     return (
         <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Preferences</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Preferences</h1>
                 <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage your profile and UI settings.</p>
             </div>
 
@@ -448,7 +448,7 @@ export default function PreferencesPage() {
 
 function PrefSection({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+        <div className="glass-card rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
                 <span>{icon}</span>
                 <h2 className="font-semibold text-slate-900 dark:text-white text-sm">{title}</h2>

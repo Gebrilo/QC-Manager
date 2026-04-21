@@ -234,7 +234,7 @@ export default function ResourceDashboardPage() {
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-6xl mb-4">🔒</div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Access Denied</h2>
                     <p className="text-slate-500 dark:text-slate-400 mb-6">Only Admins and Managers can access the Resource Dashboard.</p>
                     <Link href="/resources" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
                         Back to Resources
@@ -287,7 +287,7 @@ export default function ResourceDashboardPage() {
                         </svg>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{profile.resource_name}</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{profile.resource_name}</h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Resource Analytics Dashboard</p>
                     </div>
                 </div>
@@ -300,7 +300,7 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Profile Card */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+            <div className="glass-card rounded-2xl p-6">
                 <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Profile</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div>
@@ -325,7 +325,7 @@ export default function ResourceDashboardPage() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Overall Utilization */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="glass-card rounded-2xl p-6">
                     <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Overall Utilization</h4>
                     <div className="flex items-end gap-3">
                         <span className={`text-3xl font-bold text-${utilizationColor}-600 dark:text-${utilizationColor}-400`}>
@@ -344,7 +344,7 @@ export default function ResourceDashboardPage() {
                 </div>
 
                 {/* Current Week Actuals */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="glass-card rounded-2xl p-6">
                     <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Current Week Actuals</h4>
                     <div className="flex items-end gap-3">
                         <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
@@ -364,7 +364,7 @@ export default function ResourceDashboardPage() {
                 </div>
 
                 {/* Backlog */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="glass-card rounded-2xl p-6">
                     <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Backlog</h4>
                     <div className="flex items-end gap-3">
                         <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">
@@ -384,7 +384,7 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Timeline Health Summary */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden">
                 <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Timeline Health</h3>
                 </div>
@@ -417,7 +417,7 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Task Summary */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden">
                 <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Task Summary
@@ -471,7 +471,7 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Assigned Tasks Table with Timeline Columns */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Assigned Tasks ({data.tasks.length})
@@ -591,7 +591,7 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Reported Bugs */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Reported Bugs ({data.bugs.length})

@@ -55,7 +55,7 @@ export default function CreateResourcePage() {
                 <Link href="/resources">
                     <Button variant="ghost">← Back</Button>
                 </Link>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Create New Resource</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Resource</h1>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">

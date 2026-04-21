@@ -105,7 +105,7 @@ export default function TaskHistoryPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                             </svg>
                         </Link>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Task History</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Task History</h1>
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 mt-1 ml-8">
                         Tasks rejected or archived due to unknown assignees from Tuleap
@@ -159,7 +159,7 @@ export default function TaskHistoryPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+            <div className="glass-card rounded-xl p-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                     {/* Search Input */}
                     <div className="relative flex-1 min-w-0">
@@ -234,7 +234,7 @@ export default function TaskHistoryPage() {
             </div>
 
             {/* History Table */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="glass-card rounded-xl overflow-hidden shadow-sm">
                 {filteredHistory.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 dark:text-slate-400">
                         <svg className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,7 +347,7 @@ export default function TaskHistoryPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Records</p>
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{history.length}</p>
+                        <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">{history.length}</p>
                     </div>
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Rejected (New)</p>
