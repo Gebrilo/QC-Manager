@@ -66,7 +66,6 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
             <head>
                 <title>{getPageTitle(pathname)}</title>
-                <link rel="icon" type="image/svg+xml" href="/icon.svg" />
             </head>
             <body className={inter.className}>
                 <TooltipProvider delayDuration={300}>
