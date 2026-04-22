@@ -12,8 +12,8 @@ class FieldRegistry {
     const cached = this._cache.get(trackerId);
     if (cached && Date.now() < cached.expiresAt) return cached.fields;
 
-    const { data } = await this._client.get(`/trackers/${trackerId}/used_fields`);
-    const fields = new Map(data.map(f => [f.name, f]));
+    const { data } = await this._client.get(`/trackers/${trackerId}`);
+    const fields = new Map((data.fields || []).map(f => [f.name, f]));
     this._cache.set(trackerId, { fields, expiresAt: Date.now() + CACHE_TTL_MS });
     return fields;
   }

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') });
 const { defaultClient } = require('../src/services/tuleapClient');
 const { FieldRegistry } = require('../src/services/tuleapFieldRegistry');
 const { buildUserStoryPayload, buildTestCasePayload, buildTaskPayload, buildBugPayload } = require('../src/services/tuleapPayloadBuilder');
@@ -8,17 +8,19 @@ async function smoke() {
 
   console.log('--- Testing FieldRegistry for USER STORY tracker ---');
   const usTrackerId = Number(process.env.TULEAP_TRACKER_USER_STORY);
-  const summaryId = await reg.getFieldId(usTrackerId, 'summary');
-  console.log('summary field_id:', summaryId);
+  const titleId = await reg.getFieldId(usTrackerId, 'story_title');
+  console.log('story_title field_id:', titleId);
 
   console.log('--- Building User Story payload (dry run) ---');
+  // status values: 'Draft' | 'Changes' | 'Review' | 'Approved'
+  // ba_author values: 'BA-Team'
   const usPayload = await buildUserStoryPayload({
     trackerId: usTrackerId,
     summary: '[SMOKE TEST] Auto-created user story',
     description: '## Description\nThis is a smoke test.',
     acceptanceCriteria: '## AC\n- Given/When/Then',
-    status: 'New',
-    baAuthor: 'QC-Manager-Bot',
+    status: 'Draft',
+    baAuthor: 'BA-Team',
     requirementVersion: '1',
   }, reg);
   console.log('Payload values count:', usPayload.values.length);

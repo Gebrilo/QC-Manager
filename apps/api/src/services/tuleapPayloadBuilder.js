@@ -9,7 +9,6 @@ async function buildUserStoryPayload(input, registry) {
   const t = input.trackerId;
   required(input.summary, 'summary');
   required(input.status, 'status');
-  required(input.baAuthor, 'baAuthor');
   required(input.requirementVersion, 'requirementVersion');
 
   const values = [];
@@ -18,12 +17,14 @@ async function buildUserStoryPayload(input, registry) {
     values.push({ field_id, ...shape });
   };
 
-  await push('summary', { value: input.summary });
-  if (input.description) await push('description', { value: input.description });
+  // Real Tuleap field names (tracker 6): story_title, overview_description, acceptance_criteria
+  await push('story_title', { value: input.summary });
+  if (input.description) await push('overview_description', { value: input.description });
   if (input.acceptanceCriteria) await push('acceptance_criteria', { value: input.acceptanceCriteria });
   await push('status', { bind_value_ids: [(await registry.resolveBindValue(t, 'status', input.status)).id] });
-  await push('ba_author', { value: input.baAuthor });
-  await push('requirement_version', { value: input.requirementVersion });
+  // ba_author is a select-box (sb) in Tuleap — values: ['BA-Team']
+  if (input.baAuthor) await push('ba_author', { bind_value_ids: [(await registry.resolveBindValue(t, 'ba_author', input.baAuthor)).id] });
+  await push('requirement_version', { value: Number(input.requirementVersion) });
   if (input.priority) await push('priority', { bind_value_ids: [(await registry.resolveBindValue(t, 'priority', input.priority)).id] });
   if (input.initialEffort != null) await push('initial_effort', { value: Number(input.initialEffort) });
   if (input.remainingEffort != null) await push('remaining_effort', { value: Number(input.remainingEffort) });
@@ -55,10 +56,13 @@ async function buildTestCasePayload(input, registry) {
   if (input.serviceName) await push('service_name', { value: input.serviceName });
   if (input.preconditions) await push('preconditions', { value: input.preconditions });
   if (input.actualResult) await push('actual_result', { value: input.actualResult });
-  if (input.assignedTo) await push('assigned_to', { value: input.assignedTo });
-  if (input.isRegression != null) await push('is_regression', { bind_value_ids: [input.isRegression ? 1 : 0] });
+  // assigned_to is msb (multi-select) with user labels e.g. 'belal.z'
+  if (input.assignedTo) await push('assigned_to', { bind_value_ids: [(await registry.resolveBindValue(t, 'assigned_to', input.assignedTo)).id] });
+  // is_regression is rb — only value is 'Is Regression'; pass [] to unset
+  if (input.isRegression) await push('is_regression', { bind_value_ids: [(await registry.resolveBindValue(t, 'is_regression', 'Is Regression')).id] });
+  if (!input.isRegression && input.isRegression != null) await push('is_regression', { bind_value_ids: [] });
   if (input.note) await push('note', { value: input.note });
-  if (input.attachmentIds?.length) await push('attachment', { value: input.attachmentIds });
+  if (input.attachmentIds?.length) await push('attachments_1', { value: input.attachmentIds });
   if (input.linkedArtifactIds?.length) {
     await push('links', { links: input.linkedArtifactIds.map(id => ({ id })) });
   }
@@ -80,14 +84,15 @@ async function buildTaskPayload(input, registry) {
     values.push({ field_id, ...shape });
   };
 
-  await push('task_title', { value: input.taskTitle });
+  // Real Tuleap field names (tracker 5): title, details, assigned_to (sb), team (sb)
+  await push('title', { value: input.taskTitle });
   await push('status', { bind_value_ids: [(await registry.resolveBindValue(t, 'status', input.status)).id] });
-  await push('assigned_to', { value: input.assignedTo });
+  // assigned_to is sb — label is the Tuleap username e.g. 'belal.z'
+  await push('assigned_to', { bind_value_ids: [(await registry.resolveBindValue(t, 'assigned_to', input.assignedTo)).id] });
   await push('team', { bind_value_ids: [(await registry.resolveBindValue(t, 'team', input.team)).id] });
   await push('parent_story', { links: [{ id: Number(input.parentStoryArtifactId) }] });
 
-  if (input.description) await push('description', { value: input.description });
-  if (input.devInitialEstimate != null) await push('dev_initial_estimate', { value: Number(input.devInitialEstimate) });
+  if (input.description) await push('details', { value: input.description });
   if (input.pmFinalEstimate != null) await push('pm_final_estimate', { value: Number(input.pmFinalEstimate) });
   if (input.actualEffort != null) await push('actual_effort', { value: Number(input.actualEffort) });
   if (input.blockedReason) await push('blocked_reason', { value: input.blockedReason });
@@ -111,18 +116,20 @@ async function buildBugPayload(input, registry) {
   await push('service_name', { value: input.serviceName });
   await push('environment', { bind_value_ids: [(await registry.resolveBindValue(t, 'environment', input.environment)).id] });
 
-  const statusLabel = input.status || 'Open';
+  // Real Tuleap status values (tracker 1): 'New', 'In Progress', 'Assigned', 'Fixed', 'Verified', 'Reopened'
+  const statusLabel = input.status || 'New';
   await push('status', { bind_value_ids: [(await registry.resolveBindValue(t, 'status', statusLabel)).id] });
 
-  if (input.description) await push('description', { value: input.description });
-  if (input.assignedTo) await push('assigned_to', { value: input.assignedTo });
+  // Real field names: steps_to_reproduce, test-case (art_link), severity labels differ
+  if (input.description) await push('steps_to_reproduce', { value: input.description });
+  // assigned_to is sb — label is Tuleap username
+  if (input.assignedTo) await push('assigned_to', { bind_value_ids: [(await registry.resolveBindValue(t, 'assigned_to', input.assignedTo)).id] });
+  // severity labels: 'Cosmetic impact' | 'Minor impact' | 'Major impact' | 'Critical impact'
   if (input.severity) await push('severity', { bind_value_ids: [(await registry.resolveBindValue(t, 'severity', input.severity)).id] });
   if (input.initialEffort != null) await push('initial_effort', { value: Number(input.initialEffort) });
   if (input.remainingEffort != null) await push('remaining_effort', { value: Number(input.remainingEffort) });
-  if (input.devFixDescription) await push('dev_fix_description', { value: input.devFixDescription });
-  if (input.qcVerificationNotes) await push('qc_verification_notes', { value: input.qcVerificationNotes });
   if (input.testCaseArtifactId) {
-    await push('test_case_link', { links: [{ id: Number(input.testCaseArtifactId) }] });
+    await push('test-case', { links: [{ id: Number(input.testCaseArtifactId) }] });
   }
   if (input.attachmentIds?.length) await push('attachment', { value: input.attachmentIds });
 

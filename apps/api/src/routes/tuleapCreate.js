@@ -18,7 +18,7 @@ const TRACKER_IDS = {
 };
 
 const REQUIRED_FIELDS = {
-  'user-story': ['summary', 'status', 'baAuthor', 'requirementVersion'],
+  'user-story': ['summary', 'status', 'requirementVersion'],
   'test-case':  ['title', 'testSteps', 'expectedResult'],
   'task':       ['taskTitle', 'assignedTo', 'team', 'status', 'parentStoryArtifactId'],
   'bug':        ['bugTitle', 'environment', 'serviceName'],

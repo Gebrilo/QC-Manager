@@ -15,7 +15,8 @@ const MOCK_FIELDS = [
 
 beforeEach(() => {
   jest.clearAllMocks();
-  defaultClient.get.mockResolvedValue({ data: MOCK_FIELDS });
+  // API returns { fields: [...] } via GET /trackers/:id
+  defaultClient.get.mockResolvedValue({ data: { fields: MOCK_FIELDS } });
 });
 
 describe('FieldRegistry', () => {
