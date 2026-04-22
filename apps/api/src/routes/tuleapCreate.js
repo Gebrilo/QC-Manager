@@ -17,6 +17,13 @@ const TRACKER_IDS = {
   'bug':        () => Number(process.env.TULEAP_TRACKER_BUG),
 };
 
+const REQUIRED_FIELDS = {
+  'user-story': ['summary', 'status', 'baAuthor', 'requirementVersion'],
+  'test-case':  ['title', 'testSteps', 'expectedResult'],
+  'task':       ['taskTitle', 'assignedTo', 'team', 'status', 'parentStoryArtifactId'],
+  'bug':        ['bugTitle', 'environment', 'serviceName'],
+};
+
 const BUILDERS = {
   'user-story': buildUserStoryPayload,
   'test-case':  buildTestCasePayload,
@@ -34,6 +41,12 @@ router.post('/:type', requireAuth, async (req, res) => {
   const trackerId = TRACKER_IDS[type]();
   const builder = BUILDERS[type];
   const input = { ...req.body, trackerId };
+
+  const required = REQUIRED_FIELDS[type] || [];
+  const missing = required.filter(k => !input[k] && input[k] !== 0);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+  }
 
   let payload;
   try {

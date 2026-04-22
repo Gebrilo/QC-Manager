@@ -58,7 +58,7 @@ describe('POST /tuleap/artifacts/user-story', () => {
       .post('/tuleap/artifacts/user-story')
       .send({ status: 'New', baAuthor: 'Alice', requirementVersion: '1' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/summary.*required/i);
+    expect(res.body.error).toMatch(/summary/i);
   });
 });
 
@@ -76,5 +76,22 @@ describe('POST /tuleap/artifacts/task', () => {
       });
     expect(res.status).toBe(201);
     expect(res.body.tuleap_artifact_id).toBe(9999);
+  });
+});
+
+describe('Required field validation', () => {
+  it('returns 400 with missing fields for bug', async () => {
+    const res = await request(app)
+      .post('/tuleap/artifacts/bug')
+      .send({ bugTitle: 'Crash' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/environment.*serviceName|serviceName.*environment/i);
+  });
+
+  it('returns 404 for unknown artifact type', async () => {
+    const res = await request(app)
+      .post('/tuleap/artifacts/unknown-type')
+      .send({});
+    expect(res.status).toBe(404);
   });
 });
