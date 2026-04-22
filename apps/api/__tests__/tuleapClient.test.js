@@ -141,15 +141,18 @@ describe('createTuleapClient', () => {
     expect(mockInstance.get).toHaveBeenCalledTimes(1);
   });
 
-  it('gives up after MAX_RETRIES attempts', async () => {
+  it('gives up after MAX_RETRIES retries (4 total attempts)', async () => {
     const sleepSpy = jest.spyOn(deps, 'sleep').mockImplementation(() => Promise.resolve());
 
     mockInstance.get.mockRejectedValue({ message: 'Server Error', status: 500 });
 
     const client = createTuleapClient({ baseURL: 'https://example.com', accessKey: 'tok' });
     await expect(client.get('/exhausted')).rejects.toMatchObject({ status: 500 });
-    expect(mockInstance.get).toHaveBeenCalledTimes(3);
-    expect(sleepSpy).toHaveBeenCalledTimes(2);
+    expect(mockInstance.get).toHaveBeenCalledTimes(4);
+    expect(sleepSpy).toHaveBeenCalledTimes(3);
+    expect(sleepSpy).toHaveBeenNthCalledWith(1, 1000);
+    expect(sleepSpy).toHaveBeenNthCalledWith(2, 2000);
+    expect(sleepSpy).toHaveBeenNthCalledWith(3, 4000);
 
     sleepSpy.mockRestore();
   });
@@ -176,5 +179,25 @@ describe('createTuleapClient', () => {
 
     delete process.env.TULEAP_BASE_URL;
     delete process.env.TULEAP_ACCESS_KEY;
+  });
+
+  it('defaultClient lazy getter creates singleton', () => {
+    jest.clearAllMocks();
+    const { defaultClient } = require('../src/services/tuleapClient');
+    expect(defaultClient).toBeDefined();
+    expect(typeof defaultClient.get).toBe('function');
+    expect(typeof defaultClient.post).toBe('function');
+  });
+
+it('normalises non-Axios errors via interceptor into standard shape', () => {
+    createTuleapClient({ baseURL: 'https://example.com', accessKey: 'tok' });
+    const errorInterceptor = interceptors.response.errorHandlers[0];
+    const plainError = Object.assign(new Error('Network timeout'), { code: 'ECONNRESET' });
+
+    return expect(errorInterceptor(plainError)).rejects.toMatchObject({
+      message: 'Network timeout',
+      status: null,
+      code: 'ECONNRESET',
+    });
   });
 });

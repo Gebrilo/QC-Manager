@@ -18,7 +18,11 @@ function normaliseError(err) {
     normalized.raw = data;
     return normalized;
   }
-  return err;
+  const normalized = new Error(err.message || String(err));
+  normalized.status = err.status || null;
+  normalized.code = err.code || null;
+  normalized.raw = err;
+  return normalized;
 }
 
 function createTuleapClient({ baseURL, accessKey } = {}) {
@@ -48,7 +52,7 @@ function createTuleapClient({ baseURL, accessKey } = {}) {
         return await instance[method](...args);
       } catch (err) {
         attempt++;
-        if (attempt >= MAX_RETRIES || !RETRY_STATUSES.has(err.status)) throw err;
+        if (attempt > MAX_RETRIES || !RETRY_STATUSES.has(err.status)) throw err;
         await deps.sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
       }
     }
