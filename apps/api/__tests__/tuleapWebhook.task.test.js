@@ -56,13 +56,13 @@ describe('POST /tuleap-webhook/task', () => {
             action: 'create'
         };
 
-        // Mock: no existing task
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook INSERT
-            .mockResolvedValueOnce({ rows: [] })  // SELECT existing task
+            .mockResolvedValueOnce({ rows: [] })  // SELECT existing task (no live)
+            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
             .mockResolvedValueOnce({ rows: [{ task_id: 'TSK-001' }] }) // generateTaskId
             .mockResolvedValueOnce({
-                rows: [{ // INSERT task
+                rows: [{
                     id: 'new-uuid',
                     task_id: 'TSK-002',
                     task_name: taskPayload.task_name,
@@ -113,8 +113,9 @@ describe('POST /tuleap-webhook/task', () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
             .mockResolvedValueOnce({ rows: [existingTask] })  // SELECT existing task
+            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
             .mockResolvedValueOnce({
-                rows: [{ // UPDATE task
+                rows: [{
                     ...existingTask,
                     task_name: taskPayload.task_name,
                     id: existingTask.id,
@@ -151,9 +152,10 @@ describe('POST /tuleap-webhook/task', () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
             .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing task
+            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
             .mockResolvedValueOnce({ rows: [{ task_id: 'TSK-001' }] }) // generateTaskId
             .mockResolvedValueOnce({
-                rows: [{ // INSERT
+                rows: [{
                     id: 'new-uuid',
                     task_id: 'TSK-002',
                     task_name: taskPayload.task_name,
@@ -190,7 +192,8 @@ describe('POST /tuleap-webhook/task', () => {
 
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [] }); // SELECT: no existing task
+            .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing task
+            .mockResolvedValueOnce({ rows: [] }); // SELECT deleted task (none)
 
         const mockReq = { body: taskPayload };
         const mockRes = {
@@ -225,7 +228,8 @@ describe('POST /tuleap-webhook/task', () => {
 
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [existingTask] }); // SELECT: task exists
+            .mockResolvedValueOnce({ rows: [existingTask] })  // SELECT: task exists
+            .mockResolvedValueOnce({ rows: [] }); // SELECT deleted task (none)
 
         const mockReq = { body: taskPayload };
         const mockRes = {
