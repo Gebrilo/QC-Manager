@@ -42,7 +42,7 @@ apiRouter.use('/users', require('./routes/users'));
 apiRouter.use('/notifications', require('./routes/notifications'));
 apiRouter.use('/bugs', require('./routes/bugs'));
 apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
-apiRouter.use('/tuleap/artifacts', require('./routes/tuleapCreate'));
+apiRouter.use('/tuleap/artifacts', require('./routes/tuleapArtifacts'));
 apiRouter.use('/my-tasks', require('./routes/personalTasks'));
 apiRouter.use('/me', require('./routes/me'));
 apiRouter.use('/roles', require('./routes/roles'));
