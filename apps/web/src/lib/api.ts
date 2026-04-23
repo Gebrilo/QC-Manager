@@ -1280,3 +1280,38 @@ export const developmentPlansApi = {
             method: 'DELETE',
         }),
 };
+
+export interface TuleapArtifact {
+    id: number;
+    xref?: string;
+    title?: string;
+    summary?: string;
+    description?: string;
+    status?: string;
+    [key: string]: unknown;
+}
+
+export const tuleapApi = {
+    list: async (type: string, params?: Record<string, string | number>) => {
+        const query = params ? '?' + new URLSearchParams(
+            Object.entries(params).map(([k, v]) => [k, String(v)])
+        ).toString() : '';
+        return fetchApi<{ data: TuleapArtifact[]; total: number }>(`/tuleap/artifacts/${type}${query}`);
+    },
+    get: async (type: string, id: string | number) =>
+        fetchApi<TuleapArtifact>(`/tuleap/artifacts/${type}/${id}`),
+    create: async (type: string, data: Record<string, unknown>) =>
+        fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; artifact_type: string; xref: string }>(`/tuleap/artifacts/${type}`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+    update: async (id: string | number, type: string, fields: Record<string, unknown>) =>
+        fetchApi<{ updated: boolean }>(`/tuleap/artifacts/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ type, fields }),
+        }),
+    remove: async (id: string | number) =>
+        fetchApi<{ deleted: boolean }>(`/tuleap/artifacts/${id}`, {
+            method: 'DELETE',
+        }),
+};
