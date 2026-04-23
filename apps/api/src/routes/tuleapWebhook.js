@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
+const { fromTuleap } = require('../services/tuleapTransformEngine');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -1337,6 +1338,108 @@ router.post('/bug-deletion-sync', async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to sync bug deletions', message: error.message });
     } finally {
         client.release();
+    }
+});
+
+// =====================================================
+// POST /tuleap-webhook/unified
+// Unified webhook handler for all Tuleap artifact types
+// Receives raw Tuleap artifact payload and transforms it
+// =====================================================
+router.post('/unified', async (req, res) => {
+    try {
+        const { tracker_id, artifact, project, raw_payload, action = 'sync' } = req.body;
+
+        // 1. Validate tracker_id
+        if (!tracker_id) {
+            return res.status(400).json({ success: false, error: 'tracker_id is required' });
+        }
+
+        // 2. Look up sync config by tracker_id
+        let configRes = await pool.query(
+            'SELECT * FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
+            [tracker_id]
+        );
+        let syncConfig = configRes.rows[0];
+
+        // 3. Fallback to project-level config
+        if (!syncConfig && project && project.id) {
+            configRes = await pool.query(
+                'SELECT * FROM tuleap_sync_config WHERE tuleap_project_id = $1 AND is_active = true LIMIT 1',
+                [project.id]
+            );
+            syncConfig = configRes.rows[0];
+        }
+
+        // 4. Return 404 if no config found
+        if (!syncConfig) {
+            return res.status(404).json({ success: false, error: 'No sync config found for this tracker or project' });
+        }
+
+        // 5. Extract Tuleap values
+        let tuleapValues = {};
+        if (artifact && Array.isArray(artifact.values)) {
+            for (const v of artifact.values) {
+                const label = v.field_name || v.label || v.name || `field_${v.field_id}`;
+                let value = v.value;
+                if (value === undefined && Array.isArray(v.values) && v.values.length > 0) {
+                    const first = v.values[0];
+                    if (first && typeof first === 'object') {
+                        value = first.label || first.display_name || first.name || first;
+                    } else {
+                        value = v.values;
+                    }
+                }
+                if (value !== undefined && value !== null) {
+                    tuleapValues[label] = value;
+                }
+            }
+        } else if (raw_payload && typeof raw_payload === 'object') {
+            tuleapValues = raw_payload;
+        }
+
+        // 6. Transform via fromTuleap
+        const unified = fromTuleap(tuleapValues, syncConfig);
+
+        // 7. Set metadata
+        unified.project_id = syncConfig.qc_project_id;
+        if (!unified.tuleap) unified.tuleap = {};
+        unified.tuleap.project_id = syncConfig.tuleap_project_id;
+        unified.tuleap.tracker_id = syncConfig.tuleap_tracker_id;
+        if (artifact && artifact.id) {
+            unified.tuleap.artifact_id = artifact.id;
+        }
+        if (req.body.tuleap_url) {
+            unified.tuleap.url = req.body.tuleap_url;
+        }
+
+        // 8. Log webhook with idempotency
+        const payloadHash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
+        const tuleapArtifactId = artifact && artifact.id ? artifact.id : null;
+        await pool.query(`
+            INSERT INTO tuleap_webhook_log (
+                tuleap_artifact_id, tuleap_tracker_id, artifact_type, action,
+                payload_hash, raw_payload, processing_status, processed_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (tuleap_artifact_id, payload_hash) DO UPDATE SET
+                processing_status = 'duplicate',
+                processed_at = NOW()
+        `, [
+            tuleapArtifactId, tracker_id, syncConfig.tracker_type || 'unknown', action,
+            payloadHash, JSON.stringify(req.body), 'received', null
+        ]);
+
+        // 9. Return 200
+        return res.status(200).json({
+            success: true,
+            artifact_type: syncConfig.tracker_type,
+            tracker_id,
+            action,
+            unified
+        });
+    } catch (error) {
+        console.error('Error processing unified webhook:', error);
+        res.status(500).json({ success: false, error: 'Failed to process unified webhook', message: error.message });
     }
 });
 
