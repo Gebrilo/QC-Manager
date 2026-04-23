@@ -5,6 +5,17 @@
 BEGIN;
 
 -- =====================================================
+-- ENSURE update_updated_at_column() EXISTS
+-- =====================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- =====================================================
 -- USER_STORIES TABLE — Store synced User Stories from Tuleap
 -- =====================================================
 CREATE TABLE IF NOT EXISTS user_stories (
