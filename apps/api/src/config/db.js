@@ -1621,6 +1621,51 @@ const runMigrations = async () => {
                 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
         `);
 
+        // =====================================================
+        // Unified Tuleap payload — add new columns for dynamic field mapping
+        // =====================================================
+
+        await client.query(`
+            ALTER TABLE tuleap_sync_config
+                ADD COLUMN IF NOT EXISTS artifact_fields JSONB DEFAULT '{}',
+                ADD COLUMN IF NOT EXISTS status_value_map JSONB DEFAULT '{}'
+        `);
+
+        await client.query(`
+            ALTER TABLE bugs
+                ADD COLUMN IF NOT EXISTS environment VARCHAR(20),
+                ADD COLUMN IF NOT EXISTS cc TEXT[],
+                ADD COLUMN IF NOT EXISTS dev_fix_description TEXT,
+                ADD COLUMN IF NOT EXISTS qc_verification_notes TEXT
+        `);
+
+        await client.query(`
+            ALTER TABLE tasks
+                ADD COLUMN IF NOT EXISTS initial_estimate NUMERIC,
+                ADD COLUMN IF NOT EXISTS final_estimate NUMERIC,
+                ADD COLUMN IF NOT EXISTS actual_effort NUMERIC,
+                ADD COLUMN IF NOT EXISTS blocked_reason TEXT,
+                ADD COLUMN IF NOT EXISTS parent_story_id INTEGER
+        `);
+
+        await client.query(`
+            ALTER TABLE user_stories
+                ADD COLUMN IF NOT EXISTS initial_effort NUMERIC,
+                ADD COLUMN IF NOT EXISTS remaining_effort NUMERIC,
+                ADD COLUMN IF NOT EXISTS change_reason TEXT
+        `);
+
+        await client.query(`
+            ALTER TABLE test_cases
+                ADD COLUMN IF NOT EXISTS service_name VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS preconditions TEXT,
+                ADD COLUMN IF NOT EXISTS actual_result TEXT,
+                ADD COLUMN IF NOT EXISTS task_number VARCHAR(50),
+                ADD COLUMN IF NOT EXISTS is_regression BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS execution_count INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS note TEXT
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
