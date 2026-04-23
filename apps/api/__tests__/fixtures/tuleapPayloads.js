@@ -126,11 +126,29 @@ const sampleResource = {
     email: 'jdoe@example.com'
 };
 
+/**
+ * Processed user story data — shape sent by n8n to POST /tuleap-webhook/user-story
+ */
+const processedUserStoryData = {
+  tuleap_artifact_id: 5001,
+  tuleap_tracker_id:  6,
+  title:              'As a user I can log in with SSO',
+  description:        '## Overview\nAllow users to authenticate via SSO.',
+  acceptance_criteria:'## AC\n- Given a valid SSO token, the user is logged in.',
+  status:             'Draft',
+  requirement_version:'1',
+  priority:           'P2-High',
+  ba_author:          'BA-Team',
+  project_id:         null,
+  raw_tuleap_payload: { id: 5001, tracker: { id: 6 } },
+};
+
 module.exports = {
     sampleTaskPayload,
     sampleBugPayload,
     processedTaskData,
     processedBugData,
     sampleSyncConfig,
-    sampleResource
+    sampleResource,
+    processedUserStoryData
 };

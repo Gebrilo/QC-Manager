@@ -50,14 +50,15 @@ function mapTuleapStatus(tuleapStatus) {
         'wont fix': 'Cancelled',
         'invalid': 'Cancelled',
         'abandoned': 'Cancelled',
-        // → Backlog (default for todo/open/blocked/unknown)
+        // → Backlog (default for todo/open/unknown)
         'todo': 'Backlog',
         'to do': 'Backlog',
         'open': 'Backlog',
         'new': 'Backlog',
         'backlog': 'Backlog',
         'pending': 'Backlog',
-        'blocked': 'Backlog',
+        // blocked tasks remain In Progress — they're still being worked on
+        'blocked': 'In Progress',
     };
 
     return statusMap[normalized] || 'Backlog';
@@ -557,6 +558,105 @@ router.post('/test-case', async (req, res) => {
             success: false,
             error: 'Failed to process test case webhook',
             message: error.message
+        });
+    }
+});
+
+// =====================================================
+// POST /tuleap-webhook/user-story
+// Receive processed User Story from n8n — upsert by tuleap_artifact_id
+// =====================================================
+router.post('/user-story', async (req, res) => {
+    try {
+        const {
+            tuleap_artifact_id,
+            title,
+            description         = null,
+            acceptance_criteria = null,
+            status              = 'Draft',
+            requirement_version = null,
+            priority            = null,
+            ba_author           = null,
+            project_id          = null,
+            raw_tuleap_payload  = null,
+        } = req.body;
+
+        if (!tuleap_artifact_id || !title) {
+            return res.status(400).json({
+                success: false,
+                error: 'tuleap_artifact_id and title are required',
+            });
+        }
+
+        const payload_hash = crypto
+            .createHash('sha256')
+            .update(JSON.stringify(req.body))
+            .digest('hex');
+
+        await pool.query(
+            `INSERT INTO tuleap_webhook_log
+               (tuleap_artifact_id, artifact_type, action, payload_hash, raw_payload, processing_status)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (tuleap_artifact_id, payload_hash) DO NOTHING`,
+            [tuleap_artifact_id, 'user_story', 'sync', payload_hash, raw_tuleap_payload, 'received']
+        );
+
+        const existing = await pool.query(
+            `SELECT id FROM user_stories WHERE tuleap_artifact_id = $1`,
+            [tuleap_artifact_id]
+        );
+        const isUpdate = existing.rows.length > 0;
+
+        let story;
+        if (isUpdate) {
+            const result = await pool.query(
+                `UPDATE user_stories SET
+                    title = $1, description = $2, acceptance_criteria = $3,
+                    status = $4, requirement_version = $5, priority = $6,
+                    ba_author = $7, raw_tuleap_payload = $8,
+                    last_sync_at = NOW(), updated_at = NOW()
+                 WHERE tuleap_artifact_id = $9
+                 RETURNING *`,
+                [title, description, acceptance_criteria, status,
+                 requirement_version, priority, ba_author,
+                 raw_tuleap_payload, tuleap_artifact_id]
+            );
+            story = result.rows[0];
+        } else {
+            const result = await pool.query(
+                `INSERT INTO user_stories
+                   (tuleap_artifact_id, title, description, acceptance_criteria,
+                    status, requirement_version, priority, ba_author,
+                    project_id, raw_tuleap_payload)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 RETURNING *`,
+                [tuleap_artifact_id, title, description, acceptance_criteria,
+                 status, requirement_version, priority, ba_author,
+                 project_id, raw_tuleap_payload]
+            );
+            story = result.rows[0];
+        }
+
+        await pool.query(
+            `UPDATE tuleap_webhook_log SET
+                processing_status = $1, processing_result = $2, processed_at = NOW()
+             WHERE tuleap_artifact_id = $3 AND payload_hash = $4`,
+            ['processed',
+             `User story ${isUpdate ? 'updated' : 'created'}: ${story.id}`,
+             tuleap_artifact_id, payload_hash]
+        );
+
+        return res.status(isUpdate ? 200 : 201).json({
+            success: true,
+            action: isUpdate ? 'updated' : 'created',
+            data: story,
+        });
+    } catch (error) {
+        console.error('Error processing user story webhook:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to process user story webhook',
+            message: error.message,
         });
     }
 });
