@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, tuleapApi, type TuleapArtifact } from '@/lib/api';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
@@ -16,6 +16,21 @@ export default function ProjectDetailPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'overview' | 'user-stories'>('overview');
+    const [userStories, setUserStories] = useState<TuleapArtifact[]>([]);
+    const [storiesLoading, setStoriesLoading] = useState(false);
+
+    const loadUserStories = async () => {
+        setStoriesLoading(true);
+        try {
+            const result = await tuleapApi.list('user-story', { limit: 100 });
+            setUserStories(result.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setStoriesLoading(false);
+        }
+    };
 
     useEffect(() => {
         async function load() {
@@ -132,6 +147,12 @@ export default function ProjectDetailPage() {
                 </div>
             </div>
 
+            <div className="flex gap-1 mb-6 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Overview</button>
+                <button onClick={() => { setActiveTab('user-stories'); if (!userStories.length) loadUserStories(); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'user-stories' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>User Stories</button>
+            </div>
+
+            {activeTab === 'overview' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Main Info */}
                 <div className="md:col-span-2 space-y-6">
@@ -190,8 +211,54 @@ export default function ProjectDetailPage() {
                     </div>
                 </div>
             </div>
+            ) : (
+            <div className="glass-card rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">User Stories</h3>
+                    <Link href={`/user-stories/create?projectId=${project.id}`}>
+                        <Button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm px-4 py-2 rounded-xl">+ Create User Story</Button>
+                    </Link>
+                </div>
+                {storiesLoading ? (
+                    <div className="text-center py-8 text-slate-400 animate-pulse">Loading user stories...</div>
+                ) : userStories.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">No user stories found</div>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-slate-200 dark:border-slate-700">
+                                <th className="text-left py-2 px-3 text-slate-500 font-medium">ID</th>
+                                <th className="text-left py-2 px-3 text-slate-500 font-medium">Title</th>
+                                <th className="text-left py-2 px-3 text-slate-500 font-medium">Status</th>
+                                <th className="text-right py-2 px-3 text-slate-500 font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {userStories.map(story => (
+                                <tr key={story.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <td className="py-2 px-3">
+                                        <Link href={`/user-stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
+                                            {story.xref || story.id}
+                                        </Link>
+                                    </td>
+                                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{story.title || '-'}</td>
+                                    <td className="py-2 px-3">
+                                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                            {story.status || 'Draft'}
+                                        </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-right">
+                                        <Link href={`/user-stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs mr-3">View</Link>
+                                        <Link href={`/user-stories/${story.id}/edit`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">Edit</Link>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+            )}
 
-            {/* Delete Confirmation Modal */}
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
