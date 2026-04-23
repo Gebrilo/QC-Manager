@@ -1,0 +1,147 @@
+{
+  "id": "UserStorySync001TuleapQC",
+  "name": "Tuleap User Story → QC-Manager Sync",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tuleap-user-story",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "us0001-0001-4001-8001-000000000001",
+      "name": "Webhook: Tuleap User Story",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 304],
+      "webhookId": "tuleap-user-story-sync"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst body = (raw.body !== undefined && typeof raw.body === 'object') ? raw.body : raw;\nlet payload;\nif (body.payload !== undefined) {\n  payload = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;\n  if (!payload || typeof payload !== 'object') throw new Error('Parsed payload is not a valid object');\n} else if (body.artifact !== undefined) {\n  payload = { current: body.artifact, project: body.project || null, user: body.user || null, action: body.action || 'artifact:created' };\n} else {\n  throw new Error(`Unrecognized Tuleap webhook format. Body keys: ${Object.keys(body).join(', ')}`);\n}\nconst tracker = payload.tracker || payload.current?.tracker;\nif (!tracker?.id) throw new Error(`Missing tracker.id in payload.`);\nreturn [{ json: { payload } }];"
+      },
+      "id": "us0001-0002-4002-8002-000000000002",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 304]
+    },
+    {
+      "parameters": {
+        "url": "http://qc-api:3001/tuleap-webhook/config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "tracker_type", "value": "user-story" },
+            { "name": "is_active",    "value": "true" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "us0001-0003-4003-8003-000000000003",
+      "name": "Fetch Sync Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 304]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $('Parse Payload').first().json.payload;\nconst configs = $('Fetch Sync Config').first().json.data || [];\nconst trackerId = payload?.tracker?.id;\nconst config = configs.find(c => String(c.tuleap_tracker_id) === String(trackerId));\nif (!config) return [{ json: { hasConfig: false, trackerId, payload } }];\nreturn [{ json: { hasConfig: true, config, payload } }];"
+      },
+      "id": "us0001-0004-4004-8004-000000000004",
+      "name": "Match Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-config-check",
+              "leftValue": "={{ $json.hasConfig }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "rightType": "boolean" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "us0001-0005-4005-8005-000000000005",
+      "name": "Has Config?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 304]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { config, payload } = $input.first().json;\nconst artifact = payload.current;\nconst fields = {};\nfor (const v of (artifact.values || [])) { fields[v.name] = v; }\n\nfunction txt(...names) {\n  for (const n of names) {\n    const f = fields[n];\n    if (f && f.value != null) return String(f.value);\n  }\n  return null;\n}\n\nfunction sel(...names) {\n  for (const n of names) {\n    const f = fields[n];\n    if (f && f.values && f.values[0]) return f.values[0].label || null;\n  }\n  return null;\n}\n\nconst artifactId = payload.id || artifact.id;\n\nconst usData = {\n  tuleap_artifact_id: artifactId,\n  title: txt('story_title') || `User Story ${artifactId}`,\n  description: txt('overview_description'),\n  acceptance_criteria: txt('acceptance_criteria'),\n  status: sel('status') || 'Draft',\n  requirement_version: txt('requirement_version'),\n  project_id: config.qc_project_id,\n  raw_tuleap_payload: payload\n};\n\nreturn [{ json: { usData } }];"
+      },
+      "id": "us0001-0006-4006-8006-000000000006",
+      "name": "Transform User Story Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 224]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/user-story",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.usData) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "us0001-0007-4007-8007-000000000007",
+      "name": "Send to QC API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 224]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'User story processed', id: $json.data?.id || 'unknown' }) }}",
+        "options": {}
+      },
+      "id": "us0001-0008-4008-8008-000000000008",
+      "name": "Respond: OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1920, 224]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: 'No sync config found for this tracker' }) }}",
+        "options": {}
+      },
+      "id": "us0001-0009-4009-8009-000000000009",
+      "name": "Respond: Not Configured",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 464]
+    }
+  ],
+  "connections": {
+    "Webhook: Tuleap User Story": { "main": [[{ "node": "Parse Payload",          "type": "main", "index": 0 }]] },
+    "Parse Payload":              { "main": [[{ "node": "Fetch Sync Config",       "type": "main", "index": 0 }]] },
+    "Fetch Sync Config":          { "main": [[{ "node": "Match Config",            "type": "main", "index": 0 }]] },
+    "Match Config":               { "main": [[{ "node": "Has Config?",              "type": "main", "index": 0 }]] },
+    "Has Config?": {
+      "main": [
+        [{ "node": "Transform User Story Data", "type": "main", "index": 0 }],
+        [{ "node": "Respond: Not Configured",   "type": "main", "index": 0 }]
+      ]
+    },
+    "Transform User Story Data":  { "main": [[{ "node": "Send to QC API", "type": "main", "index": 0 }]] },
+    "Send to QC API":             { "main": [[{ "node": "Respond: OK",    "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "tuleap" }]
+}
