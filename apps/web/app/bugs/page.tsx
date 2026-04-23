@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { bugsApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -144,6 +145,10 @@ function BugsContent() {
                         Defects synced from Tuleap. Total: <span className="font-semibold">{total}</span>
                     </p>
                 </div>
+                <Link href="/bugs/create" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Create Bug
+                </Link>
             </div>
 
             {/* Filters */}
@@ -248,7 +253,11 @@ function BugsContent() {
                                                className="text-indigo-600 dark:text-indigo-400 hover:underline">
                                                 {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
                                             </a>
-                                        ) : (bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id)}
+                                        ) : (
+                                            <Link href={`/bugs/${bug.tuleap_artifact_id || bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
+                                            </Link>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <p className="font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</p>
