@@ -1,5 +1,5 @@
 {
-  "id": "BugDeletionSync001",
+  "id": "QhxK0Pwd4LgkGDip",
   "name": "Tuleap Bug Deletion Sync (Polling)",
   "active": false,
   "nodes": [
@@ -104,17 +104,46 @@
       "name": "Fetch Tuleap Artifacts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "continueOnFail": true,
       "position": [1200, 304]
     },
     {
       "parameters": {
-        "jsCode": "const trackerId = $('Prepare Trackers').first().json.tuleap_tracker_id;\n\nlet artifacts = $input.first().json;\nif (!Array.isArray(artifacts)) {\n  if (artifacts?.collection && Array.isArray(artifacts.collection)) {\n    artifacts = artifacts.collection;\n  } else {\n    artifacts = [];\n  }\n}\n\nconst activeIds = artifacts.map(a => a.id).filter(Boolean);\n\nreturn [{\n  json: {\n    tuleap_tracker_id: trackerId,\n    active_tuleap_artifact_ids: activeIds,\n    total_fetched: activeIds.length\n  }\n}];"
+        "jsCode": "// Pair each Tuleap API response with its tracker config by index.\n// $('Prepare Trackers').first() would always give the FIRST tracker — wrong for multiple configs.\nconst allTrackers = $('Prepare Trackers').all();\nconst allResponses = $input.all();\n\nreturn allResponses.map((item, i) => {\n  const trackerId = allTrackers[i]?.json.tuleap_tracker_id;\n  const data = item.json;\n\n  let artifacts = data;\n  if (!Array.isArray(artifacts)) {\n    if (data?.collection && Array.isArray(data.collection)) {\n      artifacts = data.collection;\n    } else {\n      artifacts = [];\n    }\n  }\n\n  // Only keep integer IDs — filters out nulls and malformed entries\n  const activeIds = artifacts.map(a => a.id).filter(id => typeof id === 'number' && id > 0);\n\n  if (activeIds.length === 0) {\n    console.warn(`[bug-deletion-sync] No valid artifacts for tracker ${trackerId} — skipping to avoid mass delete`);\n    return { json: { skipped: true, reason: 'No active artifacts or Tuleap API error', tuleap_tracker_id: trackerId } };\n  }\n\n  return {\n    json: {\n      tuleap_tracker_id: trackerId,\n      active_tuleap_artifact_ids: activeIds,\n      total_fetched: activeIds.length,\n      skipped: false\n    }\n  };\n});"
       },
       "id": "d1000000-0006-4006-8006-000000000006",
       "name": "Extract Active IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1440, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-active-ids",
+              "leftValue": "={{ $json.active_tuleap_artifact_ids?.length ?? 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d1000000-0009-4009-8009-000000000009",
+      "name": "Has Active IDs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1680, 304]
     },
     {
       "parameters": {
@@ -131,11 +160,11 @@
       "name": "Send to Deletion Sync",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1680, 304]
+      "position": [1920, 304]
     },
     {
       "parameters": {
-        "jsCode": "const trackerId = $('Prepare Trackers').first().json.tuleap_tracker_id;\nconsole.log(`[bug-deletion-sync] No configs with tuleap_base_url found for tracker ${trackerId}`);\nreturn [{ json: { skipped: true, reason: 'No valid tracker configs' } }];"
+        "jsCode": "console.log('[bug-deletion-sync] No active tracker configs found — skipping');\nreturn [{ json: { skipped: true, reason: 'No valid tracker configs' } }];"
       },
       "id": "d1000000-0008-4008-8008-000000000008",
       "name": "No Trackers - Skip",
@@ -176,7 +205,13 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "No Trackers - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepare Trackers": {
@@ -205,11 +240,23 @@
       "main": [
         [
           {
-            "node": "Send to Deletion Sync",
+            "node": "Has Active IDs?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Has Active IDs?": {
+      "main": [
+        [
+          {
+            "node": "Send to Deletion Sync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

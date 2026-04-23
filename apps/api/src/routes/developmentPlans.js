@@ -95,6 +95,19 @@ async function assertTaskInPlan(planId, taskId) {
     return r.rows.length > 0;
 }
 
+async function assertTaskBelongsToUser(userId, taskId) {
+    const r = await db.query(
+        `SELECT jt.id FROM journey_tasks jt
+         JOIN journey_quests jq ON jt.quest_id = jq.id
+         JOIN journey_chapters jc ON jq.chapter_id = jc.id
+         JOIN journeys j ON j.id = jc.journey_id
+         WHERE jt.id = $1 AND j.owner_user_id = $2
+           AND j.plan_type = 'idp' AND j.is_active = true AND j.deleted_at IS NULL`,
+        [taskId, userId]
+    );
+    return r.rows.length > 0;
+}
+
 async function getPlanForUserOrId(userId, planId) {
     if (planId) {
         const r = await db.query(
@@ -807,10 +820,8 @@ router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-        if (!(await assertTaskInPlan(plan.id, taskId))) {
-            return res.status(404).json({ error: 'Task not found in this plan' });
+        if (!(await assertTaskBelongsToUser(userId, taskId))) {
+            return res.status(404).json({ error: 'Task not found in any active plan for this user' });
         }
         const result = await db.query(
             `SELECT c.id, c.user_id, c.task_id, c.author_id, c.body, c.created_at, c.updated_at,
@@ -836,10 +847,8 @@ router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin',
         const allowed = await canAccessUser(req.user, userId);
         if (!allowed) return res.status(403).json({ error: 'User is not in your team' });
 
-        const plan = await getPlanForUser(userId);
-        if (!plan) return res.status(404).json({ error: 'No active IDP plan found' });
-        if (!(await assertTaskInPlan(plan.id, taskId))) {
-            return res.status(404).json({ error: 'Task not found in this plan' });
+        if (!(await assertTaskBelongsToUser(userId, taskId))) {
+            return res.status(404).json({ error: 'Task not found in any active plan for this user' });
         }
         const inserted = await db.query(
             `INSERT INTO idp_task_comment (user_id, task_id, author_id, body)
