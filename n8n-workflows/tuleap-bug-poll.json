@@ -1,0 +1,140 @@
+{
+  "id": "BugPoll001TuleapQC",
+  "name": "Tuleap Bug Polling Sync",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "*/15 * * * *" }] } },
+      "id": "bp0001-0001-4001-8001-000000000001",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 304]
+    },
+    {
+      "parameters": {
+        "url": "http://qc-api:3001/tuleap-webhook/config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "tracker_type", "value": "bug" },
+            { "name": "is_active",    "value": "true" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "bp0001-0002-4002-8002-000000000002",
+      "name": "Fetch Bug Configs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-configs",
+              "leftValue": "={{ $json.data?.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bp0001-0003-4003-8003-000000000003",
+      "name": "Has Configs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 304]
+    },
+    {
+      "parameters": {
+        "jsCode": "const configs = $input.first().json.data || [];\nreturn configs\n  .filter(c => c.qc_project_id)\n  .map(c => ({ json: { qc_project_id: c.qc_project_id, tuleap_tracker_id: c.tuleap_tracker_id } }));"
+      },
+      "id": "bp0001-0004-4004-8004-000000000004",
+      "name": "Split Configs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 224]
+    },
+    {
+      "parameters": {
+        "url": "=http://qc-api:3001/tuleap/artifacts/bug?limit=100&offset=0",
+        "options": { "timeout": 30000 },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "x-qc-project-id", "value": "={{ $json.qc_project_id }}" }]
+        }
+      },
+      "id": "bp0001-0005-4005-8005-000000000005",
+      "name": "Fetch Bug Artifacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 224]
+    },
+    {
+      "parameters": {
+        "jsCode": "const projectId = $('Split Configs').first().json.qc_project_id;\nconst items = ($input.first().json.data || []);\nreturn items.map(artifact => ({\n  json: { artifact, project_id: projectId }\n}));"
+      },
+      "id": "bp0001-0006-4006-8006-000000000006",
+      "name": "Split Artifacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 224]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { artifact, project_id } = $input.first().json;\nconst fields = {};\nfor (const v of (artifact.values || [])) { fields[v.name] = v; }\n\nfunction txt(...names) {\n  for (const n of names) { const f = fields[n]; if (f && f.value != null) return String(f.value); } return null;\n}\nfunction sel(...names) {\n  for (const n of names) { const f = fields[n]; if (f?.values?.[0]) return f.values[0].label || null; } return null;\n}\nfunction user(...names) {\n  for (const n of names) { const f = fields[n]; if (f?.values?.[0]) return f.values[0].display_name || f.values[0].username || null; } return null;\n}\nfunction mapStatus(s) {\n  if (!s) return 'Open';\n  return { New:'Open', Open:'Open', Assigned:'In Progress', Fixed:'Resolved', Verified:'Resolved', Closed:'Closed', Reopened:'Reopened' }[s] || 'Open';\n}\nfunction mapSeverity(s) {\n  if (!s) return 'medium';\n  const l = s.toLowerCase();\n  if (l.includes('critical')) return 'critical';\n  if (l.includes('major'))    return 'high';\n  if (l.includes('minor'))    return 'medium';\n  if (l.includes('cosmetic')) return 'low';\n  return 'medium';\n}\n\nreturn [{ json: { bugData: {\n  tuleap_artifact_id: artifact.id,\n  tuleap_tracker_id: artifact.tracker?.id,\n  bug_id: `TLP-${artifact.id}`,\n  title: txt('bug_title') || `Bug ${artifact.id}`,\n  description: txt('steps_to_reproduce'),\n  status: mapStatus(sel('status')),\n  severity: mapSeverity(sel('severity')),\n  priority: 'medium',\n  project_id,\n  assigned_to: user('assigned_to'),\n  reported_date: artifact.submitted_on || null,\n  raw_tuleap_payload: artifact\n} } }];"
+      },
+      "id": "bp0001-0007-4007-8007-000000000007",
+      "name": "Transform Bug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 224]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/bug",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.bugData) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "bp0001-0008-4008-8008-000000000008",
+      "name": "Upsert Bug",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 224]
+    },
+    {
+      "parameters": { "jsCode": "return [];" },
+      "id": "bp0001-0009-4009-8009-000000000009",
+      "name": "No Configs - Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 464]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes":  { "main": [[{ "node": "Fetch Bug Configs",  "type": "main", "index": 0 }]] },
+    "Fetch Bug Configs":  { "main": [[{ "node": "Has Configs?",       "type": "main", "index": 0 }]] },
+    "Has Configs?": {
+      "main": [
+        [{ "node": "Split Configs",    "type": "main", "index": 0 }],
+        [{ "node": "No Configs - Skip","type": "main", "index": 0 }]
+      ]
+    },
+    "Split Configs":      { "main": [[{ "node": "Fetch Bug Artifacts","type": "main", "index": 0 }]] },
+    "Fetch Bug Artifacts":{ "main": [[{ "node": "Split Artifacts",    "type": "main", "index": 0 }]] },
+    "Split Artifacts":    { "main": [[{ "node": "Transform Bug",      "type": "main", "index": 0 }]] },
+    "Transform Bug":      { "main": [[{ "node": "Upsert Bug",         "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "tuleap" }]
+}

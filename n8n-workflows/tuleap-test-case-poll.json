@@ -1,0 +1,140 @@
+{
+  "id": "TestCasePoll001TuleapQC",
+  "name": "Tuleap Test Case Polling Sync",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "*/15 * * * *" }] } },
+      "id": "tcp0001-0001-4001-8001-000000000001",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 304]
+    },
+    {
+      "parameters": {
+        "url": "http://qc-api:3001/tuleap-webhook/config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "tracker_type", "value": "test-case" },
+            { "name": "is_active",    "value": "true" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "tcp0001-0002-4002-8002-000000000002",
+      "name": "Fetch TC Configs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-configs",
+              "leftValue": "={{ $json.data?.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "tcp0001-0003-4003-8003-000000000003",
+      "name": "Has Configs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 304]
+    },
+    {
+      "parameters": {
+        "jsCode": "const configs = $input.first().json.data || [];\nreturn configs\n  .filter(c => c.qc_project_id)\n  .map(c => ({ json: { qc_project_id: c.qc_project_id, tuleap_tracker_id: c.tuleap_tracker_id } }));"
+      },
+      "id": "tcp0001-0004-4004-8004-000000000004",
+      "name": "Split Configs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 224]
+    },
+    {
+      "parameters": {
+        "url": "=http://qc-api:3001/tuleap/artifacts/test-case?limit=100&offset=0",
+        "options": { "timeout": 30000 },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "x-qc-project-id", "value": "={{ $json.qc_project_id }}" }]
+        }
+      },
+      "id": "tcp0001-0005-4005-8005-000000000005",
+      "name": "Fetch TC Artifacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 224]
+    },
+    {
+      "parameters": {
+        "jsCode": "const projectId = $('Split Configs').first().json.qc_project_id;\nconst items = ($input.first().json.data || []);\nreturn items.map(artifact => ({\n  json: { artifact, project_id: projectId }\n}));"
+      },
+      "id": "tcp0001-0006-4006-8006-000000000006",
+      "name": "Split Artifacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 224]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { artifact, project_id } = $input.first().json;\nconst fields = {};\nfor (const v of (artifact.values || [])) { fields[v.name] = v; }\nfunction txt(...names) { for (const n of names) { const f = fields[n]; if (f && f.value != null) return String(f.value); } return null; }\nreturn [{ json: { tcData: {\n  tuleap_artifact_id: artifact.id,\n  title: txt('title') || `Test Case ${artifact.id}`,\n  description: txt('test_steps'),\n  priority: 'medium',\n  category: 'other',\n  status: 'active',\n  project_id,\n  tags: [`tuleap:${artifact.id}`],\n  raw_tuleap_payload: artifact\n} } }];"
+      },
+      "id": "tcp0001-0007-4007-8007-000000000007",
+      "name": "Transform Test Case",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 224]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/test-case",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.tcData) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "tcp0001-0008-4008-8008-000000000008",
+      "name": "Upsert Test Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 224]
+    },
+    {
+      "parameters": { "jsCode": "return [];" },
+      "id": "tcp0001-0009-4009-8009-000000000009",
+      "name": "No Configs - Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 464]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes":  { "main": [[{ "node": "Fetch TC Configs",  "type": "main", "index": 0 }]] },
+    "Fetch TC Configs":  { "main": [[{ "node": "Has Configs?",       "type": "main", "index": 0 }]] },
+    "Has Configs?": {
+      "main": [
+        [{ "node": "Split Configs",    "type": "main", "index": 0 }],
+        [{ "node": "No Configs - Skip","type": "main", "index": 0 }]
+      ]
+    },
+    "Split Configs":      { "main": [[{ "node": "Fetch TC Artifacts","type": "main", "index": 0 }]] },
+    "Fetch TC Artifacts":{ "main": [[{ "node": "Split Artifacts",    "type": "main", "index": 0 }]] },
+    "Split Artifacts":    { "main": [[{ "node": "Transform Test Case","type": "main", "index": 0 }]] },
+    "Transform Test Case":{ "main": [[{ "node": "Upsert Test Case",  "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "tuleap" }]
+}
