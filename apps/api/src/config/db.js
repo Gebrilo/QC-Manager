@@ -416,6 +416,47 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_webhook_log_artifact ON tuleap_webhook_log(tuleap_artifact_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_webhook_log_status ON tuleap_webhook_log(processing_status)`);
 
+        // User Stories (synced from Tuleap)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_stories (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                tuleap_artifact_id INTEGER NOT NULL UNIQUE,
+                tuleap_tracker_id  INTEGER,
+                tuleap_url         TEXT,
+                title              VARCHAR(500) NOT NULL,
+                description        TEXT,
+                acceptance_criteria TEXT,
+                status             VARCHAR(50) NOT NULL DEFAULT 'Draft',
+                requirement_version VARCHAR(50),
+                priority           VARCHAR(50),
+                ba_author          VARCHAR(255),
+                project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+                last_sync_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                raw_tuleap_payload JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_stories_tuleap_artifact ON user_stories(tuleap_artifact_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_stories_project_id ON user_stories(project_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_stories_status ON user_stories(status) WHERE deleted_at IS NULL`);
+
+        await client.query(`
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'tuleap_sync_config_tracker_type_check'
+                    AND conrelid = 'tuleap_sync_config'::regclass
+                ) THEN
+                    ALTER TABLE tuleap_sync_config DROP CONSTRAINT tuleap_sync_config_tracker_type_check;
+                END IF;
+            END $$;
+        `);
+        await client.query(`ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user-story', 'test-case'))`);
+
         // Tuleap Task History
         await client.query(`
             CREATE TABLE IF NOT EXISTS tuleap_task_history (
@@ -1570,6 +1611,13 @@ const runMigrations = async () => {
         await client.query(`
             CREATE TRIGGER set_updated_at
                 BEFORE UPDATE ON journey_tasks
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+        `);
+
+        await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON user_stories`);
+        await client.query(`
+            CREATE TRIGGER set_updated_at
+                BEFORE UPDATE ON user_stories
                 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
         `);
 
