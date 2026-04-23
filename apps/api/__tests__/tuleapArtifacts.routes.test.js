@@ -178,3 +178,49 @@ describe('DELETE /tuleap/artifacts/:id', () => {
     expect(res.status).toBe(503);
   });
 });
+
+// ── New: GET /:type — list ────────────────────────────────────────────────────
+describe('GET /tuleap/artifacts/:type', () => {
+  it('returns 200 with data array on success', async () => {
+    defaultClient.get.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] });
+    const res = await request(app).get('/tuleap/artifacts/user-story');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.total).toBe(2);
+    expect(defaultClient.get).toHaveBeenCalledWith(
+      '/artifacts',
+      expect.objectContaining({ params: expect.objectContaining({ tracker: 10 }) })
+    );
+  });
+
+  it('passes limit and offset query params to Tuleap', async () => {
+    defaultClient.get.mockResolvedValue({ data: [] });
+    await request(app).get('/tuleap/artifacts/bug?limit=10&offset=20');
+    expect(defaultClient.get).toHaveBeenCalledWith(
+      '/artifacts',
+      expect.objectContaining({ params: expect.objectContaining({ limit: 10, offset: 20, tracker: 30 }) })
+    );
+  });
+
+  it('returns 404 for unknown type', async () => {
+    const res = await request(app).get('/tuleap/artifacts/unknown-type');
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── New: GET /:type/:id — single ──────────────────────────────────────────────
+describe('GET /tuleap/artifacts/:type/:id', () => {
+  it('returns 200 with artifact on success', async () => {
+    defaultClient.get.mockResolvedValue({ data: { id: 42, xref: 'bug #42' } });
+    const res = await request(app).get('/tuleap/artifacts/bug/42');
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(42);
+    expect(defaultClient.get).toHaveBeenCalledWith('/artifacts/42');
+  });
+
+  it('returns 404 when Tuleap returns 404', async () => {
+    defaultClient.get.mockRejectedValue(Object.assign(new Error('Not found'), { status: 404 }));
+    const res = await request(app).get('/tuleap/artifacts/bug/99999');
+    expect(res.status).toBe(404);
+  });
+});
