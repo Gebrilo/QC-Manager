@@ -1170,6 +1170,8 @@ router.post('/config', async (req, res) => {
             qc_project_id,
             field_mappings = {},
             status_mappings = {},
+            artifact_fields = {},
+            status_value_map = {},
             is_active = true
         } = req.body;
 
@@ -1183,20 +1185,22 @@ router.post('/config', async (req, res) => {
         const result = await pool.query(`
             INSERT INTO tuleap_sync_config (
                 tuleap_project_id, tuleap_tracker_id, tuleap_base_url, tracker_type,
-                qc_project_id, field_mappings, status_mappings, is_active
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                qc_project_id, field_mappings, status_mappings, artifact_fields, status_value_map, is_active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (tuleap_project_id, tuleap_tracker_id) DO UPDATE SET
                 tuleap_base_url = EXCLUDED.tuleap_base_url,
                 tracker_type = EXCLUDED.tracker_type,
                 qc_project_id = EXCLUDED.qc_project_id,
                 field_mappings = EXCLUDED.field_mappings,
                 status_mappings = EXCLUDED.status_mappings,
+                artifact_fields = EXCLUDED.artifact_fields,
+                status_value_map = EXCLUDED.status_value_map,
                 is_active = EXCLUDED.is_active,
                 updated_at = NOW()
             RETURNING *
         `, [
             tuleap_project_id, tuleap_tracker_id, tuleap_base_url, tracker_type,
-            qc_project_id, field_mappings, status_mappings, is_active
+            qc_project_id, field_mappings, status_mappings, artifact_fields, status_value_map, is_active
         ]);
 
         res.json({
@@ -1209,6 +1213,201 @@ router.post('/config', async (req, res) => {
             success: false,
             error: 'Failed to save sync configuration',
             message: error.message
+        });
+    }
+});
+
+// =====================================================
+// PUT /tuleap-webhook/config/:id
+// Update sync configuration
+// =====================================================
+router.put('/config/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = [];
+        const values = [];
+        let paramIdx = 1;
+
+        if (req.body.artifact_fields !== undefined) {
+            updates.push(`artifact_fields = $${paramIdx++}`);
+            values.push(JSON.stringify(req.body.artifact_fields));
+        }
+        if (req.body.status_value_map !== undefined) {
+            updates.push(`status_value_map = $${paramIdx++}`);
+            values.push(JSON.stringify(req.body.status_value_map));
+        }
+        if (req.body.tracker_type !== undefined) {
+            updates.push(`tracker_type = $${paramIdx++}`);
+            values.push(req.body.tracker_type);
+        }
+        if (req.body.tuleap_tracker_id !== undefined) {
+            updates.push(`tuleap_tracker_id = $${paramIdx++}`);
+            values.push(req.body.tuleap_tracker_id);
+        }
+        if (req.body.tuleap_project_id !== undefined) {
+            updates.push(`tuleap_project_id = $${paramIdx++}`);
+            values.push(req.body.tuleap_project_id);
+        }
+        if (req.body.is_active !== undefined) {
+            updates.push(`is_active = $${paramIdx++}`);
+            values.push(req.body.is_active);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ success: false, error: 'No fields to update' });
+        }
+
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(id);
+
+        const result = await pool.query(
+            `UPDATE tuleap_sync_config SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Config not found' });
+        }
+
+        res.json({
+            success: true,
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating sync config:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update sync configuration',
+            message: error.message
+        });
+    }
+});
+
+// =====================================================
+// DELETE /tuleap-webhook/config/:id
+// Soft-delete sync configuration
+// =====================================================
+router.delete('/config/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            'UPDATE tuleap_sync_config SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Config not found' });
+        }
+        return res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('Error deleting sync config:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete sync configuration',
+            message: error.message
+        });
+    }
+});
+
+// =====================================================
+// POST /tuleap-webhook/config/test-connection
+// Validate a Tuleap tracker by calling the Tuleap API
+// =====================================================
+router.post('/config/test-connection', async (req, res) => {
+    try {
+        const { tuleap_base_url, tuleap_tracker_id, access_key } = req.body;
+
+        if (!tuleap_tracker_id) {
+            return res.status(400).json({ success: false, error: 'tuleap_tracker_id is required' });
+        }
+
+        const { createTuleapClient } = require('../services/tuleapClient');
+        const client = createTuleapClient({
+            baseURL: tuleap_base_url || process.env.TULEAP_BASE_URL,
+            accessKey: access_key || process.env.TULEAP_ACCESS_KEY
+        });
+        const response = await client.get(`/trackers/${tuleap_tracker_id}`);
+        const tracker = response.data;
+        const fields = (tracker.fields || []).map(f => ({
+            field_id: f.field_id,
+            name: f.name,
+            label: f.label,
+            type: f.type,
+            values: (f.values || []).map(v => ({ id: v.id, label: v.label })),
+        }));
+
+        return res.json({
+            success: true,
+            tracker: {
+                id: tracker.id,
+                name: tracker.name,
+                item_name: tracker.item_name,
+                fields,
+            },
+        });
+    } catch (err) {
+        console.error('Error testing Tuleap connection:', err);
+        return res.status(err.status || 502).json({
+            success: false,
+            error: err.message,
+            tuleap_status: err.status,
+        });
+    }
+});
+
+// =====================================================
+// GET /tuleap-webhook/config/discover/:trackerId
+// Auto-discover field mappings by fetching tracker schema
+// =====================================================
+router.get('/config/discover/:trackerId', async (req, res) => {
+    try {
+        const { trackerId } = req.params;
+
+        const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+        const fields = await defaultRegistry._load(trackerId);
+        const fieldList = [];
+        for (const [name, field] of fields) {
+            fieldList.push({
+                field_id: field.field_id,
+                name: field.name,
+                label: field.label,
+                type: field.type,
+                values: (field.values || []).map(v => ({ id: v.id, label: v.label })),
+            });
+        }
+
+        // Suggest mappings based on name similarity with base field mappings
+        const { BASE_FIELD_MAPPINGS } = require('../services/tuleapTransformEngine');
+        const suggestions = {};
+        const allBaseMappings = { ...BASE_FIELD_MAPPINGS.bug, ...BASE_FIELD_MAPPINGS.task, ...BASE_FIELD_MAPPINGS.user_story, ...BASE_FIELD_MAPPINGS.test_case };
+
+        for (const [tuleapName, field] of fields) {
+            const unifiedName = allBaseMappings[tuleapName];
+            if (unifiedName) {
+                suggestions[tuleapName] = unifiedName;
+            } else {
+                // Try fuzzy match on label
+                const label = (field.label || '').toLowerCase();
+                const knownUnifiedNames = [...new Set(Object.values(allBaseMappings))];
+                for (const unified of knownUnifiedNames) {
+                    if (label.includes(unified.replace('_', ' '))) {
+                        suggestions[tuleapName] = unified;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return res.json({
+            tracker_id: Number(trackerId),
+            fields: fieldList,
+            suggested_mappings: suggestions,
+        });
+    } catch (err) {
+        console.error('Error discovering tracker fields:', err);
+        return res.status(err.status || 500).json({
+            success: false,
+            error: err.message,
+            tuleap_status: err.status,
         });
     }
 });
