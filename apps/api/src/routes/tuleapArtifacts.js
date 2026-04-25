@@ -137,6 +137,67 @@ router.post('/:type', requireAuth, async (req, res) => {
     return res.status(404).json({ error: `Unknown artifact type: ${type}` });
   }
 
+  if (req.body.artifact_type && req.body.common) {
+    const { artifact_type, project_id, common, fields } = req.body;
+    if (!project_id) {
+      return res.status(400).json({ error: 'project_id is required for unified payload' });
+    }
+    const configResult = await db.pool.query(
+      `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = $2 AND is_active = true`,
+      [project_id, artifact_type]
+    );
+    const config = configResult.rows[0];
+    if (!config) {
+      return res.status(400).json({ error: `No active config for type '${artifact_type}' in project ${project_id}` });
+    }
+    const tuleapPayload = toTuleap({ artifact_type, common, fields }, config);
+    const trackerId = config.tuleap_tracker_id;
+    const values = [];
+    try {
+      for (const [tuleapFieldName, fieldValue] of Object.entries(tuleapPayload)) {
+        if (fieldValue === undefined || fieldValue === null) continue;
+        const field = await defaultRegistry.getField(trackerId, tuleapFieldName);
+        let shape;
+        if (['sb', 'rb', 'msb', 'cb'].includes(field.type)) {
+          if (Array.isArray(fieldValue)) {
+            const boundIds = await Promise.all(
+              fieldValue.map(v => defaultRegistry.resolveBindValue(trackerId, tuleapFieldName, v).then(b => b.id))
+            );
+            shape = { bind_value_ids: boundIds };
+          } else {
+            const bound = await defaultRegistry.resolveBindValue(trackerId, tuleapFieldName, fieldValue);
+            shape = { bind_value_ids: [bound.id] };
+          }
+        } else if (field.type === 'art_link') {
+          const links = Array.isArray(fieldValue)
+            ? fieldValue.map(id => ({ id: Number(id) }))
+            : [{ id: Number(fieldValue) }];
+          shape = { links };
+        } else {
+          shape = { value: fieldValue };
+        }
+        values.push({ field_id: field.field_id, ...shape });
+      }
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    const payload = { tracker: { id: trackerId }, values };
+    let response;
+    try {
+      response = await defaultClient.post('/artifacts', payload);
+    } catch (err) {
+      return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+    }
+    const artifact = response.data;
+    const base = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+    return res.status(201).json({
+      tuleap_artifact_id: artifact.id,
+      tuleap_url: `${base}/plugins/tracker/?aid=${artifact.id}`,
+      artifact_type,
+      xref: artifact.xref || null,
+    });
+  }
+
   const { trackerId, config } = await resolveTrackerId(type, req.body.project_id);
   if (!trackerId) {
     return res.status(400).json({ error: `No tracker configured for artifact type: ${type}` });

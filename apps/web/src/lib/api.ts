@@ -1291,6 +1291,27 @@ export interface TuleapArtifact {
     [key: string]: unknown;
 }
 
+export interface UnifiedPayload {
+    artifact_type: 'bug' | 'task' | 'user_story' | 'test_case';
+    project_id?: string;
+    common: {
+        title: string;
+        description?: string;
+        status?: string;
+        assigned_to?: string | null;
+        priority?: string | null;
+        attachments?: Array<{ id?: number | string; name?: string; description?: string }>;
+        links?: Array<{ type: string; target_artifact_id: number | string }>;
+    };
+    fields: Record<string, unknown>;
+    tuleap?: {
+        project_id?: number;
+        tracker_id?: number;
+        artifact_id?: number;
+        url?: string;
+    };
+}
+
 export const tuleapApi = {
     list: async (type: string, params?: Record<string, string | number>) => {
         const query = params ? '?' + new URLSearchParams(
@@ -1313,6 +1334,18 @@ export const tuleapApi = {
     remove: async (id: string | number) =>
         fetchApi<{ deleted: boolean }>(`/tuleap/artifacts/${id}`, {
             method: 'DELETE',
+        }),
+    createUnified: async (payload: UnifiedPayload) => {
+        const type = payload.artifact_type.replace('_', '-');
+        return fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; artifact_type: string; xref: string }>(`/tuleap/artifacts/${type}`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+    updateUnified: async (artifactId: string | number, payload: UnifiedPayload) =>
+        fetchApi<{ updated: boolean }>(`/tuleap/artifacts/${artifactId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
         }),
 };
 
