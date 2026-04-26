@@ -267,13 +267,13 @@ jobs:
             echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
 
             echo "=== Pulling app images (:staging) ==="
-            docker compose -f docker-compose.staging.yml --env-file .env.staging pull
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging pull
 
             echo "=== Deploying staging ==="
-            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate
 
             echo "=== Cleanup ==="
             docker image prune -f
 
             echo "=== Staging deployment complete ==="
-            docker compose -f docker-compose.staging.yml --env-file .env.staging ps
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging ps
