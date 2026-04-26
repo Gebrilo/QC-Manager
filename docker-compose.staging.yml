@@ -42,7 +42,7 @@ services:
   # ---------------------------------------------------------------------------
 
   api:
-    image: ${DOCKER_HUB_USERNAME}/qc-api:latest
+    image: ${DOCKER_HUB_USERNAME}/qc-api:staging
     container_name: qc-staging-api
     restart: unless-stopped
     environment:
@@ -76,7 +76,7 @@ services:
       start_period: 30s
 
   web:
-    image: ${DOCKER_HUB_USERNAME}/qc-web:latest
+    image: ${DOCKER_HUB_USERNAME}/qc-web:staging
     container_name: qc-staging-web
     restart: unless-stopped
     environment:
