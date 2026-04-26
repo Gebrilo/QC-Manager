@@ -63,6 +63,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/settings/journeys', label: 'Manage Journeys', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9.5, icon: Map },
     { path: '/settings/journeys/[id]', label: 'Edit Journey', adminOnly: true, requiresActivation: true },
     { path: '/settings/roles', label: 'Roles & Permissions', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
+    { path: '/settings/tuleap', label: 'Tuleap Integration', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
     { path: '/users', label: 'Users', permission: 'page:users', adminOnly: true, requiresActivation: true, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/settings/team-journeys', label: 'Team Journeys', permission: 'action:journeys:view_team_progress', requiresActivation: true, showInNavbar: true, navOrder: 9.8, icon: Users2 },
     { path: '/settings/team-journeys/[userId]', label: 'Team Member Journey', permission: 'action:journeys:view_team_progress', requiresActivation: true },

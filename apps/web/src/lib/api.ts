@@ -1291,6 +1291,27 @@ export interface TuleapArtifact {
     [key: string]: unknown;
 }
 
+export interface UnifiedPayload {
+    artifact_type: 'bug' | 'task' | 'user_story' | 'test_case';
+    project_id?: string;
+    common: {
+        title: string;
+        description?: string;
+        status?: string;
+        assigned_to?: string | null;
+        priority?: string | null;
+        attachments?: Array<{ id?: number | string; name?: string; description?: string }>;
+        links?: Array<{ type: string; target_artifact_id: number | string }>;
+    };
+    fields: Record<string, unknown>;
+    tuleap?: {
+        project_id?: number;
+        tracker_id?: number;
+        artifact_id?: number;
+        url?: string;
+    };
+}
+
 export const tuleapApi = {
     list: async (type: string, params?: Record<string, string | number>) => {
         const query = params ? '?' + new URLSearchParams(
@@ -1314,4 +1335,68 @@ export const tuleapApi = {
         fetchApi<{ deleted: boolean }>(`/tuleap/artifacts/${id}`, {
             method: 'DELETE',
         }),
+    createUnified: async (payload: UnifiedPayload) => {
+        const type = payload.artifact_type.replace('_', '-');
+        return fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; artifact_type: string; xref: string }>(`/tuleap/artifacts/${type}`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+    updateUnified: async (artifactId: string | number, payload: UnifiedPayload) =>
+        fetchApi<{ updated: boolean }>(`/tuleap/artifacts/${artifactId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+        }),
+};
+
+export interface TuleapSyncConfig {
+    id: string;
+    tuleap_project_id: number;
+    tuleap_tracker_id: number;
+    tuleap_base_url: string | null;
+    tracker_type: string;
+    qc_project_id: string;
+    field_mappings: Record<string, string>;
+    status_mappings: Record<string, string>;
+    artifact_fields: Record<string, string>;
+    status_value_map: Record<string, string>;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export const tuleapConfigApi = {
+    list: async (params?: Record<string, string>) => {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return fetchApi<{ success: boolean; data: TuleapSyncConfig[] }>(`/tuleap-webhook/config${query}`);
+    },
+
+    get: async (id: string) =>
+        fetchApi<TuleapSyncConfig>(`/tuleap-webhook/config/${id}`),
+
+    create: async (data: Partial<TuleapSyncConfig>) =>
+        fetchApi<{ success: boolean; data: TuleapSyncConfig }>('/tuleap-webhook/config', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    update: async (id: string, data: Partial<TuleapSyncConfig>) =>
+        fetchApi<{ success: boolean; data: TuleapSyncConfig }>(`/tuleap-webhook/config/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
+
+    delete: async (id: string) =>
+        fetchApi<{ success: boolean; data: TuleapSyncConfig }>(`/tuleap-webhook/config/${id}`, {
+            method: 'DELETE',
+        }),
+
+    testConnection: async (data: { tuleap_base_url?: string; tuleap_tracker_id: number; access_key?: string }) =>
+        fetchApi<{ success: boolean; tracker: { id: number; name: string; item_name: string; fields: Array<{ field_id: number; name: string; label: string; type: string; values: Array<{ id: number; label: string }> }> } }>('/tuleap-webhook/config/test-connection', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    discover: async (trackerId: number) =>
+        fetchApi<{ tracker_id: number; fields: Array<{ field_id: number; name: string; label: string; type: string; values: Array<{ id: number; label: string }> }>; suggested_mappings: Record<string, string> }>(`/tuleap-webhook/config/discover/${trackerId}`),
 };
