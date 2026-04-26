@@ -7,15 +7,24 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi } from '@/lib/api';
 
 const userStorySchema = z.object({
-    summary: z.string().min(1, 'Summary is required'),
-    overviewDescription: z.string().optional().default(''),
-    acceptanceCriteria: z.string().optional().default(''),
+    title: z.string().min(1, 'Summary is required'),
+    description: z.string().optional().default(''),
+    acceptance_criteria: z.string().optional().default(''),
+    change_reason: z.string().optional().default(''),
     status: z.enum(['Draft', 'Changes', 'Review', 'Approved']).optional().default('Draft'),
-    requirementVersion: z.string().optional().default(''),
     priority: z.enum(['P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low']).optional().default('P3-Medium'),
+    requirement_version: z.string().optional().default('1'),
+    ba_author: z.string().optional().default(''),
+    initial_effort: z.coerce.number().nullable().optional(),
+    remaining_effort: z.coerce.number().nullable().optional(),
+    assigned_to: z.string().optional().default(''),
 });
 
 type FormData = z.infer<typeof userStorySchema>;
@@ -32,19 +41,20 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId }: Us
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-    } = useForm<FormData>({
+    const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(userStorySchema) as any,
         defaultValues: {
-            summary: (initialData?.story_title as string) || (initialData?.summary as string) || '',
-            overviewDescription: (initialData?.overview_description as string) || '',
-            acceptanceCriteria: (initialData?.acceptance_criteria as string) || '',
+            title: (initialData?.title as string) || (initialData?.story_title as string) || (initialData?.summary as string) || '',
+            description: (initialData?.description as string) || (initialData?.overview_description as string) || '',
+            acceptance_criteria: (initialData?.acceptance_criteria as string) || '',
+            change_reason: (initialData?.change_reason as string) || '',
             status: (initialData?.status as any) || 'Draft',
-            requirementVersion: (initialData?.requirement_version as string) || '',
             priority: (initialData?.priority as any) || 'P3-Medium',
+            requirement_version: (initialData?.requirement_version as string) || '1',
+            ba_author: (initialData?.ba_author as string) || '',
+            initial_effort: initialData?.initial_effort != null ? Number(initialData.initial_effort) : null,
+            remaining_effort: initialData?.remaining_effort != null ? Number(initialData.remaining_effort) : null,
+            assigned_to: (initialData?.assigned_to as string) || '',
         },
     });
 
@@ -52,107 +62,138 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId }: Us
         setIsSubmitting(true);
         setError(null);
         try {
-            const payload: Record<string, unknown> = {
-                story_title: data.summary,
-                overview_description: data.overviewDescription || undefined,
-                acceptance_criteria: data.acceptanceCriteria || undefined,
-                status: data.status,
-                requirement_version: data.requirementVersion || undefined,
-                priority: data.priority,
+            const payload = {
+                artifact_type: 'user_story' as const,
+                project_id: projectId,
+                common: {
+                    title: data.title,
+                    description: data.description || undefined,
+                    status: data.status,
+                    assigned_to: data.assigned_to || null,
+                    priority: data.priority,
+                },
+                fields: {
+                    acceptance_criteria: data.acceptance_criteria || undefined,
+                    requirement_version: data.requirement_version || '1',
+                    change_reason: data.change_reason || undefined,
+                    ba_author: data.ba_author || undefined,
+                    initial_effort: data.initial_effort ?? null,
+                    remaining_effort: data.remaining_effort ?? null,
+                },
             };
 
-            if (projectId) {
-                payload.project_id = projectId;
-            }
-
             if (isEdit && artifactId) {
-                await tuleapApi.update(artifactId, 'user-story', payload);
+                await tuleapApi.updateUnified(artifactId, payload);
                 router.push(`/user-stories/${artifactId}`);
             } else {
-                const result = await tuleapApi.create('user-story', payload);
+                const result = await tuleapApi.createUnified(payload);
                 router.push(`/user-stories/${result.tuleap_artifact_id}`);
             }
             router.refresh();
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Failed to save user story');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="glass-card rounded-2xl p-6">
-                {error && (
-                    <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-4 rounded-xl text-sm mb-6 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {error}
-                    </div>
-                )}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-3xl mx-auto">
+            <ErrorBanner message={error} />
 
-                <div className="space-y-6">
+            <FormSection title="General">
+                <div className="md:col-span-2">
                     <Input
-                        label="Summary *"
-                        {...register('summary')}
-                        error={errors.summary?.message}
+                        label="Summary"
+                        {...register('title')}
+                        error={errors.title?.message}
                         placeholder="User story summary"
                         className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                     />
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Overview Description</label>
-                        <textarea
-                            {...register('overviewDescription')}
-                            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none min-h-[120px] transition-all resize-y"
-                            placeholder="Describe the user story..."
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Acceptance Criteria</label>
-                        <textarea
-                            {...register('acceptanceCriteria')}
-                            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none min-h-[120px] transition-all resize-y"
-                            placeholder="List acceptance criteria..."
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
-                            <select
-                                {...register('status')}
-                                className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-                            >
-                                <option value="Draft">Draft</option>
-                                <option value="Changes">Changes</option>
-                                <option value="Review">Review</option>
-                                <option value="Approved">Approved</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Priority</label>
-                            <select
-                                {...register('priority')}
-                                className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-                            >
-                                <option value="P1-Critical">P1 - Critical</option>
-                                <option value="P2-High">P2 - High</option>
-                                <option value="P3-Medium">P3 - Medium</option>
-                                <option value="P4-Low">P4 - Low</option>
-                            </select>
-                        </div>
-
-                        <Input
-                            label="Requirement Version"
-                            {...register('requirementVersion')}
-                            placeholder="e.g. 1.0"
-                            className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                        />
-                    </div>
                 </div>
-            </div>
+                <Select
+                    label="Status"
+                    options={[
+                        { value: 'Draft', label: 'Draft' },
+                        { value: 'Changes', label: 'Changes' },
+                        { value: 'Review', label: 'Review' },
+                        { value: 'Approved', label: 'Approved' },
+                    ]}
+                    {...register('status')}
+                    error={errors.status?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Select
+                    label="Priority"
+                    options={[
+                        { value: 'P1-Critical', label: 'P1 - Critical' },
+                        { value: 'P2-High', label: 'P2 - High' },
+                        { value: 'P3-Medium', label: 'P3 - Medium' },
+                        { value: 'P4-Low', label: 'P4 - Low' },
+                    ]}
+                    {...register('priority')}
+                    error={errors.priority?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+            </FormSection>
+
+            <FormSection title="Description">
+                <div className="md:col-span-2">
+                    <Textarea
+                        label="Description"
+                        {...register('description')}
+                        placeholder="Describe the user story..."
+                    />
+                </div>
+                <div className="md:col-span-2">
+                    <Textarea
+                        label="Acceptance Criteria"
+                        {...register('acceptance_criteria')}
+                        placeholder="List acceptance criteria..."
+                    />
+                </div>
+                <div className="md:col-span-2">
+                    <Textarea
+                        label="Change Reason"
+                        {...register('change_reason')}
+                        placeholder="Reason for this change..."
+                    />
+                </div>
+            </FormSection>
+
+            <FormSection title="Progress">
+                <Input
+                    label="Initial Effort (hours)"
+                    type="number"
+                    step="0.5"
+                    {...register('initial_effort')}
+                    placeholder="0"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Remaining Effort (hours)"
+                    type="number"
+                    step="0.5"
+                    {...register('remaining_effort')}
+                    placeholder="0"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Requirement Version"
+                    {...register('requirement_version')}
+                    placeholder="e.g. 1.0"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+            </FormSection>
+
+            <FormSection title="References">
+                <Input
+                    label="BA Author"
+                    {...register('ba_author')}
+                    placeholder="Business analyst name"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+            </FormSection>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => router.back()} className="w-24 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</Button>
