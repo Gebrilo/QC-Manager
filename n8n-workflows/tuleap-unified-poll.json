@@ -1,0 +1,188 @@
+{
+  "name": "Tuleap Unified Poll",
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/15 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fetch-active-trackers",
+      "name": "Fetch Active Trackers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://qc-api:3001/tuleap-webhook/config?is_active=true",
+        "options": {}
+      }
+    },
+    {
+      "id": "split-configs",
+      "name": "Split Configs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "jsCode": "const configs = $input.first().json.data || [];\nreturn configs.map(config => ({ json: config }));"
+      }
+    },
+    {
+      "id": "split-in-batches",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [950, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "fetch-artifacts",
+      "name": "Fetch Artifacts from Tuleap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1200, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.TULEAP_BASE_URL }}/api/v1/artifacts?tracker={{ $json.tuleap_tracker_id }}&limit=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Auth-AccessKey",
+              "value": "={{ $env.TULEAP_ACCESS_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "build-payloads",
+      "name": "Build Unified Payloads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst config = items[0]?.json || {};\n\n// Artifacts come from the previous HTTP response\nconst artifacts = $input.first().json || [];\nconst artifactList = Array.isArray(artifacts) ? artifacts : (artifacts.data || artifacts.items || [artifacts]);\n\nif (artifactList.length === 0) return [];\n\nreturn artifactList.map(artifact => {\n  const valuesMap = {};\n  for (const v of (artifact.values || [])) {\n    const key = v.field_name || v.label || v.name || `field_${v.field_id}`;\n    const val = v.value !== undefined ? v.value :\n                v.bind_value_ids ? v.bind_value_ids :\n                v.links ? v.links : null;\n    valuesMap[key] = val;\n  }\n\n  return {\n    json: {\n      tracker_id: config.tuleap_tracker_id,\n      project_id: config.tuleap_project_id,\n      action: 'poll_sync',\n      artifact: {\n        id: artifact.id,\n        uri: artifact.uri,\n        values: artifact.values || []\n      },\n      raw_payload: { current: artifact, project: { id: config.tuleap_project_id } },\n      normalized_values: valuesMap\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "send-to-qc-poll",
+      "name": "Send to QC Unified API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1700, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/unified",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Trackers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Trackers": {
+      "main": [
+        [
+          {
+            "node": "Split Configs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Configs": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Fetch Artifacts from Tuleap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Artifacts from Tuleap": {
+      "main": [
+        [
+          {
+            "node": "Build Unified Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Unified Payloads": {
+      "main": [
+        [
+          {
+            "node": "Send to QC Unified API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    {
+      "name": "tuleap"
+    },
+    {
+      "name": "unified"
+    },
+    {
+      "name": "poll"
+    }
+  ]
+}

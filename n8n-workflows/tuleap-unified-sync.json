@@ -1,0 +1,108 @@
+{
+  "name": "Tuleap Unified Sync",
+  "nodes": [
+    {
+      "id": "webhook-unified-trigger",
+      "name": "Tuleap Unified Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "path": "tuleap-unified",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "a1b2c3d4-e5f6-7890-abcd-tuleapunified01"
+    },
+    {
+      "id": "normalize-payload",
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst body = (raw.body !== undefined && typeof raw.body === 'object') ? raw.body : raw;\n\nlet payload, artifactId, trackerId, projectId, action;\n\nif (body.payload !== undefined) {\n  const p = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;\n  payload = p;\n  artifactId = p.current?.id || p.artifact_id;\n  trackerId = p.current?.tracker?.id || p.tracker_id;\n  projectId = p.current?.project?.id || p.project?.id || p.project_id;\n  action = p.action || 'artifact:updated';\n} else if (body.artifact !== undefined) {\n  payload = { current: body.artifact, project: body.project, user: body.user, action: body.action };\n  artifactId = body.artifact.id;\n  trackerId = body.artifact.tracker?.id;\n  projectId = body.project?.id;\n  action = body.action || 'artifact:created';\n} else {\n  throw new Error('Unrecognized Tuleap payload format');\n}\n\nif (!trackerId) throw new Error('No tracker ID found in payload');\n\nlet valuesMap = {};\nconst values = payload.current?.values || payload.values || [];\nfor (const v of values) {\n  const key = v.field_name || v.label || v.name || `field_${v.field_id}`;\n  const val = v.value !== undefined ? v.value :\n              v.bind_value_ids ? v.bind_value_ids :\n              v.links ? v.links :\n              v.content || null;\n  valuesMap[key] = val;\n}\n\nreturn {\n  json: {\n    tracker_id: trackerId,\n    project_id: projectId,\n    action: action,\n    artifact: {\n      id: artifactId,\n      uri: `${$env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com'}/plugins/tracker/?aid=${artifactId}`,\n      values: values\n    },\n    raw_payload: payload,\n    normalized_values: valuesMap\n  }\n};"
+      }
+    },
+    {
+      "id": "send-to-qc-unified",
+      "name": "Send to QC Unified API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://qc-api:3001/tuleap-webhook/unified",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "respond-to-tuleap",
+      "name": "Respond to Tuleap",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [950, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Tuleap Unified Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Send to QC Unified API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to QC Unified API": {
+      "main": [
+        [
+          {
+            "node": "Respond to Tuleap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    {
+      "name": "tuleap"
+    },
+    {
+      "name": "unified"
+    }
+  ]
+}
