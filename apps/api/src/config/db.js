@@ -1666,6 +1666,50 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS note TEXT
         `);
 
+        await client.query(`
+            ALTER TABLE tuleap_sync_config
+                ADD COLUMN IF NOT EXISTS value_maps JSONB DEFAULT '{}'::jsonb
+        `);
+
+        await client.query(`
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tuleap_sync_config' AND column_name='value_maps' AND column_default IS NULL) THEN
+                    ALTER TABLE tuleap_sync_config ALTER COLUMN value_maps SET DEFAULT '{}'::jsonb;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`
+            DO $$ BEGIN
+                UPDATE tuleap_sync_config SET value_maps = jsonb_build_object('status', COALESCE(status_value_map, '{}'::jsonb)) WHERE value_maps = '{}'::jsonb OR value_maps IS NULL;
+            END $$;
+        `);
+
+        await client.query(`
+            ALTER TABLE bugs
+                ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
+        `);
+
+        await client.query(`
+            ALTER TABLE tasks
+                ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
+        `);
+
+        await client.query(`
+            ALTER TABLE user_stories
+                ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
+        `);
+
+        await client.query(`
+            ALTER TABLE test_cases
+                ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
+        `);
+
+        await client.query(`
+            ALTER TABLE tuleap_sync_config
+                ADD COLUMN IF NOT EXISTS submitted_by_resource_id UUID REFERENCES resources(id) ON DELETE SET NULL
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

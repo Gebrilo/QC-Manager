@@ -7,12 +7,21 @@ const { processedBugData } = require('./fixtures/tuleapPayloads');
 
 const mockQuery = jest.fn();
 const mockAuditLog = jest.fn().mockResolvedValue(undefined);
+const mockDispatchBug = jest.fn();
+const mockResolveLinks = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery }
 }));
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog
+}));
+jest.mock('../src/services/persisters/bug', () => ({
+    dispatchAction: mockDispatchBug
+}));
+jest.mock('../src/services/tuleapLinkResolver', () => ({
+    resolveLinks: mockResolveLinks,
+    drainPending: jest.fn().mockResolvedValue({ resolvedCount: 0 }),
 }));
 
 const express = require('express');
@@ -25,6 +34,8 @@ app.use('/tuleap-webhook', tuleapRouter);
 beforeEach(() => {
     mockQuery.mockReset();
     mockAuditLog.mockReset();
+    mockDispatchBug.mockReset();
+    mockResolveLinks.mockReset();
 });
 
 describe('POST /tuleap-webhook/bug', () => {
@@ -35,20 +46,22 @@ describe('POST /tuleap-webhook/bug', () => {
 
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing bug
-            .mockResolvedValueOnce({ rows: [] })  // SELECT resource by reporter (no match)
-            .mockResolvedValueOnce({
-                rows: [{ // INSERT bug
-                    id: 'new-bug-uuid',
-                    bug_id: 'BUG-ABC123',
-                    title: bugPayload.title,
-                    status: bugPayload.status,
-                    severity: bugPayload.severity,
-                    tuleap_artifact_id: bugPayload.tuleap_artifact_id,
-                    owner_resource_id: null,
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook update
+            .mockResolvedValueOnce({ rows: [{}] }) // config lookup
+            .mockResolvedValueOnce({ rows: [] });  // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'created',
+            id: 'new-bug-uuid',
+            data: {
+                id: 'new-bug-uuid',
+                bug_id: 'TLP-67890',
+                title: bugPayload.title,
+                status: bugPayload.status,
+                severity: bugPayload.severity,
+                tuleap_artifact_id: bugPayload.tuleap_artifact_id,
+                owner_resource_id: null,
+            },
+        });
 
         const mockReq = { body: bugPayload };
         const mockRes = {
@@ -74,25 +87,22 @@ describe('POST /tuleap-webhook/bug', () => {
     test('T019: updates existing bug when tuleap_artifact_id matches', async () => {
         const bugPayload = { ...processedBugData };
 
-        const existingBug = {
-            id: 'existing-bug-uuid',
-            bug_id: 'BUG-EXIST',
-            title: 'Old Title',
-            tuleap_artifact_id: bugPayload.tuleap_artifact_id
-        };
-
         mockQuery
             .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [existingBug] })  // SELECT: bug exists
-            .mockResolvedValueOnce({
-                rows: [{ // UPDATE bug
-                    ...existingBug,
-                    title: bugPayload.title,
-                    status: bugPayload.status,
-                    severity: bugPayload.severity
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook update
+            .mockResolvedValueOnce({ rows: [{}] }) // config lookup
+            .mockResolvedValueOnce({ rows: [] });  // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'updated',
+            id: 'existing-bug-uuid',
+            data: {
+                id: 'existing-bug-uuid',
+                bug_id: 'BUG-EXIST',
+                title: bugPayload.title,
+                status: bugPayload.status,
+                severity: bugPayload.severity
+            },
+        });
 
         const mockReq = { body: bugPayload };
         const mockRes = {
@@ -160,32 +170,28 @@ describe('POST /tuleap-webhook/bug', () => {
     });
 
     // T021: updated_by is synced on update, reported_by is not overwritten
-    test('T021: updated_by is written to DB on update; reported_by is not touched', async () => {
+    test('T021: updated_by is passed through to dispatchAction on update', async () => {
         const bugPayload = {
             ...processedBugData,
-            updated_by: 'Bob Editor',   // a different user from the original reporter
-        };
-
-        const existingBug = {
-            id: 'existing-bug-uuid',
-            bug_id: 'TLP-67890',
-            tuleap_artifact_id: bugPayload.tuleap_artifact_id,
-            deleted_at: null,
-            reported_by: 'Jane Smith',  // original reporter — must not change
+            updated_by: 'Bob Editor',
         };
 
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })            // logWebhook (received)
-            .mockResolvedValueOnce({ rows: [existingBug] }) // SELECT: bug exists
-            .mockResolvedValueOnce({
-                rows: [{
-                    ...existingBug,
-                    title: bugPayload.title,
-                    status: bugPayload.status,
-                    updated_by: 'Bob Editor',
-                }]
-            })                                              // UPDATE bug
-            .mockResolvedValueOnce({ rows: [] });           // logWebhook (processed)
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'updated',
+            id: 'existing-bug-uuid',
+            data: {
+                id: 'existing-bug-uuid',
+                bug_id: 'TLP-67890',
+                title: bugPayload.title,
+                status: bugPayload.status,
+                updated_by: 'Bob Editor',
+            },
+        });
 
         const mockReq = { body: bugPayload };
         const mockRes = {
@@ -205,16 +211,7 @@ describe('POST /tuleap-webhook/bug', () => {
         expect(response.action).toBe('updated');
         expect(response.data.updated_by).toBe('Bob Editor');
 
-        // Verify the UPDATE query included updated_by
-        const updateCall = mockQuery.mock.calls.find(
-            call => typeof call[0] === 'string' && call[0].includes('UPDATE bugs SET')
-        );
-        expect(updateCall).toBeDefined();
-        expect(updateCall[0]).toContain('updated_by');
-        expect(updateCall[1]).toContain('Bob Editor');
-
-        // Verify reported_by was NOT included in the UPDATE SQL or parameters
-        expect(updateCall[0]).not.toContain('reported_by');
-        expect(updateCall[1]).not.toContain('Jane Smith');
+        const dispatched = mockDispatchBug.mock.calls[0][0];
+        expect(dispatched.updated_by).toBe('Bob Editor');
     });
 });

@@ -112,6 +112,43 @@ const UnifiedPayloadSchema = z.discriminatedUnion('artifact_type', [
   }),
 ]);
 
+const PatchableCommonFields = CommonFields.partial();
+const PatchableBugFields = BugFields.partial();
+const PatchableTaskFields = TaskFields.partial();
+const PatchableUserStoryFields = UserStoryFields.partial();
+const PatchableTestCaseFields = TestCaseFields.partial();
+
+const UnifiedPatchSchema = z.discriminatedUnion('artifact_type', [
+  z.object({
+    artifact_type: z.literal('bug'),
+    project_id: z.string().uuid(),
+    tuleap: TuleapMeta.optional(),
+    common: PatchableCommonFields.optional(),
+    fields: PatchableBugFields.optional(),
+  }),
+  z.object({
+    artifact_type: z.literal('task'),
+    project_id: z.string().uuid(),
+    tuleap: TuleapMeta.optional(),
+    common: PatchableCommonFields.optional(),
+    fields: PatchableTaskFields.optional(),
+  }),
+  z.object({
+    artifact_type: z.literal('user_story'),
+    project_id: z.string().uuid(),
+    tuleap: TuleapMeta.optional(),
+    common: PatchableCommonFields.optional(),
+    fields: PatchableUserStoryFields.optional(),
+  }),
+  z.object({
+    artifact_type: z.literal('test_case'),
+    project_id: z.string().uuid(),
+    tuleap: TuleapMeta.optional(),
+    common: PatchableCommonFields.optional(),
+    fields: PatchableTestCaseFields.optional(),
+  }),
+]);
+
 module.exports = {
   ArtifactType,
   CommonFields,
@@ -121,6 +158,7 @@ module.exports = {
   TestCaseFields,
   FieldsByType,
   UnifiedPayloadSchema,
+  UnifiedPatchSchema,
   TuleapMeta,
   ArtifactLink,
   Attachment,

@@ -10,6 +10,9 @@ const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
 const { fromTuleap } = require('../services/tuleapTransformEngine');
+const { dispatchAction: dispatchBug } = require('../services/persisters/bug');
+const { dispatchAction: dispatchTask } = require('../services/persisters/task');
+const { normalize } = require('../services/tuleapValueNormalizer');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -260,19 +263,11 @@ router.post('/bug', async (req, res) => {
         }
 
         const linked_test_case_ids = sanitizeUuidArray(rawTestCaseIds);
-        const linked_test_execution_ids = sanitizeUuidArray(rawTestExecIds);
 
-        const computedSource = linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0
-            ? 'TEST_CASE'
-            : 'EXPLORATORY';
-        const finalSource = source || computedSource;
-
-        // Generate payload hash for idempotency
         const payload_hash = crypto.createHash('sha256')
             .update(JSON.stringify(req.body))
             .digest('hex');
 
-        // Log webhook received
         await logWebhook({
             tuleap_artifact_id,
             tuleap_tracker_id,
@@ -282,180 +277,92 @@ router.post('/bug', async (req, res) => {
             raw_payload: raw_tuleap_payload
         });
 
+        let syncConfig = null;
+        if (tuleap_tracker_id) {
+            const configRes = await pool.query(
+                'SELECT * FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
+                [tuleap_tracker_id]
+            );
+            syncConfig = configRes.rows[0] || null;
+        }
+        if (!syncConfig && project_id) {
+            const configRes = await pool.query(
+                "SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true LIMIT 1",
+                [project_id]
+            );
+            syncConfig = configRes.rows[0] || null;
+        }
+        if (!syncConfig) {
+            syncConfig = {
+                tracker_type: 'bug',
+                qc_project_id: project_id,
+                tuleap_project_id: null,
+                tuleap_tracker_id: tuleap_tracker_id,
+            };
+        }
+
         const action = req.body.action || 'sync';
+        const links = linked_test_case_ids.map(id => ({ type: 'test_case', target_artifact_id: id }));
 
-        // Handle delete action (Tuleap artifact was deleted)
-        if (action === 'delete') {
-            const existingRes = await pool.query(
-                'SELECT * FROM bugs WHERE tuleap_artifact_id = $1',
-                [tuleap_artifact_id]
-            );
+        const unified = {
+            artifact_type: 'bug',
+            action,
+            project_id: project_id || syncConfig.qc_project_id,
+            common: {
+                title,
+                description,
+                status,
+                assigned_to,
+                priority,
+                links: links.length > 0 ? links : undefined,
+            },
+            fields: {
+                severity,
+                bug_type,
+                component,
+                environment: req.body.environment,
+                service_name: req.body.service_name,
+            },
+            tuleap: {
+                project_id: syncConfig.tuleap_project_id,
+                tracker_id: tuleap_tracker_id,
+                artifact_id: tuleap_artifact_id,
+                url: tuleap_url,
+            },
+            reported_by,
+            updated_by,
+            reported_date,
+            raw_payload: raw_tuleap_payload,
+        };
 
-            if (existingRes.rows.length > 0 && !existingRes.rows[0].deleted_at) {
-                const existing = existingRes.rows[0];
-                await pool.query(
-                    `UPDATE bugs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-                    [existing.id]
-                );
-                await auditLog('bugs', existing.id, 'DELETE', { ...existing, deleted_at: new Date() }, existing);
+        const result = await dispatchBug(unified, syncConfig, { query: pool.query.bind(pool) });
 
-                await logWebhook({
-                    tuleap_artifact_id,
-                    tuleap_tracker_id,
-                    artifact_type: 'bug',
-                    action: 'delete',
-                    payload_hash,
-                    raw_payload: raw_tuleap_payload,
-                    processing_status: 'processed',
-                    processing_result: `Bug deleted from Tuleap: ${existing.bug_id}`
-                });
-
-                return res.json({ success: true, action: 'deleted', data: { bug_id: existing.bug_id } });
-            }
-
-            await logWebhook({
-                tuleap_artifact_id,
-                tuleap_tracker_id,
-                artifact_type: 'bug',
-                action: 'delete',
-                payload_hash,
-                raw_payload: raw_tuleap_payload,
-                processing_status: 'processed',
-                processing_result: `Bug not found or already deleted: ${tuleap_artifact_id}`
-            });
-
-            return res.json({ success: true, action: 'noop', message: 'Bug not found or already deleted' });
-        }
-
-        // Check if bug exists (including soft-deleted)
-        const existingRes = await pool.query(
-            'SELECT id, deleted_at FROM bugs WHERE tuleap_artifact_id = $1',
-            [tuleap_artifact_id]
-        );
-
-        let bug;
-        let isUpdate = existingRes.rows.length > 0;
-
-        // Skip updates for soft-deleted bugs (manually deleted by admin)
-        if (isUpdate && existingRes.rows[0].deleted_at) {
-            await logWebhook({
-                tuleap_artifact_id,
-                tuleap_tracker_id,
-                artifact_type: 'bug',
-                action: 'sync',
-                payload_hash,
-                raw_payload: raw_tuleap_payload,
-                processing_status: 'skipped',
-                processing_result: `Bug ${tuleap_artifact_id} is soft-deleted locally, skipping sync`
-            });
-            return res.json({ success: true, action: 'skipped', message: 'Bug is soft-deleted locally' });
-        }
-
-        let submittedByResourceId = null;
-        if (submitted_by_email) {
-            const submitterRes = await pool.query(
-                `SELECT id FROM resources
-                 WHERE LOWER(email) = LOWER($1)
-                   AND deleted_at IS NULL
-                 LIMIT 1`,
-                [submitted_by_email]
-            );
-            submittedByResourceId = submitterRes.rows[0]?.id ?? null;
-        }
-
-        if (isUpdate) {
-            // Update existing bug
-            const existingId = existingRes.rows[0].id;
-            const result = await pool.query(`
-                UPDATE bugs SET
-                    title = $1, description = $2, status = $3, severity = $4, priority = $5,
-                    bug_type = $6, component = $7, assigned_to = $8,
-                    linked_test_case_ids = $9, linked_test_execution_ids = $10,
-                    raw_tuleap_payload = $11, source = $12,
-                    updated_by = $13,
-                    last_sync_at = NOW(), updated_at = NOW()
-                WHERE id = $14
-                RETURNING *
-            `, [
-                title, description, status, severity, priority,
-                bug_type, component, assigned_to,
-                linked_test_case_ids, linked_test_execution_ids,
-                raw_tuleap_payload, finalSource,
-                updated_by || null,
-                existingId
-            ]);
-            bug = result.rows[0];
-            await auditLog('bugs', bug.id, 'UPDATE', bug, null);
-        } else {
-            // Create new bug — resolve reporter to a resource (set once, immutable)
-            let ownerResourceId = null;
-            if (reported_by) {
-                const reporterClean = (reported_by || '').trim();
-                const reporterName = reporterClean.includes('(') ? reporterClean.split(' (')[0].trim() : reporterClean;
-                const resourceRes = await pool.query(
-                    `SELECT id FROM resources
-                     WHERE deleted_at IS NULL
-                       AND (LOWER(email) = LOWER($1)
-                            OR LOWER(resource_name) = LOWER($1)
-                            OR LOWER(resource_name) = LOWER($2))
-                     LIMIT 1`,
-                    [reported_by, reporterName]
-                );
-                if (resourceRes.rows.length > 0) {
-                    ownerResourceId = resourceRes.rows[0].id;
-                }
-            }
-
-            // If email-based submitted_by lookup yielded nothing, fall back to ownerResourceId
-            // (same person — the reporter — resolved via name matching above)
-            if (!submittedByResourceId) {
-                submittedByResourceId = ownerResourceId;
-            }
-
-            const bug_id = `TLP-${tuleap_artifact_id}`;
-            const result = await pool.query(`
-                INSERT INTO bugs (
-                    tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
-                    bug_id, title, description, status, severity, priority,
-                    bug_type, component, project_id,
-                    linked_test_case_ids, linked_test_execution_ids,
-                    reported_by, assigned_to, reported_date, raw_tuleap_payload, source,
-                    owner_resource_id, submitted_by_resource_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-                RETURNING *
-            `, [
-                tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
-                bug_id, title, description, status, severity, priority,
-                bug_type, component, project_id,
-                linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource,
-                ownerResourceId,
-                submittedByResourceId
-            ]);
-            bug = result.rows[0];
-            await auditLog('bugs', bug.id, 'CREATE', bug, null);
-        }
-
-        // Update webhook log
+        const actionLabel = result.action;
         await logWebhook({
             tuleap_artifact_id,
             tuleap_tracker_id,
             artifact_type: 'bug',
-            action: isUpdate ? 'update' : 'create',
+            action,
             payload_hash,
             raw_payload: raw_tuleap_payload,
             processing_status: 'processed',
-            processing_result: `Bug ${isUpdate ? 'updated' : 'created'}: ${bug.bug_id}`
+            processing_result: `Bug ${actionLabel}: ${result.id || tuleap_artifact_id}`
         });
 
-        res.status(isUpdate ? 200 : 201).json({
+        if (result.data) {
+            await auditLog('bugs', result.id, actionLabel === 'created' ? 'CREATE' : 'UPDATE', result.data, null);
+        }
+
+        const statusCode = actionLabel === 'created' ? 201 : 200;
+        res.status(statusCode).json({
             success: true,
-            action: isUpdate ? 'updated' : 'created',
-            data: bug
+            action: actionLabel,
+            data: result.data || { id: result.id },
         });
     } catch (error) {
         console.error('Error processing bug webhook:', error);
-        res.status(500).json({
+        const status = error.statusCode || 500;
+        res.status(status).json({
             success: false,
             error: 'Failed to process bug webhook',
             message: error.message
@@ -664,13 +571,13 @@ router.post('/user-story', async (req, res) => {
 
 // =====================================================
 // POST /tuleap-webhook/task
-// Receive processed task from n8n
-// Handles: create, update, reject, archive
+// Thin shim: translate legacy payload → unified → dispatchTask()
+// Handles: create, update, delete, reject, archive
 // =====================================================
 router.post('/task', async (req, res) => {
     try {
         const {
-            action,  // 'create', 'update', 'delete', 'reject', 'archive'
+            action,
             tuleap_artifact_id,
             tuleap_url,
             task_name,
@@ -680,358 +587,103 @@ router.post('/task', async (req, res) => {
             new_assignee_name,
             action_reason,
             raw_tuleap_payload,
-            // Tuleap project metadata — used for auto-provisioning when project_id is null
-            tuleap_project_id,
-            tuleap_project_name,
-            tuleap_tracker_id,
+            project_id: bodyProjectId,
         } = req.body;
 
-        // Auto-provision QC project + sync config when no project_id supplied
-        let project_id = req.body.project_id;
-        if (!project_id && tuleap_project_id && action !== 'delete') {
-            const provisioned = await provisionTuleapProject({
-                tuleap_project_id,
-                tuleap_project_name,
-                tuleap_short_name: null,
-                tuleap_tracker_id,
-                tracker_type: 'task',
-            });
-            if (provisioned?.project) {
-                project_id = provisioned.project.id;
-                console.log(`Auto-provisioned project ${provisioned.project.project_name} (${provisioned.createdProject ? 'new' : 'existing'}) for artifact ${tuleap_artifact_id}`);
-            }
+        if (!tuleap_artifact_id) {
+            return res.status(400).json({ success: false, error: 'tuleap_artifact_id is required' });
         }
 
         const mappedStatus = mapTuleapStatus(tuleap_status);
+        const unifiedAction = action === 'create' || action === 'update' ? 'sync' : (action || 'sync');
 
-        if (!tuleap_artifact_id) {
-            return res.status(400).json({
-                success: false,
-                error: 'tuleap_artifact_id is required'
-            });
-        }
-
-        // Generate payload hash
         const payload_hash = crypto.createHash('sha256')
             .update(JSON.stringify(req.body))
             .digest('hex');
 
-        // Log webhook received
         await logWebhook({
             tuleap_artifact_id,
             artifact_type: 'task',
-            action: action || 'sync',
+            action: unifiedAction,
             payload_hash,
             raw_payload: raw_tuleap_payload
         });
 
-        // Check if task exists (live)
-        const existingRes = await pool.query(
-            'SELECT * FROM tasks WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL',
-            [tuleap_artifact_id]
-        );
-        const existingTask = existingRes.rows[0];
-
-        // Also check for previously soft-deleted task (for revival)
-        const deletedRes = await pool.query(
-            'SELECT * FROM tasks WHERE tuleap_artifact_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 1',
-            [tuleap_artifact_id]
-        );
-        const deletedTask = deletedRes.rows[0];
-
-        let result;
-        let processingResult;
-
-        switch (action) {
-            case 'reject':
-                // New task with unknown assignee - log to history but don't create
-                await pool.query(`
-                    INSERT INTO tuleap_task_history (
-                        tuleap_artifact_id, tuleap_url, task_name, notes, project_id,
-                        new_assignee_name, action, action_reason, raw_tuleap_payload
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                `, [
-                    tuleap_artifact_id, tuleap_url, task_name, notes, project_id,
-                    new_assignee_name, 'rejected_new', action_reason, raw_tuleap_payload
-                ]);
-
-                processingResult = `Task rejected: ${task_name} (assigned to unknown user: ${new_assignee_name})`;
-
-                await logWebhook({
-                    tuleap_artifact_id,
-                    artifact_type: 'task',
-                    action: 'reject',
-                    payload_hash,
-                    raw_payload: raw_tuleap_payload,
-                    processing_status: 'rejected',
-                    processing_result: processingResult
-                });
-
-                return res.json({
-                    success: true,
-                    action: 'rejected',
-                    message: processingResult
-                });
-
-            case 'delete':
-                // Tuleap artifact deleted — move to history and soft-delete from QC
-                if (existingTask) {
-                    let previousResourceName = null;
-                    if (existingTask.resource1_id) {
-                        const resourceRes = await pool.query(
-                            'SELECT resource_name FROM resources WHERE id = $1',
-                            [existingTask.resource1_id]
-                        );
-                        if (resourceRes.rows.length > 0) {
-                            previousResourceName = resourceRes.rows[0].resource_name;
-                        }
-                    }
-
-                    await pool.query(`
-                        INSERT INTO tuleap_task_history (
-                            original_task_id, tuleap_artifact_id, tuleap_url,
-                            task_name, notes, status, project_id,
-                            previous_resource_id, previous_resource_name,
-                            new_assignee_name, action, action_reason, raw_tuleap_payload
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                    `, [
-                        existingTask.id, tuleap_artifact_id, tuleap_url,
-                        existingTask.task_name, existingTask.notes, existingTask.status, existingTask.project_id,
-                        existingTask.resource1_id, previousResourceName,
-                        new_assignee_name, 'deleted_from_tuleap',
-                        `Artifact ${tuleap_artifact_id} was deleted in Tuleap`,
-                        raw_tuleap_payload
-                    ]);
-
-                    await pool.query(`
-                        UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW()
-                        WHERE id = $1
-                    `, [existingTask.id]);
-
-                    await auditLog('tasks', existingTask.id, 'DELETE', { ...existingTask, deleted_at: new Date() }, existingTask);
-
-                    processingResult = `Task deleted from Tuleap and moved to history: ${existingTask.task_name}`;
-                } else {
-                    processingResult = `Task not found for deletion: ${tuleap_artifact_id}`;
-                }
-
-                await logWebhook({
-                    tuleap_artifact_id,
-                    artifact_type: 'task',
-                    action: 'delete',
-                    payload_hash,
-                    raw_payload: raw_tuleap_payload,
-                    processing_status: 'processed',
-                    processing_result: processingResult
-                });
-
-                return res.json({
-                    success: true,
-                    action: 'deleted',
-                    message: processingResult
-                });
-
-            case 'archive':
-                // Existing task reassigned to unknown user - move to history and delete
-                if (existingTask) {
-                    // Get resource name
-                    let previousResourceName = null;
-                    if (existingTask.resource1_id) {
-                        const resourceRes = await pool.query(
-                            'SELECT resource_name FROM resources WHERE id = $1',
-                            [existingTask.resource1_id]
-                        );
-                        if (resourceRes.rows.length > 0) {
-                            previousResourceName = resourceRes.rows[0].resource_name;
-                        }
-                    }
-
-                    // Insert into history
-                    await pool.query(`
-                        INSERT INTO tuleap_task_history (
-                            original_task_id, tuleap_artifact_id, tuleap_url,
-                            task_name, notes, status, project_id,
-                            previous_resource_id, previous_resource_name,
-                            new_assignee_name, action, action_reason, raw_tuleap_payload
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                    `, [
-                        existingTask.id, tuleap_artifact_id, tuleap_url,
-                        existingTask.task_name, existingTask.notes, existingTask.status, existingTask.project_id,
-                        existingTask.resource1_id, previousResourceName,
-                        new_assignee_name, 'reassigned_out', action_reason, raw_tuleap_payload
-                    ]);
-
-                    // Soft delete the task
-                    await pool.query(`
-                        UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW()
-                        WHERE id = $1
-                    `, [existingTask.id]);
-
-                    await auditLog('tasks', existingTask.id, 'DELETE', { ...existingTask, deleted_at: new Date() }, existingTask);
-
-                    processingResult = `Task archived: ${existingTask.task_name} (reassigned to: ${new_assignee_name})`;
-                } else {
-                    processingResult = `Task not found for archiving: ${tuleap_artifact_id}`;
-                }
-
-                await logWebhook({
-                    tuleap_artifact_id,
-                    artifact_type: 'task',
-                    action: 'archive',
-                    payload_hash,
-                    raw_payload: raw_tuleap_payload,
-                    processing_status: 'processed',
-                    processing_result: processingResult
-                });
-
-                return res.json({
-                    success: true,
-                    action: 'archived',
-                    message: processingResult
-                });
-
-            case 'update':
-                // Update existing task
-                if (existingTask) {
-                    result = await pool.query(`
-                        UPDATE tasks SET
-                            task_name = COALESCE($1, task_name),
-                            notes = COALESCE($2, notes),
-                            resource1_id = COALESCE($3, resource1_id),
-                            tuleap_url = COALESCE($4, tuleap_url),
-                            status = COALESCE($5, status),
-                            last_tuleap_sync = NOW(),
-                            updated_at = NOW()
-                        WHERE id = $6
-                        RETURNING *
-                    `, [task_name, notes, resource1_id, tuleap_url, tuleap_status ? mappedStatus : null, existingTask.id]);
-
-                    const updated = result.rows[0];
-                    await auditLog('tasks', updated.id, 'UPDATE', updated, existingTask);
-
-                    processingResult = `Task updated: ${updated.task_id}`;
-
-                    await logWebhook({
-                        tuleap_artifact_id,
-                        artifact_type: 'task',
-                        action: 'update',
-                        payload_hash,
-                        raw_payload: raw_tuleap_payload,
-                        processing_status: 'processed',
-                        processing_result: processingResult
-                    });
-
-                    return res.json({
-                        success: true,
-                        action: 'updated',
-                        data: updated
-                    });
-                }
-                // Fall through to create if task doesn't exist
-
-            case 'create':
-            default:
-                // Create new task (or revive soft-deleted one)
-                if (!task_name) {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'task_name is required for creating a task'
-                    });
-                }
-
-                // Check if task already exists as live (duplicate webhook)
-                if (existingTask) {
-                    return res.json({
-                        success: true,
-                        action: 'exists',
-                        message: 'Task already exists',
-                        data: existingTask
-                    });
-                }
-
-                // Revive soft-deleted task instead of creating a new one
-                if (deletedTask) {
-                    result = await pool.query(`
-                        UPDATE tasks SET
-                            deleted_at = NULL,
-                            status = $1,
-                            task_name = $2,
-                            notes = $3,
-                            resource1_id = $4,
-                            tuleap_url = COALESCE($5, tuleap_url),
-                            last_tuleap_sync = NOW(),
-                            updated_at = NOW()
-                        WHERE id = $6
-                        RETURNING *
-                    `, [
-                        mappedStatus || 'Backlog',
-                        task_name,
-                        notes,
-                        resource1_id,
-                        tuleap_url,
-                        deletedTask.id
-                    ]);
-
-                    const revived = result.rows[0];
-                    await auditLog('tasks', revived.id, 'UPDATE', revived, deletedTask);
-
-                    processingResult = `Task revived from history: ${revived.task_id}`;
-
-                    await logWebhook({
-                        tuleap_artifact_id,
-                        artifact_type: 'task',
-                        action: 'create',
-                        payload_hash,
-                        raw_payload: raw_tuleap_payload,
-                        processing_status: 'processed',
-                        processing_result: processingResult
-                    });
-
-                    return res.status(200).json({
-                        success: true,
-                        action: 'revived',
-                        data: revived
-                    });
-                }
-
-                const task_id = await generateTaskId();
-                result = await pool.query(`
-                    INSERT INTO tasks (
-                        task_id, task_name, notes, status,
-                        project_id, resource1_id,
-                        tuleap_artifact_id, tuleap_url, synced_from_tuleap, last_tuleap_sync
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW())
-                    RETURNING *
-                `, [
-                    task_id, task_name, notes, mappedStatus,
-                    project_id, resource1_id,
-                    tuleap_artifact_id, tuleap_url
-                ]);
-
-                const created = result.rows[0];
-                await auditLog('tasks', created.id, 'CREATE', created, null);
-
-                processingResult = `Task created: ${created.task_id}`;
-
-                await logWebhook({
-                    tuleap_artifact_id,
-                    artifact_type: 'task',
-                    action: 'create',
-                    payload_hash,
-                    raw_payload: raw_tuleap_payload,
-                    processing_status: 'processed',
-                    processing_result: processingResult
-                });
-
-                return res.status(201).json({
-                    success: true,
-                    action: 'created',
-                    data: created
-                });
+        let syncConfig = null;
+        if (req.body.tuleap_tracker_id) {
+            const configRes = await pool.query(
+                'SELECT * FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
+                [req.body.tuleap_tracker_id]
+            );
+            syncConfig = configRes.rows[0] || null;
         }
+        if (!syncConfig && bodyProjectId) {
+            const configRes = await pool.query(
+                "SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true LIMIT 1",
+                [bodyProjectId]
+            );
+            syncConfig = configRes.rows[0] || null;
+        }
+        if (!syncConfig) {
+            syncConfig = {
+                tracker_type: 'task',
+                qc_project_id: bodyProjectId,
+                tuleap_project_id: req.body.tuleap_project_id || null,
+                tuleap_tracker_id: req.body.tuleap_tracker_id || null,
+            };
+        }
+
+        const unified = {
+            artifact_type: 'task',
+            action: unifiedAction,
+            project_id: bodyProjectId || syncConfig.qc_project_id,
+            common: {
+                title: task_name,
+                description: notes,
+                status: mappedStatus,
+                assigned_to: resource1_id,
+            },
+            fields: {
+                new_assignee_name: new_assignee_name,
+                action_reason: action_reason,
+            },
+            tuleap: {
+                project_id: req.body.tuleap_project_id || syncConfig.tuleap_project_id,
+                tracker_id: req.body.tuleap_tracker_id || syncConfig.tuleap_tracker_id,
+                artifact_id: tuleap_artifact_id,
+                url: tuleap_url,
+            },
+            raw_payload: raw_tuleap_payload,
+        };
+
+        const result = await dispatchTask(unified, syncConfig, { query: pool.query.bind(pool) });
+
+        const statusCode = ['created', 'revived'].includes(result.action) ? 201 : 200;
+
+        await logWebhook({
+            tuleap_artifact_id,
+            artifact_type: 'task',
+            action: unifiedAction,
+            payload_hash,
+            raw_payload: raw_tuleap_payload,
+            processing_status: 'processed',
+            processing_result: `Task ${result.action}: ${result.id || tuleap_artifact_id}`
+        });
+
+        if (result.data) {
+            await auditLog('tasks', result.id, result.action === 'created' ? 'CREATE' : 'UPDATE', result.data, null);
+        }
+
+        res.status(statusCode).json({
+            success: true,
+            action: result.action,
+            data: result.data || { id: result.id },
+            message: result.message,
+        });
     } catch (error) {
         console.error('Error processing task webhook:', error);
-        res.status(500).json({
+        const status = error.statusCode || 500;
+        res.status(status).json({
             success: false,
             error: 'Failed to process task webhook',
             message: error.message
@@ -1549,58 +1201,29 @@ router.post('/unified', async (req, res) => {
     try {
         const { tracker_id, artifact, project, raw_payload, action = 'sync' } = req.body;
 
-        // 1. Validate tracker_id
         if (!tracker_id) {
             return res.status(400).json({ success: false, error: 'tracker_id is required' });
         }
 
-        // 2. Look up sync config by tracker_id
         let configRes = await pool.query(
             'SELECT * FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
             [tracker_id]
         );
         let syncConfig = configRes.rows[0];
 
-        // 3. Fallback to project-level config
-        if (!syncConfig && project && project.id) {
-            configRes = await pool.query(
-                'SELECT * FROM tuleap_sync_config WHERE tuleap_project_id = $1 AND is_active = true LIMIT 1',
-                [project.id]
-            );
-            syncConfig = configRes.rows[0];
-        }
-
-        // 4. Return 404 if no config found
         if (!syncConfig) {
-            return res.status(404).json({ success: false, error: 'No sync config found for this tracker or project' });
+            return res.status(404).json({ success: false, error: 'No sync config found for this tracker', tracker_id });
         }
 
-        // 5. Extract Tuleap values
         let tuleapValues = {};
         if (artifact && Array.isArray(artifact.values)) {
-            for (const v of artifact.values) {
-                const label = v.field_name || v.label || v.name || `field_${v.field_id}`;
-                let value = v.value;
-                if (value === undefined && Array.isArray(v.values) && v.values.length > 0) {
-                    const first = v.values[0];
-                    if (first && typeof first === 'object') {
-                        value = first.label || first.display_name || first.name || first;
-                    } else {
-                        value = v.values;
-                    }
-                }
-                if (value !== undefined && value !== null) {
-                    tuleapValues[label] = value;
-                }
-            }
+            tuleapValues = normalize(artifact, null);
         } else if (raw_payload && typeof raw_payload === 'object') {
             tuleapValues = raw_payload;
         }
 
-        // 6. Transform via fromTuleap
         const unified = fromTuleap(tuleapValues, syncConfig);
 
-        // 7. Set metadata
         unified.project_id = syncConfig.qc_project_id;
         if (!unified.tuleap) unified.tuleap = {};
         unified.tuleap.project_id = syncConfig.tuleap_project_id;
@@ -1612,7 +1235,8 @@ router.post('/unified', async (req, res) => {
             unified.tuleap.url = req.body.tuleap_url;
         }
 
-        // 8. Log webhook with idempotency
+        unified.action = action;
+
         const payloadHash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
         const tuleapArtifactId = artifact && artifact.id ? artifact.id : null;
         await pool.query(`
@@ -1628,7 +1252,60 @@ router.post('/unified', async (req, res) => {
             payloadHash, JSON.stringify(req.body), 'received', null
         ]);
 
-        // 9. Return 200
+        const validBugActions = ['sync', 'delete'];
+        const validTaskActions = ['sync', 'delete', 'reject', 'archive'];
+        const isBug = syncConfig.tracker_type === 'bug';
+        const isTask = syncConfig.tracker_type === 'task';
+
+        if (isBug && !validBugActions.includes(action)) {
+            return res.status(400).json({ success: false, error: `Action '${action}' is not supported for artifact_type 'bug'. Allowed: sync, delete` });
+        }
+        if (isTask && !validTaskActions.includes(action)) {
+            return res.status(400).json({ success: false, error: `Action '${action}' is not supported for artifact_type 'task'. Allowed: sync, delete, reject, archive` });
+        }
+        if (!isBug && !isTask && !validBugActions.includes(action)) {
+            return res.status(400).json({ success: false, error: `Action '${action}' is not supported for artifact_type '${syncConfig.tracker_type}'. Allowed: sync, delete` });
+        }
+
+        if (isBug) {
+            const result = await dispatchBug(unified, syncConfig, { query: pool.query.bind(pool) });
+
+            await pool.query(
+                "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",
+                [tuleapArtifactId, payloadHash]
+            );
+
+            const statusCode = result.action === 'created' ? 201 : 200;
+            return res.status(statusCode).json({
+                success: true,
+                artifact_type: syncConfig.tracker_type,
+                tracker_id,
+                action: result.action,
+                id: result.id,
+                unified,
+            });
+        }
+
+        if (isTask) {
+            const result = await dispatchTask(unified, syncConfig, { query: pool.query.bind(pool) });
+
+            await pool.query(
+                "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",
+                [tuleapArtifactId, payloadHash]
+            );
+
+            const statusCode = ['created', 'revived'].includes(result.action) ? 201 : 200;
+            return res.status(statusCode).json({
+                success: true,
+                artifact_type: syncConfig.tracker_type,
+                tracker_id,
+                action: result.action,
+                id: result.id,
+                message: result.message,
+                unified,
+            });
+        }
+
         return res.status(200).json({
             success: true,
             artifact_type: syncConfig.tracker_type,
@@ -1638,7 +1315,8 @@ router.post('/unified', async (req, res) => {
         });
     } catch (error) {
         console.error('Error processing unified webhook:', error);
-        res.status(500).json({ success: false, error: 'Failed to process unified webhook', message: error.message });
+        const status = error.statusCode || 500;
+        res.status(status).json({ success: false, error: 'Failed to process unified webhook', message: error.message });
     }
 });
 

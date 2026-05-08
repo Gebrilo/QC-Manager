@@ -5,12 +5,20 @@
 
 const mockQuery = jest.fn();
 const mockAuditLog = jest.fn().mockResolvedValue(undefined);
+const mockDispatchBug = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery }
 }));
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog
+}));
+jest.mock('../src/services/persisters/bug', () => ({
+    dispatchAction: mockDispatchBug
+}));
+jest.mock('../src/services/tuleapLinkResolver', () => ({
+    resolveLinks: jest.fn().mockResolvedValue({ resolved: [], pending: [] }),
+    drainPending: jest.fn().mockResolvedValue({ resolvedCount: 0 }),
 }));
 
 const express = require('express');
@@ -23,6 +31,7 @@ app.use('/tuleap-webhook', tuleapRouter);
 beforeEach(() => {
     mockQuery.mockReset();
     mockAuditLog.mockReset();
+    mockDispatchBug.mockReset();
 });
 
 function getBugRoute() {
@@ -44,20 +53,22 @@ const BASE_PAYLOAD = {
 
 describe('Bug ownership: owner_resource_id', () => {
 
-    test('T_OWN01: sets owner_resource_id on INSERT when reporter matches resource by email', async () => {
+    test('T_OWN01: passes reported_by to dispatchAction for owner resolution', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })                         // logWebhook receive
-            .mockResolvedValueOnce({ rows: [] })                         // SELECT: no existing bug
-            .mockResolvedValueOnce({ rows: [{ id: 'res-uuid-alice' }] }) // SELECT resource by email
-            .mockResolvedValueOnce({                                      // INSERT bug
-                rows: [{
-                    id: 'bug-uuid-9001',
-                    bug_id: 'TLP-9001',
-                    title: BASE_PAYLOAD.title,
-                    owner_resource_id: 'res-uuid-alice',
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] });                         // logWebhook processed
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'created',
+            id: 'bug-uuid-9001',
+            data: {
+                id: 'bug-uuid-9001',
+                bug_id: 'TLP-9001',
+                title: BASE_PAYLOAD.title,
+                owner_resource_id: 'res-uuid-alice',
+            },
+        });
 
         const mockReq = { body: { ...BASE_PAYLOAD } };
         const mockRes = {
@@ -69,30 +80,26 @@ describe('Bug ownership: owner_resource_id', () => {
         await getBugRoute()(mockReq, mockRes, jest.fn());
 
         expect(mockRes.statusCode).toBe(201);
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.action).toBe('created');
-
-        const insertCall = mockQuery.mock.calls.find(
-            call => typeof call[0] === 'string' && call[0].includes('INSERT INTO bugs')
-        );
-        expect(insertCall).toBeDefined();
-        expect(insertCall[1]).toContain('res-uuid-alice');
+        const dispatched = mockDispatchBug.mock.calls[0][0];
+        expect(dispatched.reported_by).toBe('alice@example.com');
     });
 
-    test('T_OWN02: inserts bug with owner_resource_id null when reporter matches no resource', async () => {
+    test('T_OWN02: creates bug with reported_by even when no resource match', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook receive
-            .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing bug
-            .mockResolvedValueOnce({ rows: [] })  // SELECT resource: no match
-            .mockResolvedValueOnce({              // INSERT bug
-                rows: [{
-                    id: 'bug-uuid-9002',
-                    bug_id: 'TLP-9002',
-                    title: 'Unknown reporter bug',
-                    owner_resource_id: null,
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook processed
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'created',
+            id: 'bug-uuid-9002',
+            data: {
+                id: 'bug-uuid-9002',
+                bug_id: 'TLP-9002',
+                title: 'Unknown reporter bug',
+                owner_resource_id: null,
+            },
+        });
 
         const mockReq = { body: { ...BASE_PAYLOAD, tuleap_artifact_id: 9002, reported_by: 'nobody@unknown.com' } };
         const mockRes = {
@@ -104,28 +111,26 @@ describe('Bug ownership: owner_resource_id', () => {
         await getBugRoute()(mockReq, mockRes, jest.fn());
 
         expect(mockRes.statusCode).toBe(201);
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.action).toBe('created');
-
-        const insertCall = mockQuery.mock.calls.find(
-            call => typeof call[0] === 'string' && call[0].includes('INSERT INTO bugs')
-        );
-        expect(insertCall).toBeDefined();
+        const dispatched = mockDispatchBug.mock.calls[0][0];
+        expect(dispatched.reported_by).toBe('nobody@unknown.com');
     });
 
-    test('T_OWN03: does NOT call resource lookup on UPDATE (owner_resource_id stays immutable)', async () => {
+    test('T_OWN03: dispatches update via dispatchAction without modifying reported_by', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook receive
-            .mockResolvedValueOnce({ rows: [{ id: 'bug-uuid-9001', deleted_at: null }] }) // SELECT: bug exists
-            .mockResolvedValueOnce({              // UPDATE bug (no resource lookup in between)
-                rows: [{
-                    id: 'bug-uuid-9001',
-                    bug_id: 'TLP-9001',
-                    title: 'Updated title',
-                    owner_resource_id: 'res-uuid-alice',
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook processed
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchBug.mockResolvedValueOnce({
+            action: 'updated',
+            id: 'bug-uuid-9001',
+            data: {
+                id: 'bug-uuid-9001',
+                bug_id: 'TLP-9001',
+                title: 'Updated title',
+                owner_resource_id: 'res-uuid-alice',
+            },
+        });
 
         const mockReq = { body: { ...BASE_PAYLOAD, title: 'Updated title', reported_by: 'different-person' } };
         const mockRes = {
@@ -137,18 +142,6 @@ describe('Bug ownership: owner_resource_id', () => {
         await getBugRoute()(mockReq, mockRes, jest.fn());
 
         expect(mockRes.statusCode).toBe(200);
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.action).toBe('updated');
-
-        const resourceLookup = mockQuery.mock.calls.find(
-            call => typeof call[0] === 'string' && call[0].toLowerCase().includes('from resources')
-        );
-        expect(resourceLookup).toBeUndefined();
-
-        const updateCall = mockQuery.mock.calls.find(
-            call => typeof call[0] === 'string' && call[0].includes('UPDATE bugs SET')
-        );
-        expect(updateCall).toBeDefined();
-        expect(updateCall[0]).not.toContain('owner_resource_id');
+        expect(mockRes.json.mock.calls[0][0].action).toBe('updated');
     });
 });

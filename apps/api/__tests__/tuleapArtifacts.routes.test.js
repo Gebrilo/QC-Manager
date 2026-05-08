@@ -29,6 +29,22 @@ jest.mock('../src/middleware/authMiddleware', () => ({
   requireStatus:     jest.fn(),
 }));
 
+const mockEmitBug = jest.fn();
+jest.mock('../src/services/emitters/bug', () => ({
+  emitToTuleap: mockEmitBug,
+}));
+
+const mockEmitTask = jest.fn();
+jest.mock('../src/services/emitters/task', () => ({
+  emitToTuleap: mockEmitTask,
+}));
+
+const mockPoolQuery = jest.fn();
+jest.mock('../src/config/db', () => ({
+  pool: { query: mockPoolQuery },
+  query: mockPoolQuery,
+}));
+
 process.env.TULEAP_BASE_URL          = 'https://tuleap.example.com';
 process.env.TULEAP_TRACKER_USER_STORY = '10';
 process.env.TULEAP_TRACKER_TEST_CASE  = '20';
@@ -42,7 +58,12 @@ const app = express();
 app.use(express.json());
 app.use('/tuleap/artifacts', require('../src/routes/tuleapArtifacts'));
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockEmitBug.mockReset();
+  mockEmitTask.mockReset();
+  mockPoolQuery.mockReset();
+});
 
 // ── Existing POST tests (keep passing) ───────────────────────────────────────
 describe('POST /tuleap/artifacts/user-story', () => {
@@ -66,21 +87,40 @@ describe('POST /tuleap/artifacts/user-story', () => {
 });
 
 describe('POST /tuleap/artifacts/task', () => {
-  it('returns 201 with parent link', async () => {
-    defaultClient.post.mockResolvedValue({ data: { id: 9999, xref: 'task #9999' } });
+  it('returns 201 with task via emitToTuleap', async () => {
+    const config = {
+      id: 'cfg-task',
+      tuleap_tracker_id: 5,
+      tuleap_base_url: 'https://tuleap.example.com',
+      qc_project_id: 'proj-1',
+      tracker_type: 'task',
+      artifact_fields: {},
+      status_value_map: {},
+      value_maps: {},
+    };
+
+    mockPoolQuery.mockResolvedValueOnce({ rows: [config] });
+    mockEmitTask.mockResolvedValueOnce({
+      tuleap_artifact_id: 9999,
+      tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=9999',
+      artifact_type: 'task',
+      xref: 'task #9999',
+    });
+
     const res = await request(app)
       .post('/tuleap/artifacts/task')
-      .send({ taskTitle: 'Impl auth', assignedTo: 'bob', team: 'QA-Team', status: 'Todo', parentStoryArtifactId: 888 });
+      .send({ project_id: 'proj-1', taskTitle: 'Impl auth', assignedTo: 'bob', team: 'QA-Team', status: 'Todo', parentStoryArtifactId: 888 });
     expect(res.status).toBe(201);
     expect(res.body.tuleap_artifact_id).toBe(9999);
+    expect(mockEmitTask).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('Required field validation', () => {
-  it('returns 400 with missing fields for bug', async () => {
+  it('returns 400 when project_id is missing for bug', async () => {
     const res = await request(app).post('/tuleap/artifacts/bug').send({ bugTitle: 'Crash' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/environment.*serviceName|serviceName.*environment/i);
+    expect(res.body.error).toMatch(/project_id/i);
   });
 
   it('returns 404 for unknown artifact type', async () => {
@@ -153,6 +193,64 @@ describe('PATCH /tuleap/artifacts/:id', () => {
       .patch('/tuleap/artifacts/555')
       .send({ type: 'user-story', fields: { story_title: 'x' } });
     expect(res.status).toBe(500);
+  });
+
+  it('routes a unified bug PATCH payload through emitBug with mode=update', async () => {
+    const bugConfig = {
+      id: 'cfg-bug',
+      tuleap_tracker_id: 30,
+      qc_project_id: '11111111-2222-3333-4444-555555555555',
+      tracker_type: 'bug',
+      artifact_fields: {},
+      value_maps: {},
+    };
+    mockPoolQuery.mockResolvedValueOnce({ rows: [bugConfig] });
+    mockEmitBug.mockResolvedValueOnce({ updated: true, tuleap_artifact_id: 555 });
+
+    const res = await request(app)
+      .patch('/tuleap/artifacts/555')
+      .send({
+        artifact_type: 'bug',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'Updated title' },
+        fields: { severity: 'high' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(true);
+    expect(mockEmitBug).toHaveBeenCalledTimes(1);
+    const [unified, config, mode] = mockEmitBug.mock.calls[0];
+    expect(mode).toBe('update');
+    expect(unified.artifact_type).toBe('bug');
+    expect(unified.tuleap.artifact_id).toBe(555);
+    expect(unified.common.title).toBe('Updated title');
+    expect(config.tracker_type).toBe('bug');
+  });
+
+  it('returns 400 when unified bug PATCH payload fails UnifiedPatchSchema (missing project_id)', async () => {
+    const res = await request(app)
+      .patch('/tuleap/artifacts/555')
+      .send({
+        artifact_type: 'bug',
+        common: { title: 'Updated title' },
+      });
+    expect(res.status).toBe(400);
+    expect(mockEmitBug).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when no config exists for the unified bug PATCH project', async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .patch('/tuleap/artifacts/555')
+      .send({
+        artifact_type: 'bug',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'Updated title' },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/config/i);
+    expect(mockEmitBug).not.toHaveBeenCalled();
   });
 });
 

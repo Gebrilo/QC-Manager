@@ -11,6 +11,9 @@ const {
 } = require('../services/tuleapPayloadBuilder');
 const db = require('../config/db');
 const { toTuleap } = require('../services/tuleapTransformEngine');
+const { emitToTuleap: emitBug } = require('../services/emitters/bug');
+const { emitToTuleap: emitTask } = require('../services/emitters/task');
+const { UnifiedPatchSchema } = require('../schemas/tuleapUnified');
 
 const FALLBACK_TRACKER_IDS = {
   'user-story': () => Number(process.env.TULEAP_TRACKER_USER_STORY),
@@ -85,6 +88,39 @@ router.get('/:type', requireAuth, async (req, res) => {
 
 router.patch('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
+
+  if (req.body && req.body.artifact_type) {
+    const parsed = UnifiedPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid unified patch payload', details: parsed.error.format() });
+    }
+    const unified = parsed.data;
+    if (unified.artifact_type === 'bug') {
+      const configResult = await db.pool.query(
+        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
+        [unified.project_id]
+      );
+      const config = configResult.rows[0];
+      if (!config) {
+        return res.status(400).json({ error: `No active bug config for project ${unified.project_id}` });
+      }
+      const unifiedWithTuleap = {
+        ...unified,
+        tuleap: { ...(unified.tuleap || {}), artifact_id: Number(id) },
+      };
+      try {
+        const result = await emitBug(unifiedWithTuleap, config, 'update', {
+          client: defaultClient,
+          registry: defaultRegistry,
+          query: db.pool.query.bind(db.pool),
+        });
+        return res.status(200).json({ updated: true, ...result });
+      } catch (err) {
+        return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+      }
+    }
+  }
+
   const { type, fields } = req.body;
 
   if (!type || !FALLBACK_TRACKER_IDS[type]) {
@@ -130,11 +166,123 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
+async function handleTaskCreate(req, res) {
+  const { artifact_type, project_id, common, fields } = req.body;
+  const pid = project_id || req.body.project_id;
+
+  if (!pid) {
+    return res.status(400).json({ error: 'project_id is required' });
+  }
+
+  const configResult = await db.pool.query(
+    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
+    [pid]
+  );
+  const config = configResult.rows[0];
+  if (!config) {
+    return res.status(400).json({ error: `No active task config for project ${pid}` });
+  }
+
+  let unified;
+  if (artifact_type && common) {
+    unified = { artifact_type: 'task', project_id: pid, common, fields: fields || {} };
+  } else {
+    unified = {
+      artifact_type: 'task',
+      project_id: pid,
+      common: {
+        title: req.body.taskName || req.body.task_title || req.body.title,
+        description: req.body.notes || req.body.description || '',
+        status: req.body.status,
+        assigned_to: req.body.assignedTo,
+      },
+      fields: {
+        team: req.body.team,
+        parent_story_id: req.body.parentStoryArtifactId,
+        blocked_reason: req.body.blocked_reason,
+      },
+    };
+  }
+
+  try {
+    const result = await emitTask(unified, config, 'create', {
+      client: defaultClient,
+      registry: defaultRegistry,
+      query: db.pool.query.bind(db.pool),
+    });
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+  }
+}
+
+async function handleBugCreate(req, res) {
+  const { artifact_type, project_id, common, fields } = req.body;
+  const resolvedType = artifact_type || 'bug';
+
+  if (!project_id && !req.body.project_id) {
+    return res.status(400).json({ error: 'project_id is required' });
+  }
+
+  const pid = project_id || req.body.project_id;
+  const configResult = await db.pool.query(
+    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
+    [pid]
+  );
+  const config = configResult.rows[0];
+  if (!config) {
+    return res.status(400).json({ error: `No active bug config for project ${pid}` });
+  }
+
+  let unified;
+  if (artifact_type && common) {
+    unified = { artifact_type: 'bug', project_id: pid, common, fields: fields || {} };
+  } else {
+    unified = {
+      artifact_type: 'bug',
+      project_id: pid,
+      common: {
+        title: req.body.summary || req.body.bugTitle || req.body.title,
+        description: req.body.description || '',
+        status: req.body.status,
+        assigned_to: req.body.assignedTo,
+        priority: req.body.priority,
+      },
+      fields: {
+        severity: req.body.severity,
+        environment: req.body.environment,
+        service_name: req.body.serviceName || req.body.service_name,
+      },
+    };
+  }
+
+  try {
+    const result = await emitBug(unified, config, 'create', {
+      client: defaultClient,
+      registry: defaultRegistry,
+      query: db.pool.query.bind(db.pool),
+    });
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+  }
+}
+
 router.post('/:type', requireAuth, async (req, res) => {
   const { type } = req.params;
 
   if (!FALLBACK_TRACKER_IDS[type]) {
     return res.status(404).json({ error: `Unknown artifact type: ${type}` });
+  }
+
+  const normalizedType = type === 'user-story' ? 'user_story' : type;
+
+  if (normalizedType === 'bug') {
+    return handleBugCreate(req, res);
+  }
+
+  if (normalizedType === 'task') {
+    return handleTaskCreate(req, res);
   }
 
   if (req.body.artifact_type && req.body.common) {

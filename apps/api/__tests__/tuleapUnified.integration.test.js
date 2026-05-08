@@ -5,12 +5,20 @@
 
 const mockQuery = jest.fn();
 const mockAuditLog = jest.fn().mockResolvedValue(undefined);
+const mockDispatchBug = jest.fn();
+const mockNormalize = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery },
 }));
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog,
+}));
+jest.mock('../src/services/persisters/bug', () => ({
+    dispatchAction: mockDispatchBug,
+}));
+jest.mock('../src/services/tuleapValueNormalizer', () => ({
+    normalize: mockNormalize,
 }));
 
 const express = require('express');
@@ -24,6 +32,8 @@ app.use('/tuleap-webhook', tuleapRouter);
 beforeEach(() => {
     mockQuery.mockReset();
     mockAuditLog.mockReset();
+    mockDispatchBug.mockReset();
+    mockNormalize.mockReset();
 });
 
 // ── Test Data ───────────────────────────────────────────────
@@ -56,7 +66,7 @@ const bugConfig = {
 const artifactPayload = {
     tracker_id: 1,
     project_id: 101,
-    action: 'update',
+    action: 'sync',
     artifact: {
         id: 140,
         uri: 'https://tuleap.windinfosys.com/plugins/tracker/?aid=140',
@@ -74,29 +84,42 @@ const artifactPayload = {
 
 describe('POST /tuleap-webhook/unified', () => {
 
-    test('bug webhook through unified route → config lookup → field mapping → unified payload', async () => {
+    test('bug webhook through unified route → config lookup → field mapping → dispatchAction', async () => {
+        mockNormalize.mockReturnValue({
+            bug_title: 'Login crashes on mobile',
+            severity: 'Major impact',
+            status: 'New',
+            steps_to_reproduce: '1. Open login page\n2. Click submit',
+            environment: 'DEV',
+        });
+
         mockQuery
             .mockResolvedValueOnce({ rows: [bugConfig] })   // tracker lookup
-            .mockResolvedValueOnce({ rows: [] });            // webhook log insert (ON CONFLICT)
+            .mockResolvedValueOnce({ rows: [] })             // webhook log insert
+            .mockResolvedValueOnce({ rows: [] });            // webhook log update
+
+        mockDispatchBug.mockResolvedValueOnce({ action: 'created', id: 'new-bug-id' });
 
         const res = await request(app)
             .post('/tuleap-webhook/unified')
             .send(artifactPayload);
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(201);
         expect(res.body.success).toBe(true);
         expect(res.body.artifact_type).toBe('bug');
-        expect(res.body.unified.common.title).toBe('Login crashes on mobile');
-        // status mapped via status_value_map: 'New' → 'Open'
-        expect(res.body.unified.common.status).toBe('Open');
-        expect(res.body.unified.fields.severity).toBe('Major impact');
-        expect(res.body.unified.fields.environment).toBe('DEV');
+        expect(res.body.action).toBe('created');
+        expect(mockDispatchBug).toHaveBeenCalledTimes(1);
+
+        const dispatched = mockDispatchBug.mock.calls[0][0];
+        expect(dispatched.common.title).toBe('Login crashes on mobile');
+        expect(dispatched.common.status).toBe('Open');
+        expect(dispatched.fields.severity).toBe('Major impact');
+        expect(dispatched.fields.environment).toBe('DEV');
     });
 
     test('404 for unconfigured tracker', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // tracker lookup: empty
-            .mockResolvedValueOnce({ rows: [] }); // project fallback: empty
+            .mockResolvedValueOnce({ rows: [] });  // tracker lookup: empty
 
         const res = await request(app)
             .post('/tuleap-webhook/unified')
@@ -112,11 +135,9 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(res.body.error).toContain('No sync config found');
     });
 
-    test('project-level fallback when tracker has no direct match', async () => {
+    test('returns 404 when tracker has no direct match (no project-level fallback per ADR 0008)', async () => {
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })           // tracker lookup: empty
-            .mockResolvedValueOnce({ rows: [bugConfig] })  // project fallback: found
-            .mockResolvedValueOnce({ rows: [] });          // webhook log insert
+            .mockResolvedValueOnce({ rows: [] });         // tracker lookup: empty
 
         const res = await request(app)
             .post('/tuleap-webhook/unified')
@@ -127,9 +148,8 @@ describe('POST /tuleap-webhook/unified', () => {
                 action: 'update',
             });
 
-        expect(res.status).toBe(200);
-        expect(res.body.success).toBe(true);
-        expect(res.body.artifact_type).toBe('bug');
+        expect(res.status).toBe(404);
+        expect(res.body.success).toBe(false);
     });
 });
 

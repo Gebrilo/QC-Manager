@@ -1,13 +1,13 @@
 /**
  * Jest tests for POST /tuleap-webhook/task
- * Tests: T009–T013 (US1 — Task Sync Validation)
+ * Tests the task shim: translate legacy payload → unified → dispatchTask()
  */
 
 const { processedTaskData } = require('./fixtures/tuleapPayloads');
 
-// ---- Mocks (must be before require) ----
 const mockQuery = jest.fn();
 const mockAuditLog = jest.fn().mockResolvedValue(undefined);
+const mockDispatchTask = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery }
@@ -15,41 +15,30 @@ jest.mock('../src/config/db', () => ({
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog
 }));
+jest.mock('../src/services/persisters/task', () => ({
+    dispatchAction: mockDispatchTask
+}));
+jest.mock('../src/services/tuleapLinkResolver', () => ({
+    resolveLinks: jest.fn().mockResolvedValue({ resolved: [], pending: [] }),
+    drainPending: jest.fn().mockResolvedValue({ resolvedCount: 0 }),
+}));
 
 const express = require('express');
-
-// We use a lightweight approach without supertest — test the route handler directly
 const tuleapRouter = require('../src/routes/tuleapWebhook');
 
 const app = express();
 app.use(express.json());
 app.use('/tuleap-webhook', tuleapRouter);
 
-// Helper to make requests
-function postTask(body) {
-    return new Promise((resolve) => {
-        const req = {
-            body,
-            query: {}
-        };
-        const res = {
-            statusCode: 200,
-            status(code) { this.statusCode = code; return this; },
-            json(data) { resolve({ statusCode: this.statusCode, body: data }); }
-        };
-        // We can't easily call the router directly, so let's use a simpler approach
-        resolve(null);
-    });
-}
-
 beforeEach(() => {
     mockQuery.mockReset();
     mockAuditLog.mockReset();
+    mockDispatchTask.mockReset();
 });
 
 describe('POST /tuleap-webhook/task', () => {
 
-    // T009: Task creation with action 'create'
+    // T009: Task creation via shim → dispatchTask
     test('T009: creates a new task when action is create', async () => {
         const taskPayload = {
             ...processedTaskData,
@@ -57,22 +46,22 @@ describe('POST /tuleap-webhook/task', () => {
         };
 
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook INSERT
-            .mockResolvedValueOnce({ rows: [] })  // SELECT existing task (no live)
-            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
-            .mockResolvedValueOnce({ rows: [{ task_id: 'TSK-001' }] }) // generateTaskId
-            .mockResolvedValueOnce({
-                rows: [{
-                    id: 'new-uuid',
-                    task_id: 'TSK-002',
-                    task_name: taskPayload.task_name,
-                    synced_from_tuleap: true,
-                    tuleap_artifact_id: taskPayload.tuleap_artifact_id
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook update
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
 
-        // Simulate HTTP request via Express internals
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'created',
+            id: 'new-uuid',
+            data: {
+                id: 'new-uuid',
+                task_id: 'TSK-002',
+                task_name: taskPayload.task_name,
+                synced_from_tuleap: true,
+                tuleap_artifact_id: taskPayload.tuleap_artifact_id
+            },
+        });
+
         const mockReq = { body: taskPayload };
         const mockRes = {
             statusCode: 200,
@@ -80,7 +69,6 @@ describe('POST /tuleap-webhook/task', () => {
             json: jest.fn()
         };
 
-        // Get the route handler
         const routeLayer = tuleapRouter.stack.find(
             layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
         );
@@ -88,41 +76,146 @@ describe('POST /tuleap-webhook/task', () => {
 
         await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
 
-        // Verify task was created
-        expect(mockRes.json).toHaveBeenCalled();
+        expect(mockRes.statusCode).toBe(201);
         const response = mockRes.json.mock.calls[0][0];
         expect(response.success).toBe(true);
         expect(response.action).toBe('created');
         expect(response.data.synced_from_tuleap).toBe(true);
     });
 
-    // T010: Task update for existing artifact
+    // T010: Task update via shim → dispatchTask
     test('T010: updates existing task when action is update and task exists', async () => {
         const taskPayload = {
             ...processedTaskData,
             action: 'update'
         };
 
-        const existingTask = {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'updated',
             id: 'existing-uuid',
-            task_id: 'TSK-001',
-            task_name: 'Old Name',
-            tuleap_artifact_id: taskPayload.tuleap_artifact_id
+            data: {
+                id: 'existing-uuid',
+                task_id: 'TSK-001',
+                task_name: taskPayload.task_name,
+                tuleap_artifact_id: taskPayload.tuleap_artifact_id
+            },
+        });
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('updated');
+    });
+
+    // T011: Update action creates task when it does not exist (falls through to sync→create)
+    test('T011: update action creates task when it does not exist', async () => {
+        const taskPayload = {
+            ...processedTaskData,
+            action: 'update',
+            task_name: 'New task via update'
         };
 
         mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [existingTask] })  // SELECT existing task
-            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
-            .mockResolvedValueOnce({
-                rows: [{
-                    ...existingTask,
-                    task_name: taskPayload.task_name,
-                    id: existingTask.id,
-                    task_id: 'TSK-001'
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook update
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'created',
+            id: 'new-uuid',
+            data: {
+                id: 'new-uuid',
+                task_id: 'TSK-003',
+                task_name: taskPayload.task_name,
+                synced_from_tuleap: true
+            },
+        });
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('created');
+    });
+
+    // T012: Missing task_name — persister handles it, shim only validates tuleap_artifact_id
+    test('T012: returns 500 when dispatchTask throws for missing data', async () => {
+        const taskPayload = {
+            tuleap_artifact_id: 99999,
+            action: 'create'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] });  // logWebhook INSERT
+
+        mockDispatchTask.mockRejectedValueOnce(new Error('task_name is required'));
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(500);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(false);
+    });
+
+    // T013: Already-existing task — persister returns 'updated' for sync
+    test('T013: returns updated when task already exists on create action', async () => {
+        const taskPayload = {
+            ...processedTaskData,
+            action: 'create'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'updated',
+            id: 'existing-uuid',
+            data: {
+                id: 'existing-uuid',
+                task_id: 'TSK-001',
+                task_name: 'Existing Task',
+                tuleap_artifact_id: 12345
+            },
+        });
 
         const mockReq = { body: taskPayload };
         const mockRes = {
@@ -141,118 +234,10 @@ describe('POST /tuleap-webhook/task', () => {
         expect(response.action).toBe('updated');
     });
 
-    // T011: Update falls through to create when task doesn't exist
-    test('T011: update action creates task when it does not exist', async () => {
-        const taskPayload = {
-            ...processedTaskData,
-            action: 'update',
-            task_name: 'New task via update'
-        };
-
-        mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing task
-            .mockResolvedValueOnce({ rows: [] })  // SELECT deleted task (none)
-            .mockResolvedValueOnce({ rows: [{ task_id: 'TSK-001' }] }) // generateTaskId
-            .mockResolvedValueOnce({
-                rows: [{
-                    id: 'new-uuid',
-                    task_id: 'TSK-002',
-                    task_name: taskPayload.task_name,
-                    synced_from_tuleap: true
-                }]
-            })
-            .mockResolvedValueOnce({ rows: [] }); // logWebhook update
-
-        const mockReq = { body: taskPayload };
-        const mockRes = {
-            statusCode: 200,
-            status(code) { this.statusCode = code; return this; },
-            json: jest.fn()
-        };
-
-        const routeLayer = tuleapRouter.stack.find(
-            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
-        );
-        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
-
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.success).toBe(true);
-        // Falls through from update to create
-        expect(response.action).toBe('created');
-    });
-
-    // T012: Missing task_name returns 400
-    test('T012: returns 400 when task_name is missing on create', async () => {
-        const taskPayload = {
-            tuleap_artifact_id: 99999,
-            action: 'create'
-            // task_name intentionally missing
-        };
-
-        mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [] })  // SELECT: no existing task
-            .mockResolvedValueOnce({ rows: [] }); // SELECT deleted task (none)
-
-        const mockReq = { body: taskPayload };
-        const mockRes = {
-            statusCode: 200,
-            status(code) { this.statusCode = code; return this; },
-            json: jest.fn()
-        };
-
-        const routeLayer = tuleapRouter.stack.find(
-            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
-        );
-        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
-
-        expect(mockRes.statusCode).toBe(400);
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.success).toBe(false);
-    });
-
-    // T013: Duplicate task returns 'exists'
-    test('T013: returns exists when task already exists on create action', async () => {
-        const existingTask = {
-            id: 'existing-uuid',
-            task_id: 'TSK-001',
-            task_name: 'Existing Task',
-            tuleap_artifact_id: 12345
-        };
-
-        const taskPayload = {
-            ...processedTaskData,
-            action: 'create'
-        };
-
-        mockQuery
-            .mockResolvedValueOnce({ rows: [] })  // logWebhook
-            .mockResolvedValueOnce({ rows: [existingTask] })  // SELECT: task exists
-            .mockResolvedValueOnce({ rows: [] }); // SELECT deleted task (none)
-
-        const mockReq = { body: taskPayload };
-        const mockRes = {
-            statusCode: 200,
-            status(code) { this.statusCode = code; return this; },
-            json: jest.fn()
-        };
-
-        const routeLayer = tuleapRouter.stack.find(
-            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
-        );
-        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
-
-        const response = mockRes.json.mock.calls[0][0];
-        expect(response.success).toBe(true);
-        expect(response.action).toBe('exists');
-    });
-
     // T017: Missing tuleap_artifact_id returns 400
     test('T017: returns 400 when tuleap_artifact_id is missing', async () => {
         const taskPayload = {
             task_name: 'Some task'
-            // tuleap_artifact_id missing
         };
 
         const mockReq = { body: taskPayload };
@@ -270,5 +255,114 @@ describe('POST /tuleap-webhook/task', () => {
         expect(mockRes.statusCode).toBe(400);
         const response = mockRes.json.mock.calls[0][0];
         expect(response.success).toBe(false);
+    });
+
+    // T014: delete action
+    test('T014: deletes a task when action is delete', async () => {
+        const taskPayload = {
+            ...processedTaskData,
+            action: 'delete'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'deleted',
+            id: 'existing-uuid',
+        });
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('deleted');
+    });
+
+    // T015: reject action
+    test('T015: rejects a task when action is reject', async () => {
+        const taskPayload = {
+            ...processedTaskData,
+            action: 'reject',
+            new_assignee_name: 'Unknown Person',
+            action_reason: 'No matching resource'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'rejected',
+            message: 'Task rejected: Implement login page (assigned to unknown user: Unknown Person)'
+        });
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('rejected');
+    });
+
+    // T016: archive action
+    test('T016: archives a task when action is archive', async () => {
+        const taskPayload = {
+            ...processedTaskData,
+            action: 'archive',
+            new_assignee_name: 'New Team',
+            action_reason: 'Reassigned to another team'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })   // logWebhook INSERT
+            .mockResolvedValueOnce({ rows: [{}] })  // config lookup
+            .mockResolvedValueOnce({ rows: [] });   // logWebhook update
+
+        mockDispatchTask.mockResolvedValueOnce({
+            action: 'archived',
+            id: 'existing-uuid',
+        });
+
+        const mockReq = { body: taskPayload };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/task' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('archived');
     });
 });
