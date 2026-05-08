@@ -66,9 +66,10 @@ ALLOWED_TOOLS=(
     "Bash(ls *)" "Bash(cat *)" "Bash(grep *)" "Bash(find *)"
 )
 
-claude --permission-mode acceptEdits \
+printf '%s' "${PROMPT}" | claude --print \
+    --permission-mode acceptEdits \
     --allowed-tools "${ALLOWED_TOOLS[*]}" \
-    "${PROMPT}" >> "${LOG_FILE}" 2>&1 || {
+    >> "${LOG_FILE}" 2>&1 || {
     rc=$?
     echo "[$(date -Is)] claude exited with rc=${rc}" >> "${LOG_FILE}"
     exit "${rc}"
