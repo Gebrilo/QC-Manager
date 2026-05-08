@@ -172,6 +172,130 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(mockDispatchBug).toHaveBeenCalledTimes(1);
     });
 
+    test('returns 400 when action=reject is sent against a bug tracker (cross-type rejection)', async () => {
+        const syncConfig = {
+            id: 'cfg-1',
+            tuleap_project_id: 42,
+            tuleap_tracker_id: 5,
+            tracker_type: 'bug',
+            qc_project_id: 'proj-1'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] }) // tracker lookup
+            .mockResolvedValueOnce({ rows: [] });          // webhook log
+
+        mockNormalize.mockReturnValue({});
+        mockFromTuleap.mockReturnValue({ artifact_type: 'bug', common: {}, fields: {} });
+
+        const mockReq = {
+            body: {
+                tracker_id: 5,
+                action: 'reject',
+                artifact: { id: 123, values: [] }
+            }
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(400);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/reject/);
+        expect(response.error).toMatch(/bug/);
+        expect(mockDispatchBug).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when action=archive is sent against a non-task tracker (e.g. user_story)', async () => {
+        const syncConfig = {
+            id: 'cfg-1',
+            tuleap_project_id: 42,
+            tuleap_tracker_id: 7,
+            tracker_type: 'user_story',
+            qc_project_id: 'proj-1'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] }) // tracker lookup
+            .mockResolvedValueOnce({ rows: [] });          // webhook log
+
+        mockNormalize.mockReturnValue({});
+        mockFromTuleap.mockReturnValue({ artifact_type: 'user_story', common: {}, fields: {} });
+
+        const mockReq = {
+            body: {
+                tracker_id: 7,
+                action: 'archive',
+                artifact: { id: 222, values: [] }
+            }
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(400);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/archive/);
+    });
+
+    test('accepts action=reject against a task tracker and routes through dispatchTask', async () => {
+        const syncConfig = {
+            id: 'cfg-1',
+            tuleap_project_id: 42,
+            tuleap_tracker_id: 5,
+            tracker_type: 'task',
+            qc_project_id: 'proj-1'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] }) // tracker lookup
+            .mockResolvedValueOnce({ rows: [] })           // webhook log
+            .mockResolvedValueOnce({ rows: [] });          // webhook log update
+
+        mockNormalize.mockReturnValue({});
+        mockFromTuleap.mockReturnValue({ artifact_type: 'task', common: {}, fields: {} });
+        mockDispatchTask.mockResolvedValueOnce({ action: 'rejected', message: 'Task rejected: ...' });
+
+        const mockReq = {
+            body: {
+                tracker_id: 5,
+                action: 'reject',
+                artifact: { id: 333, values: [] }
+            }
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        expect(mockDispatchTask).toHaveBeenCalledTimes(1);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.action).toBe('rejected');
+    });
+
 test('logs webhook to tuleap_webhook_log for task type', async () => {
         const syncConfig = {
             id: 'cfg-1',

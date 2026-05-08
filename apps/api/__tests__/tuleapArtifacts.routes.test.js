@@ -252,6 +252,53 @@ describe('PATCH /tuleap/artifacts/:id', () => {
     expect(res.body.error).toMatch(/config/i);
     expect(mockEmitBug).not.toHaveBeenCalled();
   });
+
+  it('routes a unified task PATCH payload through emitTask with mode=update', async () => {
+    const taskConfig = {
+      id: 'cfg-task',
+      tuleap_tracker_id: 5,
+      qc_project_id: '11111111-2222-3333-4444-555555555555',
+      tracker_type: 'task',
+      artifact_fields: {},
+      value_maps: {},
+    };
+    mockPoolQuery.mockResolvedValueOnce({ rows: [taskConfig] });
+    mockEmitTask.mockResolvedValueOnce({ updated: true, tuleap_artifact_id: 888 });
+
+    const res = await request(app)
+      .patch('/tuleap/artifacts/888')
+      .send({
+        artifact_type: 'task',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'Updated task title', status: 'In Progress' },
+        fields: { team: 'Alpha' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(true);
+    expect(mockEmitTask).toHaveBeenCalledTimes(1);
+    const [unified, config, mode] = mockEmitTask.mock.calls[0];
+    expect(mode).toBe('update');
+    expect(unified.artifact_type).toBe('task');
+    expect(unified.tuleap.artifact_id).toBe(888);
+    expect(unified.common.title).toBe('Updated task title');
+    expect(config.tracker_type).toBe('task');
+  });
+
+  it('returns 400 when no config exists for the unified task PATCH project', async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .patch('/tuleap/artifacts/888')
+      .send({
+        artifact_type: 'task',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'Updated' },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/config/i);
+    expect(mockEmitTask).not.toHaveBeenCalled();
+  });
 });
 
 // ── New: DELETE tests ─────────────────────────────────────────────────────────

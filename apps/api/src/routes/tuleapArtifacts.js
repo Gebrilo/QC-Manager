@@ -6,7 +6,6 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const {
   buildUserStoryPayload,
   buildTestCasePayload,
-  buildTaskPayload,
   buildBugPayload,
 } = require('../services/tuleapPayloadBuilder');
 const db = require('../config/db');
@@ -50,7 +49,6 @@ const REQUIRED_FIELDS = {
 const BUILDERS = {
   'user-story': buildUserStoryPayload,
   'test-case':  buildTestCasePayload,
-  'task':       buildTaskPayload,
   'bug':        buildBugPayload,
 };
 
@@ -95,21 +93,23 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid unified patch payload', details: parsed.error.format() });
     }
     const unified = parsed.data;
-    if (unified.artifact_type === 'bug') {
+    if (unified.artifact_type === 'bug' || unified.artifact_type === 'task') {
+      const trackerType = unified.artifact_type;
       const configResult = await db.pool.query(
-        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
-        [unified.project_id]
+        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = $2 AND is_active = true`,
+        [unified.project_id, trackerType]
       );
       const config = configResult.rows[0];
       if (!config) {
-        return res.status(400).json({ error: `No active bug config for project ${unified.project_id}` });
+        return res.status(400).json({ error: `No active ${trackerType} config for project ${unified.project_id}` });
       }
       const unifiedWithTuleap = {
         ...unified,
         tuleap: { ...(unified.tuleap || {}), artifact_id: Number(id) },
       };
+      const emitter = trackerType === 'bug' ? emitBug : emitTask;
       try {
-        const result = await emitBug(unifiedWithTuleap, config, 'update', {
+        const result = await emitter(unifiedWithTuleap, config, 'update', {
           client: defaultClient,
           registry: defaultRegistry,
           query: db.pool.query.bind(db.pool),
