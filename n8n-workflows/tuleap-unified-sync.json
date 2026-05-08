@@ -17,12 +17,12 @@
     },
     {
       "id": "normalize-payload",
-      "name": "Normalize Payload",
+      "name": "Map Action Vocab",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [450, 300],
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst body = (raw.body !== undefined && typeof raw.body === 'object') ? raw.body : raw;\n\nlet payload, artifactId, trackerId, projectId, action;\n\nif (body.payload !== undefined) {\n  const p = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;\n  payload = p;\n  artifactId = p.current?.id || p.artifact_id;\n  trackerId = p.current?.tracker?.id || p.tracker_id;\n  projectId = p.current?.project?.id || p.project?.id || p.project_id;\n  action = p.action || 'artifact:updated';\n} else if (body.artifact !== undefined) {\n  payload = { current: body.artifact, project: body.project, user: body.user, action: body.action };\n  artifactId = body.artifact.id;\n  trackerId = body.artifact.tracker?.id;\n  projectId = body.project?.id;\n  action = body.action || 'artifact:created';\n} else {\n  throw new Error('Unrecognized Tuleap payload format');\n}\n\nif (!trackerId) throw new Error('No tracker ID found in payload');\n\nlet valuesMap = {};\nconst values = payload.current?.values || payload.values || [];\nfor (const v of values) {\n  const key = v.field_name || v.label || v.name || `field_${v.field_id}`;\n  const val = v.value !== undefined ? v.value :\n              v.bind_value_ids ? v.bind_value_ids :\n              v.links ? v.links :\n              v.content || null;\n  valuesMap[key] = val;\n}\n\nreturn {\n  json: {\n    tracker_id: trackerId,\n    project_id: projectId,\n    action: action,\n    artifact: {\n      id: artifactId,\n      uri: `${$env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com'}/plugins/tracker/?aid=${artifactId}`,\n      values: values\n    },\n    raw_payload: payload,\n    normalized_values: valuesMap\n  }\n};"
+        "jsCode": "const raw = $input.first().json;\nconst body = (raw.body !== undefined && typeof raw.body === 'object') ? raw.body : raw;\n\nlet payload, artifactId, trackerId, projectId, rawAction;\n\nif (body.payload !== undefined) {\n  const p = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;\n  payload = p;\n  artifactId = p.current?.id || p.artifact_id;\n  trackerId = p.current?.tracker?.id || p.tracker_id;\n  projectId = p.current?.project?.id || p.project?.id || p.project_id;\n  rawAction = p.action || 'update';\n} else if (body.artifact !== undefined) {\n  payload = { current: body.artifact, project: body.project, user: body.user, action: body.action };\n  artifactId = body.artifact.id;\n  trackerId = body.artifact.tracker?.id;\n  projectId = body.project?.id;\n  rawAction = body.action || 'create';\n} else {\n  throw new Error('Unrecognized Tuleap payload format');\n}\n\nif (!trackerId) throw new Error('No tracker ID found in payload');\n\nconst ACTION_MAP = {\n  'create': 'sync',\n  'update': 'sync',\n  'artifact:created': 'sync',\n  'artifact:updated': 'sync',\n  'artifact:deleted': 'delete',\n  'delete': 'delete',\n  'reject': 'reject',\n  'archive': 'archive',\n};\n\nconst action = ACTION_MAP[rawAction] || 'sync';\n\nconst values = payload.current?.values || payload.values || [];\n\nreturn {\n  json: {\n    tracker_id: trackerId,\n    project_id: projectId,\n    action: action,\n    artifact: {\n      id: artifactId,\n      values: values\n    },\n    project: { id: projectId },\n    raw_payload: payload\n  }\n};"
       }
     },
     {
@@ -59,14 +59,14 @@
       "main": [
         [
           {
-            "node": "Normalize Payload",
+            "node": "Map Action Vocab",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Normalize Payload": {
+    "Map Action Vocab": {
       "main": [
         [
           {

@@ -60,7 +60,6 @@ describe('PATCH /development-plans/my/tasks/:taskId/status ON_HOLD handling', ()
 
     test('upserts completion with hold_reason and inserts a comment when entering ON_HOLD', async () => {
         mockQuery.mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] });
-        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'task-1' }] });
         mockQuery.mockResolvedValueOnce({
             rows: [{ task_id: 'task-1', progress_status: 'ON_HOLD', hold_reason: 'Blocked on Bob' }],
         });
@@ -74,19 +73,18 @@ describe('PATCH /development-plans/my/tasks/:taskId/status ON_HOLD handling', ()
         expect(res.body.progress_status).toBe('ON_HOLD');
         expect(res.body.hold_reason).toBe('Blocked on Bob');
 
-        const upsertCall = mockQuery.mock.calls[2];
+        const upsertCall = mockQuery.mock.calls[1];
         expect(upsertCall[0]).toMatch(/INSERT INTO user_task_completions/);
         expect(upsertCall[0]).toMatch(/hold_reason/);
         expect(upsertCall[1]).toEqual(['user-1', 'task-1', 'ON_HOLD', 'Blocked on Bob']);
 
-        const commentCall = mockQuery.mock.calls[3];
+        const commentCall = mockQuery.mock.calls[2];
         expect(commentCall[0]).toMatch(/INSERT INTO idp_task_comment/);
         expect(commentCall[1]).toEqual(['user-1', 'task-1', 'user-1', 'Blocked on Bob']);
     });
 
     test('clears hold_reason when transitioning from ON_HOLD to IN_PROGRESS', async () => {
         mockQuery.mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] });
-        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'task-1' }] });
         mockQuery.mockResolvedValueOnce({
             rows: [{ task_id: 'task-1', progress_status: 'IN_PROGRESS', hold_reason: null }],
         });
@@ -99,7 +97,7 @@ describe('PATCH /development-plans/my/tasks/:taskId/status ON_HOLD handling', ()
         expect(res.body.progress_status).toBe('IN_PROGRESS');
         expect(res.body.hold_reason).toBeNull();
 
-        const upsertCall = mockQuery.mock.calls[2];
+        const upsertCall = mockQuery.mock.calls[1];
         expect(upsertCall[0]).toMatch(/hold_reason\s*=\s*NULL/i);
     });
 

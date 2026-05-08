@@ -83,10 +83,16 @@ export default function TuleapSettingsPage() {
     // Field/status mapping editors
     const [editingFieldMap, setEditingFieldMap] = useState<string | null>(null);
     const [editingStatusMap, setEditingStatusMap] = useState<string | null>(null);
+    const [editingValueMaps, setEditingValueMaps] = useState<string | null>(null);
     const [fieldMapEdits, setFieldMapEdits] = useState<Record<string, string>>({});
     const [statusMapEdits, setStatusMapEdits] = useState<Record<string, string>>({});
+    const [valueMapsEdits, setValueMapsEdits] = useState<Record<string, Record<string, string>>>({});
     const [savingFieldMap, setSavingFieldMap] = useState(false);
     const [savingStatusMap, setSavingStatusMap] = useState(false);
+    const [savingValueMaps, setSavingValueMaps] = useState(false);
+
+    // Unconfigured trackers
+    const [unconfigured, setUnconfigured] = useState<{ tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[]>([]);
 
     // Deleting
     const [deletingProject, setDeletingProject] = useState<string | null>(null);
@@ -104,9 +110,10 @@ export default function TuleapSettingsPage() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [configRes, projData] = await Promise.all([
+            const [configRes, projData, unconfRes] = await Promise.all([
                 tuleapConfigApi.list(),
                 fetchApi<ApiProject[]>('/projects'),
+                fetchApi<{ data: { tuleap_tracker_id: number; latest_attempt: string; attempt_count: number }[] }>('/tuleap-webhook/config/unconfigured').catch(() => ({ data: [] as any })),
             ]);
             const configList = configRes.data ?? (configRes as any);
             setConfigs(Array.isArray(configList) ? configList : []);
@@ -117,6 +124,7 @@ export default function TuleapSettingsPage() {
                     project_name: p.project_name,
                 }))
             );
+            setUnconfigured(Array.isArray(unconfRes.data) ? unconfRes.data : []);
         } catch (err: any) {
             showErrorMsg(err.message || 'Failed to load data');
         } finally {
@@ -285,6 +293,72 @@ export default function TuleapSettingsPage() {
         } finally {
             setSavingStatusMap(false);
         }
+    };
+
+    const openValueMapsEditor = (config: TuleapSyncConfig) => {
+        setEditingValueMaps(config.id);
+        const vm = config.value_maps || {};
+        const flattened: Record<string, Record<string, string>> = {};
+        for (const [field, mapping] of Object.entries(vm)) {
+            if (typeof mapping === 'object' && mapping !== null) {
+                flattened[field] = { ...(mapping as Record<string, string>) };
+            }
+        }
+        setValueMapsEdits(flattened);
+        setEditingFieldMap(null);
+        setEditingStatusMap(null);
+    };
+
+    const saveValueMaps = async (configId: string) => {
+        setSavingValueMaps(true);
+        try {
+            await tuleapConfigApi.update(configId, { value_maps: valueMapsEdits });
+            showSuccessMsg('Value maps saved');
+            setEditingValueMaps(null);
+            loadData();
+        } catch (err: any) {
+            showErrorMsg(err.message);
+        } finally {
+            setSavingValueMaps(false);
+        }
+    };
+
+    const addValueMapField = () => {
+        const keys = Object.keys(valueMapsEdits);
+        const nextKey = `field_${keys.length + 1}`;
+        setValueMapsEdits((prev) => ({ ...prev, [nextKey]: {} }));
+    };
+
+    const removeValueMapField = (field: string) => {
+        setValueMapsEdits((prev) => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
+    const addValueMapEntry = (field: string) => {
+        setValueMapsEdits((prev) => ({
+            ...prev,
+            [field]: { ...prev[field], [`tuleap_${Object.keys(prev[field] || {}).length + 1}`]: '' },
+        }));
+    };
+
+    const removeValueMapEntry = (field: string, key: string) => {
+        setValueMapsEdits((prev) => {
+            const entries = { ...prev[field] };
+            delete entries[key];
+            return { ...prev, [field]: entries };
+        });
+    };
+
+    const updateValueMapEntry = (field: string, oldKey: string, newKey: string, value: string) => {
+        setValueMapsEdits((prev) => {
+            const entries = { ...prev[field] };
+            delete entries[oldKey];
+            entries[newKey] = value;
+            return { ...prev, [field]: entries };
+        });
     };
 
     // ── Auto-detect fields ────────────────────────────────────────────────────
@@ -709,6 +783,13 @@ export default function TuleapSettingsPage() {
                                                     >
                                                         Edit Status Map
                                                     </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openValueMapsEditor(config)}
+                                                    >
+                                                        Edit Value Maps
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -859,12 +940,151 @@ export default function TuleapSettingsPage() {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* ── Section 6: Value Maps Editor ── */}
+                                        {editingValueMaps === config?.id && (
+                                            <div className="mt-4 pt-4 border-t border-white/10">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h4 className="text-sm font-semibold text-slate-200">Value Maps (severity, priority, environment)</h4>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={addValueMapField}
+                                                    >
+                                                        + Add Field
+                                                    </Button>
+                                                </div>
+                                                {Object.entries(valueMapsEdits).map(([field, mapping]) => (
+                                                    <div key={field} className="mb-4 p-3 bg-slate-700/30 rounded-lg">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <input
+                                                                type="text"
+                                                                value={field}
+                                                                onChange={(e) => {
+                                                                    const oldField = field;
+                                                                    const newField = e.target.value;
+                                                                    setValueMapsEdits((prev) => {
+                                                                        const { [oldField]: _, ...rest } = prev;
+                                                                        return { ...rest, [newField]: mapping };
+                                                                    });
+                                                                }}
+                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-sm font-medium w-40"
+                                                                placeholder="Field name (e.g. severity)"
+                                                            />
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    onClick={() => addValueMapEntry(field)}
+                                                                    className="text-xs text-indigo-400 hover:text-indigo-300 px-2"
+                                                                >+ Entry</button>
+                                                                <button
+                                                                    onClick={() => removeValueMapField(field)}
+                                                                    className="text-rose-400 hover:text-rose-300 px-1"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1 ml-2">
+                                                            {Object.entries(mapping).map(([tuleapVal, qcVal], idx) => (
+                                                                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={tuleapVal}
+                                                                        onChange={(e) => {
+                                                                            const oldKey = tuleapVal;
+                                                                            updateValueMapEntry(field, oldKey, e.target.value, qcVal);
+                                                                        }}
+                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
+                                                                        placeholder="Tuleap value"
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={qcVal}
+                                                                        onChange={(e) => {
+                                                                            updateValueMapEntry(field, tuleapVal, tuleapVal, e.target.value);
+                                                                        }}
+                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
+                                                                        placeholder="QC value"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => removeValueMapEntry(field, tuleapVal)}
+                                                                        className="text-rose-400 hover:text-rose-300 px-1"
+                                                                    >
+                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {Object.keys(valueMapsEdits).length === 0 && (
+                                                    <p className="text-xs text-slate-500 py-2 text-center">No value maps. Click "+ Add Field" to add severity/priority/environment mappings.</p>
+                                                )}
+                                                <div className="flex justify-end gap-2 mt-3">
+                                                    <Button variant="ghost" size="sm" onClick={() => setEditingValueMaps(null)} className="text-slate-300">Cancel</Button>
+                                                    <Button variant="primary" size="sm" onClick={() => saveValueMaps(config.id)} disabled={savingValueMaps}>
+                                                        {savingValueMaps ? 'Saving...' : 'Save Value Maps'}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
                     );
                 })()}
+
+                {/* ── Section: Unconfigured Trackers ── */}
+                {unconfigured.length > 0 && (
+                    <div className="glass-card p-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                            Unconfigured Trackers
+                            <span className="text-xs text-amber-400 font-normal ml-1">({unconfigured.length} tracker{unconfigured.length !== 1 ? 's' : ''} received webhooks without a config)</span>
+                        </h2>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Tracker ID</th>
+                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Latest Artifact</th>
+                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Attempts</th>
+                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Last Attempt</th>
+                                        <th className="text-right py-2 px-3 text-slate-400 font-medium">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {unconfigured.map((u) => (
+                                        <tr key={u.tuleap_tracker_id} className="border-b border-white/5 hover:bg-white/5">
+                                            <td className="py-2 px-3 font-mono text-amber-300">#{u.tuleap_tracker_id}</td>
+                                            <td className="py-2 px-3 text-slate-300">{u.latest_artifact_id || '—'}</td>
+                                            <td className="py-2 px-3 text-slate-300">{u.attempt_count}</td>
+                                            <td className="py-2 px-3 text-slate-400 text-xs">{u.latest_attempt ? new Date(u.latest_attempt).toLocaleString() : '—'}</td>
+                                            <td className="py-2 px-3 text-right">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowAddForm(true);
+                                                        setNewTuleapProjectId('');
+                                                        setNewTrackerIds({
+                                                            bug: String(u.tuleap_tracker_id),
+                                                            task: '',
+                                                            user_story: '',
+                                                            test_case: '',
+                                                        });
+                                                    }}
+                                                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                                                >
+                                                    Map This Tracker
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Delete confirmation ── */}
                 {deletingProject && (() => {

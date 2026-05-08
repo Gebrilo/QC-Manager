@@ -276,7 +276,6 @@ describe('PATCH /my/tasks/:taskId/status — requires_attachment guard', () => {
     test('returns 400 when requires_attachment=true and no attachment uploaded', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'task-1', requires_attachment: true }] })
             .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeUserApp())
@@ -289,7 +288,6 @@ describe('PATCH /my/tasks/:taskId/status — requires_attachment guard', () => {
     test('allows DONE when requires_attachment=true and attachment exists', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'task-1', requires_attachment: true }] })
             .mockResolvedValueOnce({ rows: [{ id: 'att-1' }] })
             .mockResolvedValueOnce({
@@ -304,7 +302,6 @@ describe('PATCH /my/tasks/:taskId/status — requires_attachment guard', () => {
     test('allows DONE when requires_attachment=false and no attachment', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'task-1', requires_attachment: false }] })
             .mockResolvedValueOnce({
                 rows: [{ id: 'comp-1', task_id: 'task-1', progress_status: 'DONE', completed_at: new Date() }],

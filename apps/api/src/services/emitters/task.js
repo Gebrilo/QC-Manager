@@ -31,9 +31,9 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
         shape = { bind_value_ids: [bound.id] };
       }
     } else if (field.type === 'art_link') {
-      const links = Array.isArray(fieldValue)
-        ? fieldValue.map(id => ({ id: Number(id) }))
-        : [{ id: Number(fieldValue) }];
+      const raw = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+      const links = raw.map(id => Number(id)).filter(id => !isNaN(id)).map(id => ({ id }));
+      if (links.length === 0) continue;
       shape = { links };
     } else {
       shape = { value: fieldValue };

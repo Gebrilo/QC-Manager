@@ -42,6 +42,7 @@ function stubIDPFixture({ completion }) {
     });
     mockQuery.mockResolvedValueOnce({ rows: [completion] });
     mockQuery.mockResolvedValueOnce({ rows: [] }); // attachments
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // commentCount
 }
 
 function firstPlan(res) {

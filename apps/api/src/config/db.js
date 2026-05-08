@@ -1686,6 +1686,33 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
+            CREATE TABLE IF NOT EXISTS test_case (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                test_case_id VARCHAR(50) NOT NULL,
+                title VARCHAR(500) NOT NULL,
+                description TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                priority VARCHAR(20) DEFAULT 'medium',
+                category VARCHAR(50) DEFAULT 'other',
+                project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+                tags TEXT[] DEFAULT '{}',
+                tuleap_artifact_id INTEGER UNIQUE,
+                tuleap_tracker_id INTEGER,
+                tuleap_url TEXT,
+                synced_from_tuleap BOOLEAN DEFAULT FALSE,
+                last_tuleap_sync TIMESTAMP WITH TIME ZONE,
+                pending_links JSONB DEFAULT '[]'::jsonb,
+                raw_tuleap_payload JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_tuleap_artifact ON test_case(tuleap_artifact_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_project_id ON test_case(project_id) WHERE deleted_at IS NULL`);
+
+        await client.query(`
             ALTER TABLE bugs
                 ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
         `);
@@ -1697,11 +1724,6 @@ const runMigrations = async () => {
 
         await client.query(`
             ALTER TABLE user_stories
-                ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
-        `);
-
-        await client.query(`
-            ALTER TABLE test_cases
                 ADD COLUMN IF NOT EXISTS pending_links JSONB DEFAULT '[]'::jsonb
         `);
 

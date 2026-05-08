@@ -39,6 +39,11 @@ jest.mock('../src/services/emitters/task', () => ({
   emitToTuleap: mockEmitTask,
 }));
 
+const mockEmitUserStory = jest.fn();
+jest.mock('../src/services/emitters/user_story', () => ({
+  emitToTuleap: mockEmitUserStory,
+}));
+
 const mockPoolQuery = jest.fn();
 jest.mock('../src/config/db', () => ({
   pool: { query: mockPoolQuery },
@@ -62,6 +67,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockEmitBug.mockReset();
   mockEmitTask.mockReset();
+  mockEmitUserStory.mockReset();
   mockPoolQuery.mockReset();
 });
 
@@ -83,6 +89,75 @@ describe('POST /tuleap/artifacts/user-story', () => {
       .send({ status: 'Draft', requirementVersion: '1' });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/summary/i);
+  });
+});
+
+describe('POST /tuleap/artifacts/user-story (unified emitter path)', () => {
+  it('routes a unified user_story payload through emitUserStory', async () => {
+    const config = {
+      id: 'cfg-us',
+      tuleap_tracker_id: 10,
+      qc_project_id: '11111111-2222-3333-4444-555555555555',
+      tracker_type: 'user_story',
+      artifact_fields: {},
+      value_maps: {},
+    };
+    mockPoolQuery.mockResolvedValueOnce({ rows: [config] });
+    mockEmitUserStory.mockResolvedValueOnce({
+      tuleap_artifact_id: 4242,
+      tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=4242',
+      artifact_type: 'user_story',
+      xref: 'story #4242',
+    });
+
+    const res = await request(app)
+      .post('/tuleap/artifacts/user-story')
+      .send({
+        artifact_type: 'user_story',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'New story', status: 'Draft' },
+        fields: { acceptance_criteria: 'AC', requirement_version: '1' },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.tuleap_artifact_id).toBe(4242);
+    expect(mockEmitUserStory).toHaveBeenCalledTimes(1);
+    const [unified, , mode] = mockEmitUserStory.mock.calls[0];
+    expect(unified.artifact_type).toBe('user_story');
+    expect(unified.common.title).toBe('New story');
+    expect(mode).toBe('create');
+  });
+});
+
+describe('PATCH /tuleap/artifacts/:id with unified user_story payload', () => {
+  it('routes a unified user_story PATCH payload through emitUserStory with mode=update', async () => {
+    const config = {
+      id: 'cfg-us',
+      tuleap_tracker_id: 10,
+      qc_project_id: '11111111-2222-3333-4444-555555555555',
+      tracker_type: 'user_story',
+      artifact_fields: {},
+      value_maps: {},
+    };
+    mockPoolQuery.mockResolvedValueOnce({ rows: [config] });
+    mockEmitUserStory.mockResolvedValueOnce({ updated: true, tuleap_artifact_id: 4242 });
+
+    const res = await request(app)
+      .patch('/tuleap/artifacts/4242')
+      .send({
+        artifact_type: 'user_story',
+        project_id: '11111111-2222-3333-4444-555555555555',
+        common: { title: 'Updated story' },
+        fields: { requirement_version: '2' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(true);
+    expect(mockEmitUserStory).toHaveBeenCalledTimes(1);
+    const [unified, , mode] = mockEmitUserStory.mock.calls[0];
+    expect(mode).toBe('update');
+    expect(unified.artifact_type).toBe('user_story');
+    expect(unified.tuleap.artifact_id).toBe(4242);
   });
 });
 

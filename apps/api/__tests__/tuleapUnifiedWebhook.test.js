@@ -7,6 +7,7 @@ const mockAuditLog = jest.fn().mockResolvedValue(undefined);
 const mockFromTuleap = jest.fn();
 const mockDispatchBug = jest.fn();
 const mockDispatchTask = jest.fn();
+const mockDispatchUserStory = jest.fn();
 const mockNormalize = jest.fn();
 
 jest.mock('../src/config/db', () => ({
@@ -23,6 +24,9 @@ jest.mock('../src/services/persisters/bug', () => ({
 }));
 jest.mock('../src/services/persisters/task', () => ({
     dispatchAction: mockDispatchTask
+}));
+jest.mock('../src/services/persisters/user_story', () => ({
+    dispatchAction: mockDispatchUserStory
 }));
 jest.mock('../src/services/tuleapValueNormalizer', () => ({
     normalize: mockNormalize
@@ -41,6 +45,7 @@ beforeEach(() => {
     mockFromTuleap.mockReset();
     mockDispatchBug.mockReset();
     mockDispatchTask.mockReset();
+    mockDispatchUserStory.mockReset();
     mockNormalize.mockReset();
 });
 
@@ -85,7 +90,8 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(mockRes.statusCode).toBe(404);
         const response = mockRes.json.mock.calls[0][0];
         expect(response.success).toBe(false);
-        expect(response.error).toContain('No sync config');
+        expect(response.error).toBe('Unconfigured');
+        expect(response.tracker_id).toBe(999);
     });
 
     test('returns 404 when no tracker config found (no project-level fallback per ADR 0008)', async () => {
@@ -115,7 +121,9 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(mockRes.statusCode).toBe(404);
         const response = mockRes.json.mock.calls[0][0];
         expect(response.success).toBe(false);
-        expect(response.error).toContain('No sync config');
+        expect(response.error).toBe('Unconfigured');
+        expect(response.tracker_id).toBe(999);
+        expect(response.tuleap_project_id).toBe(42);
     });
 
     test('returns 201 and creates bug via dispatchAction for valid bug payload', async () => {
@@ -294,6 +302,95 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(mockDispatchTask).toHaveBeenCalledTimes(1);
         const response = mockRes.json.mock.calls[0][0];
         expect(response.action).toBe('rejected');
+    });
+
+test('returns 201 and creates user_story via dispatchAction for valid user_story payload', async () => {
+        const syncConfig = {
+            id: 'cfg-us',
+            tuleap_project_id: 42,
+            tuleap_tracker_id: 6,
+            tracker_type: 'user_story',
+            qc_project_id: 'proj-1'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] }) // tracker lookup
+            .mockResolvedValueOnce({ rows: [] })            // webhook log
+            .mockResolvedValueOnce({ rows: [] });           // webhook log update
+
+        mockNormalize.mockReturnValue({ story_title: 'Story Title' });
+        mockFromTuleap.mockReturnValue({
+            artifact_type: 'user_story',
+            common: { title: 'Story Title' },
+            fields: { acceptance_criteria: 'AC' }
+        });
+        mockDispatchUserStory.mockResolvedValueOnce({ action: 'created', id: 'new-us-uuid' });
+
+        const mockReq = {
+            body: {
+                tracker_id: 6,
+                action: 'sync',
+                artifact: { id: 5001, values: [] }
+            }
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(201);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.action).toBe('created');
+        expect(response.id).toBe('new-us-uuid');
+        expect(mockDispatchUserStory).toHaveBeenCalledTimes(1);
+    });
+
+    test('returns 400 when action=reject is sent against a user_story tracker', async () => {
+        const syncConfig = {
+            id: 'cfg-us',
+            tuleap_project_id: 42,
+            tuleap_tracker_id: 6,
+            tracker_type: 'user_story',
+            qc_project_id: 'proj-1'
+        };
+
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] })
+            .mockResolvedValueOnce({ rows: [] });
+
+        mockNormalize.mockReturnValue({});
+        mockFromTuleap.mockReturnValue({ artifact_type: 'user_story', common: {}, fields: {} });
+
+        const mockReq = {
+            body: {
+                tracker_id: 6,
+                action: 'reject',
+                artifact: { id: 5001, values: [] }
+            }
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(400);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/reject/);
+        expect(mockDispatchUserStory).not.toHaveBeenCalled();
     });
 
 test('logs webhook to tuleap_webhook_log for task type', async () => {

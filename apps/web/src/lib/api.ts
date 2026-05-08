@@ -1360,6 +1360,7 @@ export interface TuleapSyncConfig {
     status_mappings: Record<string, string>;
     artifact_fields: Record<string, string>;
     status_value_map: Record<string, string>;
+    value_maps: Record<string, Record<string, string>>;
     is_active: boolean;
     created_at: string;
     updated_at: string;

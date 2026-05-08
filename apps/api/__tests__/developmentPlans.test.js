@@ -117,6 +117,7 @@ describe('GET /development-plans/:userId', () => {
             .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
             .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] })
             .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp()).get('/development-plans/user-1');
         expect(res.status).toBe(200);
@@ -134,6 +135,7 @@ describe('GET /development-plans/:userId', () => {
             .mockResolvedValueOnce({ rows: [{ id: 'q-1', chapter_id: 'ch-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 't-1', quest_id: 'q-1', title: 'Read book', due_date: '2026-05-01', priority: 'high', is_mandatory: true }] })
             .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'DONE' }] })
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeApp()).get('/development-plans/user-1?planId=plan-1');
@@ -339,7 +341,6 @@ describe('PATCH /development-plans/my/tasks/:taskId/status', () => {
     test('inserts IN_PROGRESS completion row', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] })
             .mockResolvedValueOnce({ rows: [{ task_id: 't-1', progress_status: 'IN_PROGRESS' }] });
         const res = await request(makeUserApp())
             .patch('/development-plans/my/tasks/t-1/status')
@@ -351,7 +352,6 @@ describe('PATCH /development-plans/my/tasks/:taskId/status', () => {
     test('deletes completion row when status is TODO', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 't-1' }] })
             .mockResolvedValueOnce({ rows: [] });
         const res = await request(makeUserApp())
             .patch('/development-plans/my/tasks/t-1/status')

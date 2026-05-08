@@ -46,7 +46,6 @@ describe('GET /development-plans/my/tasks/:taskId/comments', () => {
     test('returns comment list ordered oldest-first', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [
                 { id: 'c-1', body: 'first', author_id: 'user-1', author_name: 'Alice', author_role: 'user', created_at: '2026-04-01T00:00:00Z' },
                 { id: 'c-2', body: 'second', author_id: 'manager-1', author_name: 'Bob', author_role: 'manager', created_at: '2026-04-02T00:00:00Z' },
@@ -62,15 +61,13 @@ describe('GET /development-plans/my/tasks/:taskId/comments', () => {
         expect(res.body[0].author_role).toBe('user');
         expect(res.body[1].author_name).toBe('Bob');
 
-        const listQuery = mockQuery.mock.calls[2][0];
+        const listQuery = mockQuery.mock.calls[1][0];
         expect(listQuery).toMatch(/ORDER BY c\.created_at ASC/);
         expect(listQuery).toMatch(/LEFT JOIN app_user/);
     });
 
     test('returns 404 if task is not in user\'s plan', async () => {
-        mockQuery
-            .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [] });
+        mockQuery.mockResolvedValueOnce({ rows: [] });
 
         const res = await request(makeUserApp())
             .get('/development-plans/my/tasks/task-999/comments');
@@ -82,7 +79,6 @@ describe('POST /development-plans/my/tasks/:taskId/comments', () => {
     test('creates a comment with author_id = caller', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'c-new' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'c-new', body: 'hello', author_id: 'user-1', author_name: 'Alice', author_role: 'user' }] });
 
@@ -94,11 +90,11 @@ describe('POST /development-plans/my/tasks/:taskId/comments', () => {
         expect(res.body.body).toBe('hello');
         expect(res.body.author_name).toBe('Alice');
 
-        const insertCall = mockQuery.mock.calls[2];
+        const insertCall = mockQuery.mock.calls[1];
         expect(insertCall[0]).toMatch(/INSERT INTO idp_task_comment/);
         expect(insertCall[1]).toEqual(['user-1', 'task-1', 'user-1', 'hello']);
 
-        const selectCall = mockQuery.mock.calls[3][0];
+        const selectCall = mockQuery.mock.calls[2][0];
         expect(selectCall).toMatch(/LEFT JOIN app_user/);
     });
 
@@ -123,7 +119,6 @@ describe('GET /development-plans/:userId/tasks/:taskId/comments (manager)', () =
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'c-1', body: 'hi', author_id: 'user-1', author_name: 'Alice', author_role: 'user' }] });
 
         const res = await request(makeManagerApp())
@@ -139,7 +134,6 @@ describe('POST /development-plans/:userId/tasks/:taskId/comments (manager)', () 
         canAccessUser.mockResolvedValueOnce(true);
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-            .mockResolvedValueOnce({ rows: [{ id: 'task-1' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'c-new' }] })
             .mockResolvedValueOnce({ rows: [{ id: 'c-new', body: 'nudge', author_id: 'manager-1', author_name: 'Mgr', author_role: 'manager' }] });
 
@@ -150,7 +144,7 @@ describe('POST /development-plans/:userId/tasks/:taskId/comments (manager)', () 
         expect(res.status).toBe(201);
         expect(res.body.author_name).toBe('Mgr');
         expect(res.body.author_role).toBe('manager');
-        const insertCall = mockQuery.mock.calls[2];
+        const insertCall = mockQuery.mock.calls[1];
         expect(insertCall[1]).toEqual(['user-1', 'task-1', 'manager-1', 'nudge']);
     });
 

@@ -44,22 +44,9 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
   return values;
 }
 
-async function resolveLinkedIds(linkedIds, query) {
-  if (!Array.isArray(linkedIds) || linkedIds.length === 0) return [];
-  const tuleapIds = [];
-  for (const qcId of linkedIds) {
-    const result = await query('SELECT tuleap_artifact_id FROM test_cases WHERE id = $1', [qcId]);
-    if (result.rows.length > 0 && result.rows[0].tuleap_artifact_id) {
-      tuleapIds.push(result.rows[0].tuleap_artifact_id);
-    }
-  }
-  return tuleapIds;
-}
-
 async function emitToTuleap(unified, config, mode, deps = {}) {
   const client = deps.client || defaultClient;
   const registry = deps.registry || defaultRegistry;
-  const query = deps.query || null;
   const trackerId = config.tuleap_tracker_id;
   const valueMaps = config.value_maps || {};
   const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
@@ -71,8 +58,12 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     return { deleted: true };
   }
 
-  const statusMap = config.status_value_map || {};
-  const mappedPayload = toTuleap(unified, config);
+  if (mode === 'update' && !unified.tuleap?.artifact_id) {
+    throw new Error('tuleap.artifact_id required for update');
+  }
+
+  const effectiveConfig = { ...config, tracker_type: 'user_story' };
+  const mappedPayload = toTuleap(unified, effectiveConfig);
 
   for (const [key, val] of Object.entries(mappedPayload)) {
     if (key === 'status') {
@@ -80,14 +71,6 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     } else if (valueMaps[key]) {
       mappedPayload[key] = applyValueMap(key, val, valueMaps);
     }
-  }
-
-  if (mappedPayload.linked_test_case_ids && query) {
-    const tuleapIds = await resolveLinkedIds(mappedPayload.linked_test_case_ids, query);
-    if (tuleapIds.length > 0) {
-      mappedPayload['test-case'] = tuleapIds;
-    }
-    delete mappedPayload.linked_test_case_ids;
   }
 
   const values = await buildTuleapValues(mappedPayload, trackerId, registry);
@@ -106,7 +89,7 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
   return {
     tuleap_artifact_id: artifact.id,
     tuleap_url: `${baseUrl}/plugins/tracker/?aid=${artifact.id}`,
-    artifact_type: 'bug',
+    artifact_type: 'user_story',
     xref: artifact.xref || null,
   };
 }

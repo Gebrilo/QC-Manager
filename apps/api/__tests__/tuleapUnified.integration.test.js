@@ -132,7 +132,8 @@ describe('POST /tuleap-webhook/unified', () => {
 
         expect(res.status).toBe(404);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toContain('No sync config found');
+        expect(res.body.error).toBe('Unconfigured');
+        expect(res.body.tracker_id).toBe(999);
     });
 
     test('returns 404 when tracker has no direct match (no project-level fallback per ADR 0008)', async () => {

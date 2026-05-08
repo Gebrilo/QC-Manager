@@ -12,6 +12,8 @@ const db = require('../config/db');
 const { toTuleap } = require('../services/tuleapTransformEngine');
 const { emitToTuleap: emitBug } = require('../services/emitters/bug');
 const { emitToTuleap: emitTask } = require('../services/emitters/task');
+const { emitToTuleap: emitUserStory } = require('../services/emitters/user_story');
+const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { UnifiedPatchSchema } = require('../schemas/tuleapUnified');
 
 const FALLBACK_TRACKER_IDS = {
@@ -93,7 +95,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid unified patch payload', details: parsed.error.format() });
     }
     const unified = parsed.data;
-    if (unified.artifact_type === 'bug' || unified.artifact_type === 'task') {
+    if (['bug', 'task', 'user_story'].includes(unified.artifact_type)) {
       const trackerType = unified.artifact_type;
       const configResult = await db.pool.query(
         `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = $2 AND is_active = true`,
@@ -107,7 +109,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
         ...unified,
         tuleap: { ...(unified.tuleap || {}), artifact_id: Number(id) },
       };
-      const emitter = trackerType === 'bug' ? emitBug : emitTask;
+      const EMITTERS = { bug: emitBug, task: emitTask, user_story: emitUserStory, test_case: emitTestCase };
+      const emitter = EMITTERS[trackerType];
       try {
         const result = await emitter(unifiedWithTuleap, config, 'update', {
           client: defaultClient,
@@ -268,6 +271,105 @@ async function handleBugCreate(req, res) {
   }
 }
 
+async function handleUserStoryCreate(req, res) {
+  const { artifact_type, project_id, common, fields } = req.body;
+  const pid = project_id || req.body.project_id;
+
+  if (!pid) {
+    return res.status(400).json({ error: 'project_id is required' });
+  }
+
+  const configResult = await db.pool.query(
+    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,
+    [pid]
+  );
+  const config = configResult.rows[0];
+  if (!config) {
+    return res.status(400).json({ error: `No active user_story config for project ${pid}` });
+  }
+
+  let unified;
+  if (artifact_type && common) {
+    unified = { artifact_type: 'user_story', project_id: pid, common, fields: fields || {} };
+  } else {
+    unified = {
+      artifact_type: 'user_story',
+      project_id: pid,
+      common: {
+        title: req.body.summary || req.body.title,
+        description: req.body.description || req.body.overviewDescription || '',
+        status: req.body.status,
+        priority: req.body.priority,
+      },
+      fields: {
+        acceptance_criteria: req.body.acceptanceCriteria || req.body.acceptance_criteria,
+        requirement_version: req.body.requirementVersion || req.body.requirement_version,
+        ba_author: req.body.baAuthor || req.body.ba_author,
+      },
+    };
+  }
+
+  try {
+    const result = await emitUserStory(unified, config, 'create', {
+      client: defaultClient,
+      registry: defaultRegistry,
+      query: db.pool.query.bind(db.pool),
+    });
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+  }
+}
+
+async function handleTestCaseCreate(req, res) {
+  const { artifact_type, project_id, common, fields } = req.body;
+  const pid = project_id || req.body.project_id;
+
+  if (!pid) {
+    return res.status(400).json({ error: 'project_id is required' });
+  }
+
+  const configResult = await db.pool.query(
+    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'test_case' AND is_active = true`,
+    [pid]
+  );
+  const config = configResult.rows[0];
+  if (!config) {
+    return res.status(400).json({ error: `No active test_case config for project ${pid}` });
+  }
+
+  let unified;
+  if (artifact_type && common) {
+    unified = { artifact_type: 'test_case', project_id: pid, common, fields: fields || {} };
+  } else {
+    unified = {
+      artifact_type: 'test_case',
+      project_id: pid,
+      common: {
+        title: req.body.title,
+        description: req.body.description || '',
+        status: req.body.status,
+        priority: req.body.priority,
+      },
+      fields: {
+        test_steps: req.body.testSteps,
+        expected_result: req.body.expectedResult,
+      },
+    };
+  }
+
+  try {
+    const result = await emitTestCase(unified, config, 'create', {
+      client: defaultClient,
+      registry: defaultRegistry,
+      query: db.pool.query.bind(db.pool),
+    });
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
+  }
+}
+
 router.post('/:type', requireAuth, async (req, res) => {
   const { type } = req.params;
 
@@ -283,6 +385,14 @@ router.post('/:type', requireAuth, async (req, res) => {
 
   if (normalizedType === 'task') {
     return handleTaskCreate(req, res);
+  }
+
+  if (normalizedType === 'user_story' && (req.body.project_id || req.body.artifact_type)) {
+    return handleUserStoryCreate(req, res);
+  }
+
+  if (normalizedType === 'test_case' && (req.body.project_id || req.body.artifact_type)) {
+    return handleTestCaseCreate(req, res);
   }
 
   if (req.body.artifact_type && req.body.common) {
