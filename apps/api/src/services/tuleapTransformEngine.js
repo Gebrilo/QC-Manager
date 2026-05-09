@@ -133,6 +133,9 @@ function toTuleap(unifiedPayload, config) {
   const mapping = getEffectiveMapping(config);
   const reverseMapping = {};
   for (const [tuleapName, unifiedName] of Object.entries(mapping)) {
+    if (reverseMapping[unifiedName]) {
+      console.warn(`[toTuleap] duplicate mapping for "${unifiedName}": "${reverseMapping[unifiedName]}" overwritten by "${tuleapName}" — check artifact_fields for duplicates`);
+    }
     reverseMapping[unifiedName] = tuleapName;
   }
 

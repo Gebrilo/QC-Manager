@@ -9,6 +9,18 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const pool = db.pool;
 
+function findDuplicateValues(obj) {
+    if (!obj || typeof obj !== 'object') return [];
+    const valueToKeys = {};
+    for (const [k, v] of Object.entries(obj)) {
+        if (!valueToKeys[v]) valueToKeys[v] = [];
+        valueToKeys[v].push(k);
+    }
+    return Object.entries(valueToKeys)
+        .filter(([, keys]) => keys.length > 1)
+        .map(([value, keys]) => ({ value, keys }));
+}
+
 const { fromTuleap } = require('../services/tuleapTransformEngine');
 const { dispatchAction: dispatchBug } = require('../services/persisters/bug');
 const { dispatchAction: dispatchTask } = require('../services/persisters/task');
@@ -339,6 +351,15 @@ router.post('/config', async (req, res) => {
             });
         }
 
+        const dupeCheck = findDuplicateValues(artifact_fields);
+        if (dupeCheck.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `artifact_fields has duplicate mappings: ${dupeCheck.map(d => `"${d.value}" mapped from keys: ${d.keys.map(k => `"${k}"`).join(', ')}`).join('; ')}`,
+                duplicates: dupeCheck,
+            });
+        }
+
         const result = await pool.query(`
             INSERT INTO tuleap_sync_config (
                 tuleap_project_id, tuleap_tracker_id, tuleap_base_url, tracker_type,
@@ -386,6 +407,14 @@ router.put('/config/:id', async (req, res) => {
         let paramIdx = 1;
 
         if (req.body.artifact_fields !== undefined) {
+            const dupeCheck = findDuplicateValues(req.body.artifact_fields);
+            if (dupeCheck.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: `artifact_fields has duplicate mappings: ${dupeCheck.map(d => `"${d.value}" mapped from keys: ${d.keys.map(k => `"${k}"`).join(', ')}`).join('; ')}`,
+                    duplicates: dupeCheck,
+                });
+            }
             updates.push(`artifact_fields = $${paramIdx++}`);
             values.push(JSON.stringify(req.body.artifact_fields));
         }

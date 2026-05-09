@@ -850,6 +850,23 @@ export default function TuleapSettingsPage() {
                                                     )}
                                                 </div>
                                                 <div className="flex justify-end gap-2 mt-3">
+                                                    {(() => {
+                                                        const valueCounts: Record<string, string[]> = {};
+                                                        Object.entries(fieldMapEdits).forEach(([k, v]) => {
+                                                            if (!valueCounts[v]) valueCounts[v] = [];
+                                                            valueCounts[v].push(k);
+                                                        });
+                                                        const dupes = Object.entries(valueCounts).filter(([, ks]) => ks.length > 1);
+                                                        if (dupes.length > 0) {
+                                                            return (
+                                                                <div className="w-full mb-2 px-3 py-2 bg-amber-900/40 border border-amber-500/50 rounded-lg text-xs text-amber-300">
+                                                                    <strong>Duplicate mappings:</strong> {dupes.map(([v, ks]) => `"${v}" ← ${ks.join(', ')}`).join('; ')}.
+                                                                    Only the last key will take effect. Remove duplicates to avoid silent data loss.
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
