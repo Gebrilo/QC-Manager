@@ -26,6 +26,7 @@ const { dispatchAction: dispatchBug } = require('../services/persisters/bug');
 const { dispatchAction: dispatchTask } = require('../services/persisters/task');
 const { dispatchAction: dispatchUserStory } = require('../services/persisters/user_story');
 const { dispatchAction: dispatchTestCase } = require('../services/persisters/test_case');
+const { reconcileDeletes } = require('../services/tuleapReconcileDeletes');
 const { normalize } = require('../services/tuleapValueNormalizer');
 
 
@@ -817,6 +818,84 @@ router.post('/unified', async (req, res) => {
         console.error('Error processing unified webhook:', error);
         const status = error.statusCode || 500;
         res.status(status).json({ success: false, error: 'Failed to process unified webhook', message: error.message });
+    }
+});
+
+// =====================================================
+// POST /tuleap-webhook/reconcile-deletes
+// Receive a complete present-artifact-id list from n8n's reconcile workflow
+// and soft-delete QC rows whose Tuleap counterpart has gone missing for >= 2 cycles.
+// =====================================================
+router.post('/reconcile-deletes', async (req, res) => {
+    try {
+        const { tuleap_tracker_id, qc_project_id, tracker_type, present_artifact_ids, page_count, truncated } = req.body;
+
+        if (!tuleap_tracker_id || !qc_project_id || !tracker_type || !Array.isArray(present_artifact_ids)) {
+            return res.status(400).json({
+                success: false,
+                error: 'tuleap_tracker_id, qc_project_id, tracker_type, and present_artifact_ids[] are required',
+            });
+        }
+
+        if (truncated) {
+            console.warn(`[reconcile-deletes] paginate_truncated tracker_id=${tuleap_tracker_id} pages=${page_count} — refusing to diff (would false-positive)`);
+            return res.status(202).json({
+                success: true,
+                aborted: true,
+                abortedReason: 'pagination_truncated',
+                tuleap_tracker_id,
+            });
+        }
+
+        const dispatchByType = {
+            bug: dispatchBug,
+            task: dispatchTask,
+            user_story: dispatchUserStory,
+            test_case: dispatchTestCase,
+        };
+
+        if (!dispatchByType[tracker_type]) {
+            return res.status(400).json({ success: false, error: `Unsupported tracker_type: ${tracker_type}` });
+        }
+
+        const result = await reconcileDeletes({
+            presentIds: present_artifact_ids,
+            qcProjectId: qc_project_id,
+            trackerType: tracker_type,
+            pool,
+            dispatchByType,
+            maxMissingPerCycle: parseInt(process.env.TULEAP_RECONCILE_MAX_MISSING || '50', 10),
+            confirmThreshold: parseInt(process.env.TULEAP_RECONCILE_CONFIRM_THRESHOLD || '2', 10),
+        });
+
+        if (result.aborted) {
+            console.warn(`[reconcile-deletes] aborted tracker_id=${tuleap_tracker_id} tracker_type=${tracker_type} reason="${result.abortedReason}"`);
+        }
+        if (result.suspected.length > 0) {
+            console.log(`[reconcile-deletes] suspected_missing tracker_id=${tuleap_tracker_id} tracker_type=${tracker_type} count=${result.suspected.length} ids=${JSON.stringify(result.suspected)}`);
+        }
+        if (result.confirmedDeletes.length > 0) {
+            console.log(`[reconcile-deletes] confirmed_deletes tracker_id=${tuleap_tracker_id} tracker_type=${tracker_type} count=${result.confirmedDeletes.length} ids=${JSON.stringify(result.confirmedDeletes)}`);
+        }
+        if (result.recovered.length > 0) {
+            console.log(`[reconcile-deletes] recovered tracker_id=${tuleap_tracker_id} tracker_type=${tracker_type} count=${result.recovered.length} ids=${JSON.stringify(result.recovered)}`);
+        }
+
+        return res.status(200).json({
+            success: true,
+            tuleap_tracker_id,
+            tracker_type,
+            qc_project_id,
+            present_count: present_artifact_ids.length,
+            ...result,
+        });
+    } catch (error) {
+        console.error('[reconcile-deletes] unhandled_error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to reconcile deletes',
+            message: error.message,
+        });
     }
 });
 

@@ -1733,6 +1733,29 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS submitted_by_resource_id UUID REFERENCES resources(id) ON DELETE SET NULL
         `);
 
+        // Migration 027: tuleap_missing_artifact — tracks consecutive-miss state for delete reconciliation
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tuleap_missing_artifact (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                tuleap_artifact_id INTEGER NOT NULL,
+                tracker_type VARCHAR(20) NOT NULL CHECK (tracker_type IN ('bug', 'task', 'user_story', 'test_case')),
+                qc_project_id UUID NOT NULL REFERENCES projects(id),
+                miss_count INTEGER NOT NULL DEFAULT 1,
+                first_missed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_missed_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP WITH TIME ZONE,
+                resolution VARCHAR(20),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(tuleap_artifact_id, tracker_type)
+            )
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_tuleap_missing_unresolved
+                ON tuleap_missing_artifact(qc_project_id, tracker_type)
+                WHERE resolved_at IS NULL
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
