@@ -125,12 +125,14 @@ jobs:
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TULEAP_BASE_URL: ${{ secrets.TULEAP_BASE_URL }}
+          TULEAP_ACCESS_KEY: ${{ secrets.TULEAP_ACCESS_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,SUPABASE_JWT_SECRET,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,SUPABASE_JWT_SECRET,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,TULEAP_BASE_URL,TULEAP_ACCESS_KEY
           script_stop: true
           script: |
             set -euo pipefail
@@ -171,6 +173,8 @@ jobs:
               printf '%s\n' "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
               printf '%s\n' "SUPABASE_URL=${SUPABASE_URL}"
               printf '%s\n' "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}"
+              printf '%s\n' "TULEAP_BASE_URL=${TULEAP_BASE_URL}"
+              printf '%s\n' "TULEAP_ACCESS_KEY=${TULEAP_ACCESS_KEY}"
               echo "NEXT_PUBLIC_API_URL=https://${API_DOMAIN}"
             } > .env
 

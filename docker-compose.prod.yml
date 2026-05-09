@@ -73,6 +73,8 @@ services:
       - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
       - CORS_ORIGIN=${CORS_ORIGIN}
+      - TULEAP_BASE_URL=${TULEAP_BASE_URL}
+      - TULEAP_ACCESS_KEY=${TULEAP_ACCESS_KEY}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=qc-shared-network"
