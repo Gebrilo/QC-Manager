@@ -115,7 +115,7 @@
         "url": "http://qc-api:3001/tuleap-webhook/unified",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}",
+        "jsonBody": "={{ $json }}",
         "options": {}
       }
     }
