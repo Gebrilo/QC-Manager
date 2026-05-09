@@ -59,7 +59,7 @@
       "position": [1200, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.TULEAP_BASE_URL }}/api/v1/artifacts?tracker={{ $json.tuleap_tracker_id }}&limit=100",
+        "url": "={{ $env.TULEAP_BASE_URL }}/api/v1/trackers/{{ $json.tuleap_tracker_id }}/artifacts?limit=100&values_format=collection",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
