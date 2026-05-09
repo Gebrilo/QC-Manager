@@ -4,6 +4,9 @@ const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { emitToTuleap: emitBug } = require('../services/emitters/bug');
+const { defaultClient } = require('../services/tuleapClient');
+const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
@@ -415,18 +418,61 @@ router.delete('/:id', requireAuth, requirePermission('action:bugs:delete'), asyn
             });
         }
 
+        if (original.tuleap_artifact_id) {
+            const configResult = await pool.query(
+                `SELECT * FROM tuleap_sync_config
+                 WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
+                [original.project_id]
+            );
+            const config = configResult.rows[0];
+            if (!config) {
+                return res.status(400).json({
+                    success: false,
+                    error: `No active bug sync config for project ${original.project_id}`,
+                });
+            }
+
+            try {
+                await emitBug(
+                    {
+                        artifact_type: 'bug',
+                        project_id: original.project_id,
+                        tuleap: { artifact_id: original.tuleap_artifact_id },
+                    },
+                    config,
+                    'delete',
+                    { client: defaultClient, registry: defaultRegistry, query: pool.query.bind(pool) }
+                );
+            } catch (emitErr) {
+                console.error(`[route:bugs:delete] emit_failed bug_id=${id} err="${emitErr.message}"`);
+                return res.status(emitErr.status || 502).json({
+                    success: false,
+                    error: 'Failed to delete in Tuleap',
+                    message: emitErr.message,
+                });
+            }
+
+            const refreshed = await pool.query('SELECT * FROM bugs WHERE id = $1', [id]);
+            const deleted = refreshed.rows[0];
+            await auditLog('bugs', id, 'DELETE', deleted, original);
+            return res.json({
+                success: true,
+                message: `Bug '${deleted.title}' has been deleted`,
+                data: deleted,
+            });
+        }
+
         const result = await pool.query(
             'UPDATE bugs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *',
             [id]
         );
         const deleted = result.rows[0];
-
         await auditLog('bugs', id, 'DELETE', deleted, original);
 
         res.json({
             success: true,
             message: `Bug '${deleted.title}' has been deleted`,
-            data: deleted
+            data: deleted,
         });
     } catch (error) {
         console.error('Error deleting bug:', error);

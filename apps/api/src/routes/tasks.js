@@ -6,6 +6,9 @@ const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
+const { emitToTuleap: emitTask } = require('../services/emitters/task');
+const { defaultClient } = require('../services/tuleapClient');
+const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
 /**
  * Helper: Get the resource ID linked to the current user.
@@ -408,6 +411,51 @@ router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), asy
 
         if (original.deleted_at) {
             return res.status(400).json({ error: 'Task already deleted' });
+        }
+
+        if (original.tuleap_artifact_id) {
+            const configResult = await db.query(
+                `SELECT * FROM tuleap_sync_config
+                 WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
+                [original.project_id]
+            );
+            const config = configResult.rows[0];
+            if (!config) {
+                return res.status(400).json({
+                    success: false,
+                    error: `No active task sync config for project ${original.project_id}`,
+                });
+            }
+
+            try {
+                await emitTask(
+                    {
+                        artifact_type: 'task',
+                        project_id: original.project_id,
+                        tuleap: { artifact_id: original.tuleap_artifact_id },
+                    },
+                    config,
+                    'delete',
+                    { client: defaultClient, registry: defaultRegistry, query: db.pool.query.bind(db.pool) }
+                );
+            } catch (emitErr) {
+                console.error(`[route:tasks:delete] emit_failed task_id=${id} err="${emitErr.message}"`);
+                return res.status(emitErr.status || 502).json({
+                    success: false,
+                    error: 'Failed to delete in Tuleap',
+                    message: emitErr.message,
+                });
+            }
+
+            const refreshed = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+            const deleted = refreshed.rows[0];
+            await auditLog('tasks', id, 'DELETE', deleted, original);
+            triggerWorkflow('task-deleted', deleted);
+            return res.json({
+                success: true,
+                message: `Task '${deleted.task_name}' has been deleted`,
+                data: deleted,
+            });
         }
 
         const result = await db.query(

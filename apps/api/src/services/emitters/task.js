@@ -1,6 +1,7 @@
 const { toTuleap } = require('../tuleapTransformEngine');
 const { defaultRegistry } = require('../tuleapFieldRegistry');
 const { defaultClient } = require('../tuleapClient');
+const { dispatchAction } = require('../persisters/task');
 
 function applyValueMap(fieldName, value, valueMaps) {
   if (!valueMaps || !valueMaps[fieldName] || value === null || value === undefined) return value;
@@ -45,48 +46,97 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
 }
 
 async function emitToTuleap(unified, config, mode, deps = {}) {
-  const client = deps.client || defaultClient;
-  const registry = deps.registry || defaultRegistry;
-  const trackerId = config.tuleap_tracker_id;
-  const valueMaps = config.value_maps || {};
-  const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+  try {
+    const client = deps.client || defaultClient;
+    const registry = deps.registry || defaultRegistry;
+    const trackerId = config.tuleap_tracker_id;
+    const valueMaps = config.value_maps || {};
+    const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
 
-  if (mode === 'delete') {
-    const artifactId = unified.tuleap?.artifact_id;
-    if (!artifactId) throw new Error('tuleap.artifact_id required for delete');
-    await client.delete(`/artifacts/${artifactId}`);
-    return { deleted: true };
-  }
+    if (mode === 'delete') {
+      const artifactId = unified.tuleap?.artifact_id;
+      if (!artifactId) throw new Error('tuleap.artifact_id required for delete');
 
-  const mappedPayload = toTuleap(unified, config);
+      await client.delete(`/artifacts/${artifactId}`);
+      console.log(`[emit:task] tuleap_delete_ok artifact_id=${artifactId} project=${config.qc_project_id}`);
 
-  for (const [key, val] of Object.entries(mappedPayload)) {
-    if (key === 'status') {
-      mappedPayload[key] = applyValueMap(key, val, valueMaps) || val;
-    } else if (valueMaps[key]) {
-      mappedPayload[key] = applyValueMap(key, val, valueMaps);
+      try {
+        await dispatchAction(
+          { ...unified, action: 'delete', tuleap: { ...(unified.tuleap || {}), artifact_id: artifactId } },
+          config,
+          { query: deps.query }
+        );
+        console.log(`[emit:task] persist_delete_ok artifact_id=${artifactId}`);
+      } catch (persistErr) {
+        console.warn(`[emit:task] persist_delete_failed artifact_id=${artifactId} err="${persistErr.message}" — drift; poll will repair`);
+      }
+
+      return { deleted: true };
     }
+
+    const mappedPayload = toTuleap(unified, config);
+
+    for (const [key, val] of Object.entries(mappedPayload)) {
+      if (key === 'status') {
+        mappedPayload[key] = applyValueMap(key, val, valueMaps) || val;
+      } else if (valueMaps[key]) {
+        mappedPayload[key] = applyValueMap(key, val, valueMaps);
+      }
+    }
+
+    const values = await buildTuleapValues(mappedPayload, trackerId, registry);
+
+    if (mode === 'update') {
+      const artifactId = unified.tuleap?.artifact_id;
+      if (!artifactId) throw new Error('tuleap.artifact_id required for update');
+      await client.put(`/artifacts/${artifactId}`, { values });
+      console.log(`[emit:task] tuleap_update_ok artifact_id=${artifactId} project=${config.qc_project_id}`);
+
+      try {
+        await dispatchAction(
+          { ...unified, action: 'sync', tuleap: { ...(unified.tuleap || {}), artifact_id: artifactId } },
+          config,
+          { query: deps.query }
+        );
+        console.log(`[emit:task] persist_update_ok artifact_id=${artifactId}`);
+      } catch (persistErr) {
+        console.warn(`[emit:task] persist_update_failed artifact_id=${artifactId} err="${persistErr.message}" — drift; poll will repair`);
+      }
+
+      return { updated: true, tuleap_artifact_id: artifactId };
+    }
+
+    const payload = { tracker: { id: trackerId }, values };
+    const response = await client.post('/artifacts', payload);
+    const artifact = response.data;
+    const newTuleapUrl = `${baseUrl}/plugins/tracker/?aid=${artifact.id}`;
+    console.log(`[emit:task] tuleap_create_ok artifact_id=${artifact.id} project=${config.qc_project_id}`);
+
+    try {
+      await dispatchAction(
+        {
+          ...unified,
+          action: 'sync',
+          tuleap: { ...(unified.tuleap || {}), artifact_id: artifact.id, url: newTuleapUrl },
+        },
+        config,
+        { query: deps.query }
+      );
+      console.log(`[emit:task] persist_create_ok artifact_id=${artifact.id}`);
+    } catch (persistErr) {
+      console.warn(`[emit:task] persist_create_failed artifact_id=${artifact.id} err="${persistErr.message}" — drift; poll will repair`);
+    }
+
+    return {
+      tuleap_artifact_id: artifact.id,
+      tuleap_url: newTuleapUrl,
+      artifact_type: 'task',
+      xref: artifact.xref || null,
+    };
+  } catch (err) {
+    console.error(`[emit:task] tuleap_${mode}_failed project=${config?.qc_project_id} err="${err.message}" status=${err.status || 'unknown'}`);
+    throw err;
   }
-
-  const values = await buildTuleapValues(mappedPayload, trackerId, registry);
-
-  if (mode === 'update') {
-    const artifactId = unified.tuleap?.artifact_id;
-    if (!artifactId) throw new Error('tuleap.artifact_id required for update');
-    await client.put(`/artifacts/${artifactId}`, { values });
-    return { updated: true, tuleap_artifact_id: artifactId };
-  }
-
-  const payload = { tracker: { id: trackerId }, values };
-  const response = await client.post('/artifacts', payload);
-  const artifact = response.data;
-
-  return {
-    tuleap_artifact_id: artifact.id,
-    tuleap_url: `${baseUrl}/plugins/tracker/?aid=${artifact.id}`,
-    artifact_type: 'task',
-    xref: artifact.xref || null,
-  };
 }
 
 module.exports = { emitToTuleap };
