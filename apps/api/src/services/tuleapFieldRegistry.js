@@ -31,10 +31,11 @@ class FieldRegistry {
 
   async resolveBindValue(trackerId, fieldName, label) {
     const f = await this.getField(trackerId, fieldName);
-    const match = (f.values || []).find(v => v.label === label);
+    const valuesArr = Array.isArray(f.values) ? f.values : [];
+    const match = valuesArr.find(v => v.label === label);
     if (!match) throw new Error(
       `Bind value '${label}' not found for field '${fieldName}' in tracker ${trackerId}. ` +
-      `Available: ${(f.values || []).map(v => v.label).join(', ')}`
+      `Available: ${valuesArr.map(v => v.label).join(', ')}`
     );
     return { id: match.id };
   }

@@ -489,7 +489,7 @@ router.post('/config/test-connection', async (req, res) => {
             name: f.name,
             label: f.label,
             type: f.type,
-            values: (f.values || []).map(v => ({ id: v.id, label: v.label })),
+            values: (Array.isArray(f.values) ? f.values : []).map(v => ({ id: v.id, label: v.label })),
         }));
 
         return res.json({
@@ -528,7 +528,7 @@ router.get('/config/discover/:trackerId', async (req, res) => {
                 name: field.name,
                 label: field.label,
                 type: field.type,
-                values: (field.values || []).map(v => ({ id: v.id, label: v.label })),
+                values: (Array.isArray(field.values) ? field.values : []).map(v => ({ id: v.id, label: v.label })),
             });
         }
 
