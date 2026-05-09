@@ -41,10 +41,10 @@ jobs:
       - name: Resolve image tag
         id: tag
         run: |
-          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
-          else
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
             echo "tag=staging" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push API image
@@ -78,12 +78,12 @@ jobs:
       - name: Resolve build args
         id: args
         run: |
-          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "api_url=https://${{ secrets.API_DOMAIN }}" >> $GITHUB_OUTPUT
-          else
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
             echo "tag=staging" >> $GITHUB_OUTPUT
             echo "api_url=https://${{ secrets.STAGING_API_DOMAIN }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "api_url=https://${{ secrets.API_DOMAIN }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push Web image
