@@ -455,7 +455,7 @@ const runMigrations = async () => {
                 END IF;
             END $$;
         `);
-        await client.query(`ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user-story', 'test-case'))`);
+        await client.query(`ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user_story'))`);
 
         // Tuleap Task History
         await client.query(`
