@@ -185,7 +185,7 @@ async function handleSync(unified, config, { query }) {
         status = COALESCE($3, status),
         resource1_id = COALESCE($4, resource1_id),
         tuleap_url = COALESCE($5, tuleap_url),
-        parent_story_id = CASE WHEN $6::uuid IS NOT NULL THEN $6 ELSE parent_story_id END,
+        parent_story_id = CASE WHEN $6 IS NOT NULL THEN $6 ELSE parent_story_id END,
         last_tuleap_sync = NOW(),
         updated_at = NOW()
       WHERE id = $7
