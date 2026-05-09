@@ -377,6 +377,54 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
         await auditLog('tasks', id, 'UPDATE', updated, original);
         triggerWorkflow('task-updated', updated);
 
+        // Push Tuleap-mappable changes through the emitter so QC→Tuleap doesn't drift.
+        // Local UPDATE has already persisted QC-only fields; this is best-effort —
+        // emit failures log a warning and the inbound poll repairs.
+        if (original.tuleap_artifact_id) {
+            const tuleapCommon = {};
+            if (data.task_name !== undefined) tuleapCommon.title = data.task_name;
+            const desc = data.notes !== undefined ? data.notes : data.description;
+            if (desc !== undefined) tuleapCommon.description = desc;
+            if (data.status !== undefined) tuleapCommon.status = data.status;
+            if (data.resource1_uuid !== undefined) {
+                if (data.resource1_uuid === null) {
+                    tuleapCommon.assigned_to = null;
+                } else {
+                    const r = await db.query('SELECT resource_name FROM resources WHERE id = $1', [data.resource1_uuid]);
+                    if (r.rows.length > 0) tuleapCommon.assigned_to = r.rows[0].resource_name;
+                }
+            }
+
+            if (Object.keys(tuleapCommon).length > 0) {
+                const configResult = await db.query(
+                    `SELECT * FROM tuleap_sync_config
+                     WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
+                    [original.project_id]
+                );
+                const config = configResult.rows[0];
+                if (!config) {
+                    console.warn(`[route:tasks:patch] no_active_task_config project=${original.project_id} task_id=${id} — Tuleap edits dropped`);
+                } else {
+                    try {
+                        await emitTask(
+                            {
+                                artifact_type: 'task',
+                                project_id: original.project_id,
+                                tuleap: { artifact_id: original.tuleap_artifact_id },
+                                common: tuleapCommon,
+                                fields: {},
+                            },
+                            config,
+                            'update',
+                            { client: defaultClient, registry: defaultRegistry, query: db.pool.query.bind(db.pool) }
+                        );
+                    } catch (emitErr) {
+                        console.warn(`[route:tasks:patch] emit_failed task_id=${id} artifact_id=${original.tuleap_artifact_id} err="${emitErr.message}" — drift; poll will repair`);
+                    }
+                }
+            }
+        }
+
         const viewResult = await db.query('SELECT * FROM v_tasks_with_metrics WHERE id = $1', [id]);
         res.json(viewResult.rows[0]);
     } catch (err) {
