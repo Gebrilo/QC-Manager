@@ -1,12 +1,16 @@
 {
   "name": "Tuleap Unified Poll",
+  "id": "PIPprgnA945Lvdog",
   "nodes": [
     {
       "id": "schedule-trigger",
       "name": "Every 15 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
-      "position": [200, 300],
+      "position": [
+        200,
+        300
+      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -23,7 +27,10 @@
       "name": "Fetch Active Trackers",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [450, 300],
+      "position": [
+        450,
+        300
+      ],
       "parameters": {
         "method": "GET",
         "url": "http://qc-api:3001/tuleap-webhook/config?is_active=true",
@@ -35,7 +42,10 @@
       "name": "Split Configs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
-      "position": [700, 300],
+      "position": [
+        700,
+        300
+      ],
       "parameters": {
         "jsCode": "const configs = $input.first().json.data || [];\nreturn configs.map(config => ({ json: config }));"
       }
@@ -45,7 +55,10 @@
       "name": "Split In Batches",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 1,
-      "position": [950, 300],
+      "position": [
+        950,
+        300
+      ],
       "parameters": {
         "batchSize": 1,
         "options": {}
@@ -56,7 +69,10 @@
       "name": "Fetch Artifacts from Tuleap",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1200, 300],
+      "position": [
+        1200,
+        300
+      ],
       "parameters": {
         "method": "GET",
         "url": "={{ $env.TULEAP_BASE_URL }}/api/v1/trackers/{{ $json.tuleap_tracker_id }}/artifacts?limit=100&values_format=collection",
@@ -77,7 +93,10 @@
       "name": "Build Unified Payloads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
-      "position": [1450, 300],
+      "position": [
+        1450,
+        300
+      ],
       "parameters": {
         "jsCode": "const items = $input.all();\nconst config = items[0]?.json || {};\n\n// Artifacts come from the previous HTTP response\nconst artifacts = $input.first().json || [];\nconst artifactList = Array.isArray(artifacts) ? artifacts : (artifacts.data || artifacts.items || [artifacts]);\n\nif (artifactList.length === 0) return [];\n\nreturn artifactList.map(artifact => {\n  const valuesMap = {};\n  for (const v of (artifact.values || [])) {\n    const key = v.field_name || v.label || v.name || `field_${v.field_id}`;\n    const val = v.value !== undefined ? v.value :\n                v.bind_value_ids ? v.bind_value_ids :\n                v.links ? v.links : null;\n    valuesMap[key] = val;\n  }\n\n  return {\n    json: {\n      tracker_id: config.tuleap_tracker_id,\n      project_id: config.tuleap_project_id,\n      action: 'poll_sync',\n      artifact: {\n        id: artifact.id,\n        uri: artifact.uri,\n        values: artifact.values || []\n      },\n      raw_payload: { current: artifact, project: { id: config.tuleap_project_id } },\n      normalized_values: valuesMap\n    }\n  };\n});"
       }
@@ -87,7 +106,10 @@
       "name": "Send to QC Unified API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1700, 300],
+      "position": [
+        1700,
+        300
+      ],
       "parameters": {
         "method": "POST",
         "url": "http://qc-api:3001/tuleap-webhook/unified",
