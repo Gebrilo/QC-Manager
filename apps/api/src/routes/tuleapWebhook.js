@@ -28,6 +28,7 @@ const { dispatchAction: dispatchUserStory } = require('../services/persisters/us
 const { dispatchAction: dispatchTestCase } = require('../services/persisters/test_case');
 const { reconcileDeletes } = require('../services/tuleapReconcileDeletes');
 const { normalize } = require('../services/tuleapValueNormalizer');
+const { defaultRegistry: tuleapFieldRegistry } = require('../services/tuleapFieldRegistry');
 
 
 
@@ -667,9 +668,17 @@ router.post('/unified', async (req, res) => {
             });
         }
 
+        let trackerFields = null;
+        try {
+            const fieldsMap = await tuleapFieldRegistry._load(tracker_id);
+            trackerFields = { fields: fieldsMap };
+        } catch (e) {
+            console.warn(`[unified] tracker field registry load failed for ${tracker_id}: ${e.message}`);
+        }
+
         let tuleapValues = {};
         if (artifact && Array.isArray(artifact.values)) {
-            tuleapValues = normalize(artifact, null);
+            tuleapValues = normalize(artifact, trackerFields);
         } else if (raw_payload && typeof raw_payload === 'object') {
             tuleapValues = raw_payload;
         }
