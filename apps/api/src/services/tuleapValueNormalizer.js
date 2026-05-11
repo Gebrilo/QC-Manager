@@ -1,5 +1,15 @@
-function getKey(v) {
-  return v.name || v.label || null;
+function getKey(v, tracker) {
+  if (v.name) return v.name;
+  if (tracker && tracker.fields instanceof Map && v.field_id != null) {
+    for (const f of tracker.fields.values()) {
+      if (f.field_id === v.field_id) return f.name;
+    }
+  }
+  if (tracker && Array.isArray(tracker.fields) && v.field_id != null) {
+    const f = tracker.fields.find(x => x.field_id === v.field_id);
+    if (f) return f.name;
+  }
+  return v.label || null;
 }
 
 function valueFromInlineValues(values) {
@@ -34,7 +44,7 @@ function normalize(rawTuleapPayload, tracker) {
   const out = {};
   const values = (rawTuleapPayload && rawTuleapPayload.values) || [];
   for (const v of values) {
-    const key = getKey(v);
+    const key = getKey(v, tracker);
     if (!key) continue;
 
     if (v.value !== undefined && v.value !== null) {
