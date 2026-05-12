@@ -1093,3 +1093,220 @@ router.get('/recent-uploads', requireAuth, requirePermission('page:test-executio
 
 module.exports = router;
 module.exports.validateExecutionDate = validateExecutionDate;
+
+// ============================================================================
+// SUITE-BASED TEST RUN CREATION
+// ============================================================================
+
+// POST /test-runs/from-suite — Create test run from suite
+router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test-executions:create'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const suiteRunSchema = z.object({
+      suite_id: z.string().uuid(),
+      name: z.string().min(1).max(255),
+      project_id: z.string().uuid(),
+      environment: z.string().max(100).optional(),
+      version_tag: z.string().max(50).optional(),
+    });
+    const validatedData = suiteRunSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Verify suite exists and has test cases
+    const suiteResult = await client.query(
+      `SELECT * FROM test_suites WHERE id = $1 AND deleted_at IS NULL`,
+      [validatedData.suite_id]
+    );
+    if (suiteResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Test suite not found' });
+    }
+
+    // Generate run ID
+    const idResult = await client.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(run_id FROM 4) AS INTEGER)), 0) + 1 AS next_id
+       FROM test_run WHERE run_id ~ '^TR-[0-9]+$'`
+    );
+    const runId = `TR-${String(idResult.rows[0].next_id).padStart(5, '0')}`;
+
+    // Create test run
+    const runResult = await client.query(
+      `INSERT INTO test_run (run_id, name, description, project_id, status, suite_id, source, environment, version_tag, created_by)
+       VALUES ($1, $2, $3, $4, 'in_progress', $5, 'suite', $6, $7, $8)
+       RETURNING *`,
+      [runId, validatedData.name, suiteResult.rows[0].description || null, validatedData.project_id,
+       validatedData.suite_id, validatedData.environment || null, validatedData.version_tag || null,
+       req.user?.id || null]
+    );
+
+    const testRun = runResult.rows[0];
+
+    // Get ordered test cases from suite
+    const suiteCases = await client.query(
+      `SELECT tsc.test_case_id, tsc.sort_order, tc.title, tc.test_steps, tc.expected_result
+       FROM test_suite_cases tsc
+       JOIN test_case tc ON tsc.test_case_id = tc.id
+       WHERE tsc.suite_id = $1 AND tsc.snapshot_id IS NULL AND tc.deleted_at IS NULL
+       ORDER BY tsc.sort_order`,
+      [validatedData.suite_id]
+    );
+
+    // Snapshot suite composition
+    for (const sc of suiteCases.rows) {
+      await client.query(
+        `INSERT INTO test_suite_cases (suite_id, test_case_id, sort_order, snapshot_id)
+         VALUES ($1, $2, $3, $4)`,
+        [validatedData.suite_id, sc.test_case_id, sc.sort_order, testRun.id]
+      );
+    }
+
+    // Create execution entries
+    const totalCases = suiteCases.rows.length;
+    const executionEntries = [];
+
+    for (const sc of suiteCases.rows) {
+      const execResult = await client.query(
+        `INSERT INTO test_execution (test_run_id, test_case_id, status, test_case_title, test_case_steps, expected_result, sort_order)
+         VALUES ($1, $2, 'not_run', $3, $4, $5, $6)
+         RETURNING id, test_case_id, test_case_title, test_case_steps, expected_result, sort_order, status, assigned_to`,
+        [testRun.id, sc.test_case_id, sc.title, sc.test_steps, sc.expected_result, sc.sort_order]
+      );
+      executionEntries.push(execResult.rows[0]);
+    }
+
+    await client.query(
+      `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      ['test_run_created', 'test_run', testRun.id, req.user?.id || null,
+       JSON.stringify({ run_id: runId, suite_id: validatedData.suite_id, source: 'suite', total_cases: totalCases })]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      ...testRun,
+      total_cases: totalCases,
+      passed: 0,
+      failed: 0,
+      blocked: 0,
+      not_run: totalCases,
+      pass_rate: 0,
+      execution_entries: executionEntries,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+// GET /test-runs/:id/progress — Get run progress summary
+router.get('/test-runs/:id/progress', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const runResult = await pool.query(
+      `SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL`, [id]
+    );
+    if (runResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Test run not found' });
+    }
+
+    const progressResult = await pool.query(
+      `SELECT
+        COUNT(*)::INTEGER as total,
+        COUNT(*) FILTER (WHERE status = 'pass')::INTEGER as passed,
+        COUNT(*) FILTER (WHERE status = 'fail')::INTEGER as failed,
+        COUNT(*) FILTER (WHERE status = 'blocked')::INTEGER as blocked,
+        COUNT(*) FILTER (WHERE status = 'not_run')::INTEGER as not_run,
+        CASE WHEN COUNT(*) > 0
+          THEN ROUND((COUNT(*) FILTER (WHERE status = 'pass')::NUMERIC / COUNT(*)) * 100, 1)
+          ELSE 0
+        END as pass_rate,
+        CASE WHEN COUNT(*) > 0
+          THEN ROUND((COUNT(*) FILTER (WHERE status != 'not_run')::NUMERIC / COUNT(*)) * 100, 1)
+          ELSE 0
+        END as completion_rate
+      FROM test_execution WHERE test_run_id = $1`,
+      [id]
+    );
+
+    res.json(progressResult.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /test-executions/:id — Update single execution (enhanced with assigned_to)
+// Note: This already exists above; adding the assigned_to field support here
+// The existing PATCH handler already handles status/notes/duration_seconds/defect_ids
+// We add a route for bulk update below
+
+// POST /test-runs/:id/executions/bulk — Bulk update execution statuses
+router.post('/test-runs/:id/executions/bulk', requireAuth, requirePermission('action:test-executions:edit'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { execution_ids, status, assigned_to } = req.body;
+
+    if (!Array.isArray(execution_ids) || execution_ids.length === 0) {
+      return res.status(400).json({ error: 'execution_ids array is required' });
+    }
+
+    if (!status && !assigned_to) {
+      return res.status(400).json({ error: 'At least one of status or assigned_to is required' });
+    }
+
+    if (execution_ids.length > 100) {
+      return res.status(400).json({ error: 'Maximum 100 executions per bulk update' });
+    }
+
+    await client.query('BEGIN');
+
+    const updates = [];
+    const params = [];
+    let pn = 1;
+
+    if (status) {
+      if (!['pass', 'fail', 'not_run', 'blocked', 'skipped'].includes(status)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid status value' });
+      }
+      updates.push(`status = $${pn++}`);
+      params.push(status);
+    }
+
+    if (assigned_to !== undefined) {
+      updates.push(`assigned_to = $${pn++}`);
+      params.push(assigned_to || null);
+    }
+
+    // Verify run exists
+    const runResult = await client.query('SELECT id FROM test_run WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
+    if (runResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Test run not found' });
+    }
+
+    // Build WHERE clause for execution IDs
+    const idPlaceholders = execution_ids.map((_, i) => `$${pn++}`).join(',');
+    params.push(...execution_ids);
+
+    const query = `UPDATE test_execution SET ${updates.join(', ')} WHERE test_run_id = $${pn} AND id IN (${idPlaceholders}) RETURNING id, status, assigned_to`;
+    params.push(req.params.id);
+
+    const result = await client.query(query, params);
+
+    await client.query('COMMIT');
+    res.json({ updated: result.rows.length, executions: result.rows });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
