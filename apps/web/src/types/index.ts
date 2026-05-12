@@ -272,6 +272,8 @@ export interface TestCase {
     project_name?: string;
     assigned_to?: string;
     assigned_to_name?: string;
+    linked_requirement_id?: string;
+    linked_bug_ids?: string[];
     created_by?: string;
     created_by_name?: string;
     updated_by?: string;

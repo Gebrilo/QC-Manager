@@ -60,7 +60,7 @@ export default function EditTestCasePage() {
                     Edit Test Case <span className="text-gray-500 font-normal">{testCase.test_case_id}</span>
                 </h1>
             </div>
-            <TestCaseForm initialData={testCase as Record<string, unknown>} isEdit testCaseId={id} />
+            <TestCaseForm initialData={testCase as unknown as Record<string, unknown>} isEdit testCaseId={id} />
         </div>
     );
 }
