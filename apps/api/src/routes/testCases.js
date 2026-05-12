@@ -8,577 +8,281 @@ const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case')
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
-// Validation Schemas
 const testCaseCreateSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().optional(),
-  project_id: z.string().uuid(),
-  task_id: z.string().uuid().optional().nullable(),
-  category: z.enum(['smoke', 'regression', 'e2e', 'integration', 'unit', 'performance', 'security', 'other']).default('other'),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  tags: z.array(z.string()).optional().default([]),
-  status: z.enum(['active', 'archived', 'draft', 'deprecated']).default('active')
+    title: z.string().min(3).max(500),
+    description: z.string().max(5000).optional(),
+    preconditions: z.string().max(3000).optional(),
+    test_steps: z.string().max(10000).optional(),
+    expected_result: z.string().max(5000).optional(),
+    priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
+    severity: z.enum(['critical', 'major', 'normal', 'minor', 'trivial']).default('normal'),
+    test_type: z.enum(['functional', 'regression', 'smoke', 'integration', 'performance', 'security', 'usability', 'exploratory', 'automated']).default('functional'),
+    category: z.string().max(50).default('other'),
+    component: z.string().max(100).optional(),
+    automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
+    status: z.enum(['draft', 'active', 'deprecated', 'archived']).default('draft'),
+    estimated_duration_minutes: z.number().int().min(0).max(480).optional(),
+    tags: z.array(z.string().max(50)).max(20).default([]),
+    project_id: z.string().uuid(),
+    assigned_to: z.string().uuid().optional(),
+    linked_requirement_id: z.string().max(100).optional(),
+    linked_bug_ids: z.array(z.string().uuid()).default([]),
 });
 
-const testCaseUpdateSchema = testCaseCreateSchema.partial().extend({
-  id: z.string().uuid()
-});
+const testCaseUpdateSchema = testCaseCreateSchema.partial().omit({ project_id: true });
 
-// GET /test-cases - List all test cases with filtering
-router.get('/', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
-  try {
-    const {
-      project_id,
-      task_id,
-      category,
-      priority,
-      status,
-      search,
-      limit = 100,
-      offset = 0
-    } = req.query;
-
-    let query = `
-      SELECT * FROM v_test_case_summary
-      WHERE 1=1
-    `;
-    const params = [];
-    let paramCount = 1;
-
-    // Apply filters
-    if (project_id) {
-      query += ` AND project_id = $${paramCount}`;
-      params.push(project_id);
-      paramCount++;
-    }
-
-    if (task_id) {
-      query += ` AND task_id = $${paramCount}`;
-      params.push(task_id);
-      paramCount++;
-    }
-
-    if (category) {
-      query += ` AND category = $${paramCount}`;
-      params.push(category);
-      paramCount++;
-    }
-
-    if (priority) {
-      query += ` AND priority = $${paramCount}`;
-      params.push(priority);
-      paramCount++;
-    }
-
-    if (status) {
-      query += ` AND status = $${paramCount}`;
-      params.push(status);
-      paramCount++;
-    }
-
-    // Full-text search
-    if (search) {
-      query += ` AND (
-        title ILIKE $${paramCount} OR
-        description ILIKE $${paramCount} OR
-        test_case_id ILIKE $${paramCount}
-      )`;
-      params.push(`%${search}%`);
-      paramCount++;
-    }
-
-    // Order by
-    query += ` ORDER BY created_at DESC`;
-
-    // Pagination
-    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    params.push(parseInt(limit), parseInt(offset));
-
-    const result = await pool.query(query, params);
-
-    // Get total count for pagination
-    let countQuery = `SELECT COUNT(*) FROM test_case WHERE deleted_at IS NULL`;
-    const countParams = [];
-    let countParamNum = 1;
-
-    if (project_id) {
-      countQuery += ` AND project_id = $${countParamNum}`;
-      countParams.push(project_id);
-      countParamNum++;
-    }
-
-    if (status) {
-      countQuery += ` AND status = $${countParamNum}`;
-      countParams.push(status);
-      countParamNum++;
-    }
-
-    const countResult = await pool.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].count);
-
-    res.json({
-      data: result.rows,
-      pagination: {
-        total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: offset + result.rows.length < total
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /test-cases/:id - Get single test case
-router.get('/:id', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      `SELECT * FROM v_test_case_summary WHERE id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Test case not found' });
-    }
-
-    // Get execution history
-    const executionsResult = await pool.query(
-      `SELECT
-        te.id,
-        te.status,
-        te.notes,
-        te.executed_at,
-        te.duration_seconds,
-        te.defect_ids,
-        tr.run_id,
-        tr.name AS test_run_name,
-        u.name AS executed_by_name
-      FROM test_execution te
-      LEFT JOIN test_run tr ON te.test_run_id = tr.id
-      LEFT JOIN app_user u ON te.executed_by = u.id
-      WHERE te.test_case_id = $1
-      ORDER BY te.executed_at DESC
-      LIMIT 50`,
-      [id]
-    );
-
-    res.json({
-      ...result.rows[0],
-      execution_history: executionsResult.rows
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /test-cases - Create new test case
-router.post('/', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
-  const client = await pool.connect();
-
-  try {
-    const validatedData = testCaseCreateSchema.parse(req.body);
-
-    await client.query('BEGIN');
-
-    // Generate next test_case_id
-    const idResult = await client.query(
-      `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id
-       FROM test_case
-       WHERE test_case_id ~ '^TC-[0-9]+$'`
-    );
-    const nextId = idResult.rows[0].next_id;
-    const testCaseId = `TC-${String(nextId).padStart(4, '0')}`;
-
-    // Insert test case
-    const result = await client.query(
-      `INSERT INTO test_case (
-        test_case_id, title, description, project_id, task_id,
-        category, priority, tags, status, created_by, last_modified_by
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING *`,
-      [
-        testCaseId,
-        validatedData.title,
-        validatedData.description || null,
-        validatedData.project_id,
-        validatedData.task_id || null,
-        validatedData.category,
-        validatedData.priority,
-        validatedData.tags,
-        validatedData.status,
-        req.user?.id || null, // Assuming auth middleware sets req.user
-        req.user?.id || null
-      ]
-    );
-
-    // Audit log
+async function logTestCaseHistory(client, { test_case_id, action, changed_fields, before_state, after_state, change_summary, user_id, user_email }) {
     await client.query(
-      `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        'test_case_created',
-        'test_case',
-        result.rows[0].id,
-        req.user?.id || null,
-        JSON.stringify({ test_case_id: testCaseId, title: validatedData.title })
-      ]
+        `INSERT INTO test_case_history (test_case_id, action, changed_fields, before_state, after_state, change_summary, performed_by, performed_by_email)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [test_case_id, action, changed_fields || null, before_state ? JSON.stringify(before_state) : null, after_state ? JSON.stringify(after_state) : null, change_summary || null, user_id || null, user_email || null]
     );
+}
 
-    await client.query('COMMIT');
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
-    next(error);
-  } finally {
-    client.release();
-  }
-});
-
-// PATCH /test-cases/:id - Update test case
-router.patch('/:id', requireAuth, requirePermission('action:test-cases:edit'), async (req, res, next) => {
-  const client = await pool.connect();
-
-  try {
-    const { id } = req.params;
-    const validatedData = testCaseUpdateSchema.parse({ ...req.body, id });
-
-    await client.query('BEGIN');
-
-    // Check if test case exists
-    const existingResult = await client.query(
-      'SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL',
-      [id]
-    );
-
-    if (existingResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Test case not found' });
-    }
-
-    // Build dynamic update query
-    const updates = [];
-    const params = [];
-    let paramCount = 1;
-
-    const updatableFields = [
-      'title', 'description', 'project_id', 'task_id',
-      'category', 'priority', 'tags', 'status'
-    ];
-
-    updatableFields.forEach(field => {
-      if (validatedData[field] !== undefined) {
-        updates.push(`${field} = $${paramCount}`);
-        params.push(validatedData[field]);
-        paramCount++;
-      }
-    });
-
-    if (updates.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    // Add last_modified_by
-    updates.push(`last_modified_by = $${paramCount}`);
-    params.push(req.user?.id || null);
-    paramCount++;
-
-    // Add id for WHERE clause
-    params.push(id);
-
-    const query = `
-      UPDATE test_case
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await client.query(query, params);
-
-    // Audit log
-    await client.query(
-      `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        'test_case_updated',
-        'test_case',
-        id,
-        req.user?.id || null,
-        JSON.stringify({ updates: validatedData })
-      ]
-    );
-
-    await client.query('COMMIT');
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
-    next(error);
-  } finally {
-    client.release();
-  }
-});
-
-// DELETE /test-cases/:id - Soft delete (archive) test case
-router.delete('/:id', requireAuth, requirePermission('action:test-cases:delete'), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const originalRes = await pool.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
-    if (originalRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Test case not found' });
-    }
-    const original = originalRes.rows[0];
-
-    if (original.deleted_at) {
-      return res.status(400).json({ error: 'Test case already deleted' });
-    }
-
-    if (original.tuleap_artifact_id) {
-      const configResult = await pool.query(
-        `SELECT * FROM tuleap_sync_config
-         WHERE qc_project_id = $1 AND tracker_type = 'test_case' AND is_active = true`,
-        [original.project_id]
-      );
-      const config = configResult.rows[0];
-      if (!config) {
-        return res.status(400).json({
-          success: false,
-          error: `No active test_case sync config for project ${original.project_id}`,
-        });
-      }
-
-      try {
-        await emitTestCase(
-          {
-            artifact_type: 'test_case',
-            project_id: original.project_id,
-            tuleap: { artifact_id: original.tuleap_artifact_id },
-          },
-          config,
-          'delete',
-          { client: defaultClient, registry: defaultRegistry, query: pool.query.bind(pool) }
-        );
-      } catch (emitErr) {
-        console.error(`[route:test_cases:delete] emit_failed test_case_id=${id} err="${emitErr.message}"`);
-        return res.status(emitErr.status || 502).json({
-          success: false,
-          error: 'Failed to delete in Tuleap',
-          message: emitErr.message,
-        });
-      }
-
-      const refreshed = await pool.query('SELECT * FROM test_case WHERE id = $1', [id]);
-      const deleted = refreshed.rows[0];
-
-      await pool.query(
-        `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          'test_case_deleted',
-          'test_case',
-          id,
-          req.user?.id || null,
-          JSON.stringify({ test_case_id: deleted.test_case_id }),
-        ]
-      );
-
-      return res.json({
-        success: true,
-        message: `Test case '${deleted.title}' has been deleted`,
-        data: deleted,
-      });
-    }
-
-    // Not Tuleap-linked: local-only soft-delete (legacy behavior preserved)
-    const client = await pool.connect();
+router.get('/', requireAuth, requirePermission('page:test-cases'), async (req, res, next) => {
     try {
-      await client.query('BEGIN');
+        const {
+            page = 1, limit = 25, search, project_id, status, priority,
+            test_type, automation_status, assigned_to, sync_status,
+            sort_by = 'created_at', sort_order = 'desc',
+        } = req.query;
 
-      const result = await client.query(
-        `UPDATE test_case
-         SET deleted_at = CURRENT_TIMESTAMP, status = 'archived'
-         WHERE id = $1 AND deleted_at IS NULL
-         RETURNING *`,
-        [id]
-      );
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const offset = (pageNum - 1) * limitNum;
 
-      if (result.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Test case not found' });
-      }
+        const allowedSortColumns = ['created_at', 'updated_at', 'title', 'priority', 'test_case_id'];
+        const safeSortBy = allowedSortColumns.includes(sort_by) ? sort_by : 'created_at';
+        const safeSortOrder = sort_order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-      await client.query(
-        `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          'test_case_deleted',
-          'test_case',
-          id,
-          req.user?.id || null,
-          JSON.stringify({ test_case_id: result.rows[0].test_case_id }),
-        ]
-      );
+        let query = `SELECT * FROM v_test_case_summary WHERE 1=1`;
+        const params = [];
+        let pn = 1;
 
-      await client.query('COMMIT');
-      res.status(204).send();
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    next(error);
-  }
-});
+        if (project_id) { query += ` AND project_id = $${pn++}`; params.push(project_id); }
+        if (status) { query += ` AND status = $${pn++}`; params.push(status); }
+        if (priority) { query += ` AND priority = $${pn++}`; params.push(priority); }
+        if (test_type) { query += ` AND test_type = $${pn++}`; params.push(test_type); }
+        if (automation_status) { query += ` AND automation_status = $${pn++}`; params.push(automation_status); }
+        if (assigned_to) { query += ` AND assigned_to = $${pn++}`; params.push(assigned_to); }
+        if (sync_status) { query += ` AND sync_status = $${pn++}`; params.push(sync_status); }
 
-// POST /test-cases/bulk-import - Bulk import from Excel/CSV data
-router.post('/bulk-import', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
-  const client = await pool.connect();
-
-  try {
-    const { test_cases, project_id } = req.body;
-
-    if (!Array.isArray(test_cases) || test_cases.length === 0) {
-      return res.status(400).json({ error: 'test_cases array is required' });
-    }
-
-    if (!project_id) {
-      return res.status(400).json({ error: 'project_id is required' });
-    }
-
-    await client.query('BEGIN');
-
-    const results = {
-      success: [],
-      errors: [],
-      duplicates: []
-    };
-
-    for (let i = 0; i < test_cases.length; i++) {
-      const testCase = test_cases[i];
-
-      try {
-        // Validate
-        const validatedData = testCaseCreateSchema.parse({
-          ...testCase,
-          project_id
-        });
-
-        // Check for duplicates by title within project
-        const duplicateCheck = await client.query(
-          `SELECT id, test_case_id FROM test_case
-           WHERE project_id = $1 AND title = $2 AND deleted_at IS NULL`,
-          [project_id, validatedData.title]
-        );
-
-        if (duplicateCheck.rows.length > 0) {
-          results.duplicates.push({
-            row: i + 1,
-            title: validatedData.title,
-            existing_id: duplicateCheck.rows[0].test_case_id
-          });
-          continue;
+        if (search) {
+            query += ` AND (title ILIKE $${pn} OR description ILIKE $${pn} OR test_case_id ILIKE $${pn})`;
+            params.push(`%${search}%`);
+            pn++;
         }
 
-        // Generate next test_case_id
+        const countQuery = `SELECT COUNT(*) as total FROM (${query}) sub`;
+        const countResult = await pool.query(countQuery, params);
+        const total = parseInt(countResult.rows[0].total);
+
+        query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
+        query += ` LIMIT $${pn++} OFFSET $${pn++}`;
+        params.push(limitNum, offset);
+
+        const result = await pool.query(query, params);
+
+        res.json({
+            data: result.rows,
+            pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
+        });
+    } catch (error) { next(error); }
+});
+
+router.get('/:id', requireAuth, requirePermission('page:test-cases'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Test case not found' });
+
+        const executionsResult = await pool.query(
+            `SELECT te.id, te.status, te.notes, te.executed_at, te.duration_seconds, te.defect_ids,
+                    tr.run_id, tr.name AS test_run_name, u.name AS executed_by_name
+             FROM test_execution te
+             LEFT JOIN test_run tr ON te.test_run_id = tr.id
+             LEFT JOIN app_user u ON te.executed_by = u.id
+             WHERE te.test_case_id = $1 ORDER BY te.executed_at DESC LIMIT 50`, [id]);
+
+        const historyResult = await pool.query(
+            `SELECT action, changed_fields, change_summary, performed_by_email, performed_at
+             FROM test_case_history WHERE test_case_id = $1 ORDER BY performed_at DESC LIMIT 20`, [id]);
+
+        res.json({ ...result.rows[0], execution_history: executionsResult.rows, activity: historyResult.rows });
+    } catch (error) { next(error); }
+});
+
+router.post('/', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+        const validatedData = testCaseCreateSchema.parse(req.body);
+        await client.query('BEGIN');
+
         const idResult = await client.query(
-          `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id
-           FROM test_case
-           WHERE test_case_id ~ '^TC-[0-9]+$'`
-        );
+            `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id
+             FROM test_case WHERE test_case_id ~ '^TC-[0-9]+$'`);
         const nextId = idResult.rows[0].next_id;
-        const testCaseId = `TC-${String(nextId).padStart(4, '0')}`;
+        const testCaseId = `TC-${String(nextId).padStart(5, '0')}`;
 
-        // Insert
         const result = await client.query(
-          `INSERT INTO test_case (
-            test_case_id, title, description, project_id, task_id,
-            category, priority, tags, status, created_by, last_modified_by
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-          RETURNING id, test_case_id, title`,
-          [
-            testCaseId,
-            validatedData.title,
-            validatedData.description || null,
-            validatedData.project_id,
-            validatedData.task_id || null,
-            validatedData.category,
-            validatedData.priority,
-            validatedData.tags,
-            validatedData.status,
-            req.user?.id || null,
-            req.user?.id || null
-          ]
-        );
+            `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
+                priority, severity, test_type, category, component, automation_status, status,
+                estimated_duration_minutes, tags, project_id, assigned_to,
+                linked_requirement_id, linked_bug_ids, created_by, updated_by, sync_status)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'not_synced')
+            RETURNING *`,
+            [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
+             validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
+             validatedData.severity, validatedData.test_type, validatedData.category,
+             validatedData.component || null, validatedData.automation_status, validatedData.status,
+             validatedData.estimated_duration_minutes || null, validatedData.tags, validatedData.project_id,
+             validatedData.assigned_to || null, validatedData.linked_requirement_id || null,
+             validatedData.linked_bug_ids, req.user?.id || null, req.user?.id || null]);
 
-        results.success.push({
-          row: i + 1,
-          id: result.rows[0].id,
-          test_case_id: result.rows[0].test_case_id,
-          title: result.rows[0].title
-        });
+        await logTestCaseHistory(client, {
+            test_case_id: result.rows[0].id, action: 'created', after_state: result.rows[0],
+            change_summary: `Test case ${testCaseId} created`, user_id: req.user?.id, user_email: req.user?.email });
 
-      } catch (error) {
-        results.errors.push({
-          row: i + 1,
-          title: testCase.title || 'N/A',
-          error: error.message
-        });
-      }
-    }
+        await client.query(
+            `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details) VALUES ($1, $2, $3, $4, $5)`,
+            ['test_case_created', 'test_case', result.rows[0].id, req.user?.id || null,
+             JSON.stringify({ test_case_id: testCaseId, title: validatedData.title })]);
 
-    // Audit log
-    await client.query(
-      `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        'test_case_bulk_import',
-        'test_case',
-        null,
-        req.user?.id || null,
-        JSON.stringify({
-          total: test_cases.length,
-          success: results.success.length,
-          errors: results.errors.length,
-          duplicates: results.duplicates.length,
-          project_id
-        })
-      ]
-    );
+        await client.query('COMMIT');
+        const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [result.rows[0].id]);
+        res.status(201).json(fullResult.rows[0]);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: error.errors });
+        next(error);
+    } finally { client.release(); }
+});
 
-    await client.query('COMMIT');
+router.patch('/:id', requireAuth, requirePermission('action:test-cases:edit'), async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const validatedData = testCaseUpdateSchema.parse(req.body);
+        await client.query('BEGIN');
 
-    res.json({
-      summary: {
-        total: test_cases.length,
-        imported: results.success.length,
-        duplicates: results.duplicates.length,
-        errors: results.errors.length,
-        success_rate: ((results.success.length / test_cases.length) * 100).toFixed(2) + '%'
-      },
-      details: results
-    });
+        const existingResult = await client.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test case not found' }); }
+        const existing = existingResult.rows[0];
 
-  } catch (error) {
-    await client.query('ROLLBACK');
-    next(error);
-  } finally {
-    client.release();
-  }
+        const updatableFields = ['title','description','preconditions','test_steps','expected_result',
+            'priority','severity','test_type','category','component','automation_status','status',
+            'estimated_duration_minutes','tags','assigned_to','linked_requirement_id','linked_bug_ids'];
+        const updates = []; const params = []; let pn = 1; const changedFields = [];
+
+        for (const field of updatableFields) {
+            if (validatedData[field] !== undefined) {
+                if (JSON.stringify(existing[field]) !== JSON.stringify(validatedData[field])) {
+                    updates.push(`${field} = $${pn++}`); params.push(validatedData[field]); changedFields.push(field);
+                }
+            }
+        }
+        if (updates.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'No fields to update' }); }
+
+        updates.push(`updated_by = $${pn++}`); params.push(req.user?.id || null);
+        updates.push(`updated_at = CURRENT_TIMESTAMP`); params.push(id);
+
+        const query = `UPDATE test_case SET ${updates.join(', ')} WHERE id = $${pn} RETURNING *`;
+        const result = await client.query(query, params);
+
+        await logTestCaseHistory(client, {
+            test_case_id: id, action: 'updated', changed_fields: changedFields,
+            before_state: existing, after_state: result.rows[0],
+            change_summary: `Updated: ${changedFields.join(', ')}`, user_id: req.user?.id, user_email: req.user?.email });
+
+        await client.query(
+            `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details) VALUES ($1, $2, $3, $4, $5)`,
+            ['test_case_updated', 'test_case', id, req.user?.id || null, JSON.stringify({ changed_fields: changedFields })]);
+
+        await client.query('COMMIT');
+        const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
+        res.json(fullResult.rows[0]);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: error.errors });
+        next(error);
+    } finally { client.release(); }
+});
+
+router.delete('/:id', requireAuth, requirePermission('action:test-cases:delete'), async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        await client.query('BEGIN');
+
+        const existingResult = await client.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test case not found' }); }
+        const existing = existingResult.rows[0];
+
+        const result = await client.query(
+            `UPDATE test_case SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1, status = 'archived'
+             WHERE id = $2 AND deleted_at IS NULL RETURNING *`, [req.user?.id || null, id]);
+
+        await logTestCaseHistory(client, {
+            test_case_id: id, action: 'deleted', before_state: existing,
+            change_summary: `Test case ${existing.test_case_id} deleted`, user_id: req.user?.id, user_email: req.user?.email });
+
+        await client.query(
+            `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details) VALUES ($1, $2, $3, $4, $5)`,
+            ['test_case_deleted', 'test_case', id, req.user?.id || null, JSON.stringify({ test_case_id: existing.test_case_id })]);
+
+        await client.query('COMMIT');
+        res.status(204).send();
+    } catch (error) { await client.query('ROLLBACK'); next(error); }
+    finally { client.release(); }
+});
+
+router.post('/bulk-import', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+        const { test_cases, project_id } = req.body;
+        if (!Array.isArray(test_cases) || test_cases.length === 0) return res.status(400).json({ error: 'test_cases array is required' });
+        if (!project_id) return res.status(400).json({ error: 'project_id is required' });
+
+        await client.query('BEGIN');
+        const results = { success: [], errors: [], duplicates: [] };
+
+        for (let i = 0; i < test_cases.length; i++) {
+            const testCase = test_cases[i];
+            try {
+                const validatedData = testCaseCreateSchema.parse({ ...testCase, project_id });
+                const duplicateCheck = await client.query(
+                    `SELECT id, test_case_id FROM test_case WHERE project_id = $1 AND title = $2 AND deleted_at IS NULL`,
+                    [project_id, validatedData.title]);
+                if (duplicateCheck.rows.length > 0) {
+                    results.duplicates.push({ row: i + 1, title: validatedData.title, existing_id: duplicateCheck.rows[0].test_case_id });
+                    continue;
+                }
+                const idResult = await client.query(
+                    `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id FROM test_case WHERE test_case_id ~ '^TC-[0-9]+$'`);
+                const testCaseId = `TC-${String(idResult.rows[0].next_id).padStart(5, '0')}`;
+
+                const result = await client.query(
+                    `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
+                        priority, severity, test_type, category, component, automation_status, status, tags, project_id, created_by, updated_by)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                    RETURNING id, test_case_id, title`,
+                    [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
+                     validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
+                     validatedData.severity, validatedData.test_type, validatedData.category,
+                     validatedData.component || null, validatedData.automation_status, validatedData.status,
+                     validatedData.tags, project_id, req.user?.id || null, req.user?.id || null]);
+                results.success.push({ row: i + 1, id: result.rows[0].id, test_case_id: result.rows[0].test_case_id, title: result.rows[0].title });
+            } catch (error) { results.errors.push({ row: i + 1, title: testCase.title || 'N/A', error: error.message }); }
+        }
+
+        await client.query(
+            `INSERT INTO audit_log (action, entity_type, entity_id, user_id, details) VALUES ($1, $2, $3, $4, $5)`,
+            ['test_case_bulk_import', 'test_case', null, req.user?.id || null,
+             JSON.stringify({ total: test_cases.length, success: results.success.length, errors: results.errors.length, duplicates: results.duplicates.length, project_id })]);
+        await client.query('COMMIT');
+        res.json({ summary: { total: test_cases.length, imported: results.success.length, duplicates: results.duplicates.length, errors: results.errors.length }, details: results });
+    } catch (error) { await client.query('ROLLBACK'); next(error); }
+    finally { client.release(); }
 });
 
 module.exports = router;
