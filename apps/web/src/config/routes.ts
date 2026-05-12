@@ -58,6 +58,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/test-suites/create', label: 'Create Suite', permission: 'page:test-suites', requiresActivation: true },
     { path: '/test-suites/[id]', label: 'Suite Details', permission: 'page:test-suites', requiresActivation: true },
     { path: '/test-suites/[id]/edit', label: 'Edit Suite', permission: 'page:test-suites', requiresActivation: true },
+    { path: '/test-runs/create', label: 'Create Test Run', permission: 'page:test-executions', requiresActivation: true },
+    { path: '/test-runs/[id]', label: 'Test Run Details', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results', label: 'Test Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results/upload', label: 'Upload Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },

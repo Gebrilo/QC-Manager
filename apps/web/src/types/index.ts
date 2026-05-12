@@ -357,6 +357,9 @@ export interface SuiteTestCase {
     priority?: string;
     status?: string;
     sort_order: number;
+    test_type?: string;
+    automation_status?: string;
+    category?: string;
     latest_execution_status?: string;
 }
 
