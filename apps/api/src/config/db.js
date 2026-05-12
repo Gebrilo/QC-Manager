@@ -1756,6 +1756,151 @@ const runMigrations = async () => {
                 WHERE resolved_at IS NULL
         `);
 
+        // Migration: Test Case Management — Sprint 1
+        // Add missing columns to test_case table
+        const tcAlterColumns = [
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS preconditions TEXT",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS test_steps TEXT",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS expected_result TEXT",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS severity VARCHAR(20) DEFAULT 'normal'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS test_type VARCHAR(50) DEFAULT 'functional'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS component VARCHAR(100)",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS automation_status VARCHAR(20) DEFAULT 'manual'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS estimated_duration_minutes INTEGER",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS linked_requirement_id VARCHAR(100)",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS linked_bug_ids UUID[] DEFAULT '{}'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'not_synced'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_error_message TEXT",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS service_name VARCHAR(100)",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS task_number VARCHAR(50)",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS is_regression BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS execution_count INTEGER DEFAULT 0",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS note TEXT",
+        ];
+        for (const sql of tcAlterColumns) {
+            await client.query(sql);
+        }
+
+        // Add CHECK constraints (idempotent via DO block)
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_severity_check') THEN
+                    ALTER TABLE test_case ADD CONSTRAINT test_case_severity_check
+                        CHECK (severity IN ('critical','major','normal','minor','trivial'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_test_type_check') THEN
+                    ALTER TABLE test_case ADD CONSTRAINT test_case_test_type_check
+                        CHECK (test_type IN ('functional','regression','smoke','integration','performance','security','usability','exploratory','automated'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_automation_status_check') THEN
+                    ALTER TABLE test_case ADD CONSTRAINT test_case_automation_status_check
+                        CHECK (automation_status IN ('manual','automated','partial','to_automate'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_sync_status_check') THEN
+                    ALTER TABLE test_case ADD CONSTRAINT test_case_sync_status_check
+                        CHECK (sync_status IN ('synced','pending','conflict','error','not_synced'));
+                END IF;
+            END $$;
+        `);
+
+        // Create test_case_history table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_case_history (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
+                action VARCHAR(50) NOT NULL,
+                changed_fields TEXT[],
+                before_state JSONB,
+                after_state JSONB,
+                change_summary TEXT,
+                performed_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                performed_by_email VARCHAR(255),
+                performed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_history_case ON test_case_history(test_case_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_history_performed_at ON test_case_history(performed_at DESC)`);
+
+        // Create indexes for test_case
+        const tcIndexes = [
+            "CREATE INDEX IF NOT EXISTS idx_test_case_status ON test_case(status) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_priority ON test_case(priority) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_test_type ON test_case(test_type) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_automation_status ON test_case(automation_status) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_sync_status ON test_case(sync_status) WHERE sync_status != 'synced'",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_assigned_to ON test_case(assigned_to) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_created_by ON test_case(created_by) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_test_case_id ON test_case(test_case_id) WHERE deleted_at IS NULL",
+        ];
+        for (const sql of tcIndexes) {
+            await client.query(sql);
+        }
+
+        // Create or replace v_test_case_summary view
+        await client.query(`
+            CREATE OR REPLACE VIEW v_test_case_summary AS
+            SELECT
+                tc.id,
+                tc.test_case_id,
+                tc.title,
+                tc.description,
+                tc.preconditions,
+                tc.test_steps,
+                tc.expected_result,
+                tc.priority,
+                tc.severity,
+                tc.test_type,
+                tc.category,
+                tc.component,
+                tc.automation_status,
+                tc.status,
+                tc.estimated_duration_minutes,
+                tc.tags,
+                tc.project_id,
+                tc.assigned_to,
+                tc.created_by,
+                tc.updated_by,
+                tc.created_at,
+                tc.updated_at,
+                tc.deleted_at,
+                tc.tuleap_artifact_id,
+                tc.tuleap_url,
+                tc.sync_status,
+                tc.last_tuleap_sync,
+                tc.service_name,
+                tc.is_regression,
+                tc.execution_count,
+                p.project_name,
+                assignee.name AS assigned_to_name,
+                creator.name AS created_by_name,
+                updater.name AS updated_by_name,
+                le.latest_status AS latest_execution_status,
+                le.latest_execution_date,
+                le.test_run_name AS latest_test_run
+            FROM test_case tc
+            LEFT JOIN projects p ON tc.project_id = p.id
+            LEFT JOIN app_user assignee ON tc.assigned_to = assignee.id
+            LEFT JOIN app_user creator ON tc.created_by = creator.id
+            LEFT JOIN app_user updater ON tc.updated_by = updater.id
+            LEFT JOIN LATERAL (
+                SELECT
+                    te.status AS latest_status,
+                    te.executed_at AS latest_execution_date,
+                    tr.name AS test_run_name
+                FROM test_execution te
+                JOIN test_run tr ON te.test_run_id = tr.id
+                WHERE te.test_case_id = tc.id
+                ORDER BY te.executed_at DESC
+                LIMIT 1
+            ) le ON true
+            WHERE tc.deleted_at IS NULL
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
