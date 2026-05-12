@@ -242,28 +242,82 @@ export interface TestResultsUploadResponse {
     };
 }
 
-// Test Case Management Types
-export type TestCategory = 'functional' | 'integration' | 'regression' | 'smoke' | 'performance' | 'security' | 'usability' | 'e2e' | 'unit' | 'other';
+// Test Case Management Types (enhanced)
+export type TestCategory = string;
 export type TestCaseStatus = 'draft' | 'active' | 'deprecated' | 'archived';
+export type TestCasePriority = 'critical' | 'high' | 'medium' | 'low';
+export type TestCaseSeverity = 'critical' | 'major' | 'normal' | 'minor' | 'trivial';
+export type TestCaseType = 'functional' | 'regression' | 'smoke' | 'integration' | 'performance' | 'security' | 'usability' | 'exploratory' | 'automated';
+export type AutomationStatus = 'manual' | 'automated' | 'partial' | 'to_automate';
+export type SyncStatus = 'synced' | 'pending' | 'conflict' | 'error' | 'not_synced';
 
 export interface TestCase {
     id: string;
     test_case_id: string;
     title: string;
     description?: string;
-    category: TestCategory;
+    preconditions?: string;
+    test_steps?: string;
+    expected_result?: string;
+    priority: TestCasePriority;
+    severity?: TestCaseSeverity;
+    test_type?: TestCaseType;
+    category?: TestCategory;
+    component?: string;
+    automation_status?: AutomationStatus;
     status: TestCaseStatus;
-    priority: 'High' | 'Medium' | 'Low';
+    estimated_duration_minutes?: number;
+    tags?: string[];
     project_id?: string;
     project_name?: string;
-    steps?: string;
-    expected_result?: string;
-    preconditions?: string;
-    tags?: string[];
+    assigned_to?: string;
+    assigned_to_name?: string;
     created_by?: string;
+    created_by_name?: string;
+    updated_by?: string;
+    updated_by_name?: string;
     created_at: string;
     updated_at: string;
-    latest_status?: string;
+    deleted_at?: string;
+    tuleap_artifact_id?: number;
+    tuleap_url?: string;
+    sync_status?: SyncStatus;
+    last_tuleap_sync?: string;
+    latest_execution_status?: string;
     latest_execution_date?: string;
+    latest_test_run?: string;
     days_since_last_run?: number;
+    execution_count?: number;
+    execution_history?: TestCaseExecution[];
+    activity?: TestCaseActivityEntry[];
+}
+
+export interface TestCaseExecution {
+    id: string;
+    status: string;
+    notes?: string;
+    executed_at?: string;
+    duration_seconds?: number;
+    defect_ids?: string[];
+    run_id?: string;
+    test_run_name?: string;
+    executed_by_name?: string;
+}
+
+export interface TestCaseActivityEntry {
+    action: string;
+    changed_fields?: string[];
+    change_summary?: string;
+    performed_by_email?: string;
+    performed_at: string;
+}
+
+export interface TestCaseListResponse {
+    data: TestCase[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        total_pages: number;
+    };
 }

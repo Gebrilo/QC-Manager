@@ -1,3 +1,5 @@
+import type { TestCase, TestCaseListResponse } from '@/types';
+
 // NEXT_PUBLIC_API_URL is baked at build time. If the build arg was missing,
 // it collapses to "https://" (truthy but invalid). Guard against that here.
 const _rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '';
@@ -460,27 +462,54 @@ export const governanceApi = {
 // ============================================================================
 
 export const testCasesApi = {
-    list: (params?: { project_id?: string; status?: string }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return fetchApi(`/test-cases${query ? `?${query}` : ''}`);
+    list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        project_id?: string;
+        status?: string;
+        priority?: string;
+        test_type?: string;
+        automation_status?: string;
+        assigned_to?: string;
+        sync_status?: string;
+        sort_by?: string;
+        sort_order?: string;
+    }) => {
+        const cleanParams: Record<string, string> = {};
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    cleanParams[key] = String(value);
+                }
+            });
+        }
+        const query = new URLSearchParams(cleanParams).toString();
+        return fetchApi<TestCaseListResponse>(`/test-cases${query ? `?${query}` : ''}`);
     },
 
-    get: (id: string) => fetchApi(`/test-cases/${id}`),
+    get: (id: string) => fetchApi<TestCase>(`/test-cases/${id}`),
 
-    create: (data: any) =>
-        fetchApi('/test-cases', {
+    create: (data: Partial<TestCase> & { title: string; project_id: string }) =>
+        fetchApi<TestCase>('/test-cases', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
 
-    update: (id: string, data: any) =>
-        fetchApi(`/test-cases/${id}`, {
+    update: (id: string, data: Partial<TestCase>) =>
+        fetchApi<TestCase>(`/test-cases/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
 
     delete: (id: string) =>
-        fetchApi(`/test-cases/${id}`, { method: 'DELETE' }),
+        fetchApi<void>(`/test-cases/${id}`, { method: 'DELETE' }),
+
+    bulkImport: (data: { test_cases: any[]; project_id: string }) =>
+        fetchApi('/test-cases/bulk-import', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
 };
 
 // ============================================================================
