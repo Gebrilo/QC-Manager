@@ -11,23 +11,25 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
-import { tuleapApi } from '@/lib/api';
+import { testCasesApi } from '@/lib/api';
 
 const testCaseSchema = z.object({
-    title: z.string().min(1, 'Title is required'),
-    description: z.string().optional().default(''),
-    status: z.enum(['active', 'draft', 'deprecated']).default('draft'),
-    priority: z.enum(['high', 'medium', 'low']).default('medium'),
+    title: z.string().min(3, 'Title must be at least 3 characters').max(500),
+    description: z.string().max(5000).optional().default(''),
+    preconditions: z.string().max(3000).optional().default(''),
+    test_steps: z.string().max(10000).optional().default(''),
+    expected_result: z.string().max(5000).optional().default(''),
+    priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
+    severity: z.enum(['critical', 'major', 'normal', 'minor', 'trivial']).default('normal'),
+    test_type: z.enum(['functional', 'regression', 'smoke', 'integration', 'performance', 'security', 'usability', 'exploratory', 'automated']).default('functional'),
+    category: z.string().max(50).optional().default(''),
+    component: z.string().max(100).optional().default(''),
+    automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
+    status: z.enum(['draft', 'active', 'deprecated', 'archived']).default('draft'),
+    estimated_duration_minutes: z.coerce.number().int().min(0).max(480).optional().nullable(),
+    tags: z.string().optional().default(''),
     assigned_to: z.string().optional().default(''),
-    service_name: z.string().optional().default(''),
-    preconditions: z.string().optional().default(''),
-    test_steps: z.string().min(1, 'Test steps are required'),
-    expected_result: z.string().min(1, 'Expected result is required'),
-    actual_result: z.string().optional().default(''),
-    task_number: z.string().optional().default(''),
-    is_regression: z.boolean().optional().default(false),
-    execution_count: z.coerce.number().optional(),
-    note: z.string().optional().default(''),
+    linked_requirement_id: z.string().max(100).optional().default(''),
 });
 
 type FormData = z.infer<typeof testCaseSchema>;
@@ -35,11 +37,11 @@ type FormData = z.infer<typeof testCaseSchema>;
 interface TestCaseFormProps {
     initialData?: Record<string, unknown>;
     isEdit?: boolean;
-    artifactId?: string;
+    testCaseId?: string;
     projectId?: string;
 }
 
-export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: TestCaseFormProps) {
+export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: TestCaseFormProps) {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -49,18 +51,20 @@ export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: Tes
         defaultValues: {
             title: (initialData?.title as string) || '',
             description: (initialData?.description as string) || '',
-            status: ((initialData?.status as string) || 'draft') as FormData['status'],
-            priority: ((initialData?.priority as string) || 'medium') as FormData['priority'],
-            assigned_to: (initialData?.assigned_to as string) || '',
-            service_name: (initialData?.service_name as string) || '',
             preconditions: (initialData?.preconditions as string) || '',
-            test_steps: (initialData?.test_steps as string) || (initialData?.testSteps as string) || '',
-            expected_result: (initialData?.expected_result as string) || (initialData?.expectedResult as string) || '',
-            actual_result: (initialData?.actual_result as string) || '',
-            task_number: (initialData?.task_number as string) || '',
-            is_regression: (initialData?.is_regression as boolean) || false,
-            execution_count: initialData?.execution_count != null ? Number(initialData.execution_count) : undefined,
-            note: (initialData?.note as string) || '',
+            test_steps: (initialData?.test_steps as string) || '',
+            expected_result: (initialData?.expected_result as string) || '',
+            priority: ((initialData?.priority as string) || 'medium') as FormData['priority'],
+            severity: ((initialData?.severity as string) || 'normal') as FormData['severity'],
+            test_type: ((initialData?.test_type as string) || 'functional') as FormData['test_type'],
+            category: (initialData?.category as string) || '',
+            component: (initialData?.component as string) || '',
+            automation_status: ((initialData?.automation_status as string) || 'manual') as FormData['automation_status'],
+            status: ((initialData?.status as string) || 'draft') as FormData['status'],
+            estimated_duration_minutes: initialData?.estimated_duration_minutes != null ? Number(initialData.estimated_duration_minutes) : null,
+            tags: Array.isArray(initialData?.tags) ? (initialData.tags as string[]).join(', ') : (initialData?.tags as string) || '',
+            assigned_to: (initialData?.assigned_to as string) || '',
+            linked_requirement_id: (initialData?.linked_requirement_id as string) || '',
         },
     });
 
@@ -68,35 +72,35 @@ export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: Tes
         setIsSubmitting(true);
         setError(null);
         try {
-            const payload = {
-                artifact_type: 'test_case' as const,
-                project_id: projectId,
-                common: {
-                    title: data.title,
-                    description: data.description || undefined,
-                    status: data.status,
-                    assigned_to: data.assigned_to || null,
-                    priority: data.priority,
-                },
-                fields: {
-                    service_name: data.service_name || undefined,
-                    preconditions: data.preconditions || undefined,
-                    test_steps: data.test_steps,
-                    expected_result: data.expected_result,
-                    actual_result: data.actual_result || undefined,
-                    task_number: data.task_number || undefined,
-                    is_regression: data.is_regression,
-                    execution_count: data.execution_count,
-                    note: data.note || undefined,
-                },
+            const payload: Record<string, unknown> = {
+                title: data.title,
+                description: data.description || undefined,
+                preconditions: data.preconditions || undefined,
+                test_steps: data.test_steps || undefined,
+                expected_result: data.expected_result || undefined,
+                priority: data.priority,
+                severity: data.severity,
+                test_type: data.test_type,
+                category: data.category || 'other',
+                component: data.component || undefined,
+                automation_status: data.automation_status,
+                status: data.status,
+                estimated_duration_minutes: data.estimated_duration_minutes || undefined,
+                tags: data.tags ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+                assigned_to: data.assigned_to || undefined,
+                linked_requirement_id: data.linked_requirement_id || undefined,
             };
 
-            if (isEdit && artifactId) {
-                await tuleapApi.updateUnified(artifactId, payload);
-                router.push(`/test-cases/${artifactId}`);
+            if (!isEdit && projectId) {
+                (payload as any).project_id = projectId;
+            }
+
+            if (isEdit && testCaseId) {
+                await testCasesApi.update(testCaseId, payload);
+                router.push(`/test-cases/${testCaseId}`);
             } else {
-                const result = await tuleapApi.createUnified(payload);
-                router.push(`/test-cases/${result.tuleap_artifact_id}`);
+                await testCasesApi.create(payload as any);
+                router.push('/test-cases');
             }
             router.refresh();
         } catch (err: any) {
@@ -123,9 +127,10 @@ export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: Tes
                 <Select
                     label="Status"
                     options={[
-                        { value: 'active', label: 'Active' },
                         { value: 'draft', label: 'Draft' },
+                        { value: 'active', label: 'Active' },
                         { value: 'deprecated', label: 'Deprecated' },
+                        { value: 'archived', label: 'Archived' },
                     ]}
                     {...register('status')}
                     error={errors.status?.message}
@@ -134,6 +139,7 @@ export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: Tes
                 <Select
                     label="Priority"
                     options={[
+                        { value: 'critical', label: 'Critical' },
                         { value: 'high', label: 'High' },
                         { value: 'medium', label: 'Medium' },
                         { value: 'low', label: 'Low' },
@@ -142,91 +148,109 @@ export function TestCaseForm({ initialData, isEdit, artifactId, projectId }: Tes
                     error={errors.priority?.message}
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
+                <Select
+                    label="Severity"
+                    options={[
+                        { value: 'critical', label: 'Critical' },
+                        { value: 'major', label: 'Major' },
+                        { value: 'normal', label: 'Normal' },
+                        { value: 'minor', label: 'Minor' },
+                        { value: 'trivial', label: 'Trivial' },
+                    ]}
+                    {...register('severity')}
+                    error={errors.severity?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Select
+                    label="Test Type"
+                    options={[
+                        { value: 'functional', label: 'Functional' },
+                        { value: 'regression', label: 'Regression' },
+                        { value: 'smoke', label: 'Smoke' },
+                        { value: 'integration', label: 'Integration' },
+                        { value: 'performance', label: 'Performance' },
+                        { value: 'security', label: 'Security' },
+                        { value: 'usability', label: 'Usability' },
+                        { value: 'exploratory', label: 'Exploratory' },
+                        { value: 'automated', label: 'Automated' },
+                    ]}
+                    {...register('test_type')}
+                    error={errors.test_type?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Select
+                    label="Automation Status"
+                    options={[
+                        { value: 'manual', label: 'Manual' },
+                        { value: 'automated', label: 'Automated' },
+                        { value: 'partial', label: 'Partial' },
+                        { value: 'to_automate', label: 'To Automate' },
+                    ]}
+                    {...register('automation_status')}
+                    error={errors.automation_status?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
                 <Input
-                    label="Assigned To"
+                    label="Category"
+                    {...register('category')}
+                    placeholder="e.g. Authentication"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Component"
+                    {...register('component')}
+                    placeholder="e.g. Login Module"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Assigned To (User ID)"
                     {...register('assigned_to')}
-                    placeholder="email@example.com"
+                    placeholder="UUID"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Est. Duration (minutes)"
+                    type="number"
+                    {...register('estimated_duration_minutes')}
+                    placeholder="5"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Linked Requirement"
+                    {...register('linked_requirement_id')}
+                    placeholder="REQ-001"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Tags (comma-separated)"
+                    {...register('tags')}
+                    placeholder="smoke, login, p1"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
             </FormSection>
 
-            <FormSection title="Details">
-                <Input
-                    label="Service Name"
-                    {...register('service_name')}
-                    placeholder="e.g. Auth Service"
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                />
-                <Input
-                    label="Task Number"
-                    {...register('task_number')}
-                    placeholder="e.g. TSK-001"
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                />
+            <FormSection title="Description & Details">
                 <div className="md:col-span-2">
-                    <Textarea
-                        label="Preconditions"
-                        {...register('preconditions')}
-                        placeholder="Prerequisites for this test..."
-                    />
+                    <Textarea label="Description" {...register('description')} placeholder="Describe the test case purpose..." />
+                </div>
+                <div className="md:col-span-2">
+                    <Textarea label="Preconditions" {...register('preconditions')} placeholder="Prerequisites for this test..." />
                 </div>
             </FormSection>
 
             <FormSection title="Test Definition">
                 <div className="md:col-span-2">
-                    <Textarea
-                        label="Test Steps"
-                        {...register('test_steps')}
-                        error={errors.test_steps?.message}
-                        placeholder="Describe the test steps..."
-                    />
+                    <Textarea label="Test Steps" {...register('test_steps')} placeholder="1. Navigate to login page&#10;2. Enter valid email&#10;3. Click Login" />
                 </div>
                 <div className="md:col-span-2">
-                    <Textarea
-                        label="Expected Result"
-                        {...register('expected_result')}
-                        error={errors.expected_result?.message}
-                        placeholder="Describe the expected result..."
-                    />
-                </div>
-                <div className="md:col-span-2">
-                    <Textarea
-                        label="Actual Result"
-                        {...register('actual_result')}
-                        placeholder="Describe the actual result (if executed)..."
-                    />
-                </div>
-            </FormSection>
-
-            <FormSection title="Progress">
-                <div className="flex items-center gap-3 h-10">
-                    <input
-                        type="checkbox"
-                        {...register('is_regression')}
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Is Regression</label>
-                </div>
-                <Input
-                    label="Execution Count"
-                    type="number"
-                    {...register('execution_count')}
-                    placeholder="0"
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                />
-                <div className="md:col-span-2">
-                    <Textarea
-                        label="Note"
-                        {...register('note')}
-                        placeholder="Additional notes..."
-                    />
+                    <Textarea label="Expected Result" {...register('expected_result')} placeholder="User is redirected to dashboard" />
                 </div>
             </FormSection>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => router.back()} className="w-24 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</Button>
                 <Button type="submit" disabled={isSubmitting} className="w-40 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
-                    {isSubmitting ? <span className="animate-spin mr-2">⏳</span> : null}
+                    {isSubmitting ? <span className="animate-spin mr-2">...</span> : null}
                     {isEdit ? 'Save Changes' : 'Create Test Case'}
                 </Button>
             </div>
