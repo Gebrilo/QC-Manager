@@ -1,4 +1,4 @@
-import type { TestCase, TestCaseListResponse } from '@/types';
+import type { TestCase, TestCaseListResponse, TestSuite, TestSuiteListResponse, TestRun, TestRunExecution, TestRunProgress, TestRunListResponse } from '@/types';
 
 // NEXT_PUBLIC_API_URL is baked at build time. If the build arg was missing,
 // it collapses to "https://" (truthy but invalid). Guard against that here.
@@ -540,6 +540,98 @@ export const notificationsApi = {
 
     delete: (id: string) =>
         fetchApi<void>(`/notifications/${id}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
+// API Client - Test Suites
+// ============================================================================
+
+export const testSuitesApi = {
+    list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        project_id?: string;
+        status?: string;
+        sort_by?: string;
+        sort_order?: string;
+    }) => {
+        const cleanParams: Record<string, string> = {};
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    cleanParams[key] = String(value);
+                }
+            });
+        }
+        const query = new URLSearchParams(cleanParams).toString();
+        return fetchApi<TestSuiteListResponse>(`/test-suites${query ? `?${query}` : ''}`);
+    },
+
+    get: (id: string) => fetchApi<TestSuite>(`/test-suites/${id}`),
+
+    create: (data: { name: string; project_id: string; description?: string; status?: string; test_case_ids?: string[] }) =>
+        fetchApi<TestSuite>('/test-suites', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    update: (id: string, data: Partial<Pick<TestSuite, 'name' | 'description' | 'status'>>) =>
+        fetchApi<TestSuite>(`/test-suites/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    delete: (id: string) =>
+        fetchApi<void>(`/test-suites/${id}`, { method: 'DELETE' }),
+
+    addTestCases: (id: string, data: { test_case_ids: string[]; position?: 'end' | 'start' | number }) =>
+        fetchApi(`/test-suites/${id}/test-cases`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    removeTestCases: (id: string, data: { test_case_ids: string[] }) =>
+        fetchApi(`/test-suites/${id}/test-cases`, {
+            method: 'DELETE',
+            body: JSON.stringify(data),
+        }),
+
+    reorder: (id: string, data: { ordered_test_case_ids: string[] }) =>
+        fetchApi(`/test-suites/${id}/reorder`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    clone: (id: string, data: { name?: string; project_id?: string; copy_test_cases?: boolean }) =>
+        fetchApi<TestSuite>(`/test-suites/${id}/clone`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+};
+
+// ============================================================================
+// API Client - Test Runs (Enhanced)
+// ============================================================================
+
+export const testRunsApi = {
+    createFromSuite: (data: { suite_id: string; name: string; project_id: string; environment?: string; version_tag?: string }) =>
+        fetchApi<TestRun>('/test-executions/test-runs/from-suite', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    getProgress: (id: string) =>
+        fetchApi<TestRunProgress>(`/test-executions/test-runs/${id}/progress`),
+
+    getExecutions: (id: string) =>
+        fetchApi<TestRunExecution[]>(`/test-executions/test-runs/${id}/executions`),
+
+    bulkUpdateExecutions: (id: string, data: { execution_ids: string[]; status?: string; assigned_to?: string }) =>
+        fetchApi(`/test-executions/test-runs/${id}/executions/bulk`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
 };
 
 // ============================================================================

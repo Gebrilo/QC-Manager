@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers } from 'lucide-react';
 
 export interface RouteConfig {
     path: string;
@@ -50,10 +50,14 @@ const ROUTES: RouteConfig[] = [
     { path: '/bugs/[id]/edit', label: 'Edit Bug', permission: 'page:bugs', requiresActivation: true },
     { path: '/governance', label: 'Governance', permission: 'page:governance', requiresActivation: true, showInNavbar: true, navOrder: 6, icon: ShieldCheck },
     { path: '/test-executions', label: 'Test Runs', permission: 'page:test-executions', requiresActivation: true, showInNavbar: true, navOrder: 7, icon: FlaskConical },
-    { path: '/test-cases', label: 'Test Cases', permission: 'page:test-cases', requiresActivation: true, showInNavbar: true, navOrder: 7.5, icon: FlaskConical },
+    { path: '/test-cases', label: 'Test Cases', permission: 'page:test-cases', requiresActivation: true, showInNavbar: true, navOrder: 7, icon: FlaskConical },
     { path: '/test-cases/create', label: 'Create Test Case', permission: 'page:test-cases', requiresActivation: true },
     { path: '/test-cases/[id]', label: 'Test Case Details', permission: 'page:test-cases', requiresActivation: true },
     { path: '/test-cases/[id]/edit', label: 'Edit Test Case', permission: 'page:test-cases', requiresActivation: true },
+    { path: '/test-suites', label: 'Test Suites', permission: 'page:test-suites', requiresActivation: true, showInNavbar: true, navOrder: 7.5, icon: Layers },
+    { path: '/test-suites/create', label: 'Create Suite', permission: 'page:test-suites', requiresActivation: true },
+    { path: '/test-suites/[id]', label: 'Suite Details', permission: 'page:test-suites', requiresActivation: true },
+    { path: '/test-suites/[id]/edit', label: 'Edit Suite', permission: 'page:test-suites', requiresActivation: true },
     { path: '/test-results', label: 'Test Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/test-results/upload', label: 'Upload Results', permission: 'page:test-executions', requiresActivation: true },
     { path: '/task-history', label: 'Task History', permission: 'page:task-history', requiresActivation: true, showInNavbar: true, navOrder: 10, icon: History },

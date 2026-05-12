@@ -323,3 +323,113 @@ export interface TestCaseListResponse {
         total_pages: number;
     };
 }
+
+// Test Suite Management Types
+export type SuiteStatus = 'draft' | 'active' | 'archived';
+
+export interface TestSuite {
+    id: string;
+    suite_id: string;
+    name: string;
+    description?: string;
+    status: SuiteStatus;
+    project_id: string;
+    project_name?: string;
+    created_by?: string;
+    created_by_name?: string;
+    updated_by?: string;
+    updated_by_name?: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    test_case_count?: number;
+    last_run_date?: string;
+    last_run_pass_rate?: number;
+    test_cases?: SuiteTestCase[];
+}
+
+export interface SuiteTestCase {
+    id: string;
+    junction_id: string;
+    test_case_id: string;
+    test_case_id_display?: string;
+    title: string;
+    priority?: string;
+    status?: string;
+    sort_order: number;
+    latest_execution_status?: string;
+}
+
+export interface TestSuiteListResponse {
+    data: TestSuite[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        total_pages: number;
+    };
+}
+
+// Enhanced Test Run types
+export interface TestRun {
+    id: string;
+    run_id: string;
+    name: string;
+    description?: string;
+    project_id: string;
+    project_name?: string;
+    status: string;
+    suite_id?: string;
+    source?: 'excel' | 'suite';
+    environment?: string;
+    version_tag?: string;
+    started_at: string;
+    completed_at?: string;
+    created_by?: string;
+    created_by_email?: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    total_cases?: number;
+    passed?: number;
+    failed?: number;
+    blocked?: number;
+    not_run?: number;
+    pass_rate?: number;
+    execution_entries?: TestRunExecution[];
+}
+
+export interface TestRunExecution {
+    id: string;
+    test_case_id: string;
+    test_case_title?: string;
+    test_case_steps?: string;
+    expected_result?: string;
+    sort_order?: number;
+    status: string;
+    notes?: string;
+    duration_seconds?: number;
+    defect_ids?: string[];
+    assigned_to?: string;
+    assigned_to_name?: string;
+}
+
+export interface TestRunProgress {
+    total: number;
+    passed: number;
+    failed: number;
+    blocked: number;
+    not_run: number;
+    pass_rate: number;
+    completion_rate: number;
+}
+
+export interface TestRunListResponse {
+    data: TestRun[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        total_pages: number;
+    };
+}
