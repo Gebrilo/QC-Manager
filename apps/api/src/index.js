@@ -30,6 +30,7 @@ apiRouter.use('/projects', require('./routes/projects'));
 apiRouter.use('/tasks', require('./routes/tasks'));
 apiRouter.use('/resources', require('./routes/resources'));
 apiRouter.use('/test-cases', require('./routes/testCases'));
+apiRouter.use('/test-suites', require('./routes/testSuites'));
 apiRouter.use('/test-executions', require('./routes/testExecutions'));
 apiRouter.use('/dashboard', require('./routes/dashboard'));
 apiRouter.use('/reports', require('./routes/reports'));
