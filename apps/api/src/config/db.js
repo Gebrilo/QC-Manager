@@ -1756,6 +1756,78 @@ const runMigrations = async () => {
                 WHERE resolved_at IS NULL
         `);
 
+        // Migration: Test Suite Management — Sprint 3
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_suites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                suite_id VARCHAR(50) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('draft','active','archived')),
+                project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                updated_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMPTZ,
+                deleted_by UUID REFERENCES app_user(id) ON DELETE SET NULL
+            )
+        `);
+
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_project_id ON test_suites(project_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_status ON test_suites(status) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_created_by ON test_suites(created_by) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_suite_id ON test_suites(suite_id) WHERE deleted_at IS NULL`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_suite_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                suite_id UUID NOT NULL REFERENCES test_suites(id) ON DELETE CASCADE,
+                test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                snapshot_id UUID,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await client.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_test_suite_cases_active
+                ON test_suite_cases(suite_id, test_case_id)
+                WHERE snapshot_id IS NULL
+        `);
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_test_suite_cases_snapshot
+                ON test_suite_cases(snapshot_id)
+                WHERE snapshot_id IS NOT NULL
+        `);
+
+        // Alter test_run table for suite-based runs
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS suite_id UUID REFERENCES test_suites(id) ON DELETE SET NULL`);
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS created_by_email VARCHAR(255)`);
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS environment VARCHAR(100)`);
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS version_tag VARCHAR(50)`);
+        await client.query(`ALTER TABLE test_run ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'excel'`);
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_run_source_check') THEN
+                    ALTER TABLE test_run ADD CONSTRAINT test_run_source_check
+                        CHECK (source IN ('excel','suite'));
+                END IF;
+            END $$;
+        `);
+
+        // Alter test_execution table for enhanced fields
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS test_case_title VARCHAR(500)`);
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS test_case_steps TEXT`);
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS expected_result TEXT`);
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+        await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES app_user(id) ON DELETE SET NULL`);
+
+        // Add GIN index on test_case tags
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_tags ON test_case USING GIN(tags) WHERE deleted_at IS NULL`);
+
         // Migration: Test Case Management — Sprint 1
         // Add missing columns to test_case table
         const tcAlterColumns = [
