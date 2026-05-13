@@ -539,11 +539,8 @@ const runMigrations = async () => {
         await client.query(`DROP VIEW IF EXISTS v_dashboard_metrics CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_resources_with_utilization CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_projects_with_metrics CASCADE`);
-        await client.query(`DROP VIEW IF EXISTS v_tasks_with_metrics CASCADE`);
-        await client.query(`DROP VIEW IF EXISTS v_bug_summary CASCADE`);
-        await client.query(`DROP VIEW IF EXISTS v_bug_summary_global CASCADE`);
 
-        // Bug Summary View
+        // Bug Summary View (no dependency on normalized tables)
         await client.query(`
             CREATE OR REPLACE VIEW v_bug_summary AS
             SELECT
@@ -562,28 +559,6 @@ const runMigrations = async () => {
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.deleted_at IS NULL
             GROUP BY b.project_id, p.project_name
-        `);
-
-        // Global Bug Summary View (includes source-based columns + normalized linked cols)
-        await client.query(`
-            CREATE OR REPLACE VIEW v_bug_summary_global AS
-            SELECT
-                COUNT(id) AS total_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
-                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
-                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
-                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
-                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
-                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
-                COUNT(id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
-                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)) AS bugs_from_testing,
-                COUNT(id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
-                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
-                                      AND COALESCE(array_length(linked_test_case_ids, 1), 0) = 0) AS standalone_bugs
-            FROM bugs
-            WHERE deleted_at IS NULL
         `);
 
         await client.query(`
@@ -694,65 +669,6 @@ const runMigrations = async () => {
             FROM projects p
             LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
             WHERE p.deleted_at IS NULL
-        `);
-
-        await client.query(`
-            CREATE OR REPLACE VIEW v_tasks_with_metrics AS
-            SELECT
-                t.id,
-                t.task_id,
-                t.project_id,
-                t.task_name,
-                t.description,
-                t.status,
-                t.assignee,
-                t.priority,
-                t.tags,
-                t.notes,
-                t.resource1_id,
-                t.resource2_id,
-                t.resource1_id AS resource1_uuid,
-                t.resource2_id AS resource2_uuid,
-                t.estimate_days,
-                t.r1_estimate_hrs,
-                t.r1_actual_hrs,
-                t.r2_estimate_hrs,
-                t.r2_actual_hrs,
-                t.due_date,
-                t.deadline,
-                t.expected_start_date,
-                t.actual_start_date,
-                t.completed_date,
-                t.completed_at,
-                t.created_at,
-                t.created_by,
-                t.updated_at,
-                t.updated_by,
-                t.deleted_at,
-                t.deleted_by,
-                t.tuleap_artifact_id,
-                t.tuleap_url,
-                t.synced_from_tuleap,
-                t.last_tuleap_sync,
-                t.parent_user_story_id,
-                r1.resource_name AS resource1_name,
-                r2.resource_name AS resource2_name,
-                p.project_name,
-                (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_estimated_hrs,
-                (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_est_hrs,
-                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
-                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) - (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS hours_variance,
-                CASE 
-                    WHEN (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
-                        ROUND(((COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) / 
-                               (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) * 100)::NUMERIC, 2)
-                    ELSE 0
-                END AS overall_completion_pct
-            FROM tasks t
-            LEFT JOIN resources r1 ON t.resource1_id = r1.id
-            LEFT JOIN resources r2 ON t.resource2_id = r2.id
-            LEFT JOIN projects p ON t.project_id = p.id
-            WHERE t.deleted_at IS NULL
         `);
 
         // =====================================================
@@ -1985,6 +1901,89 @@ const runMigrations = async () => {
                 OR COALESCE(array_length(linked_test_execution_ids, 1), 0) > 0
                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
               )
+        `);
+
+        // Recreate views that depend on the new normalized tables/columns
+        await client.query(`DROP VIEW IF EXISTS v_bug_summary_global CASCADE`);
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_summary_global AS
+            SELECT
+                COUNT(id) AS total_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
+                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
+                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
+                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
+                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
+                COUNT(id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)) AS bugs_from_testing,
+                COUNT(id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
+                                      AND COALESCE(array_length(linked_test_case_ids, 1), 0) = 0) AS standalone_bugs
+            FROM bugs
+            WHERE deleted_at IS NULL
+        `);
+
+        await client.query(`DROP VIEW IF EXISTS v_tasks_with_metrics CASCADE`);
+        await client.query(`
+            CREATE OR REPLACE VIEW v_tasks_with_metrics AS
+            SELECT
+                t.id,
+                t.task_id,
+                t.project_id,
+                t.task_name,
+                t.description,
+                t.status,
+                t.assignee,
+                t.priority,
+                t.tags,
+                t.notes,
+                t.resource1_id,
+                t.resource2_id,
+                t.resource1_id AS resource1_uuid,
+                t.resource2_id AS resource2_uuid,
+                t.estimate_days,
+                t.r1_estimate_hrs,
+                t.r1_actual_hrs,
+                t.r2_estimate_hrs,
+                t.r2_actual_hrs,
+                t.due_date,
+                t.deadline,
+                t.expected_start_date,
+                t.actual_start_date,
+                t.completed_date,
+                t.completed_at,
+                t.created_at,
+                t.created_by,
+                t.updated_at,
+                t.updated_by,
+                t.deleted_at,
+                t.deleted_by,
+                t.tuleap_artifact_id,
+                t.tuleap_url,
+                t.synced_from_tuleap,
+                t.last_tuleap_sync,
+                t.parent_user_story_id,
+                r1.resource_name AS resource1_name,
+                r2.resource_name AS resource2_name,
+                p.project_name,
+                (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_estimated_hrs,
+                (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_est_hrs,
+                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
+                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) - (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS hours_variance,
+                CASE 
+                    WHEN (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
+                        ROUND(((COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) / 
+                               (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) * 100)::NUMERIC, 2)
+                    ELSE 0
+                END AS overall_completion_pct
+            FROM tasks t
+            LEFT JOIN resources r1 ON t.resource1_id = r1.id
+            LEFT JOIN resources r2 ON t.resource2_id = r2.id
+            LEFT JOIN projects p ON t.project_id = p.id
+            WHERE t.deleted_at IS NULL
         `);
 
         await client.query(`
