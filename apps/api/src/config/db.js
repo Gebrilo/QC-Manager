@@ -138,6 +138,15 @@ const runMigrations = async () => {
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='entity_uuid') THEN
                     ALTER TABLE audit_log ADD COLUMN entity_uuid UUID;
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='entity_id') THEN
+                    ALTER TABLE audit_log ADD COLUMN entity_id UUID;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='user_id') THEN
+                    ALTER TABLE audit_log ADD COLUMN user_id UUID;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='details') THEN
+                    ALTER TABLE audit_log ADD COLUMN details JSONB;
+                END IF;
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='before_state') THEN
                     ALTER TABLE audit_log ADD COLUMN before_state JSONB;
                 END IF;
