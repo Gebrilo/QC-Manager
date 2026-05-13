@@ -1,4 +1,4 @@
-import type { TestCase, TestCaseListResponse, TestSuite, TestSuiteListResponse, TestRun, TestRunExecution, TestRunProgress, TestRunListResponse } from '@/types';
+import type { TestCase, TestCaseListResponse, TestSuite, SuiteTestCase, TestSuiteListResponse, TestRun, TestRunExecution, TestRunProgress, TestRunListResponse } from '@/types';
 
 // NEXT_PUBLIC_API_URL is baked at build time. If the build arg was missing,
 // it collapses to "https://" (truthy but invalid). Guard against that here.
@@ -569,6 +569,30 @@ export const testSuitesApi = {
     },
 
     get: (id: string) => fetchApi<TestSuite>(`/test-suites/${id}`),
+
+    availableTestCases: (id: string, params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        status?: string;
+        priority?: string;
+        test_type?: string;
+        automation_status?: string;
+        category?: string;
+    }) => {
+        const cleanParams: Record<string, string> = {};
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    cleanParams[key] = String(value);
+                }
+            });
+        }
+        const query = new URLSearchParams(cleanParams).toString();
+        return fetchApi<{ data: SuiteTestCase[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(
+            `/test-suites/${id}/available-test-cases${query ? `?${query}` : ''}`
+        );
+    },
 
     create: (data: { name: string; project_id: string; description?: string; status?: string; test_case_ids?: string[] }) =>
         fetchApi<TestSuite>('/test-suites', {

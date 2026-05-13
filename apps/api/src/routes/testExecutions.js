@@ -52,8 +52,13 @@ const testExecutionUpdateSchema = z.object({
   status: z.enum(['pass', 'fail', 'not_run', 'blocked', 'skipped']).optional(),
   notes: z.string().optional(),
   duration_seconds: z.number().int().positive().optional().nullable(),
-  defect_ids: z.array(z.string()).optional()
+  defect_ids: z.array(z.string()).optional(),
+  assigned_to: z.string().uuid().nullable().optional()
 });
+
+function shouldStampExecution(existingStatus, nextStatus) {
+  return nextStatus !== undefined && nextStatus !== existingStatus && nextStatus !== 'not_run';
+}
 
 // ============================================================================
 // DASHBOARD SUMMARY - For Governance Dashboard
@@ -232,16 +237,24 @@ router.get('/test-runs/:id', requireAuth, requirePermission('page:test-execution
     const executionsResult = await pool.query(
       `SELECT
         te.*,
-        tc.test_case_id,
-        tc.title AS test_case_title,
+        te.test_case_id AS test_case_uuid,
+        COALESCE(tc.test_case_id, te.test_case_id::text) AS test_case_id,
+        COALESCE(te.test_case_title, tc.title) AS test_case_title,
+        COALESCE(te.test_case_steps, tc.test_steps) AS test_case_steps,
+        COALESCE(te.expected_result, tc.expected_result) AS expected_result,
         tc.category,
         tc.priority,
+        assignee.name AS assigned_to_name,
         u.name AS executed_by_name
       FROM test_execution te
-      LEFT JOIN test_cases tc ON te.test_case_id = tc.id
+      LEFT JOIN test_case tc ON te.test_case_id = tc.id
+      LEFT JOIN app_user assignee ON te.assigned_to = assignee.id
       LEFT JOIN app_user u ON te.executed_by = u.id
       WHERE te.test_run_id = $1
-      ORDER BY te.executed_at DESC`,
+      ORDER BY
+        CASE WHEN COALESCE(te.sort_order, 0) > 0 THEN 0 ELSE 1 END,
+        te.sort_order ASC,
+        te.created_at ASC`,
       [id]
     );
 
@@ -500,15 +513,20 @@ router.get('/executions', requireAuth, requirePermission('page:test-executions')
     let query = `
       SELECT
         te.*,
-        tc.test_case_id,
-        tc.title AS test_case_title,
+        te.test_case_id AS test_case_uuid,
+        COALESCE(tc.test_case_id, te.test_case_id::text) AS test_case_id,
+        COALESCE(te.test_case_title, tc.title) AS test_case_title,
+        COALESCE(te.test_case_steps, tc.test_steps) AS test_case_steps,
+        COALESCE(te.expected_result, tc.expected_result) AS expected_result,
         tc.category,
         tr.run_id,
         tr.name AS test_run_name,
+        assignee.name AS assigned_to_name,
         u.name AS executed_by_name
       FROM test_execution te
-      LEFT JOIN test_cases tc ON te.test_case_id = tc.id
+      LEFT JOIN test_case tc ON te.test_case_id = tc.id
       LEFT JOIN test_run tr ON te.test_run_id = tr.id
+      LEFT JOIN app_user assignee ON te.assigned_to = assignee.id
       LEFT JOIN app_user u ON te.executed_by = u.id
       WHERE 1=1
     `;
@@ -534,7 +552,10 @@ router.get('/executions', requireAuth, requirePermission('page:test-executions')
       paramCount++;
     }
 
-    query += ` ORDER BY te.executed_at DESC`;
+    query += ` ORDER BY
+      CASE WHEN COALESCE(te.sort_order, 0) > 0 THEN 0 ELSE 1 END,
+      te.sort_order ASC,
+      te.created_at DESC`;
     query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(parseInt(limit), parseInt(offset));
 
@@ -580,9 +601,9 @@ router.post('/executions', requireAuth, requirePermission('action:test-execution
     const result = await client.query(
       `INSERT INTO test_execution (
         test_case_id, test_run_id, status, notes,
-        duration_seconds, defect_ids, executed_by
+        duration_seconds, defect_ids, executed_by, executed_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $3 <> 'not_run' THEN CURRENT_TIMESTAMP ELSE NULL END)
       RETURNING *`,
       [
         validatedData.test_case_id,
@@ -591,7 +612,7 @@ router.post('/executions', requireAuth, requirePermission('action:test-execution
         validatedData.notes || null,
         validatedData.duration_seconds || null,
         validatedData.defect_ids,
-        req.user?.id || null
+        validatedData.status !== 'not_run' ? req.user?.id || null : null
       ]
     );
 
@@ -652,10 +673,19 @@ router.patch('/executions/:id', requireAuth, requirePermission('action:test-exec
     const params = [];
     let paramCount = 1;
 
+    const existing = existingResult.rows[0];
+
     if (validatedData.status !== undefined) {
       updates.push(`status = $${paramCount}`);
       params.push(validatedData.status);
       paramCount++;
+
+      if (shouldStampExecution(existing.status, validatedData.status)) {
+        updates.push(`executed_by = $${paramCount}`);
+        params.push(req.user?.id || null);
+        paramCount++;
+        updates.push(`executed_at = CURRENT_TIMESTAMP`);
+      }
     }
 
     if (validatedData.notes !== undefined) {
@@ -673,6 +703,12 @@ router.patch('/executions/:id', requireAuth, requirePermission('action:test-exec
     if (validatedData.defect_ids !== undefined) {
       updates.push(`defect_ids = $${paramCount}`);
       params.push(validatedData.defect_ids);
+      paramCount++;
+    }
+
+    if (validatedData.assigned_to !== undefined) {
+      updates.push(`assigned_to = $${paramCount}`);
+      params.push(validatedData.assigned_to || null);
       paramCount++;
     }
 
@@ -772,9 +808,9 @@ router.post('/executions/bulk-import', requireAuth, requirePermission('action:te
         const result = await client.query(
           `INSERT INTO test_execution (
             test_case_id, test_run_id, status, notes,
-            duration_seconds, defect_ids, executed_by
+            duration_seconds, defect_ids, executed_by, executed_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $3 <> 'not_run' THEN CURRENT_TIMESTAMP ELSE NULL END)
           RETURNING id, test_case_id, status`,
           [
             validatedData.test_case_id,
@@ -783,7 +819,7 @@ router.post('/executions/bulk-import', requireAuth, requirePermission('action:te
             validatedData.notes || null,
             validatedData.duration_seconds || null,
             validatedData.defect_ids,
-            req.user?.id || null
+            validatedData.status !== 'not_run' ? req.user?.id || null : null
           ]
         );
 
@@ -1105,7 +1141,7 @@ router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test
     const suiteRunSchema = z.object({
       suite_id: z.string().uuid(),
       name: z.string().min(1).max(255),
-      project_id: z.string().uuid(),
+      project_id: z.string().uuid().optional(),
       environment: z.string().max(100).optional(),
       version_tag: z.string().max(50).optional(),
     });
@@ -1122,6 +1158,21 @@ router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Test suite not found' });
     }
+    const suite = suiteResult.rows[0];
+
+    // Get ordered test cases from suite before creating the run so empty suites do not leave orphan runs.
+    const suiteCases = await client.query(
+      `SELECT tsc.test_case_id, tsc.sort_order, tc.title, tc.test_steps, tc.expected_result
+       FROM test_suite_cases tsc
+       JOIN test_case tc ON tsc.test_case_id = tc.id
+       WHERE tsc.suite_id = $1 AND tsc.snapshot_id IS NULL AND tc.deleted_at IS NULL
+       ORDER BY tsc.sort_order`,
+      [validatedData.suite_id]
+    );
+    if (suiteCases.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cannot create a test run from an empty suite' });
+    }
 
     // Generate run ID
     const idResult = await client.query(
@@ -1135,22 +1186,12 @@ router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test
       `INSERT INTO test_run (run_id, name, description, project_id, status, suite_id, source, environment, version_tag, created_by)
        VALUES ($1, $2, $3, $4, 'in_progress', $5, 'suite', $6, $7, $8)
        RETURNING *`,
-      [runId, validatedData.name, suiteResult.rows[0].description || null, validatedData.project_id,
+      [runId, validatedData.name, suite.description || null, suite.project_id,
        validatedData.suite_id, validatedData.environment || null, validatedData.version_tag || null,
        req.user?.id || null]
     );
 
     const testRun = runResult.rows[0];
-
-    // Get ordered test cases from suite
-    const suiteCases = await client.query(
-      `SELECT tsc.test_case_id, tsc.sort_order, tc.title, tc.test_steps, tc.expected_result
-       FROM test_suite_cases tsc
-       JOIN test_case tc ON tsc.test_case_id = tc.id
-       WHERE tsc.suite_id = $1 AND tsc.snapshot_id IS NULL AND tc.deleted_at IS NULL
-       ORDER BY tsc.sort_order`,
-      [validatedData.suite_id]
-    );
 
     // Snapshot suite composition
     for (const sc of suiteCases.rows) {
@@ -1167,8 +1208,8 @@ router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test
 
     for (const sc of suiteCases.rows) {
       const execResult = await client.query(
-        `INSERT INTO test_execution (test_run_id, test_case_id, status, test_case_title, test_case_steps, expected_result, sort_order)
-         VALUES ($1, $2, 'not_run', $3, $4, $5, $6)
+        `INSERT INTO test_execution (test_run_id, test_case_id, status, test_case_title, test_case_steps, expected_result, sort_order, executed_by, executed_at)
+         VALUES ($1, $2, 'not_run', $3, $4, $5, $6, NULL, NULL)
          RETURNING id, test_case_id, test_case_title, test_case_steps, expected_result, sort_order, status, assigned_to`,
         [testRun.id, sc.test_case_id, sc.title, sc.test_steps, sc.expected_result, sc.sort_order]
       );
@@ -1276,8 +1317,12 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, requirePermission('ac
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Invalid status value' });
       }
+      const statusParam = pn;
       updates.push(`status = $${pn++}`);
       params.push(status);
+      updates.push(`executed_by = CASE WHEN status IS DISTINCT FROM $${statusParam} AND $${statusParam} <> 'not_run' THEN $${pn++} ELSE executed_by END`);
+      params.push(req.user?.id || null);
+      updates.push(`executed_at = CASE WHEN status IS DISTINCT FROM $${statusParam} AND $${statusParam} <> 'not_run' THEN CURRENT_TIMESTAMP ELSE executed_at END`);
     }
 
     if (assigned_to !== undefined) {
@@ -1296,7 +1341,7 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, requirePermission('ac
     const idPlaceholders = execution_ids.map((_, i) => `$${pn++}`).join(',');
     params.push(...execution_ids);
 
-    const query = `UPDATE test_execution SET ${updates.join(', ')} WHERE test_run_id = $${pn} AND id IN (${idPlaceholders}) RETURNING id, status, assigned_to`;
+    const query = `UPDATE test_execution SET ${updates.join(', ')} WHERE test_run_id = $${pn} AND id IN (${idPlaceholders}) RETURNING id, status, assigned_to, executed_by, executed_at`;
     params.push(req.params.id);
 
     const result = await client.query(query, params);

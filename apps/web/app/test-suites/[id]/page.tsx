@@ -92,11 +92,8 @@ export default function TestSuiteDetailPage() {
         }
         setShowAddCases(true);
         try {
-            const { fetchApi } = await import('@/lib/api');
-            const res = await fetchApi<any>('/test-cases?status=active&limit=200');
-            const data = res?.data || res || [];
-            const existingIds = new Set((suite?.test_cases || []).map(tc => tc.id));
-            setAvailableCases(Array.isArray(data) ? data.filter((tc: any) => !existingIds.has(tc.id)) : []);
+            const res = await testSuitesApi.availableTestCases(id, { status: 'active', limit: 200 });
+            setAvailableCases(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to load available cases', err);
         }

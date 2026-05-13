@@ -1130,6 +1130,7 @@ const runMigrations = async () => {
         // Add executed_by and executed_at to test_execution if missing
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS executed_by UUID`);
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+        await client.query(`ALTER TABLE test_execution ALTER COLUMN executed_at DROP DEFAULT`);
 
         // Create test_result table for the testResults.js upload endpoint
         await client.query(`
@@ -1824,6 +1825,43 @@ const runMigrations = async () => {
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS expected_result TEXT`);
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES app_user(id) ON DELETE SET NULL`);
+        await client.query(`ALTER TABLE test_execution ALTER COLUMN test_case_id DROP NOT NULL`);
+        await client.query(`
+            DO $$
+            DECLARE
+                constraint_record RECORD;
+            BEGIN
+                FOR constraint_record IN
+                    SELECT con.conname
+                    FROM pg_constraint con
+                    JOIN pg_attribute att
+                        ON att.attrelid = con.conrelid
+                       AND att.attnum = ANY(con.conkey)
+                    WHERE con.contype = 'f'
+                      AND con.conrelid = 'test_execution'::regclass
+                      AND att.attname = 'test_case_id'
+                      AND con.confrelid = 'test_cases'::regclass
+                LOOP
+                    EXECUTE format('ALTER TABLE test_execution DROP CONSTRAINT %I', constraint_record.conname);
+                END LOOP;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint con
+                    JOIN pg_attribute att
+                        ON att.attrelid = con.conrelid
+                       AND att.attnum = ANY(con.conkey)
+                    WHERE con.contype = 'f'
+                      AND con.conrelid = 'test_execution'::regclass
+                      AND att.attname = 'test_case_id'
+                      AND con.confrelid = 'test_case'::regclass
+                ) THEN
+                    ALTER TABLE test_execution
+                        ADD CONSTRAINT test_execution_test_case_id_test_case_fkey
+                        FOREIGN KEY (test_case_id) REFERENCES test_case(id) ON DELETE SET NULL NOT VALID;
+                END IF;
+            END $$;
+        `);
 
         // Add GIN index on test_case tags
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_tags ON test_case USING GIN(tags) WHERE deleted_at IS NULL`);

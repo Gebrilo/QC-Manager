@@ -19,6 +19,30 @@ const suiteUpdateSchema = z.object({
     status: z.enum(['draft', 'active', 'archived']).optional(),
 });
 
+async function validateSuiteTestCases(client, projectId, testCaseIds) {
+    const uniqueIds = [...new Set(testCaseIds)];
+    if (uniqueIds.length === 0) return { validIds: [] };
+
+    const casesResult = await client.query(
+        `SELECT id, project_id FROM test_case WHERE id = ANY($1) AND deleted_at IS NULL`,
+        [uniqueIds]
+    );
+    const foundById = new Map(casesResult.rows.map(row => [row.id, row]));
+    const invalidIds = uniqueIds.filter(tcId => !foundById.has(tcId));
+    const crossProjectIds = casesResult.rows
+        .filter(row => row.project_id !== projectId)
+        .map(row => row.id);
+
+    if (invalidIds.length > 0 || crossProjectIds.length > 0) {
+        const error = new Error('All test cases must exist and belong to the same project as the test suite');
+        error.status = 400;
+        error.details = { invalid_test_case_ids: invalidIds, cross_project_test_case_ids: crossProjectIds };
+        throw error;
+    }
+
+    return { validIds: uniqueIds };
+}
+
 router.get('/', requireAuth, requirePermission('page:test-suites'), async (req, res, next) => {
     try {
         const {
@@ -131,11 +155,12 @@ router.post('/', requireAuth, requirePermission('action:test-suites:create'), as
         const suite = suiteResult.rows[0];
 
         if (validatedData.test_case_ids.length > 0) {
-            for (let i = 0; i < validatedData.test_case_ids.length; i++) {
+            const { validIds } = await validateSuiteTestCases(client, suite.project_id, validatedData.test_case_ids);
+            for (let i = 0; i < validIds.length; i++) {
                 await client.query(
                     `INSERT INTO test_suite_cases (suite_id, test_case_id, sort_order)
                      VALUES ($1, $2, $3)`,
-                    [suite.id, validatedData.test_case_ids[i], i + 1]);
+                    [suite.id, validIds[i], i + 1]);
             }
         }
 
@@ -165,6 +190,7 @@ router.post('/', requireAuth, requirePermission('action:test-suites:create'), as
     } catch (error) {
         await client.query('ROLLBACK');
         if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: error.errors });
+        if (error.status) return res.status(error.status).json({ error: error.message, details: error.details });
         next(error);
     } finally { client.release(); }
 });
@@ -259,6 +285,75 @@ router.delete('/:id', requireAuth, requirePermission('action:test-suites:delete'
     finally { client.release(); }
 });
 
+router.get('/:id/available-test-cases', requireAuth, requirePermission('page:test-suites'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const {
+            page = 1, limit = 50, search, status, priority,
+            test_type, automation_status, category,
+        } = req.query;
+
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
+        const offset = (pageNum - 1) * limitNum;
+
+        const suiteResult = await pool.query(
+            'SELECT id, project_id FROM test_suites WHERE id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+        if (suiteResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Test suite not found' });
+        }
+
+        const whereClauses = [
+            'tc.deleted_at IS NULL',
+            'tc.project_id = $1',
+            `NOT EXISTS (
+                SELECT 1 FROM test_suite_cases tsc
+                WHERE tsc.suite_id = $2
+                  AND tsc.test_case_id = tc.id
+                  AND tsc.snapshot_id IS NULL
+            )`,
+        ];
+        const params = [suiteResult.rows[0].project_id, id];
+        let pn = 3;
+
+        if (search) {
+            whereClauses.push(`(tc.title ILIKE $${pn} OR tc.description ILIKE $${pn} OR tc.test_case_id ILIKE $${pn})`);
+            params.push(`%${search}%`);
+            pn++;
+        }
+        if (status) { whereClauses.push(`tc.status = $${pn++}`); params.push(status); }
+        if (priority) { whereClauses.push(`tc.priority = $${pn++}`); params.push(priority); }
+        if (test_type) { whereClauses.push(`tc.test_type = $${pn++}`); params.push(test_type); }
+        if (automation_status) { whereClauses.push(`tc.automation_status = $${pn++}`); params.push(automation_status); }
+        if (category) { whereClauses.push(`tc.category = $${pn++}`); params.push(category); }
+
+        const whereStr = whereClauses.join(' AND ');
+        const countResult = await pool.query(
+            `SELECT COUNT(*) AS total FROM test_case tc WHERE ${whereStr}`,
+            params
+        );
+
+        const dataResult = await pool.query(
+            `SELECT
+                tc.id, tc.test_case_id, tc.title, tc.status, tc.priority,
+                tc.test_type, tc.automation_status, tc.category, tc.updated_at
+             FROM test_case tc
+             WHERE ${whereStr}
+             ORDER BY tc.test_case_id ASC, tc.title ASC
+             LIMIT $${pn++} OFFSET $${pn++}`,
+            [...params, limitNum, offset]
+        );
+
+        const total = parseInt(countResult.rows[0].total);
+        res.json({
+            data: dataResult.rows,
+            pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
+        });
+    } catch (error) { next(error); }
+});
+
 router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suites:edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
@@ -276,6 +371,7 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
 
         const suiteResult = await client.query('SELECT * FROM test_suites WHERE id = $1 AND deleted_at IS NULL', [id]);
         if (suiteResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test suite not found' }); }
+        const { validIds } = await validateSuiteTestCases(client, suiteResult.rows[0].project_id, test_case_ids);
 
         const maxSortResult = await client.query(
             `SELECT COALESCE(MAX(sort_order), 0) AS max_sort FROM test_suite_cases WHERE suite_id = $1 AND snapshot_id IS NULL`, [id]);
@@ -288,7 +384,7 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
         let addedCount = 0;
         if (position === 'end') {
             let nextSort = currentMax + 1;
-            for (const tcId of test_case_ids) {
+            for (const tcId of validIds) {
                 if (existingIds.has(tcId)) continue;
                 await client.query(
                     `INSERT INTO test_suite_cases (suite_id, test_case_id, sort_order) VALUES ($1, $2, $3)`,
@@ -296,14 +392,12 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
                 addedCount++;
             }
         } else if (position === 'start') {
-            const totalCount = await client.query(
-                `SELECT COUNT(*) AS cnt FROM test_suite_cases WHERE suite_id = $1 AND snapshot_id IS NULL`, [id]);
-            const shift = parseInt(totalCount.rows[0].cnt) + test_case_ids.filter(tcId => !existingIds.has(tcId)).length;
+            const shift = validIds.filter(tcId => !existingIds.has(tcId)).length;
             await client.query(
                 `UPDATE test_suite_cases SET sort_order = sort_order + $1 WHERE suite_id = $2 AND snapshot_id IS NULL`,
                 [shift, id]);
             let sortIdx = 1;
-            for (const tcId of test_case_ids) {
+            for (const tcId of validIds) {
                 if (existingIds.has(tcId)) continue;
                 await client.query(
                     `INSERT INTO test_suite_cases (suite_id, test_case_id, sort_order) VALUES ($1, $2, $3)`,
@@ -314,9 +408,9 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
             const insertAt = typeof position === 'number' ? position : parseInt(position);
             await client.query(
                 `UPDATE test_suite_cases SET sort_order = sort_order + $1 WHERE suite_id = $2 AND snapshot_id IS NULL AND sort_order >= $3`,
-                [test_case_ids.filter(tcId => !existingIds.has(tcId)).length, id, insertAt]);
+                [validIds.filter(tcId => !existingIds.has(tcId)).length, id, insertAt]);
             let sortIdx = insertAt;
-            for (const tcId of test_case_ids) {
+            for (const tcId of validIds) {
                 if (existingIds.has(tcId)) continue;
                 await client.query(
                     `INSERT INTO test_suite_cases (suite_id, test_case_id, sort_order) VALUES ($1, $2, $3)`,
@@ -345,6 +439,7 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
         res.json({ added: addedCount, test_cases: casesResult.rows });
     } catch (error) {
         await client.query('ROLLBACK');
+        if (error.status) return res.status(error.status).json({ error: error.message, details: error.details });
         next(error);
     } finally { client.release(); }
 });
