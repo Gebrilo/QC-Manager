@@ -10,6 +10,8 @@ const suiteCreateSchema = z.object({
     description: z.string().max(5000).optional(),
     project_id: z.string().uuid(),
     status: z.enum(['draft', 'active', 'archived']).default('draft'),
+    readiness_scope: z.enum(['required', 'optional']).default('required'),
+    suite_type: z.enum(['smoke', 'regression', 'acceptance', 'security', 'performance', 'other']).default('other'),
     test_case_ids: z.array(z.string().uuid()).optional().default([]),
 });
 
@@ -17,6 +19,8 @@ const suiteUpdateSchema = z.object({
     name: z.string().min(3).max(255).optional(),
     description: z.string().max(5000).optional(),
     status: z.enum(['draft', 'active', 'archived']).optional(),
+    readiness_scope: z.enum(['required', 'optional']).optional(),
+    suite_type: z.enum(['smoke', 'regression', 'acceptance', 'security', 'performance', 'other']).optional(),
 });
 
 async function validateSuiteTestCases(client, projectId, testCaseIds) {
@@ -147,10 +151,14 @@ router.post('/', requireAuth, requirePermission('action:test-suites:create'), as
         const suiteId = `TS-${String(nextId).padStart(5, '0')}`;
 
         const suiteResult = await client.query(
-            `INSERT INTO test_suites (suite_id, name, description, status, project_id, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            `INSERT INTO test_suites (
+                suite_id, name, description, status, readiness_scope, suite_type,
+                project_id, created_by, updated_by
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [suiteId, validatedData.name, validatedData.description || null,
-             validatedData.status, validatedData.project_id, req.user?.id || null, req.user?.id || null]);
+             validatedData.status, validatedData.readiness_scope, validatedData.suite_type,
+             validatedData.project_id, req.user?.id || null, req.user?.id || null]);
 
         const suite = suiteResult.rows[0];
 
@@ -206,7 +214,7 @@ router.patch('/:id', requireAuth, requirePermission('action:test-suites:edit'), 
         if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test suite not found' }); }
         const existing = existingResult.rows[0];
 
-        const updatableFields = ['name', 'description', 'status'];
+        const updatableFields = ['name', 'description', 'status', 'readiness_scope', 'suite_type'];
         const updates = [];
         const params = [];
         let pn = 1;
@@ -541,9 +549,13 @@ router.post('/:id/clone', requireAuth, requirePermission('action:test-suites:cre
         const cloneName = name || `${source.name} (Copy)`;
 
         const newSuiteResult = await client.query(
-            `INSERT INTO test_suites (suite_id, name, description, status, project_id, created_by, updated_by)
-             VALUES ($1, $2, $3, 'draft', $4, $5, $6) RETURNING *`,
-            [newSuiteId, cloneName, source.description, source.project_id, req.user?.id || null, req.user?.id || null]);
+            `INSERT INTO test_suites (
+                suite_id, name, description, status, readiness_scope, suite_type,
+                project_id, created_by, updated_by
+             )
+             VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8) RETURNING *`,
+            [newSuiteId, cloneName, source.description, source.readiness_scope || 'required',
+             source.suite_type || 'other', source.project_id, req.user?.id || null, req.user?.id || null]);
 
         const newSuite = newSuiteResult.rows[0];
 

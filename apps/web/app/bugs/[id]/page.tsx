@@ -6,6 +6,7 @@ import { tuleapApi, type TuleapArtifact } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
+import { BugLinksPanel } from '@/components/bugs/BugLinksPanel';
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',
@@ -121,6 +122,8 @@ export default function BugDetailPage() {
                     {JSON.stringify(artifact, null, 2)}
                 </pre>
             </div>
+
+            <BugLinksPanel bugId={id} triageStatus={(artifact as any)?.triage_status as string | undefined} />
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

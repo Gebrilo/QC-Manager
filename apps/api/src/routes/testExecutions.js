@@ -1200,6 +1200,16 @@ router.post('/test-runs/from-suite', requireAuth, requirePermission('action:test
          VALUES ($1, $2, $3, $4)`,
         [validatedData.suite_id, sc.test_case_id, sc.sort_order, testRun.id]
       );
+      await client.query(
+        `INSERT INTO test_run_suite_cases (
+           test_run_id, original_suite_id, test_case_id, sort_order,
+           test_case_title_snapshot, test_case_steps_snapshot, expected_result_snapshot
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (test_run_id, test_case_id) DO NOTHING`,
+        [testRun.id, validatedData.suite_id, sc.test_case_id, sc.sort_order,
+         sc.title, sc.test_steps, sc.expected_result]
+      );
     }
 
     // Create execution entries

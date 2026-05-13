@@ -1,12 +1,13 @@
 const { Pool } = require('pg');
 
-const isSupabase = process.env.DATABASE_URL?.includes('supabase.co');
+const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL;
+const isSupabase = databaseUrl?.includes('supabase.co');
 const sslConfig = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
 
 const pool = new Pool(
-    process.env.DATABASE_URL
+    databaseUrl
         ? { 
-            connectionString: process.env.DATABASE_URL, 
+            connectionString: databaseUrl,
             ssl: isSupabase ? { rejectUnauthorized: false } : sslConfig 
           }
         : {
@@ -563,7 +564,7 @@ const runMigrations = async () => {
             GROUP BY b.project_id, p.project_name
         `);
 
-        // Global Bug Summary View (includes source-based columns + legacy linked_test cols)
+        // Global Bug Summary View (includes source-based columns + normalized linked cols)
         await client.query(`
             CREATE OR REPLACE VIEW v_bug_summary_global AS
             SELECT
@@ -576,10 +577,11 @@ const runMigrations = async () => {
                 COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
                 COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
                 COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
-                COUNT(id) FILTER (WHERE array_length(linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
-                COUNT(id) FILTER (WHERE linked_test_execution_ids IS NULL
-                    OR array_length(linked_test_execution_ids, 1) IS NULL
-                    OR array_length(linked_test_execution_ids, 1) = 0) AS standalone_bugs
+                COUNT(id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)) AS bugs_from_testing,
+                COUNT(id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
+                                      AND COALESCE(array_length(linked_test_case_ids, 1), 0) = 0) AS standalone_bugs
             FROM bugs
             WHERE deleted_at IS NULL
         `);
@@ -732,6 +734,7 @@ const runMigrations = async () => {
                 t.tuleap_url,
                 t.synced_from_tuleap,
                 t.last_tuleap_sync,
+                t.parent_user_story_id,
                 r1.resource_name AS resource1_name,
                 r2.resource_name AS resource2_name,
                 p.project_name,
@@ -1861,6 +1864,251 @@ const runMigrations = async () => {
                         FOREIGN KEY (test_case_id) REFERENCES test_case(id) ON DELETE SET NULL NOT VALID;
                 END IF;
             END $$;
+        `);
+
+        // Normalized traceability model — additive compatibility layer.
+        await client.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_user_story_id UUID REFERENCES user_stories(id) ON DELETE SET NULL`);
+        await client.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_story_tuleap_artifact_id INTEGER`);
+        await client.query(`
+            UPDATE tasks
+            SET parent_story_tuleap_artifact_id = parent_story_id
+            WHERE parent_story_tuleap_artifact_id IS NULL
+              AND parent_story_id IS NOT NULL
+        `);
+        await client.query(`
+            UPDATE tasks t
+            SET parent_user_story_id = us.id
+            FROM user_stories us
+            WHERE t.parent_user_story_id IS NULL
+              AND t.parent_story_tuleap_artifact_id IS NOT NULL
+              AND us.tuleap_artifact_id = t.parent_story_tuleap_artifact_id
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_parent_user_story_id ON tasks(parent_user_story_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_parent_story_tuleap_artifact_id ON tasks(parent_story_tuleap_artifact_id) WHERE parent_story_tuleap_artifact_id IS NOT NULL`);
+
+        await client.query(`ALTER TABLE test_suites ADD COLUMN IF NOT EXISTS readiness_scope VARCHAR(20) NOT NULL DEFAULT 'required'`);
+        await client.query(`ALTER TABLE test_suites ADD COLUMN IF NOT EXISTS suite_type VARCHAR(30) NOT NULL DEFAULT 'other'`);
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_suites_readiness_scope_check') THEN
+                    ALTER TABLE test_suites ADD CONSTRAINT test_suites_readiness_scope_check
+                        CHECK (readiness_scope IN ('required','optional'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_suites_suite_type_check') THEN
+                    ALTER TABLE test_suites ADD CONSTRAINT test_suites_suite_type_check
+                        CHECK (suite_type IN ('smoke','regression','acceptance','security','performance','other'));
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_readiness_scope ON test_suites(project_id, readiness_scope) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_suites_suite_type ON test_suites(project_id, suite_type) WHERE deleted_at IS NULL`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS task_test_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'covers',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(task_id, test_case_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_task_id ON task_test_cases(task_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_test_case_id ON task_test_cases(test_case_id)`);
+        await client.query(`
+            INSERT INTO task_test_cases (task_id, test_case_id, relationship_type)
+            SELECT DISTINCT t.id, tc.id, 'covers'
+            FROM test_case tc
+            JOIN tasks t
+              ON t.task_id = tc.task_number
+             AND t.deleted_at IS NULL
+             AND (tc.project_id IS NULL OR t.project_id = tc.project_id)
+            WHERE tc.deleted_at IS NULL
+              AND tc.task_number IS NOT NULL
+              AND tc.task_number <> ''
+            ON CONFLICT (task_id, test_case_id) DO NOTHING
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bug_test_executions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+                test_execution_id UUID NOT NULL REFERENCES test_execution(id) ON DELETE CASCADE,
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bug_id, test_execution_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_executions_bug_id ON bug_test_executions(bug_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_executions_execution_id ON bug_test_executions(test_execution_id)`);
+        await client.query(`ALTER TABLE bugs ADD COLUMN IF NOT EXISTS triage_status VARCHAR(20) NOT NULL DEFAULT 'untriaged'`);
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bugs_triage_status_check') THEN
+                    ALTER TABLE bugs ADD CONSTRAINT bugs_triage_status_check
+                        CHECK (triage_status IN ('untriaged','triaged'));
+                END IF;
+            END $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_triage_status ON bugs(triage_status) WHERE deleted_at IS NULL`);
+        await client.query(`
+            INSERT INTO bug_test_executions (bug_id, test_execution_id)
+            SELECT DISTINCT b.id, te.id
+            FROM bugs b
+            CROSS JOIN LATERAL unnest(COALESCE(b.linked_test_execution_ids, ARRAY[]::uuid[])) AS linked_execution_id
+            JOIN test_execution te ON te.id = linked_execution_id
+            WHERE b.deleted_at IS NULL
+            ON CONFLICT (bug_id, test_execution_id) DO NOTHING
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bug_tasks (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+                task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'reported_against',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bug_id, task_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_bug_id ON bug_tasks(bug_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_task_id ON bug_tasks(task_id)`);
+        await client.query(`
+            UPDATE bugs
+            SET triage_status = 'triaged'
+            WHERE deleted_at IS NULL
+              AND triage_status = 'untriaged'
+              AND (
+                COALESCE(array_length(linked_test_case_ids, 1), 0) > 0
+                OR COALESCE(array_length(linked_test_execution_ids, 1), 0) > 0
+                OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
+              )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_run_suite_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                test_run_id UUID NOT NULL REFERENCES test_run(id) ON DELETE CASCADE,
+                original_suite_id UUID REFERENCES test_suites(id) ON DELETE SET NULL,
+                test_case_id UUID REFERENCES test_case(id) ON DELETE SET NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                test_case_title_snapshot VARCHAR(500),
+                test_case_steps_snapshot TEXT,
+                expected_result_snapshot TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(test_run_id, test_case_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_run_id ON test_run_suite_cases(test_run_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_suite_id ON test_run_suite_cases(original_suite_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_test_case_id ON test_run_suite_cases(test_case_id)`);
+        await client.query(`
+            INSERT INTO test_run_suite_cases (
+                test_run_id, original_suite_id, test_case_id, sort_order,
+                test_case_title_snapshot, test_case_steps_snapshot, expected_result_snapshot
+            )
+            SELECT DISTINCT
+                tr.id,
+                tr.suite_id,
+                te.test_case_id,
+                COALESCE(NULLIF(te.sort_order, 0), tsc.sort_order, 0),
+                COALESCE(te.test_case_title, tc.title),
+                COALESCE(te.test_case_steps, tc.test_steps),
+                COALESCE(te.expected_result, tc.expected_result)
+            FROM test_run tr
+            JOIN test_execution te ON te.test_run_id = tr.id
+            LEFT JOIN test_case tc ON tc.id = te.test_case_id
+            LEFT JOIN test_suite_cases tsc
+              ON tsc.snapshot_id = tr.id
+             AND tsc.test_case_id = te.test_case_id
+            WHERE tr.suite_id IS NOT NULL
+              AND te.test_case_id IS NOT NULL
+            ON CONFLICT (test_run_id, test_case_id) DO NOTHING
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_task_test_coverage AS
+            SELECT
+                t.project_id,
+                COUNT(DISTINCT t.id)::INTEGER AS total_tasks,
+                COUNT(DISTINCT t.id) FILTER (WHERE active_tc.test_case_count > 0)::INTEGER AS tasks_with_active_test_cases,
+                CASE
+                    WHEN COUNT(DISTINCT t.id) > 0 THEN
+                        ROUND((
+                            COUNT(DISTINCT t.id) FILTER (WHERE active_tc.test_case_count > 0)::NUMERIC
+                            / COUNT(DISTINCT t.id)::NUMERIC
+                        ) * 100, 2)
+                    ELSE 0
+                END AS task_test_coverage_pct
+            FROM tasks t
+            LEFT JOIN LATERAL (
+                SELECT COUNT(DISTINCT tc.id) AS test_case_count
+                FROM task_test_cases ttc
+                JOIN test_case tc ON tc.id = ttc.test_case_id
+                WHERE ttc.task_id = t.id
+                  AND tc.deleted_at IS NULL
+                  AND tc.status = 'active'
+            ) active_tc ON true
+            WHERE t.deleted_at IS NULL
+            GROUP BY t.project_id
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_user_story_test_coverage AS
+            SELECT
+                us.project_id,
+                COUNT(DISTINCT us.id)::INTEGER AS total_user_stories,
+                COUNT(DISTINCT us.id) FILTER (WHERE active_tc.test_case_count > 0)::INTEGER AS user_stories_with_active_test_cases,
+                CASE
+                    WHEN COUNT(DISTINCT us.id) > 0 THEN
+                        ROUND((
+                            COUNT(DISTINCT us.id) FILTER (WHERE active_tc.test_case_count > 0)::NUMERIC
+                            / COUNT(DISTINCT us.id)::NUMERIC
+                        ) * 100, 2)
+                    ELSE 0
+                END AS story_test_coverage_pct
+            FROM user_stories us
+            LEFT JOIN LATERAL (
+                SELECT COUNT(DISTINCT tc.id) AS test_case_count
+                FROM tasks t
+                JOIN task_test_cases ttc ON ttc.task_id = t.id
+                JOIN test_case tc ON tc.id = ttc.test_case_id
+                WHERE t.parent_user_story_id = us.id
+                  AND t.deleted_at IS NULL
+                  AND tc.deleted_at IS NULL
+                  AND tc.status = 'active'
+            ) active_tc ON true
+            WHERE us.deleted_at IS NULL
+            GROUP BY us.project_id
+        `);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_traceability AS
+            SELECT
+                b.id,
+                b.bug_id,
+                b.project_id,
+                b.title,
+                b.status,
+                b.source,
+                b.triage_status,
+                COUNT(DISTINCT bte.test_execution_id)::INTEGER AS linked_test_execution_count,
+                COUNT(DISTINCT bt.task_id)::INTEGER AS linked_task_count,
+                (
+                    b.triage_status = 'untriaged'
+                    OR (
+                        COUNT(DISTINCT bte.test_execution_id) = 0
+                        AND COUNT(DISTINCT bt.task_id) = 0
+                        AND COALESCE(array_length(b.linked_test_case_ids, 1), 0) = 0
+                    )
+                ) AS needs_triage
+            FROM bugs b
+            LEFT JOIN bug_test_executions bte ON bte.bug_id = b.id
+            LEFT JOIN bug_tasks bt ON bt.bug_id = b.id
+            WHERE b.deleted_at IS NULL
+            GROUP BY b.id
         `);
 
         // Add GIN index on test_case tags

@@ -911,4 +911,289 @@ router.get('/execution-progress', requireAuth, requirePermission('page:governanc
     }
 });
 
+// =====================================================
+// GET /governance/test-coverage
+// Task & story test coverage using normalized task_test_cases
+// =====================================================
+router.get('/test-coverage', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+
+        const taskCoverageQuery = `
+            SELECT
+                ttc.project_id,
+                p.project_name,
+                ttc.total_tasks,
+                ttc.tasks_with_active_test_cases,
+                ttc.task_test_coverage_pct
+            FROM v_task_test_coverage ttc
+            JOIN projects p ON p.id = ttc.project_id
+            WHERE p.deleted_at IS NULL
+                ${project_id ? 'AND ttc.project_id = $1' : ''}
+            ORDER BY ttc.task_test_coverage_pct ASC
+        `;
+        const taskParams = project_id ? [project_id] : [];
+        const taskResult = await pool.query(taskCoverageQuery, taskParams);
+
+        const storyCoverageQuery = `
+            SELECT
+                ustc.project_id,
+                p.project_name,
+                ustc.total_user_stories,
+                ustc.user_stories_with_active_test_cases,
+                ustc.story_test_coverage_pct
+            FROM v_user_story_test_coverage ustc
+            JOIN projects p ON p.id = ustc.project_id
+            WHERE p.deleted_at IS NULL
+                ${project_id ? 'AND ustc.project_id = $1' : ''}
+            ORDER BY ustc.story_test_coverage_pct ASC
+        `;
+        const storyResult = await pool.query(storyCoverageQuery, taskParams);
+
+        res.json({
+            success: true,
+            data: {
+                task_coverage: taskResult.rows,
+                story_coverage: storyResult.rows
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching test coverage:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch test coverage', message: error.message });
+    }
+});
+
+// =====================================================
+// GET /governance/suite-readiness
+// Per-suite readiness using latest completed test runs
+// =====================================================
+router.get('/suite-readiness', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        if (!project_id) {
+            return res.status(400).json({ success: false, error: 'project_id query parameter is required' });
+        }
+
+        const projectCheck = await pool.query('SELECT id FROM projects WHERE id = $1 AND deleted_at IS NULL', [project_id]);
+        if (projectCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Project not found' });
+        }
+
+        const suiteQuery = `
+            SELECT
+                ts.id AS suite_id,
+                ts.suite_id AS suite_display_id,
+                ts.name AS suite_name,
+                ts.suite_type,
+                ts.readiness_scope,
+                latest_run.id AS latest_run_id,
+                latest_run.run_id AS latest_run_display_id,
+                latest_run.name AS latest_run_name,
+                latest_run.completed_at,
+                run_stats.total_cases,
+                run_stats.passed_count,
+                run_stats.failed_count,
+                run_stats.blocked_count,
+                run_stats.not_run_count,
+                run_stats.pass_rate,
+                CASE
+                    WHEN ts.readiness_scope = 'required' AND latest_run.id IS NULL THEN 'blocked'
+                    WHEN ts.readiness_scope = 'required' AND run_stats.pass_rate IS NULL THEN 'blocked'
+                    WHEN latest_run.id IS NULL THEN 'unknown'
+                    WHEN run_stats.pass_rate >= 95 AND COALESCE(run_stats.failed_count, 0) = 0 THEN 'ready'
+                    WHEN run_stats.pass_rate >= 80 THEN 'warning'
+                    ELSE 'blocked'
+                END AS readiness_status,
+                CASE
+                    WHEN ts.readiness_scope = 'required' AND latest_run.id IS NULL THEN 'missing_required_suite_run'
+                    WHEN COALESCE(run_stats.failed_count, 0) > 0 THEN 'failed_cases_present'
+                    WHEN COALESCE(run_stats.blocked_count, 0) > 0 THEN 'blocked_cases_present'
+                    WHEN run_stats.pass_rate IS NULL THEN 'no_run_data'
+                    WHEN run_stats.pass_rate < 80 THEN 'pass_rate_below_threshold'
+                    ELSE NULL
+                END AS risk_reason
+            FROM test_suites ts
+            LEFT JOIN LATERAL (
+                SELECT tr.id, tr.run_id, tr.name, tr.completed_at
+                FROM test_run tr
+                WHERE tr.suite_id = ts.id
+                  AND tr.deleted_at IS NULL
+                  AND tr.status = 'completed'
+                ORDER BY tr.completed_at DESC
+                LIMIT 1
+            ) latest_run ON true
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(te.id) AS total_cases,
+                    COUNT(te.id) FILTER (WHERE te.status = 'pass') AS passed_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'fail') AS failed_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'blocked') AS blocked_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'not_run') AS not_run_count,
+                    ROUND(
+                        COUNT(te.id) FILTER (WHERE te.status = 'pass')::NUMERIC
+                        / NULLIF(COUNT(te.id), 0) * 100
+                    , 2) AS pass_rate
+                FROM test_execution te
+                WHERE te.test_run_id = latest_run.id
+            ) run_stats ON true
+            WHERE ts.project_id = $1
+              AND ts.deleted_at IS NULL
+            ORDER BY ts.readiness_scope DESC, ts.name ASC
+        `;
+        const result = await pool.query(suiteQuery, [project_id]);
+
+        res.json({
+            success: true,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching suite readiness:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch suite readiness', message: error.message });
+    }
+});
+
+// =====================================================
+// GET /governance/project-readiness
+// Roll-up readiness across all required suites for a project
+// =====================================================
+router.get('/project-readiness', requireAuth, requirePermission('page:governance'), async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        if (!project_id) {
+            return res.status(400).json({ success: false, error: 'project_id query parameter is required' });
+        }
+
+        const projectCheck = await pool.query('SELECT id, project_name FROM projects WHERE id = $1 AND deleted_at IS NULL', [project_id]);
+        if (projectCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Project not found' });
+        }
+        const projectName = projectCheck.rows[0].project_name;
+
+        const taskCoverageResult = await pool.query(
+            `SELECT task_test_coverage_pct FROM v_task_test_coverage WHERE project_id = $1`,
+            [project_id]
+        );
+        const storyCoverageResult = await pool.query(
+            `SELECT story_test_coverage_pct FROM v_user_story_test_coverage WHERE project_id = $1`,
+            [project_id]
+        );
+
+        const suiteQuery = `
+            SELECT
+                ts.id AS suite_id,
+                ts.suite_id AS suite_display_id,
+                ts.name AS suite_name,
+                ts.suite_type,
+                ts.readiness_scope,
+                latest_run.id AS latest_run_id,
+                latest_run.completed_at,
+                run_stats.total_cases,
+                run_stats.passed_count,
+                run_stats.failed_count,
+                run_stats.blocked_count,
+                run_stats.not_run_count,
+                run_stats.pass_rate,
+                CASE
+                    WHEN ts.readiness_scope = 'required' AND latest_run.id IS NULL THEN 'blocked'
+                    WHEN latest_run.id IS NULL THEN 'unknown'
+                    WHEN run_stats.pass_rate >= 95 AND COALESCE(run_stats.failed_count, 0) = 0 THEN 'ready'
+                    WHEN run_stats.pass_rate >= 80 THEN 'warning'
+                    ELSE 'blocked'
+                END AS readiness_status,
+                CASE
+                    WHEN ts.readiness_scope = 'required' AND latest_run.id IS NULL THEN 'missing_required_suite_run'
+                    WHEN COALESCE(run_stats.failed_count, 0) > 0 THEN 'failed_cases_present'
+                    WHEN COALESCE(run_stats.blocked_count, 0) > 0 THEN 'blocked_cases_present'
+                    WHEN run_stats.pass_rate IS NULL THEN 'no_run_data'
+                    WHEN run_stats.pass_rate < 80 THEN 'pass_rate_below_threshold'
+                    ELSE NULL
+                END AS risk_reason
+            FROM test_suites ts
+            LEFT JOIN LATERAL (
+                SELECT tr.id, tr.completed_at
+                FROM test_run tr
+                WHERE tr.suite_id = ts.id
+                  AND tr.deleted_at IS NULL
+                  AND tr.status = 'completed'
+                ORDER BY tr.completed_at DESC
+                LIMIT 1
+            ) latest_run ON true
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(te.id) AS total_cases,
+                    COUNT(te.id) FILTER (WHERE te.status = 'pass') AS passed_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'fail') AS failed_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'blocked') AS blocked_count,
+                    COUNT(te.id) FILTER (WHERE te.status = 'not_run') AS not_run_count,
+                    ROUND(
+                        COUNT(te.id) FILTER (WHERE te.status = 'pass')::NUMERIC
+                        / NULLIF(COUNT(te.id), 0) * 100
+                    , 2) AS pass_rate
+                FROM test_execution te
+                WHERE te.test_run_id = latest_run.id
+            ) run_stats ON true
+            WHERE ts.project_id = $1
+              AND ts.deleted_at IS NULL
+            ORDER BY ts.readiness_scope DESC, ts.name ASC
+        `;
+        const suiteResult = await pool.query(suiteQuery, [project_id]);
+
+        const requiredSuites = suiteResult.rows.filter(s => s.readiness_scope === 'required');
+        const requiredSuitesTotal = requiredSuites.length;
+        const requiredSuitesWithRun = requiredSuites.filter(s => s.latest_run_id !== null).length;
+        const untriagedBugsResult = await pool.query(
+            `SELECT COUNT(*) AS untriaged_count FROM bugs WHERE project_id = $1 AND deleted_at IS NULL AND triage_status = 'untriaged'`,
+            [project_id]
+        );
+
+        const riskReasons = [];
+        const missingRequired = requiredSuites.filter(s => s.latest_run_id === null);
+        if (missingRequired.length > 0) riskReasons.push('missing_required_suite_run');
+        const failedSuites = suiteResult.rows.filter(s => s.readiness_status === 'blocked' && s.risk_reason === 'failed_cases_present');
+        if (failedSuites.length > 0) riskReasons.push('failed_cases_present');
+        const blockedSuites = suiteResult.rows.filter(s => s.risk_reason === 'blocked_cases_present');
+        if (blockedSuites.length > 0) riskReasons.push('blocked_cases_present');
+        const lowPassRate = suiteResult.rows.filter(s => s.risk_reason === 'pass_rate_below_threshold');
+        if (lowPassRate.length > 0) riskReasons.push('pass_rate_below_threshold');
+        const taskCovPct = taskCoverageResult.rows.length > 0 ? parseFloat(taskCoverageResult.rows[0].task_test_coverage_pct) || 0 : 0;
+        const storyCovPct = storyCoverageResult.rows.length > 0 ? parseFloat(storyCoverageResult.rows[0].story_test_coverage_pct) || 0 : 0;
+        if (taskCovPct < 50) riskReasons.push('task_test_coverage_below_threshold');
+        if (storyCovPct < 50) riskReasons.push('story_test_coverage_below_threshold');
+        const untriagedCount = parseInt(untriagedBugsResult.rows[0].untriaged_count) || 0;
+        if (untriagedCount > 0) riskReasons.push('untriaged_bugs_present');
+
+        let readinessStatus;
+        if (requiredSuitesTotal === 0) {
+            readinessStatus = 'unknown';
+        } else if (missingRequired.length > 0) {
+            readinessStatus = 'blocked';
+        } else if (riskReasons.length === 0) {
+            readinessStatus = 'ready';
+        } else if (riskReasons.some(r => r === 'failed_cases_present' || r === 'pass_rate_below_threshold')) {
+            readinessStatus = 'blocked';
+        } else {
+            readinessStatus = 'warning';
+        }
+
+        res.json({
+            success: true,
+            data: {
+                project_id,
+                project_name: projectName,
+                readiness_status: readinessStatus,
+                task_test_coverage_pct: taskCovPct,
+                story_test_coverage_pct: storyCovPct,
+                required_suites_total: requiredSuitesTotal,
+                required_suites_with_completed_run: requiredSuitesWithRun,
+                risk_reasons: riskReasons,
+                untriaged_bugs: untriagedCount,
+                suites: suiteResult.rows
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching project readiness:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch project readiness', message: error.message });
+    }
+});
+
 module.exports = router;

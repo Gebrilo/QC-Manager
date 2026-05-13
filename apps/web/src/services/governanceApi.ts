@@ -329,6 +329,60 @@ export async function getExecutionProgress(projectId?: string): Promise<Executio
 }
 
 // =====================================================
+// Test Coverage & Readiness (normalized traceability)
+// =====================================================
+
+export async function getTestCoverage(projectId?: string): Promise<{
+    task_coverage: Array<{ project_id: string; project_name: string; total_tasks: number; tasks_with_active_test_cases: number; task_test_coverage_pct: number }>;
+    story_coverage: Array<{ project_id: string; project_name: string; total_user_stories: number; user_stories_with_active_test_cases: number; story_test_coverage_pct: number }>;
+}> {
+    try {
+        const params = new URLSearchParams();
+        if (projectId) params.append('project_id', projectId);
+        const qs = params.toString();
+        const result = await fetchApi<GovernanceApiResponse<any>>(`/governance/test-coverage${qs ? '?' + qs : ''}`);
+        return result.data;
+    } catch (error) {
+        console.warn('Test Coverage API failed', error);
+        return { task_coverage: [], story_coverage: [] };
+    }
+}
+
+export async function getSuiteReadiness(projectId: string): Promise<Array<{
+    suite_id: string; suite_display_id: string; suite_name: string;
+    suite_type: string; readiness_scope: string;
+    latest_run_id: string | null; latest_run_display_id: string | null;
+    latest_run_name: string | null; completed_at: string | null;
+    total_cases: number; passed_count: number; failed_count: number;
+    blocked_count: number; not_run_count: number; pass_rate: number | null;
+    readiness_status: string; risk_reason: string | null;
+}>> {
+    try {
+        const result = await fetchApi<GovernanceApiResponse<any>>(`/governance/suite-readiness?project_id=${projectId}`);
+        return result.data;
+    } catch (error) {
+        console.warn('Suite Readiness API failed', error);
+        return [];
+    }
+}
+
+export async function getProjectReadiness(projectId: string): Promise<{
+    project_id: string; project_name: string;
+    readiness_status: string; task_test_coverage_pct: number;
+    story_test_coverage_pct: number; required_suites_total: number;
+    required_suites_with_completed_run: number; risk_reasons: string[];
+    untriaged_bugs: number; suites: any[];
+} | null> {
+    try {
+        const result = await fetchApi<GovernanceApiResponse<any>>(`/governance/project-readiness?project_id=${projectId}`);
+        return result.data;
+    } catch (error) {
+        console.warn('Project Readiness API failed', error);
+        return null;
+    }
+}
+
+// =====================================================
 // Combined API Service Object
 // =====================================================
 
@@ -405,6 +459,11 @@ export const governanceApi = {
     getQualityMetrics,
     getBlockedAnalysis,
     getExecutionProgress,
+
+    // Test Coverage & Readiness
+    getTestCoverage,
+    getSuiteReadiness,
+    getProjectReadiness,
 };
 
 export default governanceApi;

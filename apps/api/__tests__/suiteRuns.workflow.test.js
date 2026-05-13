@@ -111,6 +111,8 @@ describe('suite-based test run workflow', () => {
       .mockResolvedValueOnce({ rows: [{ id: runId, run_id: 'TR-00007', project_id: projectId, source: 'suite' }] })
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ rows: [{ id: executionId, test_case_id: caseId, status: 'not_run', sort_order: 1 }] })
       .mockResolvedValueOnce({ rows: [{ id: '99999999-9999-9999-9999-999999999999', test_case_id: caseId2, status: 'not_run', sort_order: 2 }] })
       .mockResolvedValueOnce({})
@@ -129,6 +131,10 @@ describe('suite-based test run workflow', () => {
     const snapshotInserts = mockClientQuery.mock.calls.filter(call => /INSERT INTO test_suite_cases/i.test(call[0]));
     expect(snapshotInserts).toHaveLength(2);
     expect(snapshotInserts[0][1][3]).toBe(runId);
+
+    const normalizedSnapshotInserts = mockClientQuery.mock.calls.filter(call => /INSERT INTO test_run_suite_cases/i.test(call[0]));
+    expect(normalizedSnapshotInserts).toHaveLength(2);
+    expect(normalizedSnapshotInserts[0][1]).toEqual([runId, suiteId, caseId, 1, 'Login works', 'Open login', 'Dashboard']);
 
     const executionInserts = mockClientQuery.mock.calls.filter(call => /INSERT INTO test_execution/i.test(call[0]));
     expect(executionInserts).toHaveLength(2);

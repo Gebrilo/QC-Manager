@@ -352,7 +352,8 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
             notes: 'notes',
             completed_date: 'completed_date',
             expected_start_date: 'expected_start_date',
-            actual_start_date: 'actual_start_date'
+            actual_start_date: 'actual_start_date',
+            parent_user_story_id: 'parent_user_story_id',
         };
 
         for (const [key, value] of Object.entries(data)) {

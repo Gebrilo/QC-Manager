@@ -11,6 +11,32 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
 
+async function replaceBugLinks(bugId, { linked_test_execution_ids, linked_task_ids }) {
+    if (Array.isArray(linked_test_execution_ids)) {
+        await pool.query('DELETE FROM bug_test_executions WHERE bug_id = $1', [bugId]);
+        if (linked_test_execution_ids.length > 0) {
+            await pool.query(
+                `INSERT INTO bug_test_executions (bug_id, test_execution_id)
+                 SELECT $1, id FROM test_execution WHERE id = ANY($2)
+                 ON CONFLICT (bug_id, test_execution_id) DO NOTHING`,
+                [bugId, linked_test_execution_ids]
+            );
+        }
+    }
+
+    if (Array.isArray(linked_task_ids)) {
+        await pool.query('DELETE FROM bug_tasks WHERE bug_id = $1', [bugId]);
+        if (linked_task_ids.length > 0) {
+            await pool.query(
+                `INSERT INTO bug_tasks (bug_id, task_id)
+                 SELECT $1, id FROM tasks WHERE id = ANY($2) AND deleted_at IS NULL
+                 ON CONFLICT (bug_id, task_id) DO NOTHING`,
+                [bugId, linked_task_ids]
+            );
+        }
+    }
+}
+
 router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, res) => {
     try {
         const project_id = validUUID(req.query.project_id);
@@ -49,7 +75,9 @@ router.get('/summary', requireAuth, requirePermission('page:bugs'), async (req, 
                 b.source,
                 b.tuleap_artifact_id,
                 p.project_name,
-                CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
+                CASE WHEN EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                         OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = b.id)
+                     THEN true ELSE false END AS has_test_link
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.deleted_at IS NULL
@@ -107,7 +135,9 @@ router.get('/', requireAuth, requirePermission('page:bugs'), async (req, res) =>
                 b.*,
                 p.project_name,
                 r.resource_name AS submitted_by_resource_name,
-                CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
+                CASE WHEN EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                         OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = b.id)
+                     THEN true ELSE false END AS has_test_link
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             LEFT JOIN resources r ON b.submitted_by_resource_id = r.id
@@ -199,7 +229,9 @@ router.get('/:id', requireAuth, requirePermission('page:bugs'), async (req, res)
             SELECT
                 b.*,
                 p.project_name,
-                CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
+                CASE WHEN EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                         OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = b.id)
+                     THEN true ELSE false END AS has_test_link
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.id = $1 AND b.deleted_at IS NULL
@@ -235,7 +267,9 @@ router.get('/by-project/:projectId', requireAuth, requirePermission('page:bugs')
             SELECT
                 b.*,
                 p.project_name,
-                CASE WHEN array_length(b.linked_test_execution_ids, 1) > 0 THEN true ELSE false END AS has_test_link
+                CASE WHEN EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                         OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = b.id)
+                     THEN true ELSE false END AS has_test_link
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.project_id = $1 AND b.deleted_at IS NULL
@@ -275,11 +309,13 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             project_id,
             linked_test_case_ids = [],
             linked_test_execution_ids = [],
+            linked_task_ids = [],
             reported_by,
             assigned_to,
             reported_date,
             raw_tuleap_payload,
-            source
+            source,
+            triage_status
         } = req.body;
 
         const finalBugId = bug_id || (tuleap_artifact_id ? `TLP-${tuleap_artifact_id}` : `BUG-${Date.now().toString(36).toUpperCase()}`);
@@ -287,6 +323,11 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             ? 'TEST_CASE'
             : 'EXPLORATORY';
         const finalSource = source || computedSource;
+        const finalTriageStatus = triage_status || (
+            linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0 || linked_task_ids.length > 0
+                ? 'triaged'
+                : 'untriaged'
+        );
 
         const query = `
             INSERT INTO bugs (
@@ -294,9 +335,10 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
                 bug_id, title, description, status, severity, priority,
                 bug_type, component, project_id,
                 linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date, raw_tuleap_payload, source
+                reported_by, assigned_to, reported_date, raw_tuleap_payload, source, triage_status
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
             )
             RETURNING *
         `;
@@ -306,11 +348,12 @@ router.post('/', requireAuth, requirePermission('action:bugs:create'), async (re
             finalBugId, title, description, status, severity, priority,
             bug_type, component, project_id,
             linked_test_case_ids, linked_test_execution_ids,
-            reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource
+            reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource, finalTriageStatus
         ];
 
         const result = await pool.query(query, values);
         const bug = result.rows[0];
+        await replaceBugLinks(bug.id, { linked_test_execution_ids, linked_task_ids });
 
         await auditLog('bugs', bug.id, 'CREATE', bug, null);
 
@@ -355,7 +398,7 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
             'bug_type', 'component', 'assigned_to', 'updated_by',
             'resolved_date',
             'linked_test_case_ids', 'linked_test_execution_ids', 'raw_tuleap_payload',
-            'source'
+            'source', 'triage_status'
         ];
 
         const fields = [];
@@ -371,6 +414,10 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
         }
 
         if (fields.length === 0) {
+            await replaceBugLinks(id, {
+                linked_test_execution_ids: req.body.linked_test_execution_ids,
+                linked_task_ids: req.body.linked_task_ids,
+            });
             return res.json({ success: true, data: original });
         }
 
@@ -381,6 +428,10 @@ router.patch('/:id', requireAuth, requirePermission('action:bugs:edit'), async (
         const query = `UPDATE bugs SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         const result = await pool.query(query, values);
         const updated = result.rows[0];
+        await replaceBugLinks(id, {
+            linked_test_execution_ids: req.body.linked_test_execution_ids,
+            linked_task_ids: req.body.linked_task_ids,
+        });
 
         await auditLog('bugs', id, 'UPDATE', updated, original);
 
@@ -481,6 +532,222 @@ router.delete('/:id', requireAuth, requirePermission('action:bugs:delete'), asyn
             error: 'Failed to delete bug',
             message: error.message
         });
+    }
+});
+
+// =====================================================
+// BUG TEST EXECUTION LINKING ENDPOINTS
+// =====================================================
+
+router.get('/:id/test-executions', requireAuth, requirePermission('page:bugs'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (bugCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Bug not found' });
+        }
+
+        const result = await pool.query(
+            `SELECT bte.id, bte.bug_id, bte.test_execution_id, bte.created_at,
+                    te.status AS execution_status, te.notes AS execution_notes,
+                    te.executed_at, tr.run_id AS test_run_id, tr.name AS test_run_name
+             FROM bug_test_executions bte
+             JOIN test_execution te ON te.id = bte.test_execution_id
+             LEFT JOIN test_run tr ON tr.id = te.test_run_id
+             WHERE bte.bug_id = $1
+             ORDER BY bte.created_at ASC`,
+            [id]
+        );
+
+        res.json({ data: result.rows });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/:id/test-executions', requireAuth, requirePermission('action:bugs:edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { test_execution_id } = req.body;
+
+        if (!test_execution_id) {
+            return res.status(400).json({ error: 'test_execution_id is required' });
+        }
+
+        const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (bugCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Bug not found' });
+        }
+
+        const teCheck = await pool.query('SELECT id FROM test_execution WHERE id = $1', [test_execution_id]);
+        if (teCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Test execution not found' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO bug_test_executions (bug_id, test_execution_id, created_by)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (bug_id, test_execution_id) DO NOTHING
+             RETURNING *`,
+            [id, test_execution_id, req.user?.id || null]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(409).json({ error: 'Link already exists' });
+        }
+
+        await pool.query(
+            `UPDATE bugs SET triage_status = 'triaged', updated_at = NOW() WHERE id = $1 AND triage_status = 'untriaged'`,
+            [id]
+        );
+
+        await auditLog('bug_test_executions', result.rows[0].id, 'CREATE', result.rows[0], null);
+        res.status(201).json({ data: result.rows[0] });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.delete('/:id/test-executions/:executionId', requireAuth, requirePermission('action:bugs:edit'), async (req, res, next) => {
+    try {
+        const { id, executionId } = req.params;
+
+        const result = await pool.query(
+            `DELETE FROM bug_test_executions WHERE bug_id = $1 AND test_execution_id = $2 RETURNING *`,
+            [id, executionId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Link not found' });
+        }
+
+        const remainingExecs = await pool.query(
+            `SELECT 1 FROM bug_test_executions WHERE bug_id = $1 LIMIT 1`,
+            [id]
+        );
+        const remainingTasks = await pool.query(
+            `SELECT 1 FROM bug_tasks WHERE bug_id = $1 LIMIT 1`,
+            [id]
+        );
+
+        if (remainingExecs.rows.length === 0 && remainingTasks.rows.length === 0) {
+            await pool.query(
+                `UPDATE bugs SET triage_status = 'untriaged', updated_at = NOW() WHERE id = $1`,
+                [id]
+            );
+        }
+
+        await auditLog('bug_test_executions', result.rows[0].id, 'DELETE', null, result.rows[0]);
+        res.json({ success: true, message: 'Link removed' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// =====================================================
+// BUG TASK LINKING ENDPOINTS
+// =====================================================
+
+router.get('/:id/tasks', requireAuth, requirePermission('page:bugs'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (bugCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Bug not found' });
+        }
+
+        const result = await pool.query(
+            `SELECT bt.id, bt.bug_id, bt.task_id, bt.relationship_type, bt.created_at,
+                    t.task_id AS task_display_id, t.task_name, t.status AS task_status, t.project_id
+             FROM bug_tasks bt
+             JOIN tasks t ON t.id = bt.task_id
+             WHERE bt.bug_id = $1 AND t.deleted_at IS NULL
+             ORDER BY bt.created_at ASC`,
+            [id]
+        );
+
+        res.json({ data: result.rows });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/:id/tasks', requireAuth, requirePermission('action:bugs:edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { task_id, relationship_type = 'reported_against' } = req.body;
+
+        if (!task_id) {
+            return res.status(400).json({ error: 'task_id is required' });
+        }
+
+        const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (bugCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Bug not found' });
+        }
+
+        const taskCheck = await pool.query('SELECT id FROM tasks WHERE id = $1 AND deleted_at IS NULL', [task_id]);
+        if (taskCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO bug_tasks (bug_id, task_id, relationship_type, created_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (bug_id, task_id) DO NOTHING
+             RETURNING *`,
+            [id, task_id, relationship_type, req.user?.id || null]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(409).json({ error: 'Link already exists' });
+        }
+
+        await pool.query(
+            `UPDATE bugs SET triage_status = 'triaged', updated_at = NOW() WHERE id = $1 AND triage_status = 'untriaged'`,
+            [id]
+        );
+
+        await auditLog('bug_tasks', result.rows[0].id, 'CREATE', result.rows[0], null);
+        res.status(201).json({ data: result.rows[0] });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.delete('/:id/tasks/:taskId', requireAuth, requirePermission('action:bugs:edit'), async (req, res, next) => {
+    try {
+        const { id, taskId } = req.params;
+
+        const result = await pool.query(
+            `DELETE FROM bug_tasks WHERE bug_id = $1 AND task_id = $2 RETURNING *`,
+            [id, taskId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Link not found' });
+        }
+
+        const remainingExecs = await pool.query(
+            `SELECT 1 FROM bug_test_executions WHERE bug_id = $1 LIMIT 1`,
+            [id]
+        );
+        const remainingTasks = await pool.query(
+            `SELECT 1 FROM bug_tasks WHERE bug_id = $1 LIMIT 1`,
+            [id]
+        );
+
+        if (remainingExecs.rows.length === 0 && remainingTasks.rows.length === 0) {
+            await pool.query(
+                `UPDATE bugs SET triage_status = 'untriaged', updated_at = NOW() WHERE id = $1`,
+                [id]
+            );
+        }
+
+        await auditLog('bug_tasks', result.rows[0].id, 'DELETE', null, result.rows[0]);
+        res.json({ success: true, message: 'Link removed' });
+    } catch (err) {
+        next(err);
     }
 });
 

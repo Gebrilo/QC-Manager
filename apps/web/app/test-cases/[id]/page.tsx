@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDistanceToNow, format } from 'date-fns';
+import { LinkedTasksPanel } from '@/components/test-cases/LinkedTasksPanel';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
@@ -197,6 +198,8 @@ export default function TestCaseDetailPage() {
                     </div>
                 )}
             </div>
+
+            <LinkedTasksPanel testCaseId={testCase.id} />
         </div>
     );
 }

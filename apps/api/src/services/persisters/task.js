@@ -168,7 +168,9 @@ async function handleSync(unified, config, { query }) {
     query,
   });
 
-  const parentStoryId = resolved.find(l => l.type === 'user_story')?.qc_id || null;
+  const parentStoryLink = resolved.find(l => l.type === 'user_story') || null;
+  const parentUserStoryId = parentStoryLink?.qc_id || null;
+  const parentStoryTuleapArtifactId = parentStoryLink?.tuleap_id || fields.parent_story_id || null;
 
   const existing = await query(
     'SELECT * FROM tasks WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL',
@@ -186,9 +188,11 @@ async function handleSync(unified, config, { query }) {
         resource1_id = COALESCE($4, resource1_id),
         tuleap_url = COALESCE($5, tuleap_url),
         parent_story_id = CASE WHEN $6::integer IS NOT NULL THEN $6 ELSE parent_story_id END,
+        parent_story_tuleap_artifact_id = CASE WHEN $6::integer IS NOT NULL THEN $6 ELSE parent_story_tuleap_artifact_id END,
+        parent_user_story_id = CASE WHEN $7::uuid IS NOT NULL THEN $7 ELSE parent_user_story_id END,
         last_tuleap_sync = NOW(),
         updated_at = NOW()
-      WHERE id = $7
+      WHERE id = $8
       RETURNING *
     `, [
       common.title || null,
@@ -196,7 +200,8 @@ async function handleSync(unified, config, { query }) {
       common.status || null,
       common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null,
       tuleapUrl,
-      parentStoryId,
+      parentStoryTuleapArtifactId,
+      parentUserStoryId,
       task.id,
     ]);
 
@@ -222,11 +227,14 @@ async function handleSync(unified, config, { query }) {
         resource1_id = $4,
         tuleap_url = $5,
         parent_story_id = $6,
+        parent_story_tuleap_artifact_id = $6,
+        parent_user_story_id = $7,
         last_tuleap_sync = NOW(),
         updated_at = NOW()
-      WHERE id = $7
+      WHERE id = $8
       RETURNING *
-    `, [common.status || 'Backlog', common.title, common.description, resourceId, tuleapUrl, parentStoryId, task.id]);
+    `, [common.status || 'Backlog', common.title, common.description, resourceId, tuleapUrl,
+      parentStoryTuleapArtifactId, parentUserStoryId, task.id]);
 
     if (resolved.length > 0) {
       await drainPending({
@@ -249,13 +257,13 @@ async function handleSync(unified, config, { query }) {
       task_id, task_name, notes, status,
       project_id, resource1_id,
       tuleap_artifact_id, tuleap_url, synced_from_tuleap, last_tuleap_sync,
-      parent_story_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9)
+      parent_story_id, parent_story_tuleap_artifact_id, parent_user_story_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10)
     RETURNING *
   `, [
     task_id, common.title, common.description || '', common.status || 'Backlog',
     projectId, resourceId,
-    tuleapArtifactId, tuleapUrl, parentStoryId,
+    tuleapArtifactId, tuleapUrl, parentStoryTuleapArtifactId, parentUserStoryId,
   ]);
 
   if (resolved.length > 0) {

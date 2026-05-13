@@ -1511,6 +1511,80 @@ export interface TuleapSyncConfig {
     updated_at: string;
 }
 
+// ============================================================================
+// API Client - Task/Test Case Links
+// ============================================================================
+
+export const taskTestCaseLinksApi = {
+    listTestCases: (taskId: string) =>
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_priority: string }> }>(`/tasks/${taskId}/test-cases`),
+
+    addTestCase: (taskId: string, testCaseId: string, relationshipType = 'covers') =>
+        fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/tasks/${taskId}/test-cases`, {
+            method: 'POST',
+            body: JSON.stringify({ test_case_id: testCaseId, relationship_type: relationshipType }),
+        }),
+
+    removeTestCase: (taskId: string, testCaseId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
+
+    listTasks: (testCaseId: string) =>
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; created_at: string; task_display_id: string; task_name: string; task_status: string; project_id: string }> }>(`/test-cases/${testCaseId}/tasks`),
+
+    addTask: (testCaseId: string, taskId: string, relationshipType = 'covers') =>
+        fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify({ task_id: taskId, relationship_type: relationshipType }),
+        }),
+
+    removeTask: (testCaseId: string, taskId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/tasks/${taskId}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
+// API Client - Bug Links
+// ============================================================================
+
+export const bugLinksApi = {
+    listTestExecutions: (bugId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_execution_id: string; created_at: string; execution_status: string; execution_notes: string; executed_at: string; test_run_id: string; test_run_name: string }> }>(`/bugs/${bugId}/test-executions`),
+
+    addTestExecution: (bugId: string, testExecutionId: string) =>
+        fetchApi<{ data: { id: string; bug_id: string; test_execution_id: string } }>(`/bugs/${bugId}/test-executions`, {
+            method: 'POST',
+            body: JSON.stringify({ test_execution_id: testExecutionId }),
+        }),
+
+    removeTestExecution: (bugId: string, testExecutionId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-executions/${testExecutionId}`, { method: 'DELETE' }),
+
+    listTasks: (bugId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; created_at: string; task_display_id: string; task_name: string; task_status: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
+
+    addTask: (bugId: string, taskId: string, relationshipType = 'reported_against') =>
+        fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/bugs/${bugId}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify({ task_id: taskId, relationship_type: relationshipType }),
+        }),
+
+    removeTask: (bugId: string, taskId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/tasks/${taskId}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
+// API Client - Search (global, used by relationship pickers)
+// ============================================================================
+
+export const searchApi = {
+    search: (params: { q: string; type?: string; project_id?: string; limit?: number; include_archived?: boolean }) => {
+        const clean: Record<string, string> = {};
+        for (const [k, v] of Object.entries(params)) {
+            if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
+        }
+        return fetchApi<{ data: Array<{ type: string; id: string; display_id: string; title: string; project_id: string; project_name: string; status: string; url: string }>; meta: { q: string; limit: number; types: string[] } }>(`/search?${new URLSearchParams(clean).toString()}`);
+    },
+};
+
 export const tuleapConfigApi = {
     list: async (params?: Record<string, string>) => {
         const query = params ? '?' + new URLSearchParams(params).toString() : '';

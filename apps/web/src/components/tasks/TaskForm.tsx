@@ -37,7 +37,7 @@ const taskSchema = z.object({
     actual_start_date: z.string().optional().or(z.literal('')),
     deadline: z.string().optional().or(z.literal('')),
     completed_date: z.string().optional().or(z.literal('')),
-    parent_story_id: z.string().optional().default(''),
+    parent_user_story_id: z.string().uuid().optional().or(z.literal('')),
 });
 
 type FormData = z.infer<typeof taskSchema>;
@@ -87,7 +87,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
             actual_start_date: initialData?.actual_start_date ? initialData.actual_start_date.split('T')[0] : '',
             deadline: initialData?.deadline ? initialData.deadline.split('T')[0] : '',
             completed_date: initialData?.completed_date ? initialData.completed_date.split('T')[0] : '',
-            parent_story_id: (initialData as any)?.parent_story_id?.toString() || '',
+            parent_user_story_id: (initialData as any)?.parent_user_story_id || '',
         },
     });
 
@@ -114,7 +114,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                 initial_estimate: data.initial_estimate ?? undefined,
                 final_estimate: data.final_estimate ?? undefined,
                 actual_effort: data.actual_effort ?? undefined,
-                parent_story_id: data.parent_story_id ? parseInt(data.parent_story_id, 10) || undefined : undefined,
+                parent_user_story_id: data.parent_user_story_id || undefined,
             };
 
             if (isEdit && initialData) {
@@ -347,9 +347,9 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
 
             <FormSection title="Links">
                 <Input
-                    label="Parent Story ID"
-                    {...register('parent_story_id')}
-                    placeholder="e.g. 140"
+                    label="Parent User Story"
+                    {...register('parent_user_story_id')}
+                    placeholder="User story UUID (or use search)"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
             </FormSection>
