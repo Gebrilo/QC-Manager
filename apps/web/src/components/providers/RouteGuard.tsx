@@ -39,7 +39,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         if (!routeAllowsStatus(route, user)) {
             console.log('[RouteGuard] status scope denied → /my-tasks', { pathname, role: user.role, status: user.status, scopes: route.scopes });
-            router.replace('/my-tasks');
+            router.replace('/me/tasks');
             return;
         }
 
