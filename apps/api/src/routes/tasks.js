@@ -4,7 +4,7 @@ const db = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireCatalogPermission, optionalAuth } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const { emitToTuleap: emitTask } = require('../services/emitters/task');
 const { defaultClient } = require('../services/tuleapClient');
@@ -78,7 +78,7 @@ async function buildTaskTeamFilter(user) {
 }
 
 // GET all tasks — filtered by team for managers, by resource for regular users
-router.get('/', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
+router.get('/', requireAuth, requireCatalogPermission('page:tasks'), async (req, res, next) => {
     try {
         const role = req.user?.role;
 

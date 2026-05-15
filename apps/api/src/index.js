@@ -8,9 +8,12 @@ dotenv.config();
 
 const errorHandler = require('./middleware/error');
 const { runMigrations } = require('./config/db');
+const { validatePermissionCatalog } = require('./rbac/validatePermissionCatalog');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+validatePermissionCatalog();
 
 // Run migrations on startup
 runMigrations().catch(err => console.error('Migration failed:', err));

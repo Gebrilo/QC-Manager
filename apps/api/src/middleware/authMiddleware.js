@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { canUserPerform, getPermissionLookupKeys } = require('../../../shared/rbac/catalog.ts');
 
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 // Legacy fallback for old custom JWTs during transition
@@ -190,6 +191,40 @@ function requirePermission(permissionKey) {
     };
 }
 
+async function loadPermissionOverrides(userId, permissionKey) {
+    const keys = getPermissionLookupKeys(permissionKey);
+    const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+    const result = await db.query(
+        `SELECT permission_key, granted FROM user_permissions WHERE user_id = $1 AND permission_key IN (${placeholders})`,
+        [userId, ...keys]
+    );
+    return result.rows;
+}
+
+/**
+ * Middleware: Check a permission through the shared RBAC catalog resolver.
+ * This keeps legacy permission-key aliases working while role defaults move to the catalog.
+ * @param {string} permissionKey - Required permission key, legacy or canonical.
+ */
+function requireCatalogPermission(permissionKey) {
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        try {
+            const permissionOverrides = await loadPermissionOverrides(req.user.id, permissionKey);
+            const allowed = canUserPerform({ ...req.user, permissionOverrides }, permissionKey);
+            if (!allowed) {
+                return res.status(403).json({ error: 'You do not have permission to perform this action' });
+            }
+            next();
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+
 /**
  * Middleware: Check if user has ANY of the specified permissions.
  * Useful for endpoints accessible by multiple permission types.
@@ -235,4 +270,4 @@ function requireStatus(...statuses) {
     };
 }
 
-module.exports = { requireAuth, requireRole, requirePermission, requireAnyPermission, optionalAuth, requireStatus };
+module.exports = { requireAuth, requireRole, requirePermission, requireCatalogPermission, requireAnyPermission, optionalAuth, requireStatus };

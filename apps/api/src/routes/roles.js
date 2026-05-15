@@ -3,42 +3,10 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
+const { LEGACY_PERMISSION_ALIASES } = require('../../../shared/rbac/catalog.ts');
 
 // All system permission keys
-const ALL_PERMISSIONS = [
-    // Page permissions
-    'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
-    'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-    'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:roles', 'page:journeys',
-    'page:teams', 'page:bugs',
-    // Task actions
-    'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
-    // Project actions
-    'action:projects:create', 'action:projects:edit', 'action:projects:delete',
-    // Resource actions
-    'action:resources:create', 'action:resources:edit', 'action:resources:delete',
-    // Report actions
-    'action:reports:generate',
-    // Personal task actions
-    'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
-    // Journey actions
-    'action:journeys:assign',
-    'action:journeys:view_assigned',
-    'action:journeys:view_team_progress',
-    // Team actions
-    'action:teams:manage',
-    'action:teams:view',
-    // Test case actions
-    'action:test-cases:create', 'action:test-cases:edit', 'action:test-cases:delete',
-    // Test execution actions
-    'action:test-executions:create', 'action:test-executions:edit', 'action:test-executions:delete',
-    // Test result actions
-    'action:test-results:upload', 'action:test-results:delete',
-    // Bug actions
-    'action:bugs:create', 'action:bugs:edit', 'action:bugs:delete',
-    // Governance actions
-    'action:governance:manage_gates', 'action:governance:approve_release',
-];
+const ALL_PERMISSIONS = Object.freeze(Object.keys(LEGACY_PERMISSION_ALIASES));
 
 // Protected built-in roles that cannot be deleted
 const BUILT_IN_ROLES = ['admin', 'manager', 'user', 'viewer', 'contributor'];
