@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { getRouteConfig, isPublicRoute, getLandingPage } from '../../config/routes';
+import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus } from '../../config/routes';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
     const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
@@ -37,8 +37,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         // Permission-validated landing page based on user preferences
         const landing = getLandingPage(user, permissions);
 
-        if (route.requiresActivation && user.status !== 'ACTIVE') {
-            console.log('[RouteGuard] not activated → /my-tasks', { pathname, role: user.role, status: user.status });
+        if (!routeAllowsStatus(route, user)) {
+            console.log('[RouteGuard] status scope denied → /my-tasks', { pathname, role: user.role, status: user.status, scopes: route.scopes });
             router.replace('/my-tasks');
             return;
         }
@@ -81,7 +81,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     const route = getRouteConfig(pathname || '');
     if (route) {
-        if (route.requiresActivation && user.status !== 'ACTIVE') return null;
+        if (!routeAllowsStatus(route, user)) return null;
         if (route.adminOnly && !isAdmin) return null;
         if (route.permission && !hasPermission(route.permission)) return null;
     }

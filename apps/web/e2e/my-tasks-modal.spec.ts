@@ -62,7 +62,7 @@ test.describe('My Tasks — Detail Modal', () => {
         await page.locator('.glass-card').filter({ hasText: 'Write unit tests' }).click();
         const modal = page.getByRole('dialog', { name: 'Task detail' });
         await expect(modal).toBeVisible();
-        await expect(modal.getByDisplayValue('Write unit tests')).toBeVisible();
+        await expect(modal.getByPlaceholder('Task title')).toHaveValue('Write unit tests');
         await expect(modal.getByText('Cover login, logout, and token refresh flows.')).toBeVisible();
     });
 

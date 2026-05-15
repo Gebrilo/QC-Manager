@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
+const { resolvePermissionKey } = require('../../../../shared/rbac/catalog.ts');
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface User {
@@ -187,7 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const hasPermission = useCallback((key: string) => {
         if (user?.role === 'admin') return true;
-        return permissions.includes(key);
+        const canonicalKey = resolvePermissionKey(key);
+        return permissions.some(permission => {
+            if (permission === '*') return true;
+            return resolvePermissionKey(permission) === canonicalKey;
+        });
     }, [user, permissions]);
 
     const isAdmin = user?.role === 'admin';

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi, profileApi, UserPreferences } from '../../src/lib/api';
 import { useTheme } from '../../src/components/providers/ThemeProvider';
 import { useAuth } from '../../src/components/providers/AuthProvider';
-import { getRouteConfig, getNavbarRoutes } from '../../src/config/routes';
+import { getRouteConfig, getNavbarRoutes, routeAllowsStatus } from '../../src/config/routes';
 
 interface UserProfile {
     id: string;
@@ -60,8 +60,8 @@ export default function PreferencesPage() {
             if (isAdmin) return true;
             // Check admin-only restriction
             if (route.adminOnly) return false;
-            // Check activation requirement
-            if (route.requiresActivation && authUser?.status !== 'ACTIVE') return false;
+            // Check catalog status scopes
+            if (!routeAllowsStatus(route, authUser)) return false;
             // Check permission
             if (route.permission && !hasPermission(route.permission)) return false;
             return true;
@@ -69,9 +69,8 @@ export default function PreferencesPage() {
     }, [authUser, permissions, isAdmin, hasPermission]);
 
     const accessibleNavRoutes = useMemo(() => {
-        return getNavbarRoutes(authUser?.status).filter(route => {
+        return getNavbarRoutes(authUser).filter(route => {
             if (route.adminOnly && !isAdmin) return false;
-            if (route.requiresActivation && authUser?.status !== 'ACTIVE') return false;
             if (route.permission && !hasPermission(route.permission)) return false;
             return true;
         });
