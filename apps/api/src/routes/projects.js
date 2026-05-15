@@ -4,8 +4,9 @@ const db = require('../config/db');
 const { createProjectSchema, updateProjectSchema } = require('../schemas/project');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, requireStatus } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireStatusScope } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
+const { SCOPES } = require('../../../shared/rbac/catalog.ts');
 
 /**
  * Resolve team-scoped WHERE clause for projects.
@@ -26,7 +27,7 @@ async function buildTeamFilter(user) {
 }
 
 // GET all projects (from View), scoped by team for managers
-router.get('/', requireAuth, requireStatus('ACTIVE'), async (req, res, next) => {
+router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), async (req, res, next) => {
     try {
         const { clause, params } = await buildTeamFilter(req.user);
 

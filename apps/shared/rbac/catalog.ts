@@ -230,6 +230,7 @@ const ROLE_DEFINITIONS = Object.freeze({
 
 const ROLES = ROLE_DEFINITIONS;
 const ALL_PERMISSION_VALUES = Object.freeze(Object.values(PERMISSIONS));
+const ALL_SCOPE_VALUES = Object.freeze(Object.values(SCOPES).map(scope => scope.key));
 
 function resolvePermissionKey(key) {
     return LEGACY_PERMISSION_ALIASES[key] || key;
@@ -256,6 +257,29 @@ function collectRolePermissions(roleName, seen) {
 
     const inherited = (role.inherits || []).flatMap(parent => collectRolePermissions(parent, seen));
     return [...inherited, ...(role.permissions || [])];
+}
+
+function collectRoleScopes(roleName, seen) {
+    const role = ROLES[roleName];
+    if (!role || seen.has(roleName)) return [];
+    seen.add(roleName);
+
+    const inherited = (role.inherits || []).flatMap(parent => collectRoleScopes(parent, seen));
+    return [...inherited, ...(role.scopes || [])];
+}
+
+function canUserUseScope(user, scopeKey) {
+    if (!user || !scopeKey || !ALL_SCOPE_VALUES.includes(scopeKey)) return false;
+
+    const rolePermissions = collectRolePermissions(user.role, new Set());
+    if (rolePermissions.includes('*')) return true;
+
+    const roleScopes = collectRoleScopes(user.role, new Set());
+    return roleScopes.includes(scopeKey);
+}
+
+function getScope(scopeKey) {
+    return Object.values(SCOPES).find(scope => scope.key === scopeKey) || null;
 }
 
 function normalizeOverrideMap(user) {
@@ -303,8 +327,12 @@ module.exports = {
     SCOPES,
     LEGACY_PERMISSION_ALIASES,
     ALL_PERMISSION_VALUES,
+    ALL_SCOPE_VALUES,
     canUserPerform,
+    canUserUseScope,
     collectRolePermissions,
+    collectRoleScopes,
+    getScope,
     getPermissionLookupKeys,
     isKnownPermissionKey,
     resolvePermissionKey,

@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { canUserPerform, getPermissionLookupKeys } = require('../../../shared/rbac/catalog.ts');
+const {
+    canUserPerform,
+    getPermissionLookupKeys,
+    getScope,
+} = require('../../../shared/rbac/catalog.ts');
 
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 // Legacy fallback for old custom JWTs during transition
@@ -161,59 +165,32 @@ async function optionalAuth(req, res, next) {
     next();
 }
 
-/**
- * Middleware: Check if user has a specific permission.
- * Queries user_permissions table for the exact permission grant.
- * Admins bypass all permission checks.
- * @param {string} permissionKey - Required permission key (e.g., 'action:tasks:create')
- */
-function requirePermission(permissionKey) {
-    return async (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-        // Admins bypass all permission checks
-        if (req.user.role === 'admin') {
-            return next();
-        }
-        try {
-            const result = await db.query(
-                'SELECT granted FROM user_permissions WHERE user_id = $1 AND permission_key = $2',
-                [req.user.id, permissionKey]
-            );
-            if (result.rows.length === 0 || !result.rows[0].granted) {
-                return res.status(403).json({ error: 'You do not have permission to perform this action' });
-            }
-            next();
-        } catch (err) {
-            next(err);
-        }
-    };
-}
-
-async function loadPermissionOverrides(userId, permissionKey) {
-    const keys = getPermissionLookupKeys(permissionKey);
-    const placeholders = keys.map((_, i) => `$${i + 2}`).join(', ');
+async function loadPermissionOverrides(userId, permissionKeys) {
+    const keys = permissionKeys.flatMap(permissionKey => getPermissionLookupKeys(permissionKey));
+    const uniqueKeys = [...new Set(keys)];
+    const placeholders = uniqueKeys.map((_, i) => `$${i + 2}`).join(', ');
     const result = await db.query(
         `SELECT permission_key, granted FROM user_permissions WHERE user_id = $1 AND permission_key IN (${placeholders})`,
-        [userId, ...keys]
+        [userId, ...uniqueKeys]
     );
     return result.rows;
 }
 
 /**
  * Middleware: Check a permission through the shared RBAC catalog resolver.
- * This keeps legacy permission-key aliases working while role defaults move to the catalog.
+ * Legacy permission keys still work through the catalog alias shim.
  * @param {string} permissionKey - Required permission key, legacy or canonical.
  */
-function requireCatalogPermission(permissionKey) {
+function requirePermission(permissionKey) {
     return async (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
         try {
-            const permissionOverrides = await loadPermissionOverrides(req.user.id, permissionKey);
+            const permissionOverrides = req.user.role === 'admin'
+                ? []
+                : await loadPermissionOverrides(req.user.id, [permissionKey]);
             const allowed = canUserPerform({ ...req.user, permissionOverrides }, permissionKey);
             if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
@@ -235,22 +212,42 @@ function requireAnyPermission(...permissionKeys) {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        if (req.user.role === 'admin') {
-            return next();
-        }
+
         try {
-            const placeholders = permissionKeys.map((_, i) => `$${i + 2}`).join(', ');
-            const result = await db.query(
-                `SELECT permission_key FROM user_permissions WHERE user_id = $1 AND permission_key IN (${placeholders}) AND granted = true`,
-                [req.user.id, ...permissionKeys]
-            );
-            if (result.rows.length === 0) {
+            const permissionOverrides = req.user.role === 'admin'
+                ? []
+                : await loadPermissionOverrides(req.user.id, permissionKeys);
+            const actor = { ...req.user, permissionOverrides };
+            const allowed = permissionKeys.some(permissionKey => canUserPerform(actor, permissionKey));
+            if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
             }
             next();
         } catch (err) {
             next(err);
         }
+    };
+}
+
+function requireStatusScope(scopeKey) {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const scope = getScope(scopeKey);
+        if (!scope || !Array.isArray(scope.statuses)) {
+            return res.status(500).json({ error: `Invalid status scope: ${scopeKey}` });
+        }
+
+        if (!scope.statuses.includes(req.user.status)) {
+            return res.status(403).json({
+                error: 'Access restricted based on your account status.',
+                required: scope.statuses,
+                current: req.user.status,
+            });
+        }
+        next();
     };
 }
 
@@ -270,4 +267,12 @@ function requireStatus(...statuses) {
     };
 }
 
-module.exports = { requireAuth, requireRole, requirePermission, requireCatalogPermission, requireAnyPermission, optionalAuth, requireStatus };
+module.exports = {
+    requireAuth,
+    requireRole,
+    requirePermission,
+    requireAnyPermission,
+    optionalAuth,
+    requireStatus,
+    requireStatusScope,
+};

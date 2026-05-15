@@ -4,8 +4,9 @@ const db = require('../config/db');
 const { createResourceSchema, updateResourceSchema } = require('../schemas/resource');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, requireRole, requireStatus } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireRole, requireStatusScope } = require('../middleware/authMiddleware');
 const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
+const { SCOPES } = require('../../../shared/rbac/catalog.ts');
 const { computeTaskTimeline } = require('../utils/workingDays');
 
 // ========================================
@@ -13,7 +14,7 @@ const { computeTaskTimeline } = require('../utils/workingDays');
 // ========================================
 
 // GET all resources — admins/non-managers see all; managers see their team only
-router.get('/', requireAuth, requireStatus('ACTIVE'), requirePermission('page:resources'), async (req, res, next) => {
+router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('page:resources'), async (req, res, next) => {
     try {
         if (req.user.role !== 'manager') {
             const result = await db.query(

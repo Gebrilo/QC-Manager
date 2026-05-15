@@ -11,7 +11,8 @@ jest.mock('jsonwebtoken', () => ({
 
 const express = require('express');
 const request = require('supertest');
-const { requireAuth, requireStatus } = require('../src/middleware/authMiddleware');
+const { SCOPES } = require('../../shared/rbac/catalog.ts');
+const { requireAuth, requireStatus, requireStatusScope } = require('../src/middleware/authMiddleware');
 
 function makeApp(statuses) {
     const app = express();
@@ -52,4 +53,20 @@ test('allows when one of multiple statuses matches', async () => {
         .get('/test')
         .set('Authorization', 'Bearer fake-token');
     expect(res.status).toBe(200);
+});
+
+test('allows request when catalog status scope matches', async () => {
+    mockQuery.mockResolvedValueOnce({
+        rows: [{ id: 'u1', email: 'a@b.com', name: 'A', role: 'user', active: true, status: 'ACTIVE', team_membership_active: true }],
+    });
+
+    const app = express();
+    app.get('/test', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), (_req, res) => res.json({ ok: true }));
+
+    const res = await request(app)
+        .get('/test')
+        .set('Authorization', 'Bearer fake-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
 });

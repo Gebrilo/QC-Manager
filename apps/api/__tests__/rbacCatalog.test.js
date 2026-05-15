@@ -2,7 +2,9 @@
 
 const {
     PERMISSIONS,
+    SCOPES,
     canUserPerform,
+    canUserUseScope,
     resolvePermissionKey,
 } = require('../../shared/rbac/catalog.ts');
 
@@ -36,7 +38,21 @@ describe('RBAC catalog resolver', () => {
         expect(canUserPerform(user, PERMISSIONS.TASKS_VIEW)).toBe(false);
     });
 
+    test('per-user override can grant a role-denied permission', () => {
+        const user = {
+            role: 'tester',
+            permissionOverrides: [{ permission_key: PERMISSIONS.GOVERNANCE_MANAGE_GATES, granted: true }],
+        };
+
+        expect(canUserPerform(user, PERMISSIONS.GOVERNANCE_MANAGE_GATES)).toBe(true);
+    });
+
     test('legacy aliases resolve to canonical permission keys', () => {
         expect(resolvePermissionKey('page:tasks')).toBe(PERMISSIONS.TASKS_VIEW);
+    });
+
+    test('team scope is declared in the catalog and granted to managers', () => {
+        expect(canUserUseScope({ role: 'manager' }, SCOPES.TEAM.key)).toBe(true);
+        expect(canUserUseScope({ role: 'tester' }, SCOPES.TEAM.key)).toBe(false);
     });
 });
