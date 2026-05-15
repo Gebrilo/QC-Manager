@@ -16,7 +16,7 @@ export default function EditProjectPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && !hasPermission('action:projects:edit')) {
+        if (!authLoading && !hasPermission('qc.projects.edit')) {
             router.replace(`/projects/${id}`);
         }
     }, [authLoading, hasPermission, router, id]);
@@ -40,7 +40,7 @@ export default function EditProjectPage() {
         router.refresh();
     };
 
-    if (authLoading || !hasPermission('action:projects:edit')) return null;
+    if (authLoading || !hasPermission('qc.projects.edit')) return null;
     if (isLoading) return <div className="p-10 text-center">Loading...</div>;
     if (!project) return <div className="p-10 text-center">Project not found</div>;
 

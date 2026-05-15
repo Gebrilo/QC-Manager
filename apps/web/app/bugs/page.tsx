@@ -34,7 +34,7 @@ function BugsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { hasPermission } = useAuth();
-    const canDelete = hasPermission('action:bugs:delete');
+    const canDelete = hasPermission('qc.bugs.delete');
 
     const [bugs, setBugs] = useState<Bug[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);

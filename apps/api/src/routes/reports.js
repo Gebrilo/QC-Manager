@@ -20,7 +20,7 @@ const generateReportSchema = z.object({
 });
 
 // POST /reports - Generate report (returns job_id)
-router.post('/', requireAuth, requirePermission('action:reports:generate'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (req, res, next) => {
     try {
         // Validate request
         const data = generateReportSchema.parse(req.body);
@@ -71,7 +71,7 @@ router.post('/', requireAuth, requirePermission('action:reports:generate'), asyn
 });
 
 // GET /reports/:job_id - Check report status
-router.get('/:job_id', requireAuth, requirePermission('page:reports'), async (req, res, next) => {
+router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
         const { job_id } = req.params;
 
@@ -139,7 +139,7 @@ router.post('/callback', async (req, res, next) => {
 });
 
 // GET /reports - List all report jobs (with pagination)
-router.get('/', requireAuth, requirePermission('page:reports'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
         const { user_email, status, limit = 50, offset = 0 } = req.query;
 

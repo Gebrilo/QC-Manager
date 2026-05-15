@@ -23,7 +23,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-router.post('/', requirePermission('action:my-tasks:create'), async (req, res, next) => {
+router.post('/', requirePermission('qc.mywork.tasks.create'), async (req, res, next) => {
     try {
         const { title, description, priority, due_date } = req.body;
 
@@ -50,7 +50,7 @@ router.post('/', requirePermission('action:my-tasks:create'), async (req, res, n
     }
 });
 
-router.patch('/:id', requirePermission('action:my-tasks:edit'), async (req, res, next) => {
+router.patch('/:id', requirePermission('qc.mywork.tasks.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { title, description, status, priority, due_date } = req.body;
@@ -112,7 +112,7 @@ router.patch('/:id', requirePermission('action:my-tasks:edit'), async (req, res,
     }
 });
 
-router.delete('/:id', requirePermission('action:my-tasks:delete'), async (req, res, next) => {
+router.delete('/:id', requirePermission('qc.mywork.tasks.delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 

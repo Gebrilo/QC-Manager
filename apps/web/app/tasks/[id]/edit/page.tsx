@@ -16,7 +16,7 @@ export default function EditTaskPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && !hasPermission('action:tasks:edit')) {
+        if (!authLoading && !hasPermission('qc.tasks.edit')) {
             router.replace(`/tasks/${id}`);
         }
     }, [authLoading, hasPermission, router, id]);
@@ -39,7 +39,7 @@ export default function EditTaskPage() {
         if (id) load();
     }, [id]);
 
-    if (authLoading || !hasPermission('action:tasks:edit')) return null;
+    if (authLoading || !hasPermission('qc.tasks.edit')) return null;
     if (isLoading) return <div className="p-10 text-center">Loading...</div>;
     if (!data) return <div className="p-10 text-center">Task not found</div>;
 

@@ -60,7 +60,7 @@ async function getTeamMetrics(teamId) {
 }
 
 // GET dashboard metrics — scoped by team for managers
-router.get('/', requireAuth, requirePermission('page:dashboard'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.dashboard.view'), async (req, res, next) => {
     try {
         // Manager: scope metrics to their team
         if (req.user?.role === 'manager') {
@@ -79,7 +79,7 @@ router.get('/', requireAuth, requirePermission('page:dashboard'), async (req, re
 });
 
 // GET /metrics (alias) — same scoping logic
-router.get('/metrics', requireAuth, requirePermission('page:dashboard'), async (req, res, next) => {
+router.get('/metrics', requireAuth, requirePermission('qc.dashboard.view'), async (req, res, next) => {
     try {
         if (req.user?.role === 'manager') {
             const teamId = await getManagerTeamId(req.user.id);

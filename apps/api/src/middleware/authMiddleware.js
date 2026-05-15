@@ -178,8 +178,7 @@ async function loadPermissionOverrides(userId, permissionKeys) {
 
 /**
  * Middleware: Check a permission through the shared RBAC catalog resolver.
- * Legacy permission keys still work through the catalog alias shim.
- * @param {string} permissionKey - Required permission key, legacy or canonical.
+ * @param {string} permissionKey - Required permission key (canonical qc.* format).
  */
 function requirePermission(permissionKey) {
     return async (req, res, next) => {

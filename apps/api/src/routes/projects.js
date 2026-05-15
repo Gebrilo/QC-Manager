@@ -68,7 +68,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 });
 
 // POST create project
-router.post('/', requireAuth, requirePermission('action:projects:create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.projects.create'), async (req, res, next) => {
     try {
         const data = createProjectSchema.parse(req.body);
 
@@ -110,7 +110,7 @@ router.post('/', requireAuth, requirePermission('action:projects:create'), async
 });
 
 // PATCH update project — enforce team scope
-router.patch('/:id', requireAuth, requirePermission('action:projects:edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = req.body;
@@ -166,7 +166,7 @@ router.patch('/:id', requireAuth, requirePermission('action:projects:edit'), asy
 });
 
 // DELETE soft delete project — enforce team scope
-router.delete('/:id', requireAuth, requirePermission('action:projects:delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.projects.delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 

@@ -47,7 +47,7 @@ async function validateSuiteTestCases(client, projectId, testCaseIds) {
     return { validIds: uniqueIds };
 }
 
-router.get('/', requireAuth, requirePermission('page:test-suites'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req, res, next) => {
     try {
         const {
             page = 1, limit = 25, search, project_id, status,
@@ -106,7 +106,7 @@ router.get('/', requireAuth, requirePermission('page:test-suites'), async (req, 
     } catch (error) { next(error); }
 });
 
-router.get('/:id', requireAuth, requirePermission('page:test-suites'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.testsuites.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -138,7 +138,7 @@ router.get('/:id', requireAuth, requirePermission('page:test-suites'), async (re
     } catch (error) { next(error); }
 });
 
-router.post('/', requireAuth, requirePermission('action:test-suites:create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.testsuites.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const validatedData = suiteCreateSchema.parse(req.body);
@@ -203,7 +203,7 @@ router.post('/', requireAuth, requirePermission('action:test-suites:create'), as
     } finally { client.release(); }
 });
 
-router.patch('/:id', requireAuth, requirePermission('action:test-suites:edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.testsuites.edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -268,7 +268,7 @@ router.patch('/:id', requireAuth, requirePermission('action:test-suites:edit'), 
     } finally { client.release(); }
 });
 
-router.delete('/:id', requireAuth, requirePermission('action:test-suites:delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.testsuites.delete'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -293,7 +293,7 @@ router.delete('/:id', requireAuth, requirePermission('action:test-suites:delete'
     finally { client.release(); }
 });
 
-router.get('/:id/available-test-cases', requireAuth, requirePermission('page:test-suites'), async (req, res, next) => {
+router.get('/:id/available-test-cases', requireAuth, requirePermission('qc.testsuites.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const {
@@ -362,7 +362,7 @@ router.get('/:id/available-test-cases', requireAuth, requirePermission('page:tes
     } catch (error) { next(error); }
 });
 
-router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suites:edit'), async (req, res, next) => {
+router.post('/:id/test-cases', requireAuth, requirePermission('qc.testsuites.edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -452,7 +452,7 @@ router.post('/:id/test-cases', requireAuth, requirePermission('action:test-suite
     } finally { client.release(); }
 });
 
-router.delete('/:id/test-cases', requireAuth, requirePermission('action:test-suites:edit'), async (req, res, next) => {
+router.delete('/:id/test-cases', requireAuth, requirePermission('qc.testsuites.edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -484,7 +484,7 @@ router.delete('/:id/test-cases', requireAuth, requirePermission('action:test-sui
     } finally { client.release(); }
 });
 
-router.patch('/:id/reorder', requireAuth, requirePermission('action:test-suites:reorder'), async (req, res, next) => {
+router.patch('/:id/reorder', requireAuth, requirePermission('qc.testsuites.reorder'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -529,7 +529,7 @@ router.patch('/:id/reorder', requireAuth, requirePermission('action:test-suites:
     } finally { client.release(); }
 });
 
-router.post('/:id/clone', requireAuth, requirePermission('action:test-suites:create'), async (req, res, next) => {
+router.post('/:id/clone', requireAuth, requirePermission('qc.testsuites.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;

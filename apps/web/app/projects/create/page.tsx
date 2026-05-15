@@ -10,7 +10,7 @@ export default function CreateProjectPage() {
     const { hasPermission, loading: authLoading } = useAuth();
 
     useEffect(() => {
-        if (!authLoading && !hasPermission('action:projects:create')) {
+        if (!authLoading && !hasPermission('qc.projects.create')) {
             router.replace('/projects');
         }
     }, [authLoading, hasPermission, router]);
@@ -20,7 +20,7 @@ export default function CreateProjectPage() {
         router.refresh();
     };
 
-    if (authLoading || !hasPermission('action:projects:create')) return null;
+    if (authLoading || !hasPermission('qc.projects.create')) return null;
 
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">

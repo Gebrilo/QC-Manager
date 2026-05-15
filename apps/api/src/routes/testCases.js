@@ -39,7 +39,7 @@ async function logTestCaseHistory(client, { test_case_id, action, changed_fields
     );
 }
 
-router.get('/', requireAuth, requirePermission('page:test-cases'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.testcases.view'), async (req, res, next) => {
     try {
         const {
             page = 1, limit = 25, search, project_id, status, priority,
@@ -90,7 +90,7 @@ router.get('/', requireAuth, requirePermission('page:test-cases'), async (req, r
     } catch (error) { next(error); }
 });
 
-router.get('/:id', requireAuth, requirePermission('page:test-cases'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.testcases.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
@@ -112,7 +112,7 @@ router.get('/:id', requireAuth, requirePermission('page:test-cases'), async (req
     } catch (error) { next(error); }
 });
 
-router.post('/', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const validatedData = testCaseCreateSchema.parse(req.body);
@@ -158,7 +158,7 @@ router.post('/', requireAuth, requirePermission('action:test-cases:create'), asy
     } finally { client.release(); }
 });
 
-router.patch('/:id', requireAuth, requirePermission('action:test-cases:edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -208,7 +208,7 @@ router.patch('/:id', requireAuth, requirePermission('action:test-cases:edit'), a
     } finally { client.release(); }
 });
 
-router.delete('/:id', requireAuth, requirePermission('action:test-cases:delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -236,7 +236,7 @@ router.delete('/:id', requireAuth, requirePermission('action:test-cases:delete')
     finally { client.release(); }
 });
 
-router.post('/bulk-import', requireAuth, requirePermission('action:test-cases:create'), async (req, res, next) => {
+router.post('/bulk-import', requireAuth, requirePermission('qc.testcases.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { test_cases, project_id } = req.body;

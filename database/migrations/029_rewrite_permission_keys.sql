@@ -1,0 +1,26 @@
+-- Migration 029: Rewrite user_permissions.permission_key from legacy to canonical keys
+-- Maps old keys (page:*, action:*) to namespaced qc.* keys.
+-- Also rewrites custom_roles.permissions arrays.
+
+-- Legacy-to-canonical mapping (each row migrated programmatically):
+-- page:dashboard       -> qc.dashboard.view
+-- page:tasks           -> qc.tasks.view
+-- page:projects        -> qc.projects.view
+-- page:resources       -> qc.resources.view
+-- page:governance      -> qc.governance.view
+-- page:test-executions -> qc.testexecutions.view
+-- page:reports         -> qc.reports.view
+-- page:users           -> qc.admin.users.view
+-- page:my-tasks        -> qc.mywork.tasks.view
+-- page:my-dashboard    -> qc.mywork.dashboard.view
+-- page:task-history    -> qc.tasks.history.view
+-- page:roles           -> qc.admin.roles.view
+-- page:journeys        -> qc.journeys.view
+-- page:teams           -> qc.team.view
+-- page:bugs            -> qc.bugs.view
+-- page:test-cases      -> qc.testcases.view
+-- page:test-suites     -> qc.testsuites.view
+-- action:*             -> qc.* equivalents
+
+-- Actual rewrite is done dynamically at API startup via LEGACY_PERMISSION_ALIASES.
+-- See apps/api/src/config/db.js runMigrations() for the UPDATE loop.

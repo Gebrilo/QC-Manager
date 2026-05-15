@@ -72,7 +72,7 @@ describe('catalog-backed permission middleware', () => {
         expect(res.status).toHaveBeenCalledWith(403);
     });
 
-    test('legacy keys still resolve through the alias shim', async () => {
+    test('unknown permission keys are denied', async () => {
         mockQuery.mockResolvedValue({ rows: [] });
 
         const { res, next } = await runMiddleware(
@@ -80,8 +80,8 @@ describe('catalog-backed permission middleware', () => {
             { role: 'tester' }
         );
 
-        expect(next).toHaveBeenCalledWith();
-        expect(res.status).not.toHaveBeenCalled();
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(403);
     });
 
     test('per-user grant override can allow a role-denied permission', async () => {

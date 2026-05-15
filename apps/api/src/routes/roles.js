@@ -3,10 +3,9 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
-const { LEGACY_PERMISSION_ALIASES } = require('../../../shared/rbac/catalog.ts');
+const { PERMISSIONS, ALL_PERMISSION_VALUES } = require('../../../shared/rbac/catalog.ts');
 
-// All system permission keys
-const ALL_PERMISSIONS = Object.freeze(Object.keys(LEGACY_PERMISSION_ALIASES));
+const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 
 // Protected built-in roles that cannot be deleted
 const BUILT_IN_ROLES = ['admin', 'manager', 'user', 'viewer', 'contributor'];

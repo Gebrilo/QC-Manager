@@ -5,7 +5,7 @@ const pool = db.pool;
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { auditLog } = require('../middleware/audit');
 
-router.get('/:taskId/test-cases', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
+router.get('/:taskId/test-cases', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const { taskId } = req.params;
         const taskCheck = await pool.query('SELECT id FROM tasks WHERE id = $1 AND deleted_at IS NULL', [taskId]);
@@ -30,7 +30,7 @@ router.get('/:taskId/test-cases', requireAuth, requirePermission('page:tasks'), 
     }
 });
 
-router.post('/:taskId/test-cases', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
+router.post('/:taskId/test-cases', requireAuth, requirePermission('qc.tasks.edit'), async (req, res, next) => {
     try {
         const { taskId } = req.params;
         const { test_case_id, relationship_type = 'covers' } = req.body;
@@ -68,7 +68,7 @@ router.post('/:taskId/test-cases', requireAuth, requirePermission('action:tasks:
     }
 });
 
-router.delete('/:taskId/test-cases/:testCaseId', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
+router.delete('/:taskId/test-cases/:testCaseId', requireAuth, requirePermission('qc.tasks.edit'), async (req, res, next) => {
     try {
         const { taskId, testCaseId } = req.params;
 

@@ -14,7 +14,7 @@ router.use(requireAuth);
 
 // GET /manager/team — List members of the manager's team (team_id scoped for managers)
 router.get('/team',
-    requirePermission('action:journeys:view_team_progress'),
+    requirePermission('qc.journeys.view_team_progress'),
     requireTeamScope,
     async (req, res, next) => {
         try {
@@ -54,7 +54,7 @@ router.get('/team',
 );
 
 // PATCH /manager/team/:userId/ready-for-activation
-router.patch('/team/:userId/ready-for-activation', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.patch('/team/:userId/ready-for-activation', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { ready } = req.body;
@@ -70,7 +70,7 @@ router.patch('/team/:userId/ready-for-activation', requirePermission('action:jou
 });
 
 // POST /manager/team/:userId/activate
-router.post('/team/:userId/activate', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.post('/team/:userId/activate', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { weekly_capacity_hrs, department } = req.body;
@@ -89,7 +89,7 @@ router.post('/team/:userId/activate', requirePermission('action:journeys:view_te
 
 // GET /manager/eligible-resources — Users ready for activation, scoped to manager's team
 router.get('/eligible-resources',
-    requirePermission('action:journeys:view_team_progress'),
+    requirePermission('qc.journeys.view_team_progress'),
     requireTeamScope,
     async (req, res, next) => {
         try {
@@ -117,7 +117,7 @@ router.get('/eligible-resources',
 );
 
 // POST /manager/team/:userId/make-resource — Convert an eligible user to a resource
-router.post('/team/:userId/make-resource', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.post('/team/:userId/make-resource', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { weekly_capacity_hrs = 40, department = null } = req.body;
@@ -156,7 +156,7 @@ router.post('/team/:userId/make-resource', requirePermission('action:journeys:vi
 });
 
 // GET /manager/team/:userId/journeys — Journey progress for a team member
-router.get('/team/:userId/journeys', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/team/:userId/journeys', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
 
@@ -213,7 +213,7 @@ router.get('/team/:userId/journeys', requirePermission('action:journeys:view_tea
 });
 
 // GET /manager/team/:userId/journeys/:journeyId — Full read-only detail view for a team member's journey
-router.get('/team/:userId/journeys/:journeyId', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/team/:userId/journeys/:journeyId', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId, journeyId } = req.params;
 
@@ -332,7 +332,7 @@ router.get('/team/:userId/journeys/:journeyId', requirePermission('action:journe
 });
 
 // GET /manager/team/:userId/journeys/:journeyId/tasks/:taskId/attachment — Download attachment
-router.get('/team/:userId/journeys/:journeyId/tasks/:taskId/attachment', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/team/:userId/journeys/:journeyId/tasks/:taskId/attachment', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId, journeyId, taskId } = req.params;
 
@@ -364,7 +364,7 @@ router.get('/team/:userId/journeys/:journeyId/tasks/:taskId/attachment', require
 });
 
 // GET /manager/team/:userId — Profile + summary for one team member
-router.get('/team/:userId', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/team/:userId', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         const { userId } = req.params;
 
@@ -399,7 +399,7 @@ router.get('/team/:userId', requirePermission('action:journeys:view_team_progres
 // ──────────────────────────────────────────────────────────────────────────────
 
 // GET /manager/projects — Projects scoped to manager's team
-router.get('/projects', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/projects', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         if (req.user.role === 'admin') {
             const result = await db.query(`SELECT * FROM v_projects_with_metrics ORDER BY created_at DESC`);
@@ -418,7 +418,7 @@ router.get('/projects', requirePermission('action:journeys:view_team_progress'),
 });
 
 // GET /manager/tasks — Tasks scoped to manager's team projects
-router.get('/tasks', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/tasks', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         if (req.user.role === 'admin') {
             const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
@@ -439,7 +439,7 @@ router.get('/tasks', requirePermission('action:journeys:view_team_progress'), as
 });
 
 // GET /manager/summary — Aggregated team summary (members, projects, task counts, XP)
-router.get('/summary', requirePermission('action:journeys:view_team_progress'), async (req, res, next) => {
+router.get('/summary', requirePermission('qc.journeys.view_team_progress'), async (req, res, next) => {
     try {
         if (req.user.role === 'admin') {
             // For admins, return global summary

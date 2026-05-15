@@ -145,7 +145,7 @@ export default function ProjectsPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Projects Registry</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Overview of all active portfolios and their health.</p>
                 </div>
-                {hasPermission('action:projects:create') && (
+                {hasPermission('qc.projects.create') && (
                     <Link href="/projects/create">
                         <Button>+ New Project</Button>
                     </Link>

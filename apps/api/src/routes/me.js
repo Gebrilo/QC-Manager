@@ -116,7 +116,7 @@ async function dashboardHandler(req, res) {
     }
 }
 
-router.get('/dashboard', requireAuth, requirePermission('page:my-dashboard'), dashboardHandler);
+router.get('/dashboard', requireAuth, requirePermission('qc.mywork.dashboard.view'), dashboardHandler);
 
 module.exports = router;
 module.exports.testExports = { dashboardHandler };

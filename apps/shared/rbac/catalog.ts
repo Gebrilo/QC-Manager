@@ -74,62 +74,6 @@ const SCOPES = Object.freeze({
     ACTIVE_ONLY: Object.freeze({ key: 'active_only', statuses: Object.freeze(['ACTIVE']) }),
 });
 
-const LEGACY_PERMISSION_ALIASES = Object.freeze({
-    'page:dashboard': PERMISSIONS.DASHBOARD_VIEW,
-    'page:tasks': PERMISSIONS.TASKS_VIEW,
-    'page:projects': PERMISSIONS.PROJECTS_VIEW,
-    'page:resources': PERMISSIONS.RESOURCES_VIEW,
-    'page:governance': PERMISSIONS.GOVERNANCE_VIEW,
-    'page:test-executions': PERMISSIONS.TESTEXECUTIONS_VIEW,
-    'page:reports': PERMISSIONS.REPORTS_VIEW,
-    'page:users': PERMISSIONS.ADMIN_USERS_VIEW,
-    'page:my-tasks': PERMISSIONS.MY_TASKS_VIEW,
-    'page:my-dashboard': PERMISSIONS.MY_DASHBOARD_VIEW,
-    'page:task-history': PERMISSIONS.TASK_HISTORY_VIEW,
-    'page:roles': PERMISSIONS.ADMIN_ROLES_VIEW,
-    'page:journeys': PERMISSIONS.JOURNEYS_VIEW,
-    'page:teams': PERMISSIONS.TEAM_VIEW,
-    'page:bugs': PERMISSIONS.BUGS_VIEW,
-    'page:test-cases': PERMISSIONS.TESTCASES_VIEW,
-    'page:test-suites': PERMISSIONS.TESTSUITES_VIEW,
-
-    'action:tasks:create': PERMISSIONS.TASKS_CREATE,
-    'action:tasks:edit': PERMISSIONS.TASKS_EDIT,
-    'action:tasks:delete': PERMISSIONS.TASKS_DELETE,
-    'action:projects:create': PERMISSIONS.PROJECTS_CREATE,
-    'action:projects:edit': PERMISSIONS.PROJECTS_EDIT,
-    'action:projects:delete': PERMISSIONS.PROJECTS_DELETE,
-    'action:resources:create': PERMISSIONS.RESOURCES_CREATE,
-    'action:resources:edit': PERMISSIONS.RESOURCES_EDIT,
-    'action:resources:delete': PERMISSIONS.RESOURCES_DELETE,
-    'action:reports:generate': PERMISSIONS.REPORTS_GENERATE,
-    'action:my-tasks:create': PERMISSIONS.MY_TASKS_CREATE,
-    'action:my-tasks:edit': PERMISSIONS.MY_TASKS_EDIT,
-    'action:my-tasks:delete': PERMISSIONS.MY_TASKS_DELETE,
-    'action:journeys:assign': PERMISSIONS.JOURNEYS_ASSIGN,
-    'action:journeys:view_assigned': PERMISSIONS.JOURNEYS_VIEW_ASSIGNED,
-    'action:journeys:view_team_progress': PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS,
-    'action:teams:manage': PERMISSIONS.TEAM_MANAGE,
-    'action:teams:view': PERMISSIONS.TEAM_VIEW,
-    'action:test-cases:create': PERMISSIONS.TESTCASES_CREATE,
-    'action:test-cases:edit': PERMISSIONS.TESTCASES_EDIT,
-    'action:test-cases:delete': PERMISSIONS.TESTCASES_DELETE,
-    'action:test-suites:create': PERMISSIONS.TESTSUITES_CREATE,
-    'action:test-suites:edit': PERMISSIONS.TESTSUITES_EDIT,
-    'action:test-suites:delete': PERMISSIONS.TESTSUITES_DELETE,
-    'action:test-suites:reorder': PERMISSIONS.TESTSUITES_REORDER,
-    'action:test-executions:create': PERMISSIONS.TESTEXECUTIONS_CREATE,
-    'action:test-executions:edit': PERMISSIONS.TESTEXECUTIONS_EDIT,
-    'action:test-executions:delete': PERMISSIONS.TESTEXECUTIONS_DELETE,
-    'action:test-results:upload': PERMISSIONS.TESTRESULTS_UPLOAD,
-    'action:test-results:delete': PERMISSIONS.TESTRESULTS_DELETE,
-    'action:bugs:create': PERMISSIONS.BUGS_CREATE,
-    'action:bugs:edit': PERMISSIONS.BUGS_EDIT,
-    'action:bugs:delete': PERMISSIONS.BUGS_DELETE,
-    'action:governance:manage_gates': PERMISSIONS.GOVERNANCE_MANAGE_GATES,
-    'action:governance:approve_release': PERMISSIONS.GOVERNANCE_APPROVE_RELEASE,
-});
-
 const ROLE_DEFINITIONS = Object.freeze({
     admin: Object.freeze({
         permissions: Object.freeze(['*']),
@@ -233,21 +177,15 @@ const ALL_PERMISSION_VALUES = Object.freeze(Object.values(PERMISSIONS));
 const ALL_SCOPE_VALUES = Object.freeze(Object.values(SCOPES).map(scope => scope.key));
 
 function resolvePermissionKey(key) {
-    return LEGACY_PERMISSION_ALIASES[key] || key;
+    return key;
 }
 
 function isKnownPermissionKey(key) {
-    const canonical = resolvePermissionKey(key);
-    return ALL_PERMISSION_VALUES.includes(canonical);
+    return ALL_PERMISSION_VALUES.includes(key);
 }
 
 function getPermissionLookupKeys(key) {
-    const canonical = resolvePermissionKey(key);
-    const keys = new Set([key, canonical]);
-    for (const [legacyKey, canonicalKey] of Object.entries(LEGACY_PERMISSION_ALIASES)) {
-        if (canonicalKey === canonical) keys.add(legacyKey);
-    }
-    return Array.from(keys);
+    return [key];
 }
 
 function collectRolePermissions(roleName, seen) {
@@ -325,7 +263,6 @@ module.exports = {
     PERMISSIONS,
     ROLES,
     SCOPES,
-    LEGACY_PERMISSION_ALIASES,
     ALL_PERMISSION_VALUES,
     ALL_SCOPE_VALUES,
     canUserPerform,

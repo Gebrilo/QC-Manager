@@ -130,7 +130,7 @@ export default function TasksPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
-                    {hasPermission('action:tasks:create') && (
+                    {hasPermission('qc.tasks.create') && (
                         <Link href="/tasks/create">
                             <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
                                 + New Task

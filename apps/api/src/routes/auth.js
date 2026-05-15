@@ -6,110 +6,75 @@ const { notifyAdmins } = require('./notifications');
 
 const DEFAULT_PERMISSIONS = {
     admin: [
-        // Pages
-        'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
-        'page:governance', 'page:test-executions', 'page:reports', 'page:users',
-        'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:roles',
-        'page:journeys', 'page:teams', 'page:bugs',
-        // Journey actions
-        'action:journeys:assign',
-        'action:journeys:view_assigned',
-        'action:journeys:view_team_progress',
-        // Task actions
-        'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
-        // Project actions
-        'action:projects:create', 'action:projects:edit', 'action:projects:delete',
-        // Resource actions
-        'action:resources:create', 'action:resources:edit', 'action:resources:delete',
-        // Report actions
-        'action:reports:generate',
-        // Personal task actions
-        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
-        // Team actions
-        'action:teams:manage', 'action:teams:view',
-        // Test case actions
-        'action:test-cases:create', 'action:test-cases:edit', 'action:test-cases:delete',
-        // Test execution actions
-        'action:test-executions:create', 'action:test-executions:edit', 'action:test-executions:delete',
-        // Test result actions
-        'action:test-results:upload', 'action:test-results:delete',
-        // Bug actions
-        'action:bugs:create', 'action:bugs:edit', 'action:bugs:delete',
-        // Governance actions
-        'action:governance:manage_gates', 'action:governance:approve_release',
+        'qc.dashboard.view',
+        'qc.tasks.view', 'qc.tasks.create', 'qc.tasks.edit', 'qc.tasks.delete',
+        'qc.projects.view', 'qc.projects.create', 'qc.projects.edit', 'qc.projects.delete',
+        'qc.resources.view', 'qc.resources.create', 'qc.resources.edit', 'qc.resources.delete',
+        'qc.governance.view', 'qc.governance.manage_gates', 'qc.governance.approve_release',
+        'qc.testexecutions.view', 'qc.testexecutions.create', 'qc.testexecutions.edit', 'qc.testexecutions.delete',
+        'qc.testresults.upload', 'qc.testresults.delete',
+        'qc.reports.view', 'qc.reports.generate',
+        'qc.admin.users.view', 'qc.admin.roles.view', 'qc.admin.settings.view',
+        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.dashboard.view',
+        'qc.tasks.history.view',
+        'qc.journeys.view', 'qc.journeys.assign', 'qc.journeys.view_assigned', 'qc.journeys.view_team_progress',
+        'qc.team.view', 'qc.team.manage',
+        'qc.bugs.view', 'qc.bugs.create', 'qc.bugs.edit', 'qc.bugs.delete',
+        'qc.testcases.view', 'qc.testcases.create', 'qc.testcases.edit', 'qc.testcases.delete',
+        'qc.testsuites.view', 'qc.testsuites.create', 'qc.testsuites.edit', 'qc.testsuites.delete', 'qc.testsuites.reorder',
+        'qc.quality.traceability.view',
     ],
     manager: [
-        // Pages
-        'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
-        'page:governance', 'page:test-executions', 'page:reports',
-        'page:my-tasks', 'page:my-dashboard', 'page:task-history', 'page:bugs',
-        // Journey actions
-        'action:journeys:view_team_progress',
-        'action:journeys:assign',
-        // Task actions
-        'action:tasks:create', 'action:tasks:edit', 'action:tasks:delete',
-        // Project actions
-        'action:projects:create', 'action:projects:edit',
-        // Resource actions
-        'action:resources:create', 'action:resources:edit',
-        // Report actions
-        'action:reports:generate',
-        // Personal task actions
-        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
-        // Team actions
-        'action:teams:view',
-        // Test case actions
-        'action:test-cases:create', 'action:test-cases:edit',
-        // Test execution actions
-        'action:test-executions:create', 'action:test-executions:edit',
-        // Test result actions
-        'action:test-results:upload',
-        // Bug actions
-        'action:bugs:create', 'action:bugs:edit',
-        // Governance actions
-        'action:governance:approve_release',
+        'qc.dashboard.view',
+        'qc.tasks.view', 'qc.tasks.create', 'qc.tasks.edit', 'qc.tasks.delete',
+        'qc.projects.view', 'qc.projects.create', 'qc.projects.edit',
+        'qc.resources.view', 'qc.resources.create', 'qc.resources.edit',
+        'qc.governance.view', 'qc.governance.approve_release',
+        'qc.testexecutions.view', 'qc.testexecutions.create', 'qc.testexecutions.edit',
+        'qc.testresults.upload',
+        'qc.reports.view', 'qc.reports.generate',
+        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.dashboard.view',
+        'qc.tasks.history.view',
+        'qc.journeys.assign', 'qc.journeys.view_team_progress',
+        'qc.team.view',
+        'qc.bugs.view', 'qc.bugs.create', 'qc.bugs.edit',
+        'qc.testcases.view', 'qc.testcases.create', 'qc.testcases.edit',
     ],
     user: [
-        // Pages
-        'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
-        'page:test-executions', 'page:reports',
-        'page:my-tasks', 'page:my-dashboard',
-        // Task actions
-        'action:tasks:create', 'action:tasks:edit',
-        // Report actions
-        'action:reports:generate',
-        // Personal task actions
-        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
-        // Test case actions
-        'action:test-cases:create', 'action:test-cases:edit',
-        // Test execution actions
-        'action:test-executions:create',
-        // Test result actions
-        'action:test-results:upload',
-        // Bug actions
-        'action:bugs:create',
+        'qc.dashboard.view',
+        'qc.tasks.view', 'qc.tasks.create', 'qc.tasks.edit',
+        'qc.projects.view',
+        'qc.resources.view',
+        'qc.testexecutions.view', 'qc.testexecutions.create',
+        'qc.testresults.upload',
+        'qc.reports.view', 'qc.reports.generate',
+        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.dashboard.view',
+        'qc.testcases.view', 'qc.testcases.create', 'qc.testcases.edit',
+        'qc.bugs.view', 'qc.bugs.create',
     ],
     viewer: [
-        // Pages
-        'page:dashboard', 'page:tasks', 'page:projects', 'page:resources',
-        'page:test-executions', 'page:reports',
-        'page:my-tasks', 'page:my-dashboard',
-        // Personal task actions
-        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+        'qc.dashboard.view',
+        'qc.tasks.view',
+        'qc.projects.view',
+        'qc.resources.view',
+        'qc.testexecutions.view',
+        'qc.reports.view',
+        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.dashboard.view',
     ],
     contributor: [
-        // Pages
-        'page:tasks', 'page:my-tasks', 'page:my-dashboard',
-        // Task actions
-        'action:tasks:edit',
-        // Personal task actions
-        'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+        'qc.tasks.view', 'qc.tasks.edit',
+        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.dashboard.view',
     ],
 };
 
 const INACTIVE_PERMISSIONS = [
-    'page:my-tasks',
-    'action:my-tasks:create', 'action:my-tasks:edit', 'action:my-tasks:delete',
+    'qc.mywork.tasks.view',
+    'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
 ];
 
 async function setDefaultPermissions(userId, role) {

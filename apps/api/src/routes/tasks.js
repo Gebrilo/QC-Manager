@@ -78,7 +78,7 @@ async function buildTaskTeamFilter(user) {
 }
 
 // GET all tasks — filtered by team for managers, by resource for regular users
-router.get('/', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const role = req.user?.role;
 
@@ -123,7 +123,7 @@ router.get('/', requireAuth, requirePermission('page:tasks'), async (req, res, n
 });
 
 // GET single task by ID — enforce team scope for managers
-router.get('/:id', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`SELECT * FROM v_tasks_with_metrics WHERE id = $1`, [id]);
@@ -168,7 +168,7 @@ router.get('/:id', requireAuth, requirePermission('page:tasks'), async (req, res
 });
 
 // POST create task — validate project and assignees belong to manager's team
-router.post('/', requireAuth, requirePermission('action:tasks:create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, res, next) => {
     try {
         const data = createTaskSchema.parse(req.body);
 
@@ -256,7 +256,7 @@ router.post('/', requireAuth, requirePermission('action:tasks:create'), async (r
 });
 
 // PATCH update task — enforce team scope and re-validate assignments
-router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateTaskSchema.parse(req.body);
@@ -434,7 +434,7 @@ router.patch('/:id', requireAuth, requirePermission('action:tasks:edit'), async 
 });
 
 // DELETE soft delete task — enforce team scope
-router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.tasks.delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -532,7 +532,7 @@ router.delete('/:id', requireAuth, requirePermission('action:tasks:delete'), asy
 // =====================================================
 
 // GET comments for a task
-router.get('/:id/comments', requireAuth, requirePermission('page:tasks'), async (req, res, next) => {
+router.get('/:id/comments', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(
@@ -546,7 +546,7 @@ router.get('/:id/comments', requireAuth, requirePermission('page:tasks'), async 
 });
 
 // POST add comment to task
-router.post('/:id/comments', requireAuth, requirePermission('action:tasks:edit'), async (req, res, next) => {
+router.post('/:id/comments', requireAuth, requirePermission('qc.tasks.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { comment } = req.body;
@@ -572,7 +572,7 @@ router.post('/:id/comments', requireAuth, requirePermission('action:tasks:edit')
 });
 
 // DELETE a comment
-router.delete('/:taskId/comments/:commentId', requireAuth, requirePermission('action:tasks:delete'), async (req, res, next) => {
+router.delete('/:taskId/comments/:commentId', requireAuth, requirePermission('qc.tasks.delete'), async (req, res, next) => {
     try {
         const { taskId, commentId } = req.params;
 

@@ -2267,6 +2267,95 @@ const runMigrations = async () => {
             WHERE tc.deleted_at IS NULL
         `);
 
+        // Migration 028: Create permissions lookup table populated from catalog
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS permissions (
+                permission_key VARCHAR(100) PRIMARY KEY,
+                domain VARCHAR(50) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        const { ALL_PERMISSION_VALUES } = require('../../shared/rbac/catalog.ts');
+        for (const permKey of ALL_PERMISSION_VALUES) {
+            const domain = permKey.split('.').slice(0, -1).join('.');
+            await client.query(`
+                INSERT INTO permissions (permission_key, domain)
+                VALUES ($1, $2)
+                ON CONFLICT (permission_key) DO UPDATE SET domain = EXCLUDED.domain
+            `, [permKey, domain]);
+        }
+
+        // Migration 029: Rewrite user_permissions.permission_key from legacy to canonical keys
+        const LEGACY_TO_CANONICAL = {
+            'page:dashboard': 'qc.dashboard.view',
+            'page:tasks': 'qc.tasks.view',
+            'page:projects': 'qc.projects.view',
+            'page:resources': 'qc.resources.view',
+            'page:governance': 'qc.governance.view',
+            'page:test-executions': 'qc.testexecutions.view',
+            'page:reports': 'qc.reports.view',
+            'page:users': 'qc.admin.users.view',
+            'page:my-tasks': 'qc.mywork.tasks.view',
+            'page:my-dashboard': 'qc.mywork.dashboard.view',
+            'page:task-history': 'qc.tasks.history.view',
+            'page:roles': 'qc.admin.roles.view',
+            'page:journeys': 'qc.journeys.view',
+            'page:teams': 'qc.team.view',
+            'page:bugs': 'qc.bugs.view',
+            'page:test-cases': 'qc.testcases.view',
+            'page:test-suites': 'qc.testsuites.view',
+            'action:tasks:create': 'qc.tasks.create',
+            'action:tasks:edit': 'qc.tasks.edit',
+            'action:tasks:delete': 'qc.tasks.delete',
+            'action:projects:create': 'qc.projects.create',
+            'action:projects:edit': 'qc.projects.edit',
+            'action:projects:delete': 'qc.projects.delete',
+            'action:resources:create': 'qc.resources.create',
+            'action:resources:edit': 'qc.resources.edit',
+            'action:resources:delete': 'qc.resources.delete',
+            'action:reports:generate': 'qc.reports.generate',
+            'action:my-tasks:create': 'qc.mywork.tasks.create',
+            'action:my-tasks:edit': 'qc.mywork.tasks.edit',
+            'action:my-tasks:delete': 'qc.mywork.tasks.delete',
+            'action:journeys:assign': 'qc.journeys.assign',
+            'action:journeys:view_assigned': 'qc.journeys.view_assigned',
+            'action:journeys:view_team_progress': 'qc.journeys.view_team_progress',
+            'action:teams:manage': 'qc.team.manage',
+            'action:teams:view': 'qc.team.view',
+            'action:test-cases:create': 'qc.testcases.create',
+            'action:test-cases:edit': 'qc.testcases.edit',
+            'action:test-cases:delete': 'qc.testcases.delete',
+            'action:test-suites:create': 'qc.testsuites.create',
+            'action:test-suites:edit': 'qc.testsuites.edit',
+            'action:test-suites:delete': 'qc.testsuites.delete',
+            'action:test-suites:reorder': 'qc.testsuites.reorder',
+            'action:test-executions:create': 'qc.testexecutions.create',
+            'action:test-executions:edit': 'qc.testexecutions.edit',
+            'action:test-executions:delete': 'qc.testexecutions.delete',
+            'action:test-results:upload': 'qc.testresults.upload',
+            'action:test-results:delete': 'qc.testresults.delete',
+            'action:bugs:create': 'qc.bugs.create',
+            'action:bugs:edit': 'qc.bugs.edit',
+            'action:bugs:delete': 'qc.bugs.delete',
+            'action:governance:manage_gates': 'qc.governance.manage_gates',
+            'action:governance:approve_release': 'qc.governance.approve_release',
+        };
+        for (const [legacyKey, canonicalKey] of Object.entries(LEGACY_TO_CANONICAL)) {
+            await client.query(`
+                UPDATE user_permissions
+                SET permission_key = $1
+                WHERE permission_key = $2
+            `, [canonicalKey, legacyKey]);
+
+            await client.query(`
+                UPDATE custom_roles
+                SET permissions = array_replace(permissions, $2, $1)
+                WHERE $2 = ANY(permissions)
+            `, [canonicalKey, legacyKey]);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

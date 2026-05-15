@@ -29,7 +29,7 @@ const bulkUploadSchema = z.object({
 // ============================================================================
 
 // GET /test-results - List test results with filters
-router.get('/test-results', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+router.get('/test-results', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const {
       project_id,
@@ -131,7 +131,7 @@ router.get('/test-results', requireAuth, requirePermission('page:test-executions
 });
 
 // GET /test-results/project/:project_id/metrics - Get project quality metrics
-router.get('/test-results/project/:project_id/metrics', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+router.get('/test-results/project/:project_id/metrics', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { project_id } = req.params;
 
@@ -155,7 +155,7 @@ router.get('/test-results/project/:project_id/metrics', requireAuth, requirePerm
 });
 
 // GET /test-results/project/:project_id/trends - Get execution trends for charts
-router.get('/test-results/project/:project_id/trends', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+router.get('/test-results/project/:project_id/trends', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { project_id } = req.params;
     const { days = 30 } = req.query;
@@ -180,7 +180,7 @@ router.get('/test-results/project/:project_id/trends', requireAuth, requirePermi
 });
 
 // GET /test-results/test-case/:test_case_id/history - Get test case history
-router.get('/test-results/test-case/:test_case_id/history', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+router.get('/test-results/test-case/:test_case_id/history', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { test_case_id } = req.params;
     const { project_id } = req.query;
@@ -220,7 +220,7 @@ router.get('/test-results/test-case/:test_case_id/history', requireAuth, require
 });
 
 // POST /test-results/upload - Bulk upload test results from Excel
-router.post('/test-results/upload', requireAuth, requirePermission('action:test-results:upload'), async (req, res, next) => {
+router.post('/test-results/upload', requireAuth, requirePermission('qc.testresults.upload'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -412,7 +412,7 @@ router.post('/test-results/upload', requireAuth, requirePermission('action:test-
 });
 
 // GET /test-results/uploads - List upload batches
-router.get('/test-results/uploads', requireAuth, requirePermission('page:test-executions'), async (req, res, next) => {
+router.get('/test-results/uploads', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { project_id, limit = 20 } = req.query;
 
@@ -461,7 +461,7 @@ router.get('/test-results/uploads', requireAuth, requirePermission('page:test-ex
 });
 
 // DELETE /test-results/:id - Soft delete test result
-router.delete('/test-results/:id', requireAuth, requirePermission('action:test-results:delete'), async (req, res, next) => {
+router.delete('/test-results/:id', requireAuth, requirePermission('qc.testresults.delete'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {

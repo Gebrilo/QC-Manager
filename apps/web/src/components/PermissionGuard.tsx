@@ -17,11 +17,11 @@ interface PermissionGuardProps {
  * PermissionGuard - Conditionally renders children based on user permissions.
  *
  * Usage:
- *   <PermissionGuard permission="action:tasks:create">
+ *   <PermissionGuard permission="qc.tasks.create">
  *     <button>Create Task</button>
  *   </PermissionGuard>
  *
- *   <PermissionGuard permission={['action:tasks:edit', 'action:tasks:delete']} requireAll>
+ *   <PermissionGuard permission={['qc.tasks.edit', 'qc.tasks.delete']} requireAll>
  *     <button>Manage Task</button>
  *   </PermissionGuard>
  */

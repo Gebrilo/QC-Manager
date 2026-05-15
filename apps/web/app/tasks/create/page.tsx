@@ -16,7 +16,7 @@ export default function CreateTaskPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && !hasPermission('action:tasks:create')) {
+        if (!authLoading && !hasPermission('qc.tasks.create')) {
             router.replace('/tasks');
         }
     }, [authLoading, hasPermission, router]);
@@ -39,7 +39,7 @@ export default function CreateTaskPage() {
         loadData();
     }, []);
 
-    if (authLoading || !hasPermission('action:tasks:create')) return null;
+    if (authLoading || !hasPermission('qc.tasks.create')) return null;
     if (isLoading) return <div className="flex justify-center p-8"><Spinner size="lg" /></div>;
 
     return (

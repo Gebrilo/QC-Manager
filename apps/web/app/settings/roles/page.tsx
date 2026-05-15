@@ -21,21 +21,47 @@ interface Role {
 
 function groupPermissions(permissions: string[]) {
     const groups: Record<string, string[]> = {};
+    const domainLabels: Record<string, string> = {
+        'qc.tasks': 'Tasks',
+        'qc.projects': 'Projects',
+        'qc.resources': 'Resources',
+        'qc.dashboard': 'Dashboard',
+        'qc.reports': 'Reports',
+        'qc.governance': 'Governance',
+        'qc.testexecutions': 'Test Executions',
+        'qc.testresults': 'Test Results',
+        'qc.testcases': 'Test Cases',
+        'qc.testsuites': 'Test Suites',
+        'qc.bugs': 'Bugs',
+        'qc.mywork': 'My Work',
+        'qc.journeys': 'Journeys',
+        'qc.team': 'Team',
+        'qc.admin': 'Admin',
+        'qc.quality': 'Quality',
+    };
     for (const perm of permissions) {
-        const parts = perm.split(':');
-        const group = parts[0] === 'page' ? 'Pages' : parts[1] ? `${parts[1].charAt(0).toUpperCase() + parts[1].slice(1)} Actions` : 'Other';
-        if (!groups[group]) groups[group] = [];
-        groups[group].push(perm);
+        const parts = perm.split('.');
+        const domain = parts.slice(0, -1).join('.');
+        const label = domainLabels[domain] || domain;
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(perm);
     }
-    return groups;
+    const ordered: Record<string, string[]> = {};
+    for (const key of Object.keys(domainLabels)) {
+        const label = domainLabels[key];
+        if (groups[label]) ordered[label] = groups[label];
+    }
+    for (const label of Object.keys(groups)) {
+        if (!ordered[label]) ordered[label] = groups[label];
+    }
+    return ordered;
 }
 
 function formatPermLabel(key: string): string {
-    return key
-        .replace('page:', '')
-        .replace('action:', '')
-        .replace(/:/g, ' → ')
-        .replace(/-/g, ' ')
+    const parts = key.split('.');
+    const action = parts[parts.length - 1];
+    return action
+        .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 

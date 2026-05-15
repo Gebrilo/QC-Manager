@@ -21,9 +21,9 @@ export default function ResourcesPage() {
     const [preparationCount, setPreparationCount] = useState(0);
     const { hasPermission, user } = useAuth();
 
-    const canCreate = hasPermission('action:resources:create');
-    const canEdit = hasPermission('action:resources:edit');
-    const canDelete = hasPermission('action:resources:delete');
+    const canCreate = hasPermission('qc.resources.create');
+    const canEdit = hasPermission('qc.resources.edit');
+    const canDelete = hasPermission('qc.resources.delete');
 
     const loadResources = async () => {
         try {

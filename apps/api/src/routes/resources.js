@@ -14,7 +14,7 @@ const { computeTaskTimeline } = require('../utils/workingDays');
 // ========================================
 
 // GET all resources — admins/non-managers see all; managers see their team only
-router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('page:resources'), async (req, res, next) => {
+router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('qc.resources.view'), async (req, res, next) => {
     try {
         if (req.user.role !== 'manager') {
             const result = await db.query(
@@ -187,7 +187,7 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
 });
 
 // GET single resource with utilization (from view)
-router.get('/:id', requireAuth, requirePermission('page:resources'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.resources.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`
@@ -266,7 +266,7 @@ router.post('/auto-map', requireAuth, requireRole('admin', 'manager'), async (re
 });
 
 // POST create resource
-router.post('/', requireAuth, requirePermission('action:resources:create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.resources.create'), async (req, res, next) => {
     try {
         // Validate with Zod
         const data = createResourceSchema.parse(req.body);
@@ -326,7 +326,7 @@ router.post('/', requireAuth, requirePermission('action:resources:create'), asyn
 });
 
 // PATCH update resource
-router.patch('/:id', requireAuth, requirePermission('action:resources:edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.resources.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateResourceSchema.parse(req.body);
@@ -397,7 +397,7 @@ router.patch('/:id', requireAuth, requirePermission('action:resources:edit'), as
 });
 
 // DELETE soft delete resource
-router.delete('/:id', requireAuth, requirePermission('action:resources:delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.resources.delete'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
