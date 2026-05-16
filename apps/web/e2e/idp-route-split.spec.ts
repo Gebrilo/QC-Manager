@@ -33,7 +33,7 @@ test.describe('IDP route split', () => {
             }),
         }));
 
-        await page.goto('/development-plan');
+        await page.goto('/me/idp');
         await expect(page.getByRole('heading', { name: 'My Development Plan' })).toBeVisible();
         await expect(page.getByRole('link', { name: /My Journeys/i }).first()).toBeVisible();
         await expect(page.getByRole('link', { name: /Development Plan/i }).first()).toBeVisible();
@@ -49,7 +49,7 @@ test.describe('IDP route split', () => {
             body: JSON.stringify([{ id: 'a1', journey_id: 'j1', title: 'Onboarding Journey' }]),
         }));
 
-        await page.goto('/journeys');
+        await page.goto('/me/journeys');
         await expect(page.getByRole('heading', { name: 'My Journeys' })).toBeVisible();
         await expect(page.getByText('Onboarding Journey')).toBeVisible();
     });
@@ -64,7 +64,7 @@ test.describe('IDP route split', () => {
             body: JSON.stringify([{ id: 'a1', journey_id: 'j1', title: 'Onboarding' }]),
         }));
 
-        await page.goto('/journeys');
+        await page.goto('/me/journeys');
         await expect(page.getByRole('heading', { name: 'My Journeys' })).toBeVisible();
         await expect(page.getByText('Onboarding')).toBeVisible();
     });
@@ -86,7 +86,7 @@ test.describe('IDP route split', () => {
             }]),
         }));
 
-        await page.goto('/development-plan/history');
+        await page.goto('/me/idp/history');
         await expect(page.getByRole('heading', { name: 'Plan History' })).toBeVisible();
         await expect(page.getByText('Q1 2026 Plan')).toBeVisible();
         await expect(page.getByText('90%')).toBeVisible();

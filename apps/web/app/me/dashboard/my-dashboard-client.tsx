@@ -98,7 +98,7 @@ export function MyDashboardClient() {
                     </svg>
                     <p className="text-sm text-indigo-700 dark:text-indigo-300">
                         This is your personal view.{' '}
-                        <a href="/dashboard" className="font-semibold underline hover:text-indigo-900 dark:hover:text-indigo-100">
+                        <a href="/me/dashboard" className="font-semibold underline hover:text-indigo-900 dark:hover:text-indigo-100">
                             Visit Dashboard
                         </a>{' '}
                         for organisation-wide analytics.

@@ -87,7 +87,7 @@ test.describe('Project and task core flow', () => {
             await route.continue();
         });
 
-        await page.goto('/projects/create');
+        await page.goto('/work/projects/create');
         await page.locator('input[name="name"]').fill('E2E New Project');
         await page.locator('input[name="project_id"]').fill('PRJ-201');
         await page.locator('input[name="total_weight"]').fill('5');
@@ -96,7 +96,7 @@ test.describe('Project and task core flow', () => {
         await page.getByRole('button', { name: 'Create Project' }).click();
         await expect(page).toHaveURL(/\/projects$/);
 
-        await page.goto('/tasks/create');
+        await page.goto('/work/tasks/create');
         await expect(page.getByRole('heading', { name: 'Create New Task' })).toBeVisible();
         await page.locator('input[placeholder="e.g. Implement Authorization Logic"]').fill('E2E Task');
         await page.locator('select[name="project_id"]').selectOption(mockProject.id);

@@ -15,7 +15,7 @@ const defaultUser: MockUser = {
     email: 'e2e-admin@example.com',
     role: 'admin',
     status: 'ACTIVE',
-    preferences: { default_page: '/dashboard' },
+    preferences: { default_page: '/me/dashboard' },
 };
 
 const adminPermissions = [

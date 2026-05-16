@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, Suspense } from 'react';
-import { useAuth } from '../../src/components/providers/AuthProvider';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 

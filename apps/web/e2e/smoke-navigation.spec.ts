@@ -3,7 +3,7 @@ import { mockAuthenticatedSession } from './helpers/session';
 
 test.describe('Smoke navigation', () => {
     test('redirects unauthenticated users to login for protected routes', async ({ page }) => {
-        await page.goto('/projects');
+        await page.goto('/work/projects');
         await expect(page).toHaveURL(/\/login$/);
         await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
     });
@@ -66,7 +66,7 @@ test.describe('Smoke navigation', () => {
             }
             await route.continue();
         });
-        await page.goto('/dashboard');
+        await page.goto('/me/dashboard');
         await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
         await expect(page.getByRole('button', { name: '+ New Project' })).toBeVisible();
     });

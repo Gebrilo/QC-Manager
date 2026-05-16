@@ -16,7 +16,7 @@ export function KeyboardShortcuts() {
             // New Task: 'n' (if not typing in input)
             if (e.key.toLowerCase() === 'n' && !isInputActive()) {
                 e.preventDefault();
-                router.push('/tasks/create');
+                router.push('/work/tasks/create');
             }
 
             // Search: '/' (if not typing)

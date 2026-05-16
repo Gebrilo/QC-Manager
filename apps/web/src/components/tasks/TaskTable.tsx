@@ -182,7 +182,7 @@ export function TaskTable({
                 <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm">
                     Get started by creating your first task to track progress and resources.
                 </p>
-                <Link href="/tasks/create">
+                <Link href="/work/tasks/create">
                     <Button variant="default">Create Task</Button>
                 </Link>
             </div>

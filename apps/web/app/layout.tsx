@@ -2,15 +2,15 @@
 
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from '../src/components/providers/ThemeProvider';
-import { AuthProvider } from '../src/components/providers/AuthProvider';
-import { RouteGuard } from '../src/components/providers/RouteGuard';
-import { SidebarProvider } from '../src/components/providers/SidebarProvider';
-import { TooltipProvider } from '../src/components/ui/Tooltip';
-import { ToastProvider } from '../src/components/ui/Toast';
-import { Sidebar } from '../src/components/layout/Sidebar';
-import { TopBar } from '../src/components/layout/TopBar';
-import { ActivationBanner } from '../src/components/ui/ActivationBanner';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { AuthProvider } from '@/components/providers/AuthProvider';
+import { RouteGuard } from '@/components/providers/RouteGuard';
+import { SidebarProvider } from '@/components/providers/SidebarProvider';
+import { TooltipProvider } from '@/components/ui/Tooltip';
+import { ToastProvider } from '@/components/ui/Toast';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { TopBar } from '@/components/layout/TopBar';
+import { ActivationBanner } from '@/components/ui/ActivationBanner';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 

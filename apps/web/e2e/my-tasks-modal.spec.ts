@@ -58,7 +58,7 @@ async function mockMyTasksApi(page: Page, tasks = TASKS) {
 test.describe('My Tasks — Detail Modal', () => {
     test('clicking a task card opens the modal pre-filled with task data', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.locator('.glass-card').filter({ hasText: 'Write unit tests' }).click();
         const modal = page.getByRole('dialog', { name: 'Task detail' });
         await expect(modal).toBeVisible();
@@ -68,7 +68,7 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('modal shows full description — no truncation', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.locator('.glass-card').filter({ hasText: 'Prepare regression suite' }).click();
         const modal = page.getByRole('dialog', { name: 'Task detail' });
         await expect(modal).toBeVisible();
@@ -77,7 +77,7 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('ESC key closes the modal without saving', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.locator('.glass-card').filter({ hasText: 'Write unit tests' }).click();
         await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
         await page.keyboard.press('Escape');
@@ -86,7 +86,7 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('clicking backdrop closes the modal', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.locator('.glass-card').filter({ hasText: 'Write unit tests' }).click();
         await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
         await page.mouse.click(10, 10);
@@ -95,7 +95,7 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('New Task button opens modal in create mode (no Delete, empty title)', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.click('button:has-text("New Task")');
         const modal = page.getByRole('dialog', { name: 'Task detail' });
         await expect(modal).toBeVisible();
@@ -106,13 +106,13 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('long description (>120 chars) shows Show more toggle on card', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await expect(page.getByRole('button', { name: 'Show more' })).toBeVisible();
     });
 
     test('Show more expands description; Show less collapses it', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await page.getByRole('button', { name: 'Show more' }).click();
         await expect(page.getByRole('button', { name: 'Show less' })).toBeVisible();
         await page.getByRole('button', { name: 'Show less' }).click();
@@ -121,7 +121,7 @@ test.describe('My Tasks — Detail Modal', () => {
 
     test('no inline form shown on page load (form is modal-only now)', async ({ page }) => {
         await mockMyTasksApi(page);
-        await page.goto('/my-tasks');
+        await page.goto('/me/tasks');
         await expect(page.getByPlaceholder('Description (optional)')).not.toBeVisible();
     });
 });

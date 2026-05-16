@@ -48,7 +48,7 @@ test('status popover lets user pick On hold which opens a dialog requiring a rea
         }) });
     });
 
-    await page.goto('/journeys');
+    await page.goto('/me/journeys');
     await page.getByRole('button', { name: /Change status, currently Todo/i }).click();
     await page.getByRole('menuitem', { name: /On hold/i }).click();
 
@@ -73,7 +73,7 @@ test('checkbox toggles DONE without reverting on a stray second click', async ({
             task_id: 'task-1', progress_status: body.status, hold_reason: null,
         }) });
     });
-    await page.goto('/journeys');
+    await page.goto('/me/journeys');
     const checkbox = page.getByRole('checkbox', { name: /Mark task as done/i });
     await checkbox.click();
     expect(calls).toEqual(['DONE']);
@@ -92,7 +92,7 @@ test('comments panel posts to the backend and appends the new comment', async ({
             body: body.body, created_at: '2026-04-18T12:00:00Z', updated_at: '2026-04-18T12:00:00Z',
         }) });
     });
-    await page.goto('/journeys');
+    await page.goto('/me/journeys');
     await page.getByRole('button', { name: /Open comments for Ship X/i }).click();
     await page.getByLabel(/New comment/i).fill('Will handle tomorrow');
     await page.getByRole('button', { name: /Post comment/i }).click();

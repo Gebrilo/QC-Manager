@@ -50,7 +50,7 @@ test.describe('IDP manager cleanup', () => {
         let nativeAlertFired = false;
         page.on('dialog', d => { nativeAlertFired = true; d.dismiss(); });
 
-        await page.goto(`/manage-development-plans/${resourceId}`);
+        await page.goto(`/team/idp/${resourceId}`);
         await expect(page.getByText('Objective A')).toBeVisible();
 
         page.once('dialog', d => d.accept());
@@ -65,7 +65,7 @@ test.describe('IDP manager cleanup', () => {
         await page.route(`**/api/development-plans/${resourceId}`, r => r.fulfill({
             status: 200, contentType: 'application/json', body: JSON.stringify(planFixture),
         }));
-        await page.goto(`/manage-development-plans/${resourceId}`);
+        await page.goto(`/team/idp/${resourceId}`);
         await expect(page.getByText('Task held')).toBeVisible();
         await expect(page.getByText('Waiting on vendor')).toBeVisible();
         await expect(page.getByText(/On hold/i)).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('IDP manager cleanup', () => {
         await page.route(`**/api/development-plans/${resourceId}`, r => r.fulfill({
             status: 200, contentType: 'application/json', body: JSON.stringify(planFixture),
         }));
-        await page.goto(`/manage-development-plans/${resourceId}`);
+        await page.goto(`/team/idp/${resourceId}`);
         await expect(page.getByText(/Late by 4d/)).toBeVisible();
     });
 
@@ -111,7 +111,7 @@ test.describe('IDP manager cleanup', () => {
             }
         });
 
-        await page.goto(`/manage-development-plans/${resourceId}`);
+        await page.goto(`/team/idp/${resourceId}`);
         await page.getByRole('button', { name: /Open comments for Task held/i }).click();
         await expect(page.getByText('Res Bob')).toBeVisible();
         await expect(page.getByText('why is this blocked?')).toBeVisible();
