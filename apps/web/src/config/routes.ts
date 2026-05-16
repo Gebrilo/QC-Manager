@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, FileText, TestTube2 } from 'lucide-react';
 
 const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
 
@@ -15,6 +15,21 @@ export interface RouteConfig {
     icon?: LucideIcon;
     onboardingStep?: number;
     onboardingGroup?: string;
+}
+
+export interface NavigationNode {
+    label: string;
+    path?: string;
+    icon?: LucideIcon;
+    children?: NavigationNode[];
+}
+
+export interface NavigationSection {
+    key: 'my-work' | 'quality' | 'manage' | 'admin';
+    label: string;
+    icon: LucideIcon;
+    roles?: readonly string[];
+    children: NavigationNode[];
 }
 
 interface RouteVisibilityUser {
@@ -142,6 +157,88 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
 ];
 
+const NAVIGATION_SECTIONS: NavigationSection[] = [
+    {
+        key: 'my-work',
+        label: 'My Work',
+        icon: CheckSquare,
+        children: [
+            { path: '/me/dashboard', label: 'My Dashboard', icon: LayoutGrid },
+            { path: '/me/tasks', label: 'My Tasks', icon: CheckSquare },
+            { path: '/me/journeys', label: 'My Journeys', icon: Map },
+            { path: '/me/idp', label: 'My Development Plan', icon: GraduationCap },
+            { path: '/me/idp/history', label: 'Plan History', icon: History },
+            { path: '/me/preferences', label: 'Preferences', icon: Settings2 },
+        ],
+    },
+    {
+        key: 'quality',
+        label: 'Quality',
+        icon: ShieldCheck,
+        children: [
+            { path: '/work/projects', label: 'Projects', icon: FolderKanban },
+            {
+                label: 'Work Tracking',
+                icon: ClipboardList,
+                children: [
+                    { path: '/work/tasks', label: 'Tasks', icon: ListTodo },
+                    { path: '/work/stories', label: 'Stories', icon: BookOpen },
+                    { path: '/work/bugs', label: 'Bugs', icon: Bug },
+                ],
+            },
+            {
+                label: 'Test Authoring',
+                icon: TestTube2,
+                children: [
+                    { path: '/test/cases', label: 'Cases', icon: FlaskConical },
+                    { path: '/test/suites', label: 'Suites', icon: Layers },
+                ],
+            },
+            {
+                label: 'Test Execution',
+                icon: PlayCircle,
+                children: [
+                    { path: '/test/runs', label: 'Runs', icon: PlayCircle },
+                    { path: '/test/results', label: 'Results', icon: FileText },
+                ],
+            },
+            { path: '/quality/governance', label: 'Governance', icon: ShieldCheck },
+            { path: '/quality/reports', label: 'Reports', icon: BarChart3 },
+        ],
+    },
+    {
+        key: 'manage',
+        label: 'Manage',
+        icon: Users,
+        roles: ['manager', 'admin'],
+        children: [
+            { path: '/team/resources', label: 'Resources', icon: Users },
+            { path: '/team/idp', label: 'Development Plans', icon: GraduationCap },
+            { path: '/team/journeys', label: 'Team Journeys', icon: Users2 },
+            { path: '/team/history', label: 'Task History', icon: History },
+        ],
+    },
+    {
+        key: 'admin',
+        label: 'Admin',
+        icon: Settings2,
+        roles: ['admin'],
+        children: [
+            { path: '/admin/users', label: 'Users', icon: UserCog },
+            { path: '/admin/teams', label: 'Teams', icon: Users2 },
+            { path: '/admin/journeys', label: 'Journey Templates', icon: Map },
+            { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
+            {
+                label: 'Integrations',
+                icon: Settings2,
+                children: [
+                    { path: '/admin/integrations/tuleap', label: 'Tuleap', icon: Settings2 },
+                ],
+            },
+        ],
+    },
+];
+
 function pathToRegex(routePath: string): RegExp {
     const escaped = routePath
         .replace(/\[[\w]+\]/g, '[^/]+')
@@ -236,4 +333,37 @@ export function getLandingPage(user: UserForLanding | null, permissions?: string
     return preferredPage;
 }
 
-export { ROUTES, PUBLIC_PATHS };
+export interface BreadcrumbItem {
+    label: string;
+    path?: string;
+}
+
+function findNodePath(nodes: NavigationNode[], targetPath: string): NavigationNode[] | null {
+    for (const node of nodes) {
+        if (node.path && targetPath === node.path) return [node];
+        if (node.path && targetPath.startsWith(node.path + '/')) {
+            const deeper = node.children ? findNodePath(node.children, targetPath) : null;
+            if (deeper) return [node, ...deeper];
+        }
+        if (node.children) {
+            const deeper = findNodePath(node.children, targetPath);
+            if (deeper) return deeper;
+        }
+    }
+    return null;
+}
+
+export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
+    for (const section of NAVIGATION_SECTIONS) {
+        const nodePath = findNodePath(section.children, pathname);
+        if (nodePath) {
+            return [
+                { label: section.label },
+                ...nodePath.map(n => ({ label: n.label, path: n.path })),
+            ];
+        }
+    }
+    return [];
+}
+
+export { ROUTES, PUBLIC_PATHS, NAVIGATION_SECTIONS };

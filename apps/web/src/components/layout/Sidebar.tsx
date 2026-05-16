@@ -1,42 +1,128 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
 import { useSidebar } from '../providers/SidebarProvider';
-import { getNavbarRoutes, getLandingPage } from '../../config/routes';
-import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
+import {
+    getLandingPage,
+    getRouteConfig,
+    NAVIGATION_SECTIONS,
+    type NavigationNode,
+    routeAllowsStatus,
+} from '../../config/routes';
+import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 
 export function Sidebar() {
     const { user, permissions, isAdmin, hasPermission } = useAuth();
     const { isExpanded, isMobileOpen, toggleExpanded, closeMobile } = useSidebar();
     const pathname = usePathname();
-
-    if (!user) return null;
-
-    const rawNavLinks = getNavbarRoutes(user).filter(route => {
-        if (route.adminOnly && !isAdmin) return false;
-        if (route.permission && !hasPermission(route.permission)) return false;
-        return true;
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        'my-work': true,
+        quality: true,
+        manage: true,
+        admin: true,
     });
-
-    const menuOrder: string[] = (user.preferences?.menu_order as string[] | undefined) || [];
-
-    const navLinks = menuOrder.length > 0
-        ? [
-            ...menuOrder
-                .map(path => rawNavLinks.find(r => r.path === path))
-                .filter((r): r is NonNullable<typeof r> => r != null),
-            ...rawNavLinks.filter(r => !menuOrder.includes(r.path)),
-        ]
-        : rawNavLinks;
-
-    const logoHref = getLandingPage(user, permissions);
 
     const isActive = (path: string) => {
         if (pathname === path) return true;
         if (path !== '/' && pathname?.startsWith(path + '/')) return true;
         return false;
+    };
+
+    const canSeePath = (path: string) => {
+        if (!user) return false;
+        const route = getRouteConfig(path);
+        if (!route) return false;
+        if (!routeAllowsStatus(route, user)) return false;
+        if (route.adminOnly && !isAdmin) return false;
+        if (route.permission && !hasPermission(route.permission)) return false;
+        return true;
+    };
+
+    const filterNode = (node: NavigationNode): NavigationNode | null => {
+        if (node.children?.length) {
+            const children = node.children
+                .map(child => filterNode(child))
+                .filter((child): child is NavigationNode => child != null);
+
+            return children.length > 0 ? { ...node, children } : null;
+        }
+
+        return node.path && canSeePath(node.path) ? node : null;
+    };
+
+    const sections = useMemo(() => {
+        if (!user) return [];
+
+        return NAVIGATION_SECTIONS
+            .filter(section => !section.roles || section.roles.includes(user.role))
+            .map(section => ({
+                ...section,
+                children: section.children
+                    .map(child => filterNode(child))
+                    .filter((child): child is NavigationNode => child != null),
+            }))
+            .filter(section => section.children.length > 0);
+    }, [user, isAdmin, hasPermission, pathname]);
+
+    if (!user) return null;
+
+    const logoHref = getLandingPage(user, permissions);
+
+    const nodeIsActive = (node: NavigationNode): boolean => {
+        if (node.path && isActive(node.path)) return true;
+        return node.children?.some(child => nodeIsActive(child)) ?? false;
+    };
+
+    const toggleSection = (key: string) => {
+        setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const renderNode = (node: NavigationNode, depth = 0) => {
+        const Icon = node.icon;
+        const active = nodeIsActive(node);
+
+        if (node.children?.length) {
+            return (
+                <li key={node.label} className={depth === 0 ? 'pt-1.5' : undefined}>
+                    {isExpanded && (
+                        <div className={`flex items-center gap-2 px-3 py-1.5 ${depth > 0 ? 'ml-3' : ''}`}>
+                            {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={1.75} aria-hidden="true" />}
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 truncate">
+                                {node.label}
+                            </span>
+                        </div>
+                    )}
+                    <ul className={`space-y-0.5 ${isExpanded ? 'ml-3 border-l border-slate-200 dark:border-slate-800 pl-2' : ''}`}>
+                        {node.children.map(child => renderNode(child, depth + 1))}
+                    </ul>
+                </li>
+            );
+        }
+
+        if (!node.path) return null;
+
+        return (
+            <li key={node.path}>
+                <Link
+                    href={node.path}
+                    onClick={closeMobile}
+                    aria-current={active ? 'page' : undefined}
+                    title={!isExpanded ? node.label : undefined}
+                    className={`flex items-center gap-3 rounded-lg transition-all duration-150 ${isExpanded ? 'px-3 py-2' : 'px-0 py-2.5 justify-center'} ${active
+                        ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-900 dark:text-white border-l-2 border-indigo-500 ml-0 pl-2.5'
+                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-700 dark:hover:text-slate-300 border-l-2 border-transparent'
+                    }`}
+                >
+                    {Icon && <Icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />}
+                    {isExpanded && (
+                        <span className="text-[13px] font-medium truncate">{node.label}</span>
+                    )}
+                </Link>
+            </li>
+        );
     };
 
     const sidebarContent = (
@@ -62,27 +148,40 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 overflow-y-auto sidebar-scrollbar py-3 px-2" aria-label="Main navigation">
-                <ul className="space-y-0.5">
-                    {navLinks.map(route => {
-                        const Icon = route.icon;
-                        const active = isActive(route.path);
+                <ul className="space-y-1.5">
+                    {sections.map(section => {
+                        const Icon = section.icon;
+                        const active = section.children.some(child => nodeIsActive(child));
+                        const open = openSections[section.key] ?? true;
                         return (
-                            <li key={route.path}>
-                                <Link
-                                    href={route.path}
-                                    onClick={closeMobile}
-                                    aria-current={active ? 'page' : undefined}
-                                    title={!isExpanded ? route.label : undefined}
-                                    className={`flex items-center gap-3 rounded-lg transition-all duration-150 ${isExpanded ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'} ${active
-                                            ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-900 dark:text-white border-l-2 border-indigo-500 ml-0 pl-2.5'
-                                            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-700 dark:hover:text-slate-300 border-l-2 border-transparent'
-                                        }`}
+                            <li key={section.key}>
+                                <button
+                                    type="button"
+                                    onClick={() => isExpanded && toggleSection(section.key)}
+                                    title={!isExpanded ? section.label : undefined}
+                                    aria-expanded={isExpanded ? open : undefined}
+                                    className={`flex w-full items-center gap-3 rounded-lg transition-all duration-150 ${isExpanded ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'} ${active
+                                        ? 'text-slate-900 dark:text-white bg-slate-100/80 dark:bg-slate-800/50'
+                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }`}
                                 >
-                                    {Icon && <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />}
+                                    <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
                                     {isExpanded && (
-                                        <span className="text-[13px] font-medium truncate">{route.label}</span>
+                                        <>
+                                            <span className="text-[13px] font-semibold truncate flex-1 text-left">{section.label}</span>
+                                            {open ? (
+                                                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden="true" />
+                                            ) : (
+                                                <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden="true" />
+                                            )}
+                                        </>
                                     )}
-                                </Link>
+                                </button>
+                                {(open || !isExpanded) && (
+                                    <ul className={`mt-1 space-y-0.5 ${isExpanded ? 'pl-1' : ''}`}>
+                                        {isExpanded ? section.children.map(child => renderNode(child)) : null}
+                                    </ul>
+                                )}
                             </li>
                         );
                     })}
