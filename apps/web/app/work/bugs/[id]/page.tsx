@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { tuleapApi, type TuleapArtifact } from '@/lib/api';
+import Link from 'next/link';
+import { tuleapApi, type TuleapArtifact, bugLinksApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import Link from 'next/link';
-import { BugLinksPanel } from '@/components/bugs/BugLinksPanel';
+import {
+    LinkedArtifactsSection,
+    type LinkedArtifactRow,
+    type LinkedArtifactsSectionConfig,
+} from '@/components/shared/LinkedArtifactsSection';
+import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',
@@ -40,6 +45,65 @@ export default function BugDetailPage() {
         }
         if (id) load();
     }, [id]);
+
+    const projectId = (artifact as any)?.project_id as string | undefined;
+
+    const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Source / Provenance',
+            emptyLabel: 'Not discovered via a test execution.',
+            readOnly: true,
+            viewPermission: 'qc.testexecutions.view',
+            load: async () => {
+                const response = await bugLinksApi.listTestExecutions(id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_execution_id,
+                    displayId: row.test_run_name || `EX-${row.test_execution_id.slice(0, 8)}`,
+                    title: row.execution_notes || row.execution_status || 'Test execution',
+                    status: row.execution_status,
+                    href: row.test_run_id ? `/test-runs/${row.test_run_id}` : undefined,
+                    source: 'qc',
+                    relationshipType: 'discovered via',
+                    meta: row.executed_at ? new Date(row.executed_at).toLocaleString() : undefined,
+                }));
+            },
+        },
+        {
+            title: 'Linked Tasks',
+            emptyLabel: 'No linked tasks yet.',
+            artifactType: 'task',
+            pickerTitle: 'Link tasks to this bug',
+            viewPermission: 'qc.tasks.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listTasks(id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.task_id,
+                    displayId: row.task_display_id || row.task_id.slice(0, 8),
+                    title: row.task_name || '(no title)',
+                    status: row.task_status,
+                    href: `/tasks/${row.task_id}`,
+                    source: 'qc',
+                    relationshipType: row.relationship_type || 'blocks',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await bugLinksApi.addTask(id, item.id, 'blocks');
+                }
+            },
+            remove: async (row) => {
+                await bugLinksApi.removeTask(id, row.artifactId);
+            },
+        },
+        // TODO: Linked Test Cases and Linked User Stories panels — enable once
+        // the bug_test_cases / bug_user_stories CRUD endpoints from issue #53
+        // are merged. The LinkedArtifactsSection + ArtifactPicker components
+        // here are already wired to plug them in: add `load`/`add`/`remove`
+        // entries against the future bugLinksApi.listTestCases / listUserStories.
+    ], [id]);
 
     const handleDelete = async () => {
         setIsDeleting(true);
@@ -105,7 +169,7 @@ export default function BugDetailPage() {
                     <Badge variant={STATUS_VARIANT[status] || 'default'}>
                         {status}
                     </Badge>
-                    <Link href={`/bugs/${id}/edit`}>
+                    <Link href={`/work/bugs/${id}/edit`}>
                         <Button variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                             Edit
                         </Button>
@@ -123,7 +187,11 @@ export default function BugDetailPage() {
                 </pre>
             </div>
 
-            <BugLinksPanel bugId={id} triageStatus={(artifact as any)?.triage_status as string | undefined} />
+            <div className="space-y-4">
+                {sections.map(section => (
+                    <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
+                ))}
+            </div>
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
