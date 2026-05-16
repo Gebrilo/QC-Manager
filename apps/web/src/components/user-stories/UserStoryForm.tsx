@@ -84,10 +84,10 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId }: Us
 
             if (isEdit && artifactId) {
                 await tuleapApi.updateUnified(artifactId, payload);
-                router.push(`/user-stories/${artifactId}`);
+                router.push(`/work/stories/${artifactId}`);
             } else {
                 const result = await tuleapApi.createUnified(payload);
-                router.push(`/user-stories/${result.tuleap_artifact_id}`);
+                router.push(`/work/stories/${result.tuleap_artifact_id}`);
             }
             router.refresh();
         } catch (err: any) {

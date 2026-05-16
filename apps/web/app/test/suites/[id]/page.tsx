@@ -1,1 +1,304 @@
-export { default } from '../../../test-suites/[id]/page';
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { TestSuite, SuiteTestCase } from '@/types';
+import { testSuitesApi } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Spinner } from '@/components/ui/Spinner';
+import { formatDistanceToNow, format } from 'date-fns';
+
+function getSuiteStatusVariant(status: string): 'success' | 'warning' | 'default' {
+    const map: Record<string, 'success' | 'warning' | 'default'> = {
+        active: 'success', draft: 'warning', archived: 'default',
+    };
+    return map[status] || 'default';
+}
+
+function getPriorityBadgeVariant(priority: string): 'danger' | 'warning' | 'default' | 'success' {
+    const map: Record<string, 'danger' | 'warning' | 'default' | 'success'> = {
+        critical: 'danger', high: 'warning', medium: 'default', low: 'success',
+    };
+    return map[priority] || 'default';
+}
+
+function getTestCaseStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
+    const map: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
+        active: 'success', draft: 'warning', deprecated: 'danger', archived: 'default',
+    };
+    return map[status] || 'default';
+}
+
+export default function TestSuiteDetailPage() {
+    const params = useParams();
+    const router = useRouter();
+    const id = params.id as string;
+
+    const [suite, setSuite] = useState<(TestSuite & { test_cases?: SuiteTestCase[] }) | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [showAddCases, setShowAddCases] = useState(false);
+    const [availableCases, setAvailableCases] = useState<any[]>([]);
+    const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
+    const [addingCases, setAddingCases] = useState(false);
+    const [removingCaseId, setRemovingCaseId] = useState<string | null>(null);
+    const [cloning, setCloning] = useState(false);
+
+    const loadSuite = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await testSuitesApi.get(id);
+            setSuite(data as any);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => {
+        loadSuite();
+    }, [loadSuite]);
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to delete this test suite?')) return;
+        try {
+            await testSuitesApi.delete(id);
+            router.push('/test/suites');
+            router.refresh();
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleRemoveCase = async (caseId: string) => {
+        setRemovingCaseId(caseId);
+        try {
+            await testSuitesApi.removeTestCases(id, { test_case_ids: [caseId] });
+            await loadSuite();
+        } catch (err: any) {
+            alert(err.message || 'Failed to remove test case');
+        } finally {
+            setRemovingCaseId(null);
+        }
+    };
+
+    const handleLoadAvailableCases = async () => {
+        if (availableCases.length > 0) {
+            setShowAddCases(!showAddCases);
+            return;
+        }
+        setShowAddCases(true);
+        try {
+            const res = await testSuitesApi.availableTestCases(id, { status: 'active', limit: 200 });
+            setAvailableCases(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('Failed to load available cases', err);
+        }
+    };
+
+    const handleAddCases = async () => {
+        if (selectedCaseIds.size === 0) return;
+        setAddingCases(true);
+        try {
+            await testSuitesApi.addTestCases(id, { test_case_ids: Array.from(selectedCaseIds), position: 'end' });
+            setSelectedCaseIds(new Set());
+            setShowAddCases(false);
+            setAvailableCases([]);
+            await loadSuite();
+        } catch (err: any) {
+            alert(err.message || 'Failed to add test cases');
+        } finally {
+            setAddingCases(false);
+        }
+    };
+
+    const handleClone = async () => {
+        const name = prompt('Enter name for the cloned suite:', `${suite?.name} (Copy)`);
+        if (!name) return;
+        setCloning(true);
+        try {
+            await testSuitesApi.clone(id, { name });
+            router.push('/test/suites');
+            router.refresh();
+        } catch (err: any) {
+            alert(err.message || 'Failed to clone suite');
+        } finally {
+            setCloning(false);
+        }
+    };
+
+    const toggleCaseSelection = (caseId: string) => {
+        const next = new Set(selectedCaseIds);
+        if (next.has(caseId)) next.delete(caseId);
+        else next.add(caseId);
+        setSelectedCaseIds(next);
+    };
+
+    if (loading) {
+        return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
+    }
+
+    if (error) {
+        return (
+            <div className="max-w-3xl mx-auto py-8 px-4">
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
+                    <h2 className="text-lg font-semibold mb-2">Error Loading Test Suite</h2>
+                    <p>{error}</p>
+                    <Link href="/test/suites"><Button variant="outline" className="mt-4">Back to Test Suites</Button></Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (!suite) {
+        return (
+            <div className="max-w-3xl mx-auto py-8 px-4">
+                <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Test Suite Not Found</h2>
+                    <Link href="/test/suites"><Button variant="outline">Back to Test Suites</Button></Link>
+                </div>
+            </div>
+        );
+    }
+
+    const testCases = suite.test_cases || [];
+    const passRate = suite.last_run_pass_rate != null ? Math.round(suite.last_run_pass_rate * 100) : null;
+
+    return (
+        <div className="max-w-5xl mx-auto py-8 px-4">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <Link href="/test/suites"><Button variant="ghost" size="sm">Back</Button></Link>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{suite.suite_id}</h1>
+                </div>
+                <div className="flex gap-3">
+                    <Link href={`/test-runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
+                    <Button variant="outline" onClick={handleLoadAvailableCases}>+ Add Cases</Button>
+                    <Button variant="outline" onClick={handleClone} disabled={cloning}>{cloning ? 'Cloning...' : 'Clone'}</Button>
+                    <Link href={`/test-suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
+                    <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6 mb-6">
+                <div>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{suite.name}</h2>
+                    <div className="flex flex-wrap gap-2">
+                        <Badge variant={getSuiteStatusVariant(suite.status)}>{suite.status}</Badge>
+                        {suite.project_name && <Badge variant="info">{suite.project_name}</Badge>}
+                        {passRate !== null && <Badge variant={passRate >= 80 ? 'success' : passRate >= 50 ? 'warning' : 'danger'}>{passRate}% pass rate</Badge>}
+                    </div>
+                </div>
+
+                {suite.description && (
+                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{suite.description}</p>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-slate-200 dark:border-slate-800 pt-4">
+                    <div><span className="text-gray-500 dark:text-gray-400">Cases</span><br /><span className="text-slate-900 dark:text-white font-medium">{suite.test_case_count ?? testCases.length}</span></div>
+                    <div><span className="text-gray-500 dark:text-gray-400">Created By</span><br /><span className="text-slate-900 dark:text-white">{suite.created_by_name || '\u2014'}</span></div>
+                    <div><span className="text-gray-500 dark:text-gray-400">Created</span><br /><span className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}</span></div>
+                    <div><span className="text-gray-500 dark:text-gray-400">Last Updated</span><br /><span className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(suite.updated_at), { addSuffix: true })}</span></div>
+                </div>
+            </div>
+
+            {showAddCases && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-900/50 p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Add Test Cases</h3>
+                        <Button variant="ghost" size="sm" onClick={() => { setShowAddCases(false); setSelectedCaseIds(new Set()); }}>Cancel</Button>
+                    </div>
+                    {availableCases.length === 0 ? (
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">No additional active test cases available to add.</p>
+                    ) : (
+                        <>
+                            <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
+                                {availableCases.map((tc) => (
+                                    <label key={tc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                                        <input type="checkbox" checked={selectedCaseIds.has(tc.id)} onChange={() => toggleCaseSelection(tc.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        <span className="font-mono text-xs text-gray-500">{tc.test_case_id}</span>
+                                        <span className="text-sm text-slate-900 dark:text-white flex-1 truncate">{tc.title}</span>
+                                        {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Button onClick={handleAddCases} disabled={addingCases || selectedCaseIds.size === 0}>
+                                    {addingCases ? 'Adding...' : `Add ${selectedCaseIds.size} Case${selectedCaseIds.size !== 1 ? 's' : ''}`}
+                                </Button>
+                                <span className="text-sm text-gray-500">{selectedCaseIds.size} selected</span>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Test Cases ({testCases.length})</h3>
+                </div>
+                {testCases.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <p className="text-gray-500 dark:text-gray-400">No test cases in this suite yet. Click &quot;+ Add Cases&quot; to add some.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-12">#</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">ID</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Title</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Priority</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {testCases.map((tc, idx) => (
+                                    <tr key={tc.junction_id || tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{tc.sort_order || idx + 1}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <Link href={`/test-cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                {tc.test_case_id_display || tc.test_case_id}
+                                            </Link>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <Link href={`/test-cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                                {tc.title}
+                                            </Link>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            {tc.status && <Badge variant={getTestCaseStatusVariant(tc.status)}>{tc.status}</Badge>}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 capitalize">
+                                            {tc.test_type || '\u2014'}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <button
+                                                onClick={() => handleRemoveCase(tc.id)}
+                                                disabled={removingCaseId === tc.id}
+                                                className="text-red-600 dark:text-red-400 hover:underline text-sm disabled:opacity-50"
+                                            >
+                                                {removingCaseId === tc.id ? 'Removing...' : 'Remove'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

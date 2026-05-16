@@ -92,7 +92,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
             Upload test results to see quality metrics and trends
           </p>
           <a
-            href="/test-results/upload"
+            href="/test/results/upload"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Upload Test Results
@@ -346,7 +346,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
           View All Test Results
         </a>
         <a
-          href="/test-results/upload"
+          href="/test/results/upload"
           className="flex-1 text-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           Upload New Results

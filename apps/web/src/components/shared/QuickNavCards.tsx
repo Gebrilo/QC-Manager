@@ -18,11 +18,11 @@ export function QuickNavCards({ journeys, pendingTasks }: {
         <div>
             <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Quick Access</h2>
-                <a href="/preferences" className="text-xs text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Manage in Preferences →</a>
+                <a href="/me/preferences" className="text-xs text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Manage in Preferences →</a>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {/* Tasks summary card */}
-                <a href="/my-tasks"
+                <a href="/me/tasks"
                     className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
                     <div className="w-10 h-10 rounded-lg bg-violet-50 dark:bg-violet-950 flex items-center justify-center flex-shrink-0">
                         <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -65,7 +65,7 @@ async function setupPage(page: import('@playwright/test').Page) {
       body: JSON.stringify(mockAnalytics),
     });
   });
-  await page.goto(`/resources/${RESOURCE_ID}`);
+  await page.goto(`/team/resources/${RESOURCE_ID}`);
   await page.waitForSelector('h1');
 }
 

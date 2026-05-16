@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useAuth } from '../../src/components/providers/AuthProvider';
+import { useAuth } from '@/components/providers/AuthProvider';
 import Link from 'next/link';
 
 export default function RegisterPage() {
