@@ -14,7 +14,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     // Get auth token from Supabase session
     let authToken: string | null = null;
     if (typeof window !== 'undefined') {
-        const { supabase } = await import('./supabase');
+        const { supabase } = await import('../supabase');
         const { data: { session } } = await supabase.auth.getSession();
         authToken = session?.access_token || null;
     }
@@ -39,7 +39,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
         // Handle 401 Unauthorized - session expired, sign out so RouteGuard redirects to login
         if (response.status === 401) {
             if (typeof window !== 'undefined') {
-                const { supabase } = await import('./supabase');
+                const { supabase } = await import('../supabase');
                 supabase.auth.signOut();
             }
             throw new Error(errorData.error || 'Session expired. Please log in again.');
@@ -691,7 +691,7 @@ export const profileApi = {
 export const avatarApi = {
     upload: async (file: File): Promise<{ avatar_url: string; avatar_type: string }> => {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.gebrils.cloud';
-        const { supabase } = await import('./supabase');
+        const { supabase } = await import('../supabase');
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || '';
 
@@ -977,7 +977,7 @@ export const myJourneysApi = {
 
         let authToken: string | null = null;
         if (typeof window !== 'undefined') {
-            const { supabase } = await import('./supabase');
+            const { supabase } = await import('../supabase');
             const { data: { session } } = await supabase.auth.getSession();
             authToken = session?.access_token || null;
         }
@@ -1384,7 +1384,7 @@ export const developmentPlansApi = {
     uploadTaskAttachment: async (userId: string, taskId: string, file: File): Promise<IDPTaskAttachment> => {
         const formData = new FormData();
         formData.append('file', file);
-        const { supabase } = await import('./supabase');
+        const { supabase } = await import('../supabase');
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
         const headers: Record<string, string> = {};
@@ -1402,7 +1402,7 @@ export const developmentPlansApi = {
     uploadMyTaskAttachment: async (taskId: string, file: File): Promise<IDPTaskAttachment> => {
         const formData = new FormData();
         formData.append('file', file);
-        const { supabase } = await import('./supabase');
+        const { supabase } = await import('../supabase');
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
         const headers: Record<string, string> = {};
