@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, taskTestCaseLinksApi } from '@/lib/api';
 import { Task } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -10,7 +10,11 @@ import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
 import { TaskCommentSection } from '@/components/tasks/TaskCommentSection';
-import { LinkedTestCasesPanel } from '@/components/tasks/LinkedTestCasesPanel';
+import {
+    LinkedArtifactsSection,
+    type LinkedArtifactsSectionConfig,
+} from '@/components/shared/LinkedArtifactsSection';
+import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import Link from 'next/link';
 
 export default function TaskDetailPage() {
@@ -96,7 +100,7 @@ export default function TaskDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href={`/tasks/${task.id}/edit`}>
+                    <Link href={`/work/tasks/${task.id}/edit`}>
                         <Button variant="outline">Edit Task</Button>
                     </Link>
                     <Button
@@ -212,8 +216,52 @@ export default function TaskDetailPage() {
             {/* Comments — full width */}
             <TaskCommentSection taskId={task.id} />
 
-            {/* Linked Test Cases */}
-            <LinkedTestCasesPanel taskId={task.id} />
+            <TaskLinkedArtifactsSections taskId={task.id} projectId={task.project_id || null} />
+        </div>
+    );
+}
+
+function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; projectId: string | null }) {
+    const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Linked Test Cases',
+            emptyLabel: 'No linked test cases yet.',
+            artifactType: 'test_case',
+            pickerTitle: 'Link test cases to this task',
+            viewPermission: 'qc.testcases.view',
+            editPermission: 'qc.tasks.edit',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listTestCases(taskId);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_case_id,
+                    displayId: row.test_case_display_id || row.test_case_id.slice(0, 8),
+                    title: row.test_case_title || '(no title)',
+                    status: row.test_case_status,
+                    href: `/test/cases/${row.test_case_id}`,
+                    source: 'qc',
+                    relationshipType: row.relationship_type || 'covers',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addTestCase(taskId, item.id, 'covers');
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeTestCase(taskId, row.artifactId);
+            },
+        },
+        // TODO: Linked Bugs (reverse of bug_tasks). Needs a backend GET
+        // /tasks/:taskId/bugs endpoint from issue #53. Once present, mirror the
+        // shape above using `bugLinksApi.listBugsForTask` (forthcoming).
+    ], [taskId]);
+
+    return (
+        <div className="space-y-4">
+            {sections.map(section => (
+                <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
+            ))}
         </div>
     );
 }
