@@ -7,6 +7,7 @@ import { useSidebar } from '../providers/SidebarProvider';
 import { getLandingPage } from '../../config/routes';
 import { Menu, Moon, Sun, LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { Breadcrumb } from './Breadcrumb';
 
 export function TopBar() {
     const { theme, toggleTheme } = useTheme();
@@ -42,6 +43,10 @@ export function TopBar() {
                         <Menu className="w-5 h-5" strokeWidth={1.75} />
                     </button>
 
+                    <div className="hidden md:flex items-center">
+                        <Breadcrumb />
+                    </div>
+
                     <Link href={logoHref} className="flex items-center gap-2 md:hidden group">
                         <div className="h-7 w-7 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
                             QC
@@ -70,7 +75,7 @@ export function TopBar() {
                     <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5 hidden sm:block" />
 
                     <Link
-                        href="/preferences"
+                        href="/me/preferences"
                         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
                     >
                         {avatarSrc ? (
