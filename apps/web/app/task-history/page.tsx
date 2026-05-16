@@ -98,7 +98,7 @@ export default function TaskHistoryPage() {
                 <div>
                     <div className="flex items-center gap-3">
                         <Link
-                            href="/tasks"
+                            href="/work/tasks"
                             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +122,7 @@ export default function TaskHistoryPage() {
                         Refresh
                     </button>
                     <Link
-                        href="/governance"
+                        href="/quality/governance"
                         className="px-4 py-2 bg-indigo-600 rounded-lg text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
                     >
                         Governance Dashboard

@@ -16,7 +16,7 @@ jest.mock('../src/middleware/audit', () => ({
 }));
 
 const express = require('express');
-const tuleapRouter = require('../src/routes/tuleapWebhook');
+const tuleapRouter = require('../src/modules/integration/tuleapWebhook.routes');
 
 const app = express();
 app.use(express.json());

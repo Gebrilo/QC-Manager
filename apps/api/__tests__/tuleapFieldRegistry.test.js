@@ -1,11 +1,11 @@
-jest.mock('../src/services/tuleapClient', () => ({
+jest.mock('../src/modules/integration/services/tuleapClient', () => ({
   defaultClient: {
     get: jest.fn(),
   },
 }));
 
-const { defaultClient } = require('../src/services/tuleapClient');
-const { FieldRegistry } = require('../src/services/tuleapFieldRegistry');
+const { defaultClient } = require('../src/modules/integration/services/tuleapClient');
+const { FieldRegistry } = require('../src/modules/integration/services/tuleapFieldRegistry');
 
 const MOCK_FIELDS = [
   { field_id: 42, name: 'summary', label: 'Summary', type: 'string', values: [] },

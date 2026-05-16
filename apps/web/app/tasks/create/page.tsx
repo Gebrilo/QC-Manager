@@ -17,7 +17,7 @@ export default function CreateTaskPage() {
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.tasks.create')) {
-            router.replace('/tasks');
+            router.replace('/work/tasks');
         }
     }, [authLoading, hasPermission, router]);
 

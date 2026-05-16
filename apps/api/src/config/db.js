@@ -386,23 +386,31 @@ const runMigrations = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bugs_owner_resource_id ON bugs(owner_resource_id) WHERE deleted_at IS NULL`);
 
-        // Tuleap Sync Configuration
+        // Tuleap Sync Configuration / tracker_config
+        // Rename existing table if needed, then create new if not exists
+        await client.query(`ALTER TABLE IF EXISTS tuleap_sync_config RENAME TO tracker_config`);
         await client.query(`
-            CREATE TABLE IF NOT EXISTS tuleap_sync_config (
+            CREATE TABLE IF NOT EXISTS tracker_config (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 tuleap_project_id INTEGER NOT NULL,
                 tuleap_tracker_id INTEGER NOT NULL,
                 tuleap_base_url TEXT,
                 tracker_type VARCHAR(20) NOT NULL CHECK (tracker_type IN ('test_case', 'bug', 'task')),
                 qc_project_id UUID REFERENCES projects(id),
-                field_mappings JSONB NOT NULL DEFAULT '{}',
-                status_mappings JSONB NOT NULL DEFAULT '{}',
+                artifact_fields JSONB NOT NULL DEFAULT '{}',
+                status_value_map JSONB NOT NULL DEFAULT '{}',
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(tuleap_project_id, tuleap_tracker_id)
             )
         `);
+
+        await client.query(`ALTER TABLE tracker_config DROP COLUMN IF EXISTS field_mappings`);
+        await client.query(`ALTER TABLE tracker_config DROP COLUMN IF EXISTS status_mappings`);
+
+        // Drop the backward-compat view — all application code reads from tracker_config now
+        await client.query(`DROP VIEW IF EXISTS tuleap_sync_config`);
 
         // Tuleap Webhook Log
         await client.query(`
@@ -458,14 +466,14 @@ const runMigrations = async () => {
             BEGIN
                 IF EXISTS (
                     SELECT 1 FROM pg_constraint
-                    WHERE conname = 'tuleap_sync_config_tracker_type_check'
-                    AND conrelid = 'tuleap_sync_config'::regclass
+                    WHERE conname = 'tracker_config_tracker_type_check'
+                    AND conrelid = 'tracker_config'::regclass
                 ) THEN
-                    ALTER TABLE tuleap_sync_config DROP CONSTRAINT tuleap_sync_config_tracker_type_check;
+                    ALTER TABLE tracker_config DROP CONSTRAINT tracker_config_tracker_type_check;
                 END IF;
             END $$;
         `);
-        await client.query(`ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user_story'))`);
+        await client.query(`ALTER TABLE tracker_config ADD CONSTRAINT tracker_config_tracker_type_check CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user_story'))`);
 
         // Tuleap Task History
         await client.query(`
@@ -562,8 +570,13 @@ const runMigrations = async () => {
                 COUNT(b.id) FILTER (WHERE b.severity = 'high') AS high_bugs,
                 COUNT(b.id) FILTER (WHERE b.severity = 'medium') AS medium_bugs,
                 COUNT(b.id) FILTER (WHERE b.severity = 'low') AS low_bugs,
-                COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(b.id) FILTER (WHERE b.source = 'EXPLORATORY') AS bugs_from_exploratory
+                COUNT(b.id) FILTER (WHERE COALESCE(b.source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(b.id) FILTER (WHERE COALESCE(b.source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
+                COUNT(b.id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = b.id)) AS bugs_from_testing,
+                COUNT(b.id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = b.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt2 WHERE bt2.bug_id = b.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_test_cases btc WHERE btc.bug_id = b.id)) AS standalone_bugs
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.deleted_at IS NULL
@@ -1555,7 +1568,7 @@ const runMigrations = async () => {
         // =====================================================
 
         await client.query(`
-            ALTER TABLE tuleap_sync_config
+            ALTER TABLE tracker_config
                 ADD COLUMN IF NOT EXISTS artifact_fields JSONB DEFAULT '{}',
                 ADD COLUMN IF NOT EXISTS status_value_map JSONB DEFAULT '{}'
         `);
@@ -1597,21 +1610,21 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
-            ALTER TABLE tuleap_sync_config
+            ALTER TABLE tracker_config
                 ADD COLUMN IF NOT EXISTS value_maps JSONB DEFAULT '{}'::jsonb
         `);
 
         await client.query(`
             DO $$ BEGIN
-                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tuleap_sync_config' AND column_name='value_maps' AND column_default IS NULL) THEN
-                    ALTER TABLE tuleap_sync_config ALTER COLUMN value_maps SET DEFAULT '{}'::jsonb;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tracker_config' AND column_name='value_maps' AND column_default IS NULL) THEN
+                    ALTER TABLE tracker_config ALTER COLUMN value_maps SET DEFAULT '{}'::jsonb;
                 END IF;
             END $$;
         `);
 
         await client.query(`
             DO $$ BEGIN
-                UPDATE tuleap_sync_config SET value_maps = jsonb_build_object('status', COALESCE(status_value_map, '{}'::jsonb)) WHERE value_maps = '{}'::jsonb OR value_maps IS NULL;
+                UPDATE tracker_config SET value_maps = jsonb_build_object('status', COALESCE(status_value_map, '{}'::jsonb)) WHERE value_maps = '{}'::jsonb OR value_maps IS NULL;
             END $$;
         `);
 
@@ -1658,7 +1671,7 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
-            ALTER TABLE tuleap_sync_config
+            ALTER TABLE tracker_config
                 ADD COLUMN IF NOT EXISTS submitted_by_resource_id UUID REFERENCES resources(id) ON DELETE SET NULL
         `);
 
@@ -2355,6 +2368,162 @@ const runMigrations = async () => {
                 WHERE $2 = ANY(permissions)
             `, [canonicalKey, legacyKey]);
         }
+
+        // ── Coverage Link tables (slice 19) ────────────────────────────────────
+
+        const coverageLinkTables = [
+            {
+                table: 'bug_test_cases',
+                from: 'bug_id', fromRef: 'bugs',
+                to: 'test_case_id', toRef: 'test_case',
+                relDefault: 'reveals'
+            },
+            {
+                table: 'bug_user_stories',
+                from: 'bug_id', fromRef: 'bugs',
+                to: 'user_story_id', toRef: 'user_stories',
+                relDefault: 'affects'
+            },
+            {
+                table: 'test_case_user_stories',
+                from: 'test_case_id', fromRef: 'test_case',
+                to: 'user_story_id', toRef: 'user_stories',
+                relDefault: 'verifies'
+            }
+        ];
+
+        for (const clt of coverageLinkTables) {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS ${clt.table} (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    ${clt.from} UUID NOT NULL REFERENCES ${clt.fromRef}(id) ON DELETE CASCADE,
+                    ${clt.to} UUID NOT NULL REFERENCES ${clt.toRef}(id) ON DELETE CASCADE,
+                    relationship_type VARCHAR(50) NOT NULL DEFAULT '${clt.relDefault}',
+                    source TEXT NOT NULL DEFAULT 'qc' CHECK (source IN ('tuleap','qc')),
+                    created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(${clt.from}, ${clt.to})
+                )
+            `);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_${clt.table}_${clt.from} ON ${clt.table}(${clt.from})`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_${clt.table}_${clt.to} ON ${clt.table}(${clt.to})`);
+        }
+
+        await client.query(`ALTER TABLE bug_tasks ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'qc' CHECK (source IN ('tuleap','qc'))`);
+        await client.query(`ALTER TABLE task_test_cases ADD COLUMN IF NOT EXISTS source TEXT`);
+        await client.query(`UPDATE task_test_cases SET source = 'tuleap' WHERE source IS NULL`);
+        await client.query(`ALTER TABLE task_test_cases ALTER COLUMN source SET NOT NULL`);
+        await client.query(`ALTER TABLE task_test_cases ALTER COLUMN source SET DEFAULT 'tuleap'`);
+        await client.query(`ALTER TABLE bug_test_executions ADD COLUMN IF NOT EXISTS source TEXT`);
+        await client.query(`UPDATE bug_test_executions SET source = 'tuleap' WHERE source IS NULL`);
+        await client.query(`ALTER TABLE bug_test_executions ALTER COLUMN source SET NOT NULL`);
+        await client.query(`ALTER TABLE bug_test_executions ALTER COLUMN source SET DEFAULT 'tuleap'`);
+
+        const allLinkTables = [
+            { table: 'task_test_cases', from: 'task_id', fromRef: 'tasks', to: 'test_case_id', toRef: 'test_case' },
+            { table: 'bug_test_cases', from: 'bug_id', fromRef: 'bugs', to: 'test_case_id', toRef: 'test_case' },
+            { table: 'bug_user_stories', from: 'bug_id', fromRef: 'bugs', to: 'user_story_id', toRef: 'user_stories' },
+            { table: 'bug_tasks', from: 'bug_id', fromRef: 'bugs', to: 'task_id', toRef: 'tasks' },
+            { table: 'test_case_user_stories', from: 'test_case_id', fromRef: 'test_case', to: 'user_story_id', toRef: 'user_stories' }
+        ];
+
+        for (const lt of allLinkTables) {
+            const fnName = `enforce_same_project_${lt.table}`;
+            await client.query(`CREATE OR REPLACE FUNCTION ${fnName}() RETURNS TRIGGER AS $$
+                DECLARE from_project UUID; to_project UUID;
+                BEGIN
+                    SELECT project_id INTO from_project FROM ${lt.fromRef} WHERE id = NEW.${lt.from};
+                    SELECT project_id INTO to_project FROM ${lt.toRef} WHERE id = NEW.${lt.to};
+                    IF from_project IS DISTINCT FROM to_project THEN
+                        RAISE EXCEPTION 'Cross-project link rejected: % and % are in different projects', NEW.${lt.from}, NEW.${lt.to};
+                    END IF;
+                    RETURN NEW;
+                END;
+            $$ LANGUAGE plpgsql`);
+
+            await client.query(`DROP TRIGGER IF EXISTS trg_${lt.table}_same_project ON ${lt.table}`);
+            await client.query(`CREATE TRIGGER trg_${lt.table}_same_project BEFORE INSERT ON ${lt.table} FOR EACH ROW EXECUTE FUNCTION ${fnName}()`);
+        }
+
+        await client.query(`CREATE OR REPLACE VIEW v_artifact_links AS
+            SELECT
+                'task_test_cases' AS kind, 'task' AS from_type, task_id AS from_id,
+                'test_case' AS to_type, test_case_id AS to_id,
+                relationship_type, source, created_at, created_by
+            FROM task_test_cases
+            UNION ALL
+            SELECT
+                'bug_test_cases' AS kind, 'bug' AS from_type, bug_id AS from_id,
+                'test_case' AS to_type, test_case_id AS to_id,
+                relationship_type, source, created_at, created_by
+            FROM bug_test_cases
+            UNION ALL
+            SELECT
+                'bug_user_stories' AS kind, 'bug' AS from_type, bug_id AS from_id,
+                'user_story' AS to_type, user_story_id AS to_id,
+                relationship_type, source, created_at, created_by
+            FROM bug_user_stories
+            UNION ALL
+            SELECT
+                'bug_tasks' AS kind, 'bug' AS from_type, bug_id AS from_id,
+                'task' AS to_type, task_id AS to_id,
+                relationship_type, source, created_at, created_by
+            FROM bug_tasks
+            UNION ALL
+            SELECT
+                'test_case_user_stories' AS kind, 'test_case' AS from_type, test_case_id AS from_id,
+                'user_story' AS to_type, user_story_id AS to_id,
+                relationship_type, source, created_at, created_by
+            FROM test_case_user_stories
+        `);
+
+        // ── Drain legacy arrays into join tables (slice 25) ─────────────────────
+
+        await client.query(`
+            INSERT INTO bug_test_cases (bug_id, test_case_id, source)
+            SELECT id, unnest(linked_test_case_ids), 'tuleap'
+            FROM bugs
+            WHERE linked_test_case_ids IS NOT NULL
+            ON CONFLICT (bug_id, test_case_id) DO NOTHING
+        `);
+
+        await client.query(`
+            INSERT INTO bug_test_executions (bug_id, test_execution_id, source)
+            SELECT id, unnest(linked_test_execution_ids), 'tuleap'
+            FROM bugs
+            WHERE linked_test_execution_ids IS NOT NULL
+            ON CONFLICT (bug_id, test_execution_id) DO NOTHING
+        `);
+
+        // ── Drop legacy array columns ──────────────────────────────────────────
+
+        await client.query(`ALTER TABLE bugs DROP COLUMN IF EXISTS linked_test_case_ids`);
+        await client.query(`ALTER TABLE bugs DROP COLUMN IF EXISTS linked_test_execution_ids`);
+        await client.query(`ALTER TABLE bugs DROP COLUMN IF EXISTS standalone_bugs`);
+
+        // ── Rebuild views that referenced arrays ────────────────────────────────
+
+        await client.query(`DROP VIEW IF EXISTS v_bug_summary_global CASCADE`);
+        await client.query(`
+            CREATE OR REPLACE VIEW v_bug_summary_global AS
+            SELECT
+                COUNT(id) AS total_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
+                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
+                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
+                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
+                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
+                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
+                COUNT(id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)) AS bugs_from_testing,
+                COUNT(id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
+                                      AND NOT EXISTS (SELECT 1 FROM bug_test_cases btc WHERE btc.bug_id = bugs.id)) AS standalone_bugs
+            FROM bugs
+            WHERE deleted_at IS NULL
+        `);
 
         console.log('Database migrations completed successfully');
     } catch (err) {

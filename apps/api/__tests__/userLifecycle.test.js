@@ -3,7 +3,7 @@
 const mockQuery = jest.fn();
 jest.mock('../src/config/db', () => ({ query: mockQuery }));
 
-const { activateUser, rollbackUser, markReadyForActivation } = require('../src/services/userLifecycle');
+const { activateUser, rollbackUser, markReadyForActivation } = require('../src/modules/identity/services/userLifecycle');
 
 afterEach(() => jest.clearAllMocks());
 

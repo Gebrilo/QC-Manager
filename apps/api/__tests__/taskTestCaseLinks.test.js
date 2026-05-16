@@ -22,8 +22,7 @@ jest.mock('../src/middleware/audit', () => ({
 const express = require('express');
 const request = require('supertest');
 
-const taskTcRouter = require('../src/routes/taskTestCases');
-const tcTaskRouter = require('../src/routes/testCaseTasks');
+const { taskSide: taskTcRouter, tcSide: tcTaskRouter } = require('../src/modules/work/links.routes');
 
 describe('Task-Test Case Linking API', () => {
     let app;

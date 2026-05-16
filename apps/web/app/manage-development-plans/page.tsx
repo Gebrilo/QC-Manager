@@ -98,7 +98,7 @@ export default function ManageDevelopmentPlansPage() {
                             </div>
 
                             <button
-                                onClick={() => router.push(`/manage-development-plans/${member.id}`)}
+                                onClick={() => router.push(`/team/idp/${member.id}`)}
                                 className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                             >
                                 {member.plans.length > 0 ? 'View Plans' : 'Create Plan'}

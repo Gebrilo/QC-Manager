@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
 import { TaskCommentSection } from '@/components/tasks/TaskCommentSection';
-import { LinkedTestCasesPanel } from '@/components/tasks/LinkedTestCasesPanel';
+import { TaskCoverageLinksPanel } from '@/components/tasks/TaskCoverageLinksPanel';
 import Link from 'next/link';
 
 export default function TaskDetailPage() {
@@ -42,7 +42,7 @@ export default function TaskDetailPage() {
         try {
             await fetchApi(`/tasks/${task.id}`, { method: 'DELETE' });
             alert('Task deleted successfully');
-            router.push('/tasks');
+            router.push('/work/tasks');
         } catch (err: any) {
             alert(`Failed to delete task: ${err.message}`);
         }
@@ -96,7 +96,7 @@ export default function TaskDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href={`/tasks/${task.id}/edit`}>
+                    <Link href={`/work/tasks/${task.id}/edit`}>
                         <Button variant="outline">Edit Task</Button>
                     </Link>
                     <Button
@@ -212,8 +212,11 @@ export default function TaskDetailPage() {
             {/* Comments — full width */}
             <TaskCommentSection taskId={task.id} />
 
-            {/* Linked Test Cases */}
-            <LinkedTestCasesPanel taskId={task.id} />
+            <TaskCoverageLinksPanel
+                taskId={task.id}
+                projectId={task.project_id}
+                parentUserStoryId={task.parent_user_story_id}
+            />
         </div>
     );
 }

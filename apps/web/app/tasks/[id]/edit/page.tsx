@@ -17,7 +17,7 @@ export default function EditTaskPage() {
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.tasks.edit')) {
-            router.replace(`/tasks/${id}`);
+            router.replace(`/work/tasks/${id}`);
         }
     }, [authLoading, hasPermission, router, id]);
 

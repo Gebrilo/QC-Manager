@@ -51,7 +51,7 @@ export default function ArchivedPlanDetailPage() {
         return (
             <div className="text-center py-16 text-slate-500 dark:text-slate-400">
                 <p className="text-lg font-medium mb-1">Plan not found</p>
-                <Link href="/development-plan/history" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                <Link href="/me/idp/history" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                     ← Back to history
                 </Link>
             </div>
@@ -61,7 +61,7 @@ export default function ArchivedPlanDetailPage() {
     return (
         <div>
             <div className="mb-6">
-                <Link href="/development-plan/history" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                <Link href="/me/idp/history" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                     ← History
                 </Link>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{plan.title}</h1>

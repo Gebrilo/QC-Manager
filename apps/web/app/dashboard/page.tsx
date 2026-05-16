@@ -17,10 +17,10 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3 pt-1">
-                    <Link href="/projects/create">
+                    <Link href="/work/projects/create">
                         <Button variant="outline">New Project</Button>
                     </Link>
-                    <Link href="/tasks/create">
+                    <Link href="/work/tasks/create">
                         <Button variant="primary">
                             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
                                 <path d="M12 5v14M5 12h14"/>

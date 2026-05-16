@@ -67,7 +67,7 @@ export function UnauthorizedPage() {
                     You don&apos;t have permission to access this page. Contact your administrator if you believe this is an error.
                 </p>
                 <a
-                    href="/my-tasks"
+                    href="/me/tasks"
                     className="inline-block px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                     Go to My Tasks

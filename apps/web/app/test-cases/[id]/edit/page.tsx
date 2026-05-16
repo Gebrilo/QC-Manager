@@ -35,7 +35,7 @@ export default function EditTestCasePage() {
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
                     <h2 className="text-lg font-semibold mb-2">Error Loading Test Case</h2>
                     <p>{error}</p>
-                    <Link href="/test-cases"><Button variant="outline" className="mt-4">Back to Test Cases</Button></Link>
+                    <Link href="/test/cases"><Button variant="outline" className="mt-4">Back to Test Cases</Button></Link>
                 </div>
             </div>
         );
@@ -46,7 +46,7 @@ export default function EditTestCasePage() {
             <div className="max-w-3xl mx-auto py-8 px-4">
                 <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Test Case Not Found</h2>
-                    <Link href="/test-cases"><Button variant="outline">Back to Test Cases</Button></Link>
+                    <Link href="/test/cases"><Button variant="outline">Back to Test Cases</Button></Link>
                 </div>
             </div>
         );
@@ -55,7 +55,7 @@ export default function EditTestCasePage() {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             <div className="flex items-center gap-4 mb-6">
-                <Link href={`/test-cases/${id}`}><Button variant="ghost" size="sm">Cancel</Button></Link>
+                <Link href={`/test/cases/${id}`}><Button variant="ghost" size="sm">Cancel</Button></Link>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
                     Edit Test Case <span className="text-gray-500 font-normal">{testCase.test_case_id}</span>
                 </h1>

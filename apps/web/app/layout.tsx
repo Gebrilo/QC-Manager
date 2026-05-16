@@ -13,33 +13,46 @@ import { TopBar } from '../src/components/layout/TopBar';
 import { ActivationBanner } from '../src/components/ui/ActivationBanner';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { getRouteConfig } from '../src/config/routes';
 
 const inter = Inter({ subsets: ['latin'] });
 
 const AUTH_PAGES = ['/login', '/register', '/auth/callback', '/auth/confirmed'];
 
 const PAGE_TITLES: Record<string, string> = {
-    '/': 'Dashboard',
-    '/my-tasks': 'My Tasks',
-    '/projects': 'Projects',
-    '/tasks': 'Tasks',
-    '/resources': 'Resources',
-    '/governance': 'Governance',
-    '/settings': 'Settings',
-    '/reports': 'Reports',
+    '/': 'My Tasks',
+    '/me/tasks': 'My Tasks',
+    '/me/dashboard': 'My Dashboard',
+    '/me/preferences': 'Preferences',
+    '/work/projects': 'Projects',
+    '/work/tasks': 'Tasks',
+    '/work/stories': 'User Stories',
+    '/work/bugs': 'Bugs',
+    '/test/cases': 'Test Cases',
+    '/test/suites': 'Test Suites',
+    '/test/runs': 'Test Runs',
+    '/test/results': 'Test Results',
+    '/quality/governance': 'Governance',
+    '/quality/reports': 'Reports',
+    '/team/resources': 'Resources',
+    '/team/idp': 'Development Plans',
+    '/team/journeys': 'Team Journeys',
+    '/team/history': 'Task History',
+    '/admin': 'Admin',
+    '/admin/users': 'User Management',
+    '/admin/teams': 'Teams',
+    '/admin/journeys': 'Journey Templates',
+    '/admin/roles': 'Roles & Permissions',
+    '/admin/integrations/tuleap': 'Tuleap Integration',
     '/login': 'Login',
     '/register': 'Register',
-    '/preferences': 'Preferences',
-    '/users': 'User Management',
-    '/journeys': 'Journeys',
-    '/test-cases': 'Test Cases',
-    '/test-executions': 'Test Executions',
-    '/test-results': 'Test Results',
-    '/task-history': 'Task History',
 };
 
 const getPageTitle = (pathname: string | null) => {
     if (!pathname) return 'QC Manager';
+    const route = getRouteConfig(pathname);
+    if (route) return `QC Manager - ${route.label}`;
+
     if (PAGE_TITLES[pathname]) return `QC Manager - ${PAGE_TITLES[pathname]}`;
 
     const baseRoute = '/' + pathname.split('/')[1];

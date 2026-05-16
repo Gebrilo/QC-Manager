@@ -16,7 +16,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
 
 const express = require('express');
 const request = require('supertest');
-const testExecutionsRouter = require('../src/routes/testExecutions');
+const { executionsRouter: testExecutionsRouter } = require('../src/modules/testing/test-runs.routes');
 
 const app = express();
 app.use(express.json());

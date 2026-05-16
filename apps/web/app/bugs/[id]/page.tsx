@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { tuleapApi, type TuleapArtifact } from '@/lib/api';
+import { bugsApi, type Bug } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
@@ -21,7 +21,7 @@ export default function BugDetailPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
-    const [artifact, setArtifact] = useState<TuleapArtifact | null>(null);
+    const [bug, setBug] = useState<Bug | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -30,8 +30,8 @@ export default function BugDetailPage() {
     useEffect(() => {
         async function load() {
             try {
-                const data = await tuleapApi.get('bug', id);
-                setArtifact(data);
+                const response = await bugsApi.get(id);
+                setBug(response.data);
             } catch (err: any) {
                 setError(err.message || 'Failed to load bug');
             } finally {
@@ -44,8 +44,8 @@ export default function BugDetailPage() {
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await tuleapApi.remove(id);
-            router.push('/bugs');
+            await bugsApi.delete(id);
+            router.push('/work/bugs');
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to delete');
@@ -68,7 +68,7 @@ export default function BugDetailPage() {
         </div>
     );
 
-    if (error && !artifact) return (
+    if (error && !bug) return (
         <div className="max-w-5xl mx-auto py-8 px-4">
             <div className="text-center py-20">
                 <div className="mx-auto w-16 h-16 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mb-4">
@@ -77,27 +77,27 @@ export default function BugDetailPage() {
                     </svg>
                 </div>
                 <p className="text-lg font-medium text-rose-700 dark:text-rose-400">{error}</p>
-                <button onClick={() => router.push('/bugs')} className="mt-4 text-sm text-indigo-600 hover:text-indigo-800">← Back to Bugs</button>
+                <button onClick={() => router.push('/work/bugs')} className="mt-4 text-sm text-indigo-600 hover:text-indigo-800">← Back to Bugs</button>
             </div>
         </div>
     );
 
-    if (!artifact) return null;
+    if (!bug) return null;
 
-    const title = artifact.title || artifact.summary || `Bug #${id}`;
-    const status = artifact.status || 'New';
+    const title = bug.title || `Bug #${id}`;
+    const status = bug.status || 'New';
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-4">
-                    <Button variant="outline" onClick={() => router.push('/bugs')} className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" onClick={() => router.push('/work/bugs')} className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                         ← Back
                     </Button>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{title}</h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                            Artifact #{id}{artifact.xref ? ` · ${artifact.xref}` : ''}
+                            {bug.bug_id || id}{bug.tuleap_artifact_id ? ` · Tuleap ${bug.tuleap_artifact_id}` : ''}
                         </p>
                     </div>
                 </div>
@@ -105,7 +105,7 @@ export default function BugDetailPage() {
                     <Badge variant={STATUS_VARIANT[status] || 'default'}>
                         {status}
                     </Badge>
-                    <Link href={`/bugs/${id}/edit`}>
+                    <Link href={`/work/bugs/${bug.tuleap_artifact_id || bug.id}/edit`}>
                         <Button variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                             Edit
                         </Button>
@@ -119,11 +119,15 @@ export default function BugDetailPage() {
             <div className="glass-card rounded-2xl p-6">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">Artifact Data</h3>
                 <pre className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl p-4 overflow-auto max-h-[600px]">
-                    {JSON.stringify(artifact, null, 2)}
+                    {JSON.stringify(bug, null, 2)}
                 </pre>
             </div>
 
-            <BugLinksPanel bugId={id} triageStatus={(artifact as any)?.triage_status as string | undefined} />
+            <BugLinksPanel
+                bugId={id}
+                projectId={bug.project_id}
+                triageStatus={(bug as any)?.triage_status as string | undefined}
+            />
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -137,9 +141,9 @@ export default function BugDetailPage() {
                             <div>
                                 <h3 className="font-semibold text-slate-900 dark:text-white">Delete Bug</h3>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                    Delete artifact <span className="font-mono font-medium">#{id}</span>: {title}?
+                                    Delete bug <span className="font-mono font-medium">{bug.bug_id || id}</span>: {title}?
                                 </p>
-                                <p className="text-xs text-slate-400 mt-2">This will remove the artifact from Tuleap.</p>
+                                <p className="text-xs text-slate-400 mt-2">This archives the bug in QC and syncs the delete when configured.</p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-2">

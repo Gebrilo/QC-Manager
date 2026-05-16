@@ -1,12 +1,12 @@
-jest.mock('../src/services/tuleapClient', () => ({
+jest.mock('../src/modules/integration/services/tuleapClient', () => ({
   defaultClient: {
     _raw: { post: jest.fn(), patch: jest.fn() },
     patch: jest.fn(),
   },
 }));
 
-const { defaultClient } = require('../src/services/tuleapClient');
-const { uploadFile, attachFilesToArtifact } = require('../src/services/tuleapAttachment');
+const { defaultClient } = require('../src/modules/integration/services/tuleapClient');
+const { uploadFile, attachFilesToArtifact } = require('../src/modules/integration/services/tuleapAttachment');
 
 describe('uploadFile', () => {
   it('returns the file id from Tuleap response', async () => {

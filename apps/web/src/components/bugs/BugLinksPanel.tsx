@@ -1,228 +1,160 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { bugLinksApi } from '@/lib/api';
-import { RelationshipPicker } from '@/components/shared/RelationshipPicker';
-import { Badge } from '@/components/ui/Badge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import Link from 'next/link';
-
-interface LinkedExecution {
-    id: string;
-    bug_id: string;
-    test_execution_id: string;
-    created_at: string;
-    execution_status: string;
-    execution_notes: string;
-    executed_at: string;
-    test_run_id: string;
-    test_run_name: string;
-}
-
-interface LinkedTask {
-    id: string;
-    bug_id: string;
-    task_id: string;
-    relationship_type: string;
-    created_at: string;
-    task_display_id: string;
-    task_name: string;
-    task_status: string;
-    project_id: string;
-}
+import {
+    LinkedArtifactsSection,
+    LinkedArtifactsSectionConfig,
+    LinkedArtifactRow,
+} from '@/components/shared/LinkedArtifactsSection';
+import { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 
 interface BugLinksPanelProps {
     bugId: string;
+    projectId?: string | null;
     triageStatus?: string;
 }
 
-const STATUS_VARIANT: Record<string, 'complete' | 'danger' | 'warning' | 'default' | 'info'> = {
-    pass: 'complete',
-    fail: 'danger',
-    blocked: 'warning',
-    not_run: 'default',
-};
-
-export function BugLinksPanel({ bugId, triageStatus }: BugLinksPanelProps) {
-    const [executions, setExecutions] = useState<LinkedExecution[]>([]);
-    const [tasks, setTasks] = useState<LinkedTask[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const load = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const [execRes, taskRes] = await Promise.all([
-                bugLinksApi.listTestExecutions(bugId),
-                bugLinksApi.listTasks(bugId),
-            ]);
-            setExecutions(execRes.data);
-            setTasks(taskRes.data);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load bug links');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [bugId]);
-
-    useEffect(() => { load(); }, [load]);
-
-    const handleAddExecution = async (item: any) => {
-        try {
-            await bugLinksApi.addTestExecution(bugId, item.id);
-            await load();
-        } catch (err: any) {
-            alert(err.message || 'Failed to link execution');
-        }
+function normalizeTestCase(row: any): LinkedArtifactRow {
+    return {
+        id: row.id,
+        artifactId: row.test_case_id,
+        displayId: row['test-case_display_id'] || row.test_case_display_id || row.test_case_id,
+        title: row['test-case_title'] || row.test_case_title || 'Deleted test case',
+        status: row['test-case_status'] || row.test_case_status,
+        href: `/test/cases/${row.test_case_id}`,
+        source: row.source || 'qc',
+        relationshipType: row.relationship_type,
+        deleted: !row['test-case_title'] && !row.test_case_title,
     };
+}
 
-    const handleRemoveExecution = async (executionId: string) => {
-        if (!confirm('Remove this test execution link?')) return;
-        try {
-            await bugLinksApi.removeTestExecution(bugId, executionId);
-            await load();
-        } catch (err: any) {
-            alert(err.message || 'Failed to remove link');
-        }
+function normalizeTask(row: any): LinkedArtifactRow {
+    return {
+        id: row.id,
+        artifactId: row.task_id,
+        displayId: row.task_display_id || row.task_id,
+        title: row.task_name || 'Deleted task',
+        status: row.task_status,
+        href: `/work/tasks/${row.task_id}`,
+        source: row.source || 'qc',
+        relationshipType: row.relationship_type,
+        deleted: !row.task_name,
     };
+}
 
-    const handleAddTask = async (item: any) => {
-        try {
-            await bugLinksApi.addTask(bugId, item.id);
-            await load();
-        } catch (err: any) {
-            alert(err.message || 'Failed to link task');
-        }
+function normalizeUserStory(row: any): LinkedArtifactRow {
+    return {
+        id: row.id,
+        artifactId: row.user_story_id,
+        displayId: row['user-story_display_id'] || row.user_story_display_id || row.user_story_id,
+        title: row['user-story_title'] || row.user_story_title || 'Deleted user story',
+        status: row['user-story_status'] || row.user_story_status,
+        href: `/work/stories/${row.user_story_id}`,
+        source: row.source || 'qc',
+        relationshipType: row.relationship_type,
+        deleted: !row['user-story_title'] && !row.user_story_title,
     };
+}
 
-    const handleRemoveTask = async (taskId: string) => {
-        if (!confirm('Remove this task link?')) return;
-        try {
-            await bugLinksApi.removeTask(bugId, taskId);
-            await load();
-        } catch (err: any) {
-            alert(err.message || 'Failed to remove link');
-        }
+function normalizeExecution(row: any): LinkedArtifactRow {
+    return {
+        id: row.id,
+        artifactId: row.test_execution_id,
+        displayId: row.test_run_id || row.test_execution_id,
+        title: row.test_run_name || 'Test execution',
+        status: row.execution_status,
+        source: 'tuleap',
+        meta: row.executed_at ? new Date(row.executed_at).toLocaleDateString() : undefined,
     };
+}
 
-    const excludeExecIds = executions.map(e => e.test_execution_id);
-    const excludeTaskIds = tasks.map(t => t.task_id);
+export function BugLinksPanel({ bugId, projectId, triageStatus }: BugLinksPanelProps) {
+    const sections = useMemo<LinkedArtifactsSectionConfig[]>(() => [
+        {
+            title: 'Source / Provenance',
+            emptyLabel: 'No source execution recorded.',
+            readOnly: true,
+            viewPermission: 'qc.testexecutions.view',
+            load: async () => {
+                const response = await bugLinksApi.listTestExecutions(bugId);
+                return response.data.map(normalizeExecution);
+            },
+        },
+        {
+            title: 'Linked Test Cases',
+            emptyLabel: 'No linked test cases yet.',
+            artifactType: 'test_case',
+            pickerTitle: 'Add linked test cases',
+            addLabel: 'Add',
+            viewPermission: 'qc.testcases.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listTestCases(bugId);
+                return response.data.map(normalizeTestCase);
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                await Promise.all(items.map(item => bugLinksApi.addTestCase(bugId, item.id, 'reveals')));
+            },
+            remove: async (row: LinkedArtifactRow) => {
+                await bugLinksApi.removeTestCase(bugId, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Tasks',
+            emptyLabel: 'No linked tasks yet.',
+            artifactType: 'task',
+            pickerTitle: 'Add linked tasks',
+            addLabel: 'Add',
+            viewPermission: 'qc.tasks.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listTasks(bugId);
+                return response.data.map(normalizeTask);
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                await Promise.all(items.map(item => bugLinksApi.addTask(bugId, item.id, 'blocks')));
+            },
+            remove: async (row: LinkedArtifactRow) => {
+                await bugLinksApi.removeTask(bugId, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked User Stories',
+            emptyLabel: 'No linked user stories yet.',
+            artifactType: 'user_story',
+            pickerTitle: 'Add linked user stories',
+            addLabel: 'Add',
+            viewPermission: 'qc.projects.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listUserStories(bugId);
+                return response.data.map(normalizeUserStory);
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                await Promise.all(items.map(item => bugLinksApi.addUserStory(bugId, item.id, 'affects')));
+            },
+            remove: async (row: LinkedArtifactRow) => {
+                await bugLinksApi.removeUserStory(bugId, row.artifactId);
+            },
+        },
+    ], [bugId]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {triageStatus === 'untriaged' && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16.5c-.77 1.333.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <span className="text-sm font-medium text-amber-800 dark:text-amber-300">Untriaged — link this bug to a test execution or task to mark it as triaged.</span>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                    Untriaged - link this bug to source or coverage artifacts to complete triage.
                 </div>
             )}
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Linked Test Executions</CardTitle>
-                    <span className="text-xs text-slate-500">{executions.length} linked</span>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <RelationshipPicker
-                        searchType="test_case"
-                        searchPlaceholder="Search test cases for execution evidence..."
-                        onAdd={handleAddExecution}
-                        excludeIds={excludeExecIds}
-                        label="Add test execution link"
-                    />
-
-                    {error && <p className="text-sm text-rose-600">{error}</p>}
-
-                    {isLoading && executions.length === 0 ? (
-                        <p className="text-sm text-slate-500 italic">Loading...</p>
-                    ) : executions.length === 0 ? (
-                        <p className="text-sm text-slate-500 italic">No test executions linked.</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {executions.map(exec => (
-                                <div
-                                    key={exec.id}
-                                    className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 group"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                                            {exec.test_run_name || 'Test Run'}
-                                        </p>
-                                        <span className="text-xs text-slate-500">
-                                            {exec.executed_at ? new Date(exec.executed_at).toLocaleDateString() : ''}
-                                            {exec.execution_notes ? ` — ${exec.execution_notes.substring(0, 80)}` : ''}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 ml-2">
-                                        <Badge variant={STATUS_VARIANT[exec.execution_status] || 'default'}>
-                                            {exec.execution_status}
-                                        </Badge>
-                                        <button
-                                            onClick={() => handleRemoveExecution(exec.test_execution_id)}
-                                            className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 text-xs font-medium transition-opacity"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Linked Tasks</CardTitle>
-                    <span className="text-xs text-slate-500">{tasks.length} linked</span>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <RelationshipPicker
-                        searchType="task"
-                        searchPlaceholder="Search tasks to link..."
-                        onAdd={handleAddTask}
-                        excludeIds={excludeTaskIds}
-                        label="Add task link"
-                    />
-
-                    {tasks.length === 0 ? (
-                        <p className="text-sm text-slate-500 italic">No tasks linked.</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {tasks.map(task => (
-                                <div
-                                    key={task.id}
-                                    className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 group"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <Link
-                                            href={`/tasks/${task.task_id}`}
-                                            className="text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
-                                        >
-                                            {task.task_name}
-                                        </Link>
-                                        <span className="text-xs text-slate-500">{task.task_display_id} • {task.relationship_type}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 ml-2">
-                                        <Badge variant={STATUS_VARIANT[task.task_status] || 'default'}>
-                                            {task.task_status}
-                                        </Badge>
-                                        <button
-                                            onClick={() => handleRemoveTask(task.task_id)}
-                                            className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 text-xs font-medium transition-opacity"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            {sections.map(section => (
+                <LinkedArtifactsSection
+                    key={section.title}
+                    config={section}
+                    projectId={projectId}
+                />
+            ))}
         </div>
     );
 }

@@ -7,7 +7,7 @@ jest.mock('../src/config/db', () => ({ pool: { connect: jest.fn() } }));
 let validateExecutionDate;
 
 beforeAll(() => {
-  ({ validateExecutionDate } = require('../src/routes/testExecutions'));
+  ({ validateExecutionDate } = require('../src/modules/testing/test-runs.routes'));
 });
 
 describe('validateExecutionDate', () => {

@@ -28,7 +28,7 @@ jest.mock('../src/schemas/resource', () => ({
     updateResourceSchema: { parse: (d) => d },
 }));
 
-const resourcesRouter = require('../src/routes/resources');
+const resourcesRouter = require('../src/modules/identity/resources.routes');
 
 const RESOURCE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 

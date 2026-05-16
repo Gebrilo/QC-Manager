@@ -236,7 +236,7 @@ export default function ResourceDashboardPage() {
                     <div className="text-6xl mb-4">🔒</div>
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Access Denied</h2>
                     <p className="text-slate-500 dark:text-slate-400 mb-6">Only Admins and Managers can access the Resource Dashboard.</p>
-                    <Link href="/resources" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    <Link href="/team/resources" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
                         Back to Resources
                     </Link>
                 </div>
@@ -260,7 +260,7 @@ export default function ResourceDashboardPage() {
             <div className="p-8">
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-6 text-center">
                     <p className="text-rose-600 dark:text-rose-400">{error || 'Failed to load data'}</p>
-                    <Link href="/resources" className="mt-4 inline-block text-indigo-600 dark:text-indigo-400 hover:underline">
+                    <Link href="/team/resources" className="mt-4 inline-block text-indigo-600 dark:text-indigo-400 hover:underline">
                         ← Back to Resources
                     </Link>
                 </div>
@@ -281,7 +281,7 @@ export default function ResourceDashboardPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link href="/resources" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
+                    <Link href="/team/resources" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
@@ -531,7 +531,7 @@ export default function ResourceDashboardPage() {
                                     return (
                                         <tr key={task.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                             <td className="px-4 py-3">
-                                                <Link href={`/tasks/${task.id}`} className="block text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate">
+                                                <Link href={`/work/tasks/${task.id}`} className="block text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate">
                                                     <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{task.task_id}</span>
                                                     {task.task_name}
                                                 </Link>

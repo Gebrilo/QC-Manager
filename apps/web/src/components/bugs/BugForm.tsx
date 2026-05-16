@@ -99,10 +99,10 @@ export function BugForm({ initialData, isEdit, artifactId, projectId }: BugFormP
 
             if (isEdit && artifactId) {
                 await tuleapApi.updateUnified(artifactId, payload);
-                router.push(`/bugs/${artifactId}`);
+                router.push(`/work/bugs/${artifactId}`);
             } else {
                 const result = await tuleapApi.createUnified(payload);
-                router.push(`/bugs/${result.tuleap_artifact_id}`);
+                router.push(`/work/bugs/${result.tuleap_artifact_id}`);
             }
             router.refresh();
         } catch (err: any) {

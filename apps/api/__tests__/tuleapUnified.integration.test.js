@@ -14,15 +14,15 @@ jest.mock('../src/config/db', () => ({
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog,
 }));
-jest.mock('../src/services/persisters/bug', () => ({
+jest.mock('../src/modules/integration/services/persisters/bug', () => ({
     dispatchAction: mockDispatchBug,
 }));
-jest.mock('../src/services/tuleapValueNormalizer', () => ({
+jest.mock('../src/modules/integration/services/tuleapValueNormalizer', () => ({
     normalize: mockNormalize,
 }));
 
 const express = require('express');
-const tuleapRouter = require('../src/routes/tuleapWebhook');
+const tuleapRouter = require('../src/modules/integration/tuleapWebhook.routes');
 const request = require('supertest');
 
 const app = express();

@@ -13,7 +13,7 @@ jest.mock('../src/middleware/audit', () => ({
   auditLog: jest.fn(),
 }));
 
-const bugsRouter = require('../src/routes/bugs');
+const bugsRouter = require('../src/modules/work/bugs.routes');
 const app = express();
 app.use(express.json());
 app.use('/bugs', bugsRouter);

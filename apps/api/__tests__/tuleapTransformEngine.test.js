@@ -4,7 +4,7 @@ const {
   reverseStatusMap,
   fromTuleap,
   toTuleap,
-} = require('../src/services/tuleapTransformEngine');
+} = require('../src/modules/integration/services/tuleapTransformEngine');
 
 describe('applyFieldMappings', () => {
   it('maps using config\'s artifact_fields', () => {

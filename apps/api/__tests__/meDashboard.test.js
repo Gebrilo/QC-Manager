@@ -8,7 +8,7 @@ const { pool } = require('../src/config/db');
 
 let handler;
 beforeAll(() => {
-  handler = require('../src/routes/me').testExports.dashboardHandler;
+  handler = require('../src/modules/identity/me.routes').testExports.dashboardHandler;
 });
 
 beforeEach(() => {

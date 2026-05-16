@@ -17,7 +17,7 @@ export default function EditProjectPage() {
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.projects.edit')) {
-            router.replace(`/projects/${id}`);
+            router.replace(`/work/projects/${id}`);
         }
     }, [authLoading, hasPermission, router, id]);
 
@@ -36,7 +36,7 @@ export default function EditProjectPage() {
     }, [id]);
 
     const handleSuccess = () => {
-        router.push('/projects');
+        router.push('/work/projects');
         router.refresh();
     };
 

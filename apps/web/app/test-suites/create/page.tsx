@@ -53,7 +53,7 @@ export default function CreateTestSuitePage() {
                 project_id: projectId,
                 status: status as 'draft' | 'active' | 'archived',
             });
-            router.push('/test-suites');
+            router.push('/test/suites');
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to create test suite');

@@ -90,7 +90,7 @@ export default function TestRunDetailPage() {
     const loadRun = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await fetchApi<TestRunDetail>(`/test-executions/test-runs/${id}`);
+            const data = await fetchApi<TestRunDetail>(`/test/runs/test-runs/${id}`);
             setRun(data);
         } catch (err: any) {
             setError(err.message);
@@ -106,7 +106,7 @@ export default function TestRunDetailPage() {
     const handleStatusUpdate = async (executionId: string, newStatus: string) => {
         setUpdatingId(executionId);
         try {
-            await fetchApi(`/test-executions/executions/${executionId}`, {
+            await fetchApi(`/test/runs/executions/${executionId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: newStatus }),
             });
@@ -164,7 +164,7 @@ export default function TestRunDetailPage() {
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
                     <h2 className="text-lg font-semibold mb-2">Error</h2>
                     <p>{error || 'Test run not found'}</p>
-                    <Link href="/test-executions"><Button variant="outline" className="mt-4">Back to Test Runs</Button></Link>
+                    <Link href="/test/runs"><Button variant="outline" className="mt-4">Back to Test Runs</Button></Link>
                 </div>
             </div>
         );
@@ -180,7 +180,7 @@ export default function TestRunDetailPage() {
         <div className="max-w-6xl mx-auto py-8 px-4">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <Link href="/test-executions"><Button variant="ghost" size="sm">Back</Button></Link>
+                    <Link href="/test/runs"><Button variant="ghost" size="sm">Back</Button></Link>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{run.run_id}: {run.name}</h1>
                         <div className="flex gap-2 mt-1">
@@ -243,7 +243,7 @@ export default function TestRunDetailPage() {
                 <span>Started: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.started_at), { addSuffix: true })}</strong></span>
                 {run.completed_at && <span>Completed: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.completed_at), { addSuffix: true })}</strong></span>}
                 {run.suite_id && (
-                    <span>Suite: <Link href={`/test-suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
+                    <span>Suite: <Link href={`/test/suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
                 )}
             </div>
 

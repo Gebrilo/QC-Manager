@@ -111,7 +111,7 @@ export default function DevelopmentPlanPage() {
                     <p className="text-slate-500 dark:text-slate-400">Your ongoing development journey as an active resource.</p>
                 </div>
                 <Link
-                    href="/development-plan/history"
+                    href="/me/idp/history"
                     className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
                 >
                     View history →

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi, profileApi, UserPreferences } from '../../src/lib/api';
 import { useTheme } from '../../src/components/providers/ThemeProvider';
 import { useAuth } from '../../src/components/providers/AuthProvider';
-import { getRouteConfig, getNavbarRoutes, routeAllowsStatus } from '../../src/config/routes';
+import { getRouteConfig, NAVIGATION_SECTIONS, type NavigationNode, routeAllowsStatus } from '../../src/config/routes';
 
 interface UserProfile {
     id: string;
@@ -20,7 +20,7 @@ interface UserProfile {
 const DEFAULT_PREFS: Required<UserPreferences> = {
     theme: 'light',
     quick_nav_visible: true,
-    default_page: '/my-tasks',
+    default_page: '/me/tasks',
     display_density: 'comfortable',
     timezone: 'UTC',
     language: 'en',
@@ -33,17 +33,32 @@ const btnPrimary = 'px-4 py-2 bg-indigo-600 text-white text-sm font-medium round
 
 // All possible landing page options with their route paths and labels
 const LANDING_PAGE_OPTIONS = [
-    { path: '/dashboard', label: 'Dashboard' },
-    { path: '/my-tasks', label: 'My Tasks' },
-    { path: '/journeys', label: 'My Journeys' },
-    { path: '/tasks', label: 'Tasks' },
-    { path: '/projects', label: 'Projects' },
-    { path: '/resources', label: 'Resources' },
-    { path: '/governance', label: 'Governance' },
-    { path: '/test-executions', label: 'Test Runs' },
-    { path: '/reports', label: 'Reports' },
-    { path: '/task-history', label: 'Task History' },
+    { path: '/me/tasks', label: 'My Tasks' },
+    { path: '/me/dashboard', label: 'My Dashboard' },
+    { path: '/me/journeys', label: 'My Journeys' },
+    { path: '/me/idp', label: 'My Development Plan' },
+    { path: '/work/projects', label: 'Projects' },
+    { path: '/work/tasks', label: 'Tasks' },
+    { path: '/work/stories', label: 'User Stories' },
+    { path: '/work/bugs', label: 'Bugs' },
+    { path: '/test/cases', label: 'Test Cases' },
+    { path: '/test/suites', label: 'Test Suites' },
+    { path: '/test/runs', label: 'Test Runs' },
+    { path: '/test/results', label: 'Test Results' },
+    { path: '/quality/governance', label: 'Governance' },
+    { path: '/quality/reports', label: 'Reports' },
+    { path: '/team/resources', label: 'Resources' },
+    { path: '/team/idp', label: 'Development Plans' },
+    { path: '/team/journeys', label: 'Team Journeys' },
+    { path: '/team/history', label: 'Task History' },
 ];
+
+function flattenNavigationNodes(nodes: NavigationNode[]): Array<{ path: string; label: string; icon?: NavigationNode['icon'] }> {
+    return nodes.flatMap(node => {
+        if (node.children?.length) return flattenNavigationNodes(node.children);
+        return node.path ? [{ path: node.path, label: node.label, icon: node.icon }] : [];
+    });
+}
 
 export default function PreferencesPage() {
     const { setTheme } = useTheme();
@@ -69,11 +84,19 @@ export default function PreferencesPage() {
     }, [authUser, permissions, isAdmin, hasPermission]);
 
     const accessibleNavRoutes = useMemo(() => {
-        return getNavbarRoutes(authUser).filter(route => {
-            if (route.adminOnly && !isAdmin) return false;
-            if (route.permission && !hasPermission(route.permission)) return false;
-            return true;
-        });
+        if (!authUser) return [];
+
+        return NAVIGATION_SECTIONS
+            .filter(section => !section.roles || section.roles.includes(authUser.role))
+            .flatMap(section => flattenNavigationNodes(section.children))
+            .filter(navItem => {
+                const route = getRouteConfig(navItem.path);
+                if (!route) return false;
+                if (route.adminOnly && !isAdmin) return false;
+                if (!routeAllowsStatus(route, authUser)) return false;
+                if (route.permission && !hasPermission(route.permission)) return false;
+                return true;
+            });
     }, [isAdmin, authUser, hasPermission]);
 
     const [displayName, setDisplayName] = useState('');
@@ -119,12 +142,12 @@ export default function PreferencesPage() {
             .finally(() => setLoading(false));
     }, [accessibleNavRoutes]);
 
-    // If the saved default_page is no longer accessible, reset to /dashboard
+    // If the saved default_page is no longer accessible, reset to the canonical default.
     useEffect(() => {
         if (loading) return;
         const allowed = allowedLandingPages.map(o => o.path);
         if (prefs.default_page && !allowed.includes(prefs.default_page)) {
-            setPrefs(p => ({ ...p, default_page: '/my-tasks' }));
+            setPrefs(p => ({ ...p, default_page: '/me/tasks' }));
         }
     }, [allowedLandingPages, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 

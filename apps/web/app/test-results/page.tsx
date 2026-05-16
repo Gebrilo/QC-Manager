@@ -58,7 +58,7 @@ function TestResultsContent() {
       params.append('latest_only', latestOnly.toString());
       params.append('limit', '200');
 
-      const response = await fetchApi<{ data: TestResult[] } | TestResult[]>(`/test-results?${params.toString()}`);
+      const response = await fetchApi<{ data: TestResult[] } | TestResult[]>(`/test/results?${params.toString()}`);
       const data = Array.isArray(response) ? response : (response as any).data || [];
       setTestResults(data);
     } catch (error) {
@@ -104,7 +104,7 @@ function TestResultsContent() {
             View and manage test execution results
           </p>
         </div>
-        <Link href="/test-results/upload">
+        <Link href="/test/results/upload">
           <Button>
             Upload Test Results
           </Button>
@@ -183,7 +183,7 @@ function TestResultsContent() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             No test results found. Upload your test results to get started.
           </p>
-          <Link href="/test-results/upload">
+          <Link href="/test/results/upload">
             <Button>Upload Test Results</Button>
           </Link>
         </div>

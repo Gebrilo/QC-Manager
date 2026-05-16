@@ -455,7 +455,7 @@ export default function TuleapSettingsPage() {
             <div className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-md border-b border-white/10 px-6 py-4">
                 <div className="max-w-6xl mx-auto flex items-center gap-4">
                     <Link
-                        href="/settings"
+                        href="/admin"
                         className="text-slate-400 hover:text-white transition-colors"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

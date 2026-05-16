@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDistanceToNow, format } from 'date-fns';
-import { LinkedTasksPanel } from '@/components/test-cases/LinkedTasksPanel';
+import { TestCaseCoverageLinksPanel } from '@/components/test-cases/TestCaseCoverageLinksPanel';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
@@ -32,7 +32,7 @@ export default function TestCaseDetailPage() {
         if (!confirm('Are you sure you want to delete this test case? This action can be undone by an admin.')) return;
         try {
             await testCasesApi.delete(id);
-            router.push('/test-cases');
+            router.push('/test/cases');
             router.refresh();
         } catch (err: any) {
             setError(err.message);
@@ -49,7 +49,7 @@ export default function TestCaseDetailPage() {
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
                     <h2 className="text-lg font-semibold mb-2">Error Loading Test Case</h2>
                     <p>{error}</p>
-                    <Link href="/test-cases"><Button variant="outline" className="mt-4">Back to Test Cases</Button></Link>
+                    <Link href="/test/cases"><Button variant="outline" className="mt-4">Back to Test Cases</Button></Link>
                 </div>
             </div>
         );
@@ -60,7 +60,7 @@ export default function TestCaseDetailPage() {
             <div className="max-w-3xl mx-auto py-8 px-4">
                 <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Test Case Not Found</h2>
-                    <Link href="/test-cases"><Button variant="outline">Back to Test Cases</Button></Link>
+                    <Link href="/test/cases"><Button variant="outline">Back to Test Cases</Button></Link>
                 </div>
             </div>
         );
@@ -77,14 +77,14 @@ export default function TestCaseDetailPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <Link href="/test-cases"><Button variant="ghost" size="sm">Back</Button></Link>
+                    <Link href="/test/cases"><Button variant="ghost" size="sm">Back</Button></Link>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{testCase.test_case_id}</h1>
                 </div>
                 <div className="flex gap-3">
-                    <Link href={`/test-cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
+                    <Link href={`/test/cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
                     <Button variant="destructive" onClick={handleDelete}>Delete</Button>
                 </div>
             </div>
@@ -199,7 +199,7 @@ export default function TestCaseDetailPage() {
                 )}
             </div>
 
-            <LinkedTasksPanel testCaseId={testCase.id} />
+            <TestCaseCoverageLinksPanel testCaseId={testCase.id} projectId={testCase.project_id} />
         </div>
     );
 }

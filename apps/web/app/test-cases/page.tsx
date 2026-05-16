@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TestCase, TestCaseListResponse } from '@/types';
-import { testCasesApi } from '@/lib/api';
+import { fetchApi, projectsApi, testCasesApi, type Project } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { ActivityFilters, type ActivityFilterOption, type ActivityFiltersConfig, type ActivityFiltersValue } from '@/components/ui/ActivityFilters';
+import { parseActivityFilters, writeActivityFiltersToParams } from '@/lib/activityFilters';
 import { formatDistanceToNow } from 'date-fns';
 
 const PRIORITY_OPTIONS = [
@@ -24,6 +27,18 @@ const STATUS_OPTIONS = [
     { value: 'deprecated', label: 'Deprecated' },
     { value: 'archived', label: 'Archived' },
 ];
+
+const CASE_FILTER_CONFIG: ActivityFiltersConfig = {
+    slots: ['search', 'project', 'status', 'priority', 'source', 'date', 'relatedArtifact'],
+    statusOptions: STATUS_OPTIONS.filter(option => option.value).map(option => ({ value: option.value, label: option.label })),
+    priorityOptions: PRIORITY_OPTIONS.filter(option => option.value).map(option => ({ value: option.value, label: option.label })),
+    relatedArtifactTypes: [
+        { value: 'user_story', label: 'User Story', searchTypes: ['user_story'] },
+        { value: 'task', label: 'Task', searchTypes: ['task'] },
+        { value: 'bug', label: 'Bug', searchTypes: ['bug'] },
+        { value: 'suite', label: 'Suite' },
+    ],
+};
 
 const TYPE_OPTIONS = [
     { value: '', label: 'All Types' },
@@ -77,16 +92,16 @@ function getSyncBadgeVariant(sync: string): 'success' | 'warning' | 'danger' | '
 }
 
 export default function TestCasesPage() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const searchParamString = searchParams.toString();
     const [testCases, setTestCases] = useState<TestCase[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [relatedArtifacts, setRelatedArtifacts] = useState<ActivityFilterOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, total_pages: 0 });
-
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
-    const [priority, setPriority] = useState('');
-    const [testType, setTestType] = useState('');
-    const [automationStatus, setAutomationStatus] = useState('');
-    const [syncStatus, setSyncStatus] = useState('');
+    const filters = useMemo(() => parseActivityFilters(new URLSearchParams(searchParamString)), [searchParamString]);
     const [sortBy] = useState('created_at');
     const [sortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -96,12 +111,17 @@ export default function TestCasesPage() {
             const response = await testCasesApi.list({
                 page,
                 limit: 25,
-                search: search || undefined,
-                status: status || undefined,
-                priority: priority || undefined,
-                test_type: testType || undefined,
-                automation_status: automationStatus || undefined,
-                sync_status: syncStatus || undefined,
+                search: filters.search || undefined,
+                project_ids: filters.projectIds.join(',') || undefined,
+                statuses: filters.statuses.join(',') || undefined,
+                priorities: filters.priorities.join(',') || undefined,
+                source: filters.source || undefined,
+                created_from: filters.createdFrom || undefined,
+                created_to: filters.createdTo || undefined,
+                updated_from: filters.updatedFrom || undefined,
+                updated_to: filters.updatedTo || undefined,
+                related_type: filters.relatedType || undefined,
+                related_id: filters.relatedId || undefined,
                 sort_by: sortBy,
                 sort_order: sortOrder,
             });
@@ -114,22 +134,45 @@ export default function TestCasesPage() {
         } finally {
             setLoading(false);
         }
-    }, [search, status, priority, testType, automationStatus, syncStatus, sortBy, sortOrder]);
+    }, [filters, sortBy, sortOrder]);
 
     useEffect(() => {
         loadTestCases(1);
     }, [loadTestCases]);
 
-    const clearFilters = () => {
-        setSearch('');
-        setStatus('');
-        setPriority('');
-        setTestType('');
-        setAutomationStatus('');
-        setSyncStatus('');
+    useEffect(() => {
+        projectsApi.list().then(data => setProjects(Array.isArray(data) ? data : [])).catch(() => setProjects([]));
+    }, []);
+
+    const updateFilters = (nextFilters: ActivityFiltersValue) => {
+        const params = new URLSearchParams(searchParamString);
+        writeActivityFiltersToParams(params, nextFilters);
+        const query = params.toString();
+        router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     };
 
-    const hasActiveFilters = status || priority || testType || automationStatus || syncStatus || search;
+    const handleRelatedArtifactSearch = async (query: string, relatedType: string) => {
+        if (relatedType === 'suite') {
+            const trimmed = query.trim();
+            setRelatedArtifacts(trimmed ? [{ value: trimmed, label: trimmed }] : []);
+            return;
+        }
+        if (query.trim().length < 2 || !relatedType) {
+            setRelatedArtifacts(filters.relatedId ? [{ value: filters.relatedId, label: filters.relatedId }] : []);
+            return;
+        }
+        try {
+            const response = await fetchApi<{ data: Array<{ id: string; display_id: string; title: string }> }>(
+                `/search?q=${encodeURIComponent(query.trim())}&type=${encodeURIComponent(relatedType)}&limit=20`
+            );
+            setRelatedArtifacts(response.data.map(item => ({ value: item.id, label: `${item.display_id} - ${item.title}` })));
+        } catch (error) {
+            console.error(error);
+            setRelatedArtifacts([]);
+        }
+    };
+
+    const projectOptions = useMemo(() => projects.map(project => ({ value: project.id, label: project.project_name })), [projects]);
 
     return (
         <div className="p-6">
@@ -138,47 +181,22 @@ export default function TestCasesPage() {
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Test Cases</h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your test case registry</p>
                 </div>
-                <Link href="/test-cases/create">
+                <Link href="/test/cases/create">
                     <Button>+ New Test Case</Button>
                 </Link>
             </div>
 
-            <div className="mb-6 space-y-4">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && loadTestCases(1)}
-                        placeholder="Search by ID, title, or description..."
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <Button onClick={() => loadTestCases(1)}>Search</Button>
-                </div>
-
-                <div className="flex flex-wrap gap-3 items-center">
-                    <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <select value={priority} onChange={(e) => setPriority(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <select value={testType} onChange={(e) => setTestType(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <select value={automationStatus} onChange={(e) => setAutomationStatus(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {AUTOMATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <select value={syncStatus} onChange={(e) => setSyncStatus(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {SYNC_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>Clear All</Button>
-                    )}
-                    <span className="ml-auto text-sm text-gray-600 dark:text-gray-400">
-                        {pagination.total} test case{pagination.total !== 1 ? 's' : ''}
-                    </span>
-                </div>
+            <div className="mb-6">
+                <ActivityFilters
+                    value={filters}
+                    config={CASE_FILTER_CONFIG}
+                    projects={projectOptions}
+                    relatedArtifacts={relatedArtifacts}
+                    relatedArtifactPlaceholder="Search related item"
+                    resultSummary={`${pagination.total} test case${pagination.total !== 1 ? 's' : ''}`}
+                    onChange={updateFilters}
+                    onRelatedArtifactSearch={handleRelatedArtifactSearch}
+                />
             </div>
 
             {loading && testCases.length === 0 ? (
@@ -186,7 +204,7 @@ export default function TestCasesPage() {
             ) : testCases.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
                     <p className="text-gray-600 dark:text-gray-400 mb-4">No test cases found. Create your first test case to get started.</p>
-                    <Link href="/test-cases/create"><Button>Create Test Case</Button></Link>
+                    <Link href="/test/cases/create"><Button>Create Test Case</Button></Link>
                 </div>
             ) : (
                 <>
@@ -211,7 +229,7 @@ export default function TestCasesPage() {
                                     {testCases.map((tc) => (
                                         <tr key={tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                <Link href={`/test-cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                     {tc.test_case_id}
                                                 </Link>
                                             </td>
@@ -247,8 +265,8 @@ export default function TestCasesPage() {
                                                 {tc.latest_execution_date ? formatDistanceToNow(new Date(tc.latest_execution_date), { addSuffix: true }) : 'Never'}
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                                <Link href={`/test-cases/${tc.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
-                                                <Link href={`/test-cases/${tc.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
+                                                <Link href={`/test/cases/${tc.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
+                                                <Link href={`/test/cases/${tc.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
                                             </td>
                                         </tr>
                                     ))}

@@ -11,7 +11,7 @@ const { createTestApp } = require('./helpers/testApp');
 
 describe('POST /auth/profile/avatar', () => {
     let app;
-    beforeAll(() => { app = createTestApp('/auth/profile', require('../src/routes/avatar')); });
+    beforeAll(() => { app = createTestApp('/auth/profile', require('../src/modules/identity/avatar.routes')); });
 
     it('rejects non-image files', async () => {
         const res = await request(app)

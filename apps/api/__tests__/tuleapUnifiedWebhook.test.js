@@ -16,24 +16,24 @@ jest.mock('../src/config/db', () => ({
 jest.mock('../src/middleware/audit', () => ({
     auditLog: mockAuditLog
 }));
-jest.mock('../src/services/tuleapTransformEngine', () => ({
+jest.mock('../src/modules/integration/services/tuleapTransformEngine', () => ({
     fromTuleap: mockFromTuleap
 }));
-jest.mock('../src/services/persisters/bug', () => ({
+jest.mock('../src/modules/integration/services/persisters/bug', () => ({
     dispatchAction: mockDispatchBug
 }));
-jest.mock('../src/services/persisters/task', () => ({
+jest.mock('../src/modules/integration/services/persisters/task', () => ({
     dispatchAction: mockDispatchTask
 }));
-jest.mock('../src/services/persisters/user_story', () => ({
+jest.mock('../src/modules/integration/services/persisters/user_story', () => ({
     dispatchAction: mockDispatchUserStory
 }));
-jest.mock('../src/services/tuleapValueNormalizer', () => ({
+jest.mock('../src/modules/integration/services/tuleapValueNormalizer', () => ({
     normalize: mockNormalize
 }));
 
 const express = require('express');
-const tuleapRouter = require('../src/routes/tuleapWebhook');
+const tuleapRouter = require('../src/modules/integration/tuleapWebhook.routes');
 
 const app = express();
 app.use(express.json());

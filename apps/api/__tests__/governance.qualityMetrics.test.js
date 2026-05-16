@@ -9,7 +9,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
   requirePermission: () => (req, res, next) => next(),
 }));
 
-const governanceRouter = require('../src/routes/governance');
+const governanceRouter = require('../src/modules/quality/governance.routes');
 const app = express();
 app.use(express.json());
 app.use('/governance', governanceRouter);

@@ -86,7 +86,7 @@ export default function CreateTestRunPage() {
                 environment: environment.trim() || undefined,
                 version_tag: versionTag.trim() || undefined,
             });
-            router.push(`/test-runs/${(result as any).id}`);
+            router.push(`/test/runs/${(result as any).id}`);
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to create test run');

@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutDashboard, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, FileText, TestTube2 } from 'lucide-react';
 
 const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
 
@@ -17,78 +17,38 @@ export interface RouteConfig {
     onboardingGroup?: string;
 }
 
+export interface NavigationNode {
+    label: string;
+    path?: string;
+    icon?: LucideIcon;
+    children?: NavigationNode[];
+}
+
+export interface NavigationSection {
+    key: 'my-work' | 'quality' | 'manage' | 'admin';
+    label: string;
+    icon: LucideIcon;
+    roles?: readonly string[];
+    children: NavigationNode[];
+}
+
 interface RouteVisibilityUser {
     status?: UserStatus | null;
 }
 
 const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
 const ACTIVE_ONLY_SCOPES = [SCOPES.ACTIVE_ONLY.key] as const;
+const PREPARATION_ONLY_SCOPES = [SCOPES.PREPARATION_ONLY.key] as const;
 
 const ROUTES: RouteConfig[] = [
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Register' },
     { path: '/auth/callback', label: 'Auth Callback' },
     { path: '/auth/reset-password', label: 'Reset Password' },
-    { path: '/my-tasks', label: 'My Tasks', permission: PERMISSIONS.MY_TASKS_VIEW, showInNavbar: true, navOrder: 1, icon: CheckSquare },
-    { path: '/journeys', label: 'My Journeys', permission: PERMISSIONS.MY_TASKS_VIEW, showInNavbar: true, navOrder: 1.5, icon: Map },
-    { path: '/journeys/[id]', label: 'Journey Details', permission: PERMISSIONS.MY_TASKS_VIEW },
-    { path: '/development-plan', label: 'My Development Plan', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 1.5, icon: GraduationCap },
-    { path: '/development-plan/history', label: 'Plan History', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 1.6, icon: History },
-    { path: '/development-plan/history/[planId]', label: 'Archived Plan', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/my-dashboard', label: 'My Dashboard', permission: PERMISSIONS.MY_DASHBOARD_VIEW, showInNavbar: true, navOrder: 1.8, icon: LayoutGrid },
-    { path: '/dashboard', label: 'Dashboard', permission: PERMISSIONS.DASHBOARD_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 2, icon: LayoutDashboard },
-    { path: '/tasks', label: 'Tasks', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 3, icon: ListTodo },
-    { path: '/tasks/create', label: 'Create Task', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/tasks/[id]', label: 'Task Details', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/tasks/[id]/edit', label: 'Edit Task', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/projects', label: 'Projects', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 4, icon: FolderKanban },
-    { path: '/projects/create', label: 'Create Project', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/projects/[id]', label: 'Project Details', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/projects/[id]/edit', label: 'Edit Project', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/projects/[id]/quality', label: 'Project Quality', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/user-stories/create', label: 'Create User Story', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/user-stories/[id]', label: 'User Story Details', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/user-stories/[id]/edit', label: 'Edit User Story', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/resources', label: 'Resources', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 5, icon: Users },
-    { path: '/resources/create', label: 'Create Resource', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/resources/[id]', label: 'Resource Dashboard', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/bugs', label: 'Bugs', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 5.5, icon: Bug },
-    { path: '/bugs/create', label: 'Create Bug', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/bugs/[id]', label: 'Bug Details', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/bugs/[id]/edit', label: 'Edit Bug', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/governance', label: 'Governance', permission: PERMISSIONS.GOVERNANCE_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 6, icon: ShieldCheck },
-    { path: '/test-executions', label: 'Test Runs', permission: PERMISSIONS.TESTEXECUTIONS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 7, icon: FlaskConical },
-    { path: '/test-cases', label: 'Test Cases', permission: PERMISSIONS.TESTCASES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 7, icon: FlaskConical },
-    { path: '/test-cases/create', label: 'Create Test Case', permission: PERMISSIONS.TESTCASES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-cases/[id]', label: 'Test Case Details', permission: PERMISSIONS.TESTCASES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-cases/[id]/edit', label: 'Edit Test Case', permission: PERMISSIONS.TESTCASES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-suites', label: 'Test Suites', permission: PERMISSIONS.TESTSUITES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 7.5, icon: Layers },
-    { path: '/test-suites/create', label: 'Create Suite', permission: PERMISSIONS.TESTSUITES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-suites/[id]', label: 'Suite Details', permission: PERMISSIONS.TESTSUITES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-suites/[id]/edit', label: 'Edit Suite', permission: PERMISSIONS.TESTSUITES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-runs/create', label: 'Create Test Run', permission: PERMISSIONS.TESTEXECUTIONS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-runs/[id]', label: 'Test Run Details', permission: PERMISSIONS.TESTEXECUTIONS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-results', label: 'Test Results', permission: PERMISSIONS.TESTEXECUTIONS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/test-results/upload', label: 'Upload Results', permission: PERMISSIONS.TESTEXECUTIONS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/task-history', label: 'Task History', permission: PERMISSIONS.TASK_HISTORY_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: History },
-    { path: '/reports', label: 'Reports', permission: PERMISSIONS.REPORTS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 8, icon: BarChart3 },
-    { path: '/settings', label: 'Settings', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/settings/teams', label: 'Teams', permission: PERMISSIONS.TEAM_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.3, icon: Users2 },
-    { path: '/settings/journeys', label: 'Manage Journeys', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.5, icon: Map },
-    { path: '/settings/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/settings/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
-    { path: '/settings/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
-    { path: '/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
-    { path: '/settings/team-journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
-    { path: '/settings/team-journeys/[userId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/manage-development-plans', label: 'Dev Plans', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.6, icon: GraduationCap },
-    { path: '/manage-development-plans/[userId]', label: 'IDP Builder', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/preferences', label: 'Preferences' },
-
-    // New URL plan — dual entries (#41)
+    // Canonical URL plan
     { path: '/me/tasks', label: 'My Tasks', permission: PERMISSIONS.MY_TASKS_VIEW, showInNavbar: false },
-    { path: '/me/journeys', label: 'My Journeys', permission: PERMISSIONS.MY_TASKS_VIEW, showInNavbar: false },
-    { path: '/me/journeys/[id]', label: 'Journey Details', permission: PERMISSIONS.MY_TASKS_VIEW },
+    { path: '/me/journeys', label: 'My Journeys', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: PREPARATION_ONLY_SCOPES, showInNavbar: false },
+    { path: '/me/journeys/[id]', label: 'Journey Details', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: PREPARATION_ONLY_SCOPES },
     { path: '/me/idp', label: 'My Development Plan', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
     { path: '/me/idp/history', label: 'Plan History', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
     { path: '/me/idp/history/[planId]', label: 'Archived Plan', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
@@ -103,6 +63,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/work/projects/[id]', label: 'Project Details', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/work/projects/[id]/edit', label: 'Edit Project', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/work/projects/[id]/quality', label: 'Project Quality', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
+    { path: '/work/stories', label: 'User Stories', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
     { path: '/work/bugs', label: 'Bugs', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
     { path: '/work/bugs/create', label: 'Create Bug', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/work/bugs/[id]', label: 'Bug Details', permission: PERMISSIONS.BUGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
@@ -140,6 +101,88 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: false },
+];
+
+const NAVIGATION_SECTIONS: NavigationSection[] = [
+    {
+        key: 'my-work',
+        label: 'My Work',
+        icon: CheckSquare,
+        children: [
+            { path: '/me/dashboard', label: 'My Dashboard', icon: LayoutGrid },
+            { path: '/me/tasks', label: 'My Tasks', icon: CheckSquare },
+            { path: '/me/journeys', label: 'My Journeys', icon: Map },
+            { path: '/me/idp', label: 'My Development Plan', icon: GraduationCap },
+            { path: '/me/idp/history', label: 'Plan History', icon: History },
+            { path: '/me/preferences', label: 'Preferences', icon: Settings2 },
+        ],
+    },
+    {
+        key: 'quality',
+        label: 'Quality',
+        icon: ShieldCheck,
+        children: [
+            { path: '/work/projects', label: 'Projects', icon: FolderKanban },
+            {
+                label: 'Work Tracking',
+                icon: ClipboardList,
+                children: [
+                    { path: '/work/tasks', label: 'Tasks', icon: ListTodo },
+                    { path: '/work/stories', label: 'Stories', icon: BookOpen },
+                    { path: '/work/bugs', label: 'Bugs', icon: Bug },
+                ],
+            },
+            {
+                label: 'Test Authoring',
+                icon: TestTube2,
+                children: [
+                    { path: '/test/cases', label: 'Cases', icon: FlaskConical },
+                    { path: '/test/suites', label: 'Suites', icon: Layers },
+                ],
+            },
+            {
+                label: 'Test Execution',
+                icon: PlayCircle,
+                children: [
+                    { path: '/test/runs', label: 'Runs', icon: PlayCircle },
+                    { path: '/test/results', label: 'Results', icon: FileText },
+                ],
+            },
+            { path: '/quality/governance', label: 'Governance', icon: ShieldCheck },
+            { path: '/quality/reports', label: 'Reports', icon: BarChart3 },
+        ],
+    },
+    {
+        key: 'manage',
+        label: 'Manage',
+        icon: Users,
+        roles: ['manager', 'admin'],
+        children: [
+            { path: '/team/resources', label: 'Resources', icon: Users },
+            { path: '/team/idp', label: 'Development Plans', icon: GraduationCap },
+            { path: '/team/journeys', label: 'Team Journeys', icon: Users2 },
+            { path: '/team/history', label: 'Task History', icon: History },
+        ],
+    },
+    {
+        key: 'admin',
+        label: 'Admin',
+        icon: Settings2,
+        roles: ['admin'],
+        children: [
+            { path: '/admin/users', label: 'Users', icon: UserCog },
+            { path: '/admin/teams', label: 'Teams', icon: Users2 },
+            { path: '/admin/journeys', label: 'Journey Templates', icon: Map },
+            { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
+            {
+                label: 'Integrations',
+                icon: Settings2,
+                children: [
+                    { path: '/admin/integrations/tuleap', label: 'Tuleap', icon: Settings2 },
+                ],
+            },
+        ],
+    },
 ];
 
 function pathToRegex(routePath: string): RegExp {
@@ -236,4 +279,37 @@ export function getLandingPage(user: UserForLanding | null, permissions?: string
     return preferredPage;
 }
 
-export { ROUTES, PUBLIC_PATHS };
+export interface BreadcrumbItem {
+    label: string;
+    path?: string;
+}
+
+function findNodePath(nodes: NavigationNode[], targetPath: string): NavigationNode[] | null {
+    for (const node of nodes) {
+        if (node.path && targetPath === node.path) return [node];
+        if (node.path && targetPath.startsWith(node.path + '/')) {
+            const deeper = node.children ? findNodePath(node.children, targetPath) : null;
+            if (deeper) return [node, ...deeper];
+        }
+        if (node.children) {
+            const deeper = findNodePath(node.children, targetPath);
+            if (deeper) return deeper;
+        }
+    }
+    return null;
+}
+
+export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
+    for (const section of NAVIGATION_SECTIONS) {
+        const nodePath = findNodePath(section.children, pathname);
+        if (nodePath) {
+            return [
+                { label: section.label },
+                ...nodePath.map(n => ({ label: n.label, path: n.path })),
+            ];
+        }
+    }
+    return [];
+}
+
+export { ROUTES, PUBLIC_PATHS, NAVIGATION_SECTIONS };

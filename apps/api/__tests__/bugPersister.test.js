@@ -1,7 +1,7 @@
-const { dispatchAction } = require('../src/services/persisters/bug');
-const { resolveLinks, drainPending } = require('../src/services/tuleapLinkResolver');
+const { dispatchAction } = require('../src/modules/integration/services/persisters/bug');
+const { resolveLinks, drainPending } = require('../src/modules/integration/services/tuleapLinkResolver');
 
-jest.mock('../src/services/tuleapLinkResolver', () => ({
+jest.mock('../src/modules/integration/services/tuleapLinkResolver', () => ({
   resolveLinks: jest.fn(),
   drainPending: jest.fn(),
 }));

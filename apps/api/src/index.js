@@ -27,49 +27,21 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Create API router for all routes (supports both / and /api prefixes)
 const apiRouter = express.Router();
-apiRouter.use('/projects', require('./routes/projects'));
-apiRouter.use('/tasks', require('./routes/tasks'));
-apiRouter.use('/resources', require('./routes/resources'));
-apiRouter.use('/test-cases', require('./routes/testCases'));
-apiRouter.use('/test-suites', require('./routes/testSuites'));
-apiRouter.use('/test-executions', require('./routes/testExecutions'));
-apiRouter.use('/dashboard', require('./routes/dashboard'));
-apiRouter.use('/reports', require('./routes/reports'));
-apiRouter.use('/', require('./routes/testResults'));
-apiRouter.use('/testsprite', require('./routes/testspriteWebhook'));
-apiRouter.use('/governance', require('./routes/governance'));
-apiRouter.use('/auth', require('./routes/auth'));
-apiRouter.use('/auth/profile', require('./routes/avatar'));
-apiRouter.use('/users', require('./routes/users'));
-apiRouter.use('/notifications', require('./routes/notifications'));
-apiRouter.use('/bugs', require('./routes/bugs'));
-apiRouter.use('/search', require('./routes/search'));
-apiRouter.use('/tasks', require('./routes/taskTestCases'));
-apiRouter.use('/test-cases', require('./routes/testCaseTasks'));
-apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
-apiRouter.use('/tuleap/artifacts', require('./routes/tuleapArtifacts'));
-apiRouter.use('/my-tasks', require('./routes/personalTasks'));
-apiRouter.use('/me', require('./routes/me'));
-apiRouter.use('/roles', require('./routes/roles'));
-apiRouter.use('/journeys', require('./routes/journeys'));
-apiRouter.use('/my-journeys', require('./routes/myJourneys'));
-apiRouter.use('/manager', require('./routes/managerView'));
-apiRouter.use('/development-plans', require('./routes/developmentPlans'));
-apiRouter.use('/teams', require('./routes/teams'));
+['identity', 'work', 'testing', 'quality', 'lifecycle', 'integration']
+    .forEach(m => require(`./modules/${m}`).mount(apiRouter));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// Mount routes at both root and /api for compatibility
-app.use('/', apiRouter);
 app.use('/api', apiRouter);
 
-// Health check (available at both /health and /api/health)
+// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+app.get('/dashboard', (req, res) => res.status(410).json({ error: 'Deprecated', message: 'The /dashboard endpoint has been removed. Use /api/me/dashboard.' }));
 
 // Error Handler (must be last)
 app.use(errorHandler);

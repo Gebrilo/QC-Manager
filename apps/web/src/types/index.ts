@@ -115,7 +115,10 @@ export interface Task {
     completed_date?: string;
     tags?: string[];
     notes?: string;
-    tuleap_url?: string;
+    tuleap_artifact_id?: number | null;
+    tuleap_url?: string | null;
+    synced_from_tuleap?: boolean;
+    parent_user_story_id?: string | null;
 
     // Joined fields from API View
     project_name?: string;
@@ -333,6 +336,8 @@ export interface TestSuite {
     name: string;
     description?: string;
     status: SuiteStatus;
+    suite_type?: string;
+    readiness_scope?: string;
     project_id: string;
     project_name?: string;
     created_by?: string;

@@ -56,7 +56,7 @@ export default function JourneysPage() {
                 {journeys.map((journey) => (
                     <button
                         key={journey.id}
-                        onClick={() => router.push(`/journeys/${journey.journey_id}`)}
+                        onClick={() => router.push(`/me/journeys/${journey.journey_id}`)}
                         className="text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
                     >
                         <div className="flex items-start justify-between mb-3">

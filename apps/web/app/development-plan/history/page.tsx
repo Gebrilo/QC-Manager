@@ -41,7 +41,7 @@ export default function DevelopmentPlanHistoryPage() {
     return (
         <div>
             <div className="mb-6 flex items-center gap-3">
-                <Link href="/development-plan" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                <Link href="/me/idp" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                     ← Current plan
                 </Link>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Plan History</h1>
@@ -57,7 +57,7 @@ export default function DevelopmentPlanHistoryPage() {
                     {plans.map(p => (
                         <Link
                             key={p.id}
-                            href={`/development-plan/history/${p.id}`}
+                            href={`/me/idp/history/${p.id}`}
                             className="block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:border-indigo-400 transition-colors"
                         >
                             <div className="flex items-center justify-between gap-4">

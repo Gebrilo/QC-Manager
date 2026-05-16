@@ -59,7 +59,7 @@ export default function EditTestSuitePage() {
                 description: description.trim() || undefined,
                 status: status as 'draft' | 'active' | 'archived',
             });
-            router.push(`/test-suites/${id}`);
+            router.push(`/test/suites/${id}`);
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to update test suite');
@@ -78,7 +78,7 @@ export default function EditTestSuitePage() {
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
                     <h2 className="text-lg font-semibold mb-2">Error</h2>
                     <p>{error}</p>
-                    <Link href="/test-suites"><Button variant="outline" className="mt-4">Back to Test Suites</Button></Link>
+                    <Link href="/test/suites"><Button variant="outline" className="mt-4">Back to Test Suites</Button></Link>
                 </div>
             </div>
         );
@@ -87,7 +87,7 @@ export default function EditTestSuitePage() {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             <div className="flex items-center gap-4 mb-6">
-                <Link href={`/test-suites/${id}`}><Button variant="ghost" size="sm">Back</Button></Link>
+                <Link href={`/test/suites/${id}`}><Button variant="ghost" size="sm">Back</Button></Link>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Edit Suite: {suite?.suite_id}</h1>
             </div>
 

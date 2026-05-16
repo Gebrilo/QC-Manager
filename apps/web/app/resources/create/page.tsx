@@ -40,7 +40,7 @@ export default function CreateResourcePage() {
                 method: 'POST',
                 body: JSON.stringify(formData)
             });
-            router.push('/resources');
+            router.push('/team/resources');
         } catch (err: any) {
             console.error('Failed to create resource:', err);
             setError(err.message || 'Failed to create resource');
@@ -52,7 +52,7 @@ export default function CreateResourcePage() {
     return (
         <div className="max-w-2xl mx-auto py-8 px-4">
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/resources">
+                <Link href="/team/resources">
                     <Button variant="ghost">← Back</Button>
                 </Link>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Resource</h1>
@@ -173,7 +173,7 @@ export default function CreateResourcePage() {
 
                 {/* Actions */}
                 <div className="flex justify-end gap-4">
-                    <Link href="/resources">
+                    <Link href="/team/resources">
                         <Button type="button" variant="outline">Cancel</Button>
                     </Link>
                     <Button type="submit" disabled={isSubmitting}>

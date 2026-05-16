@@ -97,10 +97,10 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
 
             if (isEdit && testCaseId) {
                 await testCasesApi.update(testCaseId, payload);
-                router.push(`/test-cases/${testCaseId}`);
+                router.push(`/test/cases/${testCaseId}`);
             } else {
                 await testCasesApi.create(payload as any);
-                router.push('/test-cases');
+                router.push('/test/cases');
             }
             router.refresh();
         } catch (err: any) {

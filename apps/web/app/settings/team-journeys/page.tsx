@@ -329,7 +329,7 @@ export default function TeamJourneysPage() {
                                         {journeys.map(journey => {
                                             const statusCfg = statusConfig[journey.status] || statusConfig.assigned;
                                             return (
-                                                <Link key={journey.id} href={`/settings/team-journeys/${selectedUser?.id}/${journey.journey_id}`} className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors">
+                                                <Link key={journey.id} href={`/admin/team-journeys/${selectedUser?.id}/${journey.journey_id}`} className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors">
                                                     <div className="flex items-start justify-between mb-3">
                                                         <div>
                                                             <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{journey.title}</h3>

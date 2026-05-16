@@ -1,6 +1,6 @@
-const { emitToTuleap } = require('../src/services/emitters/test_case');
+const { emitToTuleap } = require('../src/modules/integration/services/emitters/test_case');
 
-jest.mock('../src/services/tuleapClient', () => ({
+jest.mock('../src/modules/integration/services/tuleapClient', () => ({
   createTuleapClient: jest.fn(),
   defaultClient: {
     post: jest.fn(),
@@ -9,7 +9,7 @@ jest.mock('../src/services/tuleapClient', () => ({
   },
 }));
 
-jest.mock('../src/services/tuleapFieldRegistry', () => ({
+jest.mock('../src/modules/integration/services/tuleapFieldRegistry', () => ({
   FieldRegistry: jest.fn(),
   defaultRegistry: {
     getField: jest.fn(),
@@ -18,8 +18,8 @@ jest.mock('../src/services/tuleapFieldRegistry', () => ({
   },
 }));
 
-const { defaultClient } = require('../src/services/tuleapClient');
-const { defaultRegistry } = require('../src/services/tuleapFieldRegistry');
+const { defaultClient } = require('../src/modules/integration/services/tuleapClient');
+const { defaultRegistry } = require('../src/modules/integration/services/tuleapFieldRegistry');
 
 describe('test_case emitter — emitToTuleap', () => {
   const config = {

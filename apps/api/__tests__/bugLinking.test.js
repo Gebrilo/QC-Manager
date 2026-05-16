@@ -15,19 +15,19 @@ jest.mock('../src/middleware/authMiddleware', () => ({
     requirePermission: () => (req, res, next) => next(),
 }));
 
-jest.mock('../src/services/emitters/bug', () => ({
+jest.mock('../src/modules/integration/services/emitters/bug', () => ({
     emitToTuleap: jest.fn(),
 }));
-jest.mock('../src/services/tuleapClient', () => ({
+jest.mock('../src/modules/integration/services/tuleapClient', () => ({
     defaultClient: {},
 }));
-jest.mock('../src/services/tuleapFieldRegistry', () => ({
+jest.mock('../src/modules/integration/services/tuleapFieldRegistry', () => ({
     defaultRegistry: {},
 }));
 
 const express = require('express');
 const request = require('supertest');
-const bugsRouter = require('../src/routes/bugs');
+const bugsRouter = require('../src/modules/work/bugs.routes');
 
 describe('Bug Linking API', () => {
     let app;

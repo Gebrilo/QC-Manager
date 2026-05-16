@@ -58,7 +58,7 @@ export default function GovernanceDashboardPage() {
     };
 
     const handleProjectClick = (projectId: string) => {
-        router.push(`/projects/${projectId}/quality`);
+        router.push(`/work/projects/${projectId}/quality`);
     };
 
     return (
@@ -74,7 +74,7 @@ export default function GovernanceDashboardPage() {
                         <RefreshCw className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
                         Refresh
                     </Button>
-                    <Button variant="primary" size="sm" onClick={() => router.push('/reports')}>
+                    <Button variant="primary" size="sm" onClick={() => router.push('/quality/reports')}>
                         <FileText className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
                         Export Report
                     </Button>
@@ -150,7 +150,7 @@ export default function GovernanceDashboardPage() {
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Test Execution Summary</h2>
                     <button
-                        onClick={() => router.push('/reports?tab=executions')}
+                        onClick={() => router.push('/quality/reports?tab=executions')}
                         className="text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
                     >
                         View All Test Runs →

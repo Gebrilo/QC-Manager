@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { projectsApi } from '@/lib/api';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { projectsApi, testRunsApi, testSuitesApi } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { ActivityFilters, type ActivityFiltersConfig, type ActivityFiltersValue } from '@/components/ui/ActivityFilters';
+import { parseActivityFilters, writeActivityFiltersToParams } from '@/lib/activityFilters';
 
 interface Project {
     id: string;
@@ -15,18 +17,21 @@ interface TestRun {
     id: string;
     run_id: string;
     name: string;
-    description: string;
+    description?: string;
     status: string;
+    environment?: string;
+    version_tag?: string;
+    suite_id?: string;
     started_at: string;
-    project_name: string;
+    project_name?: string;
     project_id: string;
-    total_cases: number;
-    passed: number;
-    failed: number;
-    not_run: number;
-    blocked: number;
-    skipped: number;
-    pass_rate: number;
+    total_cases?: number;
+    passed?: number;
+    failed?: number;
+    not_run?: number;
+    blocked?: number;
+    skipped?: number;
+    pass_rate?: number;
 }
 
 interface UploadResult {
@@ -47,6 +52,18 @@ interface UploadResult {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+const RUN_FILTER_CONFIG: ActivityFiltersConfig = {
+    slots: ['search', 'project', 'environment', 'versionTag', 'status', 'date', 'relatedArtifact'],
+    statusOptions: [
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'aborted', label: 'Aborted' },
+    ],
+    relatedArtifactTypes: [
+        { value: 'suite', label: 'Source Suite' },
+    ],
+};
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
@@ -65,8 +82,13 @@ const SAMPLE_TEMPLATE = [
 
 export default function TestExecutionsPage() {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const searchParamString = searchParams.toString();
+    const filters = React.useMemo(() => parseActivityFilters(new URLSearchParams(searchParamString)), [searchParamString]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [suiteOptions, setSuiteOptions] = useState<Array<{ value: string; label: string }>>([]);
     const [testRuns, setTestRuns] = useState<TestRun[]>([]);
     const [filteredRuns, setFilteredRuns] = useState<TestRun[]>([]);
     const [selectedProject, setSelectedProject] = useState<string>('');
@@ -81,8 +103,6 @@ export default function TestExecutionsPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDragOver, setIsDragOver] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterProject, setFilterProject] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
 
@@ -91,21 +111,29 @@ export default function TestExecutionsPage() {
         async function loadData() {
             try {
                 setLoading(true);
-                const authHeaders = await getAuthHeaders();
-                const [projectsData, runsResponse] = await Promise.all([
+                const [projectsData, suitesData, runsData] = await Promise.all([
                     projectsApi.list(),
-                    fetch(`${API_BASE}/test-executions/recent-uploads`, { headers: authHeaders })
+                    testSuitesApi.list({ limit: 100 }).catch(() => ({ data: [] })),
+                    testRunsApi.listRecent({
+                        q: filters.search || undefined,
+                        project_ids: filters.projectIds.join(',') || undefined,
+                        statuses: filters.statuses.join(',') || undefined,
+                        environments: filters.environments.join(',') || undefined,
+                        version_tags: filters.versionTags.join(',') || undefined,
+                        created_from: filters.createdFrom || undefined,
+                        created_to: filters.createdTo || undefined,
+                        updated_from: filters.updatedFrom || undefined,
+                        updated_to: filters.updatedTo || undefined,
+                        related_type: filters.relatedType || undefined,
+                        related_id: filters.relatedId || undefined,
+                    })
                 ]);
 
                 setProjects(Array.isArray(projectsData) ? projectsData : []);
-
-                if (runsResponse.ok) {
-                    const runsData = await runsResponse.json();
-                    setTestRuns(Array.isArray(runsData) ? runsData : []);
-                } else {
-                    console.error('Failed to fetch test runs:', runsResponse.status);
-                    setTestRuns([]);
-                }
+                setSuiteOptions(Array.isArray((suitesData as any).data)
+                    ? (suitesData as any).data.map((suite: any) => ({ value: suite.id, label: `${suite.suite_id} - ${suite.name}` }))
+                    : []);
+                setTestRuns(Array.isArray(runsData) ? runsData : []);
             } catch (err) {
                 console.error('Error loading data:', err);
                 setProjects([]);
@@ -115,27 +143,32 @@ export default function TestExecutionsPage() {
             }
         }
         loadData();
-    }, []);
+    }, [filters]);
 
     // Filter test runs based on search and project filter
     useEffect(() => {
-        let filtered = testRuns;
+        setFilteredRuns(testRuns);
+    }, [testRuns]);
 
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(run =>
-                run.name.toLowerCase().includes(query) ||
-                run.run_id.toLowerCase().includes(query) ||
-                (run.project_name && run.project_name.toLowerCase().includes(query))
-            );
-        }
+    const updateFilters = (nextFilters: ActivityFiltersValue) => {
+        const params = new URLSearchParams(searchParamString);
+        writeActivityFiltersToParams(params, nextFilters);
+        const query = params.toString();
+        router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    };
 
-        if (filterProject) {
-            filtered = filtered.filter(run => run.project_id === filterProject);
-        }
-
-        setFilteredRuns(filtered);
-    }, [testRuns, searchQuery, filterProject]);
+    const projectOptions = React.useMemo(
+        () => projects.map(project => ({ value: project.id, label: project.project_name })),
+        [projects]
+    );
+    const environmentOptions = React.useMemo(
+        () => Array.from(new Set(testRuns.map(run => run.environment).filter(Boolean) as string[])).map(value => ({ value, label: value })),
+        [testRuns]
+    );
+    const versionTagOptions = React.useMemo(
+        () => Array.from(new Set(testRuns.map(run => run.version_tag).filter(Boolean) as string[])).map(value => ({ value, label: value })),
+        [testRuns]
+    );
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -231,11 +264,8 @@ export default function TestExecutionsPage() {
             setUploadResult(result);
 
             // Refresh the test runs list
-            const runsResponse = await fetch(`${API_BASE}/test-executions/recent-uploads`, { headers: authHeaders });
-            if (runsResponse.ok) {
-                const runsData = await runsResponse.json();
-                setTestRuns(Array.isArray(runsData) ? runsData : []);
-            }
+            const runsData = await testRunsApi.listRecent();
+            setTestRuns(Array.isArray(runsData) ? runsData : []);
 
             // Clear form
             setFile(null);
@@ -335,7 +365,7 @@ export default function TestExecutionsPage() {
                         Download Template
                     </button>
                     <button
-                        onClick={() => router.push('/governance')}
+                        onClick={() => router.push('/quality/governance')}
                         className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium text-white transition-all"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -661,30 +691,6 @@ export default function TestExecutionsPage() {
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
-                                {/* Search */}
-                                <div className="relative">
-                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Search runs..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 w-full sm:w-64 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    />
-                                </div>
-                                {/* Filter by Project */}
-                                <select
-                                    value={filterProject}
-                                    onChange={(e) => setFilterProject(e.target.value)}
-                                    className="px-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <option value="">All Projects</option>
-                                    {projects.map(p => (
-                                        <option key={p.id} value={p.id}>{p.project_name}</option>
-                                    ))}
-                                </select>
                                 {/* Export Button */}
                                 <button
                                     onClick={handleExportResults}
@@ -698,6 +704,22 @@ export default function TestExecutionsPage() {
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                        <ActivityFilters
+                            value={filters}
+                            config={{
+                                ...RUN_FILTER_CONFIG,
+                                environmentOptions,
+                                versionTagOptions,
+                            }}
+                            projects={projectOptions}
+                            relatedArtifacts={suiteOptions}
+                            relatedArtifactPlaceholder="Search source suite"
+                            resultSummary={`${filteredRuns.length} run${filteredRuns.length === 1 ? '' : 's'}`}
+                            onChange={updateFilters}
+                        />
                     </div>
 
                     {loading ? (
@@ -741,28 +763,30 @@ export default function TestExecutionsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                    {filteredRuns.map(run => (
-                                        <tr key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                                            <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
-                                            <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-medium max-w-xs truncate">{run.name}</td>
-                                            <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">{run.project_name || '-'}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-slate-700 dark:text-slate-300">{run.total_cases}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-emerald-600">{run.passed}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-rose-600">{run.failed}</td>
-                                            <td className="px-4 py-4 text-sm text-center font-semibold text-amber-600">{run.blocked}</td>
-                                            <td className="px-4 py-4 text-sm text-center">
-                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${run.pass_rate >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                                        run.pass_rate >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                            'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                                                    }`}>
-                                                    {run.pass_rate}%
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
-                                                {run.started_at ? new Date(run.started_at).toLocaleDateString() : '-'}
-                                            </td>
-                                            <td className="px-4 py-4 text-center">
-                                                {deleteConfirm === run.id ? (
+                                    {filteredRuns.map(run => {
+                                        const passRate = run.pass_rate ?? 0;
+                                        return (
+                                            <tr key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                                <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
+                                                <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-medium max-w-xs truncate">{run.name}</td>
+                                                <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">{run.project_name || '-'}</td>
+                                                <td className="px-4 py-4 text-sm text-center font-semibold text-slate-700 dark:text-slate-300">{run.total_cases ?? 0}</td>
+                                                <td className="px-4 py-4 text-sm text-center font-semibold text-emerald-600">{run.passed ?? 0}</td>
+                                                <td className="px-4 py-4 text-sm text-center font-semibold text-rose-600">{run.failed ?? 0}</td>
+                                                <td className="px-4 py-4 text-sm text-center font-semibold text-amber-600">{run.blocked ?? 0}</td>
+                                                <td className="px-4 py-4 text-sm text-center">
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${passRate >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                            passRate >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                                'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                                                        }`}>
+                                                        {passRate}%
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+                                                    {run.started_at ? new Date(run.started_at).toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-4 text-center">
+                                                    {deleteConfirm === run.id ? (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
                                                             onClick={() => handleDeleteRun(run.id)}
@@ -789,9 +813,10 @@ export default function TestExecutionsPage() {
                                                         </svg>
                                                     </button>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

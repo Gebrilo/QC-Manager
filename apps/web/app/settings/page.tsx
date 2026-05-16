@@ -128,7 +128,7 @@ export default function SettingsPage() {
                                 Configure global thresholds for release readiness and risk assessment
                             </p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => router.push('/governance')}>
+                        <Button variant="outline" size="sm" onClick={() => router.push('/quality/governance')}>
                             <ArrowLeft className="w-4 h-4 mr-1.5" strokeWidth={1.75} />
                             Dashboard
                         </Button>

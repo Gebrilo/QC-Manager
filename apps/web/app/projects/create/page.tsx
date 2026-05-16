@@ -11,12 +11,12 @@ export default function CreateProjectPage() {
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.projects.create')) {
-            router.replace('/projects');
+            router.replace('/work/projects');
         }
     }, [authLoading, hasPermission, router]);
 
     const handleSuccess = () => {
-        router.push('/projects');
+        router.push('/work/projects');
         router.refresh();
     };
 

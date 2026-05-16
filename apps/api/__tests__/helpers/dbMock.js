@@ -38,7 +38,7 @@ function setupTestApp() {
     app.use(express.json());
 
     // Require the router AFTER mocking
-    const tuleapWebhookRouter = require('../../src/routes/tuleapWebhook');
+    const tuleapWebhookRouter = require('../../src/modules/integration/tuleapWebhook.routes');
     app.use('/tuleap-webhook', tuleapWebhookRouter);
 
     return { app, mockPool, mockAuditLog };

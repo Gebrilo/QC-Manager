@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { bugsApi, type Bug } from '@/lib/api';
+import { bugsApi, fetchApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { ActivityFilters, type ActivityFilterOption, type ActivityFiltersConfig, type ActivityFiltersValue } from '@/components/ui/ActivityFilters';
+import { parseActivityFilters, writeActivityFiltersToParams } from '@/lib/activityFilters';
 
 const SEVERITY_COLORS: Record<string, string> = {
     critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
@@ -22,6 +24,18 @@ const STATUS_COLORS: Record<string, string> = {
     Reopened:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 };
 
+const BUG_FILTER_CONFIG: ActivityFiltersConfig = {
+    slots: ['search', 'project', 'status', 'assignee', 'severity', 'source', 'date', 'relatedArtifact'],
+    statusOptions: ['Open', 'In Progress', 'Resolved', 'Closed', 'Reopened'].map(status => ({ value: status, label: status })),
+    severityOptions: ['critical', 'high', 'medium', 'low'].map(severity => ({ value: severity, label: severity.charAt(0).toUpperCase() + severity.slice(1) })),
+    relatedArtifactTypes: [
+        { value: 'task', label: 'Task', searchTypes: ['task'] },
+        { value: 'user_story', label: 'User Story', searchTypes: ['user_story'] },
+        { value: 'test_case', label: 'Test Case', searchTypes: ['test_case'] },
+        { value: 'test_execution', label: 'Test Execution' },
+    ],
+};
+
 export default function BugsPage() {
     return (
         <Suspense fallback={<div className="py-12 text-center text-slate-400">Loading\u2026</div>}>
@@ -32,19 +46,18 @@ export default function BugsPage() {
 
 function BugsContent() {
     const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
+    const searchParamString = searchParams.toString();
     const { hasPermission } = useAuth();
     const canDelete = hasPermission('qc.bugs.delete');
 
     const [bugs, setBugs] = useState<Bug[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [relatedArtifacts, setRelatedArtifacts] = useState<ActivityFilterOption[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [total, setTotal] = useState(0);
-    const [filter, setFilter] = useState('');
-    const [projectFilter, setProjectFilter] = useState(searchParams.get('project_id') || '');
-    const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-    const [severityFilter, setSeverityFilter] = useState(searchParams.get('severity') || '');
-    const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
+    const filters = useMemo(() => parseActivityFilters(new URLSearchParams(searchParamString)), [searchParamString]);
     const [page, setPage] = useState(() => {
         const p = searchParams.get('page');
         return p ? Math.max(0, parseInt(p) - 1) : 0;
@@ -54,29 +67,22 @@ function BugsContent() {
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const PAGE_SIZE = 50;
 
-    const updateUrlParams = useCallback(() => {
-        const params = new URLSearchParams();
-        if (projectFilter) params.set('project_id', projectFilter);
-        if (statusFilter) params.set('status', statusFilter);
-        if (severityFilter) params.set('severity', severityFilter);
-        if (sourceFilter) params.set('source', sourceFilter);
-        if (page > 0) params.set('page', String(page + 1));
-        const qs = params.toString();
-        router.replace(`/bugs${qs ? `?${qs}` : ''}`, { scroll: false });
-    }, [projectFilter, statusFilter, severityFilter, sourceFilter, page, router]);
-
-    useEffect(() => {
-        updateUrlParams();
-    }, [updateUrlParams]);
-
-    const loadBugs = async () => {
+    const loadBugs = useCallback(async () => {
         try {
             setIsLoading(true);
             const res = await bugsApi.list({
-                project_id: projectFilter || undefined,
-                status:     statusFilter   || undefined,
-                severity:   severityFilter || undefined,
-                source:     sourceFilter   || undefined,
+                q: filters.search || undefined,
+                project_ids: filters.projectIds.join(',') || undefined,
+                statuses: filters.statuses.join(',') || undefined,
+                severities: filters.severities.join(',') || undefined,
+                assignee: filters.assigneeIds.join(',') || undefined,
+                source: filters.source || undefined,
+                created_from: filters.createdFrom || undefined,
+                created_to: filters.createdTo || undefined,
+                updated_from: filters.updatedFrom || undefined,
+                updated_to: filters.updatedTo || undefined,
+                related_type: filters.relatedType || undefined,
+                related_id: filters.relatedId || undefined,
                 limit:  PAGE_SIZE,
                 offset: page * PAGE_SIZE,
             });
@@ -87,31 +93,57 @@ function BugsContent() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [filters, page]);
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
     }, []);
 
     useEffect(() => {
-        setPage(0);
-    }, [projectFilter, statusFilter, severityFilter, sourceFilter]);
+        loadBugs();
+    }, [loadBugs]);
 
     useEffect(() => {
-        loadBugs();
-    }, [projectFilter, statusFilter, severityFilter, sourceFilter, page]);
+        setPage(0);
+    }, [searchParamString]);
 
-    const filtered = useMemo(() => {
-        if (!filter) return bugs;
-        const q = filter.toLowerCase();
-        return bugs.filter(b =>
-            b.title.toLowerCase().includes(q) ||
-            b.bug_id.toLowerCase().includes(q) ||
-            b.assigned_to?.toLowerCase().includes(q) ||
-            b.reported_by?.toLowerCase().includes(q) ||
-            b.component?.toLowerCase().includes(q)
-        );
-    }, [bugs, filter]);
+    const updateFilters = (nextFilters: ActivityFiltersValue) => {
+        const params = new URLSearchParams(searchParamString);
+        writeActivityFiltersToParams(params, nextFilters);
+        params.delete('page');
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    };
+
+    const handleRelatedArtifactSearch = async (query: string, relatedType: string) => {
+        if (relatedType === 'test_execution') {
+            const trimmed = query.trim();
+            setRelatedArtifacts(trimmed ? [{ value: trimmed, label: trimmed }] : []);
+            return;
+        }
+        if (query.trim().length < 2 || !relatedType) {
+            setRelatedArtifacts(filters.relatedId ? [{ value: filters.relatedId, label: filters.relatedId }] : []);
+            return;
+        }
+        try {
+            const response = await fetchApi<{ data: Array<{ id: string; display_id: string; title: string }> }>(
+                `/search?q=${encodeURIComponent(query.trim())}&type=${encodeURIComponent(relatedType)}&limit=20`
+            );
+            setRelatedArtifacts(response.data.map(item => ({ value: item.id, label: `${item.display_id} - ${item.title}` })));
+        } catch (err) {
+            console.error(err);
+            setRelatedArtifacts([]);
+        }
+    };
+
+    const projectOptions = useMemo<ActivityFilterOption[]>(
+        () => projects.map(project => ({ value: project.id, label: project.project_name })),
+        [projects]
+    );
+    const assigneeOptions = useMemo<ActivityFilterOption[]>(
+        () => Array.from(new Set(bugs.map(bug => bug.assigned_to).filter(Boolean) as string[])).map(name => ({ value: name, label: name })),
+        [bugs]
+    );
 
     useEffect(() => {
         if (!toast) return;
@@ -145,79 +177,23 @@ function BugsContent() {
                         Defects synced from Tuleap. Total: <span className="font-semibold">{total}</span>
                     </p>
                 </div>
-                <Link href="/bugs/create" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 transition-colors">
+                <Link href="/work/bugs/create" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 transition-colors">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                     Create Bug
                 </Link>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[200px]">
-                    <input
-                        type="text"
-                        placeholder="Search title, ID, component…"
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                    />
-                    <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    {filter && total > PAGE_SIZE && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                            Searching within current page only. Use filters above to narrow results first.
-                        </p>
-                    )}
-                </div>
-
-                <select
-                    value={projectFilter}
-                    onChange={e => setProjectFilter(e.target.value)}
-                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                    <option value="">All Projects</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
-                </select>
-
-                <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                    <option value="">All Statuses</option>
-                    {['Open','In Progress','Resolved','Closed','Reopened'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-
-                <select
-                    value={severityFilter}
-                    onChange={e => setSeverityFilter(e.target.value)}
-                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                    <option value="">All Severities</option>
-                    {['critical','high','medium','low'].map(s => <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
-                </select>
-
-                <select
-                    value={sourceFilter}
-                    onChange={e => setSourceFilter(e.target.value)}
-                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                    <option value="">All Sources</option>
-                    <option value="TEST_CASE">Test Case</option>
-                    <option value="EXPLORATORY">Exploratory</option>
-                </select>
-
-                {(projectFilter || statusFilter || severityFilter || sourceFilter || filter) && (
-                    <button
-                        onClick={() => { setProjectFilter(''); setStatusFilter(''); setSeverityFilter(''); setSourceFilter(''); setFilter(''); }}
-                        className="py-2 px-3 text-sm text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 whitespace-nowrap"
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        Clear
-                    </button>
-                )}
-            </div>
+            <ActivityFilters
+                value={filters}
+                config={BUG_FILTER_CONFIG}
+                projects={projectOptions}
+                assignees={assigneeOptions}
+                relatedArtifacts={relatedArtifacts}
+                relatedArtifactPlaceholder="Search related item"
+                resultSummary={`${total} bug${total === 1 ? '' : 's'}`}
+                onChange={updateFilters}
+                onRelatedArtifactSearch={handleRelatedArtifactSearch}
+            />
 
             {/* Table */}
             <div className="glass-card rounded-2xl overflow-hidden">
@@ -243,21 +219,14 @@ function BugsContent() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
                                 <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
-                            ) : filtered.length === 0 ? (
+                            ) : bugs.length === 0 ? (
                                 <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
-                            ) : filtered.map(bug => (
+                            ) : bugs.map(bug => (
                                 <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                                        {bug.tuleap_url ? (
-                                            <a href={bug.tuleap_url} target="_blank" rel="noopener noreferrer"
-                                               className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
-                                            </a>
-                                        ) : (
-                                            <Link href={`/bugs/${bug.tuleap_artifact_id || bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
-                                            </Link>
-                                        )}
+                                        <Link href={`/work/bugs/${bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
+                                        </Link>
                                     </td>
                                     <td className="px-4 py-3">
                                         <p className="font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</p>

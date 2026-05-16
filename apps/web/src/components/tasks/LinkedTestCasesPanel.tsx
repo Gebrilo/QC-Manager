@@ -100,7 +100,7 @@ export function LinkedTestCasesPanel({ taskId }: LinkedTestCasesPanelProps) {
                             >
                                 <div className="min-w-0 flex-1">
                                     <Link
-                                        href={`/test-cases/${link.test_case_id}`}
+                                        href={`/test/cases/${link.test_case_id}`}
                                         className="text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
                                     >
                                         {link.test_case_title}

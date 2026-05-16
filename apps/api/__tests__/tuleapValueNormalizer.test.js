@@ -1,4 +1,4 @@
-const { normalize } = require('../src/services/tuleapValueNormalizer');
+const { normalize } = require('../src/modules/integration/services/tuleapValueNormalizer');
 
 describe('tuleapValueNormalizer.normalize', () => {
   it('extracts a simple value field by name', () => {

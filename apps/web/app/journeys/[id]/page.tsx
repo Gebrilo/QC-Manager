@@ -61,7 +61,7 @@ export default function JourneyDetailPage() {
         return (
             <div className="text-center py-20">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Journey Not Found</h3>
-                <button onClick={() => router.push('/journeys')} className="mt-4 text-indigo-600 hover:text-indigo-500">
+                <button onClick={() => router.push('/me/journeys')} className="mt-4 text-indigo-600 hover:text-indigo-500">
                     Back to Journeys
                 </button>
             </div>
@@ -77,7 +77,7 @@ export default function JourneyDetailPage() {
             {/* Header */}
             <div className="mb-6">
                 <button
-                    onClick={() => router.push('/journeys')}
+                    onClick={() => router.push('/me/journeys')}
                     className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 mb-3 flex items-center gap-1"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

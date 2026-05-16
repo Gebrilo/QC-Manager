@@ -66,7 +66,7 @@ export default function TestSuiteDetailPage() {
         if (!confirm('Are you sure you want to delete this test suite?')) return;
         try {
             await testSuitesApi.delete(id);
-            router.push('/test-suites');
+            router.push('/test/suites');
             router.refresh();
         } catch (err: any) {
             setError(err.message);
@@ -121,7 +121,7 @@ export default function TestSuiteDetailPage() {
         setCloning(true);
         try {
             await testSuitesApi.clone(id, { name });
-            router.push('/test-suites');
+            router.push('/test/suites');
             router.refresh();
         } catch (err: any) {
             alert(err.message || 'Failed to clone suite');
@@ -147,7 +147,7 @@ export default function TestSuiteDetailPage() {
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 p-6 rounded-2xl">
                     <h2 className="text-lg font-semibold mb-2">Error Loading Test Suite</h2>
                     <p>{error}</p>
-                    <Link href="/test-suites"><Button variant="outline" className="mt-4">Back to Test Suites</Button></Link>
+                    <Link href="/test/suites"><Button variant="outline" className="mt-4">Back to Test Suites</Button></Link>
                 </div>
             </div>
         );
@@ -158,7 +158,7 @@ export default function TestSuiteDetailPage() {
             <div className="max-w-3xl mx-auto py-8 px-4">
                 <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Test Suite Not Found</h2>
-                    <Link href="/test-suites"><Button variant="outline">Back to Test Suites</Button></Link>
+                    <Link href="/test/suites"><Button variant="outline">Back to Test Suites</Button></Link>
                 </div>
             </div>
         );
@@ -171,14 +171,14 @@ export default function TestSuiteDetailPage() {
         <div className="max-w-5xl mx-auto py-8 px-4">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <Link href="/test-suites"><Button variant="ghost" size="sm">Back</Button></Link>
+                    <Link href="/test/suites"><Button variant="ghost" size="sm">Back</Button></Link>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{suite.suite_id}</h1>
                 </div>
                 <div className="flex gap-3">
-                    <Link href={`/test-runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
+                    <Link href={`/test/runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
                     <Button variant="outline" onClick={handleLoadAvailableCases}>+ Add Cases</Button>
                     <Button variant="outline" onClick={handleClone} disabled={cloning}>{cloning ? 'Cloning...' : 'Clone'}</Button>
-                    <Link href={`/test-suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
+                    <Link href={`/test/suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
                     <Button variant="destructive" onClick={handleDelete}>Delete</Button>
                 </div>
             </div>
@@ -265,12 +265,12 @@ export default function TestSuiteDetailPage() {
                                     <tr key={tc.junction_id || tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{tc.sort_order || idx + 1}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">
-                                            <Link href={`/test-cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                            <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                 {tc.test_case_id_display || tc.test_case_id}
                                             </Link>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Link href={`/test-cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                            <Link href={`/test/cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
                                                 {tc.title}
                                             </Link>
                                         </td>

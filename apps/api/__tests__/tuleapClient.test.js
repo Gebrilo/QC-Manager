@@ -1,7 +1,7 @@
 const axios = require('axios');
 jest.mock('axios');
 
-const { createTuleapClient } = require('../src/services/tuleapClient');
+const { createTuleapClient } = require('../src/modules/integration/services/tuleapClient');
 
 describe('createTuleapClient', () => {
   let mockInstance;

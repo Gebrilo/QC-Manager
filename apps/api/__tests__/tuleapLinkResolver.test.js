@@ -1,4 +1,4 @@
-const { resolveLinks, drainPending } = require('../src/services/tuleapLinkResolver');
+const { resolveLinks, drainPending } = require('../src/modules/integration/services/tuleapLinkResolver');
 
 describe('tuleapLinkResolver.resolveLinks', () => {
   it('returns empty resolved/pending when no links given', async () => {

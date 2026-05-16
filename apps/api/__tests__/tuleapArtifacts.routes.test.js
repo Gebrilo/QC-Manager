@@ -1,7 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 
-jest.mock('../src/services/tuleapClient', () => ({
+jest.mock('../src/modules/integration/services/tuleapClient', () => ({
   defaultClient: {
     post:   jest.fn(),
     put:    jest.fn(),
@@ -11,7 +11,7 @@ jest.mock('../src/services/tuleapClient', () => ({
   createTuleapClient: jest.fn(),
 }));
 
-jest.mock('../src/services/tuleapFieldRegistry', () => ({
+jest.mock('../src/modules/integration/services/tuleapFieldRegistry', () => ({
   defaultRegistry: {
     getFieldId:       jest.fn().mockResolvedValue(42),
     resolveBindValue: jest.fn().mockResolvedValue({ id: 100 }),
@@ -30,17 +30,17 @@ jest.mock('../src/middleware/authMiddleware', () => ({
 }));
 
 const mockEmitBug = jest.fn();
-jest.mock('../src/services/emitters/bug', () => ({
+jest.mock('../src/modules/integration/services/emitters/bug', () => ({
   emitToTuleap: mockEmitBug,
 }));
 
 const mockEmitTask = jest.fn();
-jest.mock('../src/services/emitters/task', () => ({
+jest.mock('../src/modules/integration/services/emitters/task', () => ({
   emitToTuleap: mockEmitTask,
 }));
 
 const mockEmitUserStory = jest.fn();
-jest.mock('../src/services/emitters/user_story', () => ({
+jest.mock('../src/modules/integration/services/emitters/user_story', () => ({
   emitToTuleap: mockEmitUserStory,
 }));
 
@@ -56,12 +56,12 @@ process.env.TULEAP_TRACKER_TEST_CASE  = '20';
 process.env.TULEAP_TRACKER_TASK       = '5';
 process.env.TULEAP_TRACKER_BUG        = '30';
 
-const { defaultClient }   = require('../src/services/tuleapClient');
-const { defaultRegistry } = require('../src/services/tuleapFieldRegistry');
+const { defaultClient }   = require('../src/modules/integration/services/tuleapClient');
+const { defaultRegistry } = require('../src/modules/integration/services/tuleapFieldRegistry');
 
 const app = express();
 app.use(express.json());
-app.use('/tuleap/artifacts', require('../src/routes/tuleapArtifacts'));
+app.use('/tuleap/artifacts', require('../src/modules/integration/tuleapArtifacts.routes'));
 
 beforeEach(() => {
   jest.clearAllMocks();

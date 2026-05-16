@@ -1,4 +1,4 @@
-const { buildUserStoryPayload, buildTestCasePayload, buildTaskPayload, buildBugPayload } = require('../src/services/tuleapPayloadBuilder');
+const { buildUserStoryPayload, buildTestCasePayload, buildTaskPayload, buildBugPayload } = require('../src/modules/integration/services/tuleapPayloadBuilder');
 
 const makeRegistry = (fields, binds = {}) => ({
   getFieldId: jest.fn(async (trackerId, name) => {
