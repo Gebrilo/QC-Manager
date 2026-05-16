@@ -81,6 +81,18 @@ async function buildTaskTeamFilter(user) {
 router.get('/', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const role = req.user?.role;
+        const relatedType = req.query.related_type || req.query.related_artifact_type;
+        const relatedId = req.query.related_id || req.query.related_artifact_id;
+
+        if (relatedType === 'user_story' && relatedId) {
+            const result = await db.query(
+                `SELECT * FROM v_tasks_with_metrics
+                 WHERE parent_user_story_id = $1
+                 ORDER BY created_at DESC`,
+                [relatedId]
+            );
+            return res.json(result.rows);
+        }
 
         if (role === 'admin') {
             const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);

@@ -51,6 +51,7 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
     try {
         const {
             page = 1, limit = 25, search, project_id, status,
+            related_type, related_artifact_type, related_id, related_artifact_id,
             sort_by = 'created_at', sort_order = 'desc',
         } = req.query;
 
@@ -68,6 +69,18 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
 
         if (project_id) { whereClauses.push(`ts.project_id = $${pn++}`); params.push(project_id); }
         if (status) { whereClauses.push(`ts.status = $${pn++}`); params.push(status); }
+        const relatedType = related_type || related_artifact_type;
+        const relatedId = related_id || related_artifact_id;
+        if (relatedType === 'test_case' && relatedId) {
+            whereClauses.push(`EXISTS (
+                SELECT 1
+                FROM test_suite_cases tsc_rel
+                WHERE tsc_rel.suite_id = ts.id
+                  AND tsc_rel.test_case_id = $${pn++}
+                  AND tsc_rel.snapshot_id IS NULL
+            )`);
+            params.push(relatedId);
+        }
         if (search) {
             whereClauses.push(`(ts.name ILIKE $${pn} OR ts.description ILIKE $${pn} OR ts.suite_id ILIKE $${pn})`);
             params.push(`%${search}%`); pn++;

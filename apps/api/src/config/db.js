@@ -1834,11 +1834,13 @@ const runMigrations = async () => {
                 task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
                 relationship_type VARCHAR(50) NOT NULL DEFAULT 'covers',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
                 created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(task_id, test_case_id)
             )
         `);
+        await client.query(`ALTER TABLE task_test_cases ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'qc'`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_task_id ON task_test_cases(task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_test_case_id ON task_test_cases(test_case_id)`);
         await client.query(`
@@ -1893,13 +1895,60 @@ const runMigrations = async () => {
                 bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
                 task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 relationship_type VARCHAR(50) NOT NULL DEFAULT 'reported_against',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
                 created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(bug_id, task_id)
             )
         `);
+        await client.query(`ALTER TABLE bug_tasks ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'qc'`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_bug_id ON bug_tasks(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_task_id ON bug_tasks(task_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bug_test_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+                test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'reveals',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bug_id, test_case_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_cases_bug_id ON bug_test_cases(bug_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_cases_test_case_id ON bug_test_cases(test_case_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bug_user_stories (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+                user_story_id UUID NOT NULL REFERENCES user_stories(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'affects',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bug_id, user_story_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_user_stories_bug_id ON bug_user_stories(bug_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_user_stories_user_story_id ON bug_user_stories(user_story_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS test_case_user_stories (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                test_case_id UUID NOT NULL REFERENCES test_case(id) ON DELETE CASCADE,
+                user_story_id UUID NOT NULL REFERENCES user_stories(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'verifies',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(test_case_id, user_story_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_test_case_id ON test_case_user_stories(test_case_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_user_story_id ON test_case_user_stories(user_story_id)`);
         await client.query(`
             UPDATE bugs
             SET triage_status = 'triaged'

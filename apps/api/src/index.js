@@ -12,6 +12,7 @@ const { validatePermissionCatalog } = require('./rbac/validatePermissionCatalog'
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const coverageLinks = require('./routes/coverageLinks');
 
 validatePermissionCatalog();
 
@@ -44,10 +45,13 @@ apiRouter.use('/auth', require('./routes/auth'));
 apiRouter.use('/auth/profile', require('./routes/avatar'));
 apiRouter.use('/users', require('./routes/users'));
 apiRouter.use('/notifications', require('./routes/notifications'));
+apiRouter.use('/bugs', coverageLinks.bugSide);
 apiRouter.use('/bugs', require('./routes/bugs'));
 apiRouter.use('/search', require('./routes/search'));
-apiRouter.use('/tasks', require('./routes/taskTestCases'));
-apiRouter.use('/test-cases', require('./routes/testCaseTasks'));
+apiRouter.use('/tasks', coverageLinks.taskSide);
+apiRouter.use('/test-cases', coverageLinks.testCaseSide);
+apiRouter.use('/user-stories', require('./routes/userStories'));
+apiRouter.use('/user-stories', coverageLinks.userStorySide);
 apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
 apiRouter.use('/tuleap/artifacts', require('./routes/tuleapArtifacts'));
 apiRouter.use('/my-tasks', require('./routes/personalTasks'));

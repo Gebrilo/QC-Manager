@@ -93,6 +93,7 @@ export interface Task {
     id: string; // UUID
     task_id: string; // Display ID e.g. TSK-001
     project_id: string;
+    parent_user_story_id?: string;
     task_name: string;
     description?: string;
     status: 'Backlog' | 'In Progress' | 'Done' | 'Cancelled';

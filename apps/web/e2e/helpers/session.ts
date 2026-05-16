@@ -64,6 +64,7 @@ export async function mockAuthenticatedSession(
     await page.addInitScript((values) => {
         window.localStorage.setItem('auth_token', values.token);
         window.localStorage.setItem('sb-placeholder-auth-token', values.session);
+        window.localStorage.setItem('sb-example-auth-token', values.session);
     }, { token, session: supabaseSession });
 
     // Mock both the old production API and new localhost API URLs
@@ -83,7 +84,7 @@ export async function mockAuthenticatedSession(
     });
 
     // Mock Supabase GoTrue auth endpoints
-    await page.route('**/placeholder.supabase.co/**', async (route) => {
+    await page.route(/.*\.(placeholder|example)\.supabase\.co\/.*/, async (route) => {
         const url = route.request().url();
         if (url.includes('/token') || url.includes('/oauth')) {
             await route.fulfill({

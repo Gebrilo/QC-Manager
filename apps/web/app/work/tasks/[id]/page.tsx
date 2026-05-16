@@ -97,6 +97,14 @@ export default function TaskDetailPage() {
                             )}
                             {' '}• {task.project_name || 'No Project'}
                         </p>
+                        {task.parent_user_story_id && (
+                            <Link
+                                href={`/work/stories/${task.parent_user_story_id}`}
+                                className="mt-1 inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                            >
+                                Parent user story
+                            </Link>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -239,7 +247,7 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                     title: row.test_case_title || '(no title)',
                     status: row.test_case_status,
                     href: `/test/cases/${row.test_case_id}`,
-                    source: 'qc',
+                    source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'covers',
                 }));
             },
@@ -252,9 +260,35 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                 await taskTestCaseLinksApi.removeTestCase(taskId, row.artifactId);
             },
         },
-        // TODO: Linked Bugs (reverse of bug_tasks). Needs a backend GET
-        // /tasks/:taskId/bugs endpoint from issue #53. Once present, mirror the
-        // shape above using `bugLinksApi.listBugsForTask` (forthcoming).
+        {
+            title: 'Linked Bugs',
+            emptyLabel: 'No linked bugs yet.',
+            artifactType: 'bug',
+            pickerTitle: 'Link bugs to this task',
+            viewPermission: 'qc.bugs.view',
+            editPermission: 'qc.tasks.edit',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listBugsForTask(taskId);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.bug_id,
+                    displayId: row.bug_display_id || row.bug_id.slice(0, 8),
+                    title: row.bug_title || '(no title)',
+                    status: row.bug_status,
+                    href: `/work/bugs/${row.bug_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'blocks',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addBugToTask(taskId, item.id, 'blocks');
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeBugFromTask(taskId, row.artifactId);
+            },
+        },
     ], [taskId]);
 
     return (

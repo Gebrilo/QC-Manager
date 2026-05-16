@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TestCase, TestCaseExecution, TestCaseActivityEntry } from '@/types';
-import { testCasesApi } from '@/lib/api';
+import { taskTestCaseLinksApi, testCasesApi, testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDistanceToNow, format } from 'date-fns';
-import { LinkedTasksPanel } from '@/components/test-cases/LinkedTasksPanel';
+import {
+    LinkedArtifactsSection,
+    type LinkedArtifactsSectionConfig,
+} from '@/components/shared/LinkedArtifactsSection';
+import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
@@ -199,7 +203,126 @@ export default function TestCaseDetailPage() {
                 )}
             </div>
 
-            <LinkedTasksPanel testCaseId={testCase.id} />
+            <TestCaseLinkedArtifactsSections testCase={testCase} />
+        </div>
+    );
+}
+
+function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
+    const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Linked User Stories',
+            emptyLabel: 'No linked user stories yet.',
+            artifactType: 'user_story',
+            pickerTitle: 'Link user stories to this test case',
+            viewPermission: 'qc.projects.view',
+            editPermission: 'qc.testcases.edit',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listUserStoriesForTestCase(testCase.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.user_story_id,
+                    displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
+                    title: row.user_story_title || '(no title)',
+                    status: row.user_story_status,
+                    href: `/work/stories/${row.user_story_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'verifies',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addUserStoryToTestCase(testCase.id, item.id, 'verifies');
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeUserStoryFromTestCase(testCase.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Tasks',
+            emptyLabel: 'No linked tasks yet.',
+            artifactType: 'task',
+            pickerTitle: 'Link tasks to this test case',
+            viewPermission: 'qc.tasks.view',
+            editPermission: 'qc.testcases.edit',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listTasks(testCase.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.task_id,
+                    displayId: row.task_display_id || row.task_id.slice(0, 8),
+                    title: row.task_title || '(no title)',
+                    status: row.task_status,
+                    href: `/work/tasks/${row.task_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'covers',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addTask(testCase.id, item.id, 'covers');
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeTask(testCase.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Bugs',
+            emptyLabel: 'No linked bugs yet.',
+            artifactType: 'bug',
+            pickerTitle: 'Link bugs to this test case',
+            viewPermission: 'qc.bugs.view',
+            editPermission: 'qc.testcases.edit',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listBugsForTestCase(testCase.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.bug_id,
+                    displayId: row.bug_display_id || row.bug_id.slice(0, 8),
+                    title: row.bug_title || '(no title)',
+                    status: row.bug_status,
+                    href: `/work/bugs/${row.bug_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'reveals',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addBugToTestCase(testCase.id, item.id, 'reveals');
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeBugFromTestCase(testCase.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Containing Test Suites',
+            emptyLabel: 'This test case is not in any suites.',
+            readOnly: true,
+            viewPermission: 'qc.testsuites.view',
+            load: async () => {
+                const response = await testSuitesApi.list({ related_type: 'test_case', related_id: testCase.id, limit: 100 });
+                return response.data.map((suite: any) => ({
+                    id: suite.id,
+                    artifactId: suite.id,
+                    displayId: suite.suite_id || suite.id.slice(0, 8),
+                    title: suite.name || '(no title)',
+                    status: suite.status,
+                    href: `/test/suites/${suite.id}`,
+                    source: 'qc',
+                    meta: suite.test_case_count ? `${suite.test_case_count} cases` : undefined,
+                }));
+            },
+        },
+    ], [testCase.id]);
+
+    return (
+        <div className="mt-6 space-y-4">
+            {sections.map(section => (
+                <LinkedArtifactsSection key={section.title} config={section} projectId={testCase.project_id || null} />
+            ))}
         </div>
     );
 }

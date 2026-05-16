@@ -62,7 +62,7 @@ function BugsContent() {
         if (sourceFilter) params.set('source', sourceFilter);
         if (page > 0) params.set('page', String(page + 1));
         const qs = params.toString();
-        router.replace(`/bugs${qs ? `?${qs}` : ''}`, { scroll: false });
+        router.replace(`/work/bugs${qs ? `?${qs}` : ''}`, { scroll: false });
     }, [projectFilter, statusFilter, severityFilter, sourceFilter, page, router]);
 
     useEffect(() => {
@@ -248,16 +248,9 @@ function BugsContent() {
                             ) : filtered.map(bug => (
                                 <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                                        {bug.tuleap_url ? (
-                                            <a href={bug.tuleap_url} target="_blank" rel="noopener noreferrer"
-                                               className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
-                                            </a>
-                                        ) : (
-                                            <Link href={`/bugs/${bug.tuleap_artifact_id || bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                                {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
-                                            </Link>
-                                        )}
+                                        <Link href={`/work/bugs/${bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
+                                        </Link>
                                     </td>
                                     <td className="px-4 py-3">
                                         <p className="font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</p>

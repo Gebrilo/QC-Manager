@@ -107,6 +107,7 @@ export interface Task {
     status: 'Backlog' | 'In Progress' | 'Done' | 'Cancelled';
     priority?: 'High' | 'Medium' | 'Low';
     project_id: string;
+    parent_user_story_id?: string;
     project_name?: string;
     project_display_id?: string;
     resource1_uuid?: string;
@@ -226,7 +227,16 @@ export const projectsApi = {
 // ============================================================================
 
 export const tasksApi = {
-    list: () => fetchApi<Task[]>('/tasks'),
+    list: (params?: { related_type?: string; related_id?: string; limit?: number }) => {
+        const clean: Record<string, string> = {};
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
+            }
+        }
+        const query = new URLSearchParams(clean).toString();
+        return fetchApi<Task[]>(`/tasks${query ? `?${query}` : ''}`);
+    },
 
     get: (id: string) => fetchApi<Task>(`/tasks/${id}`),
 
@@ -329,6 +339,22 @@ export interface Bug {
     updated_at?: string;
 }
 
+export interface UserStory {
+    id: string;
+    tuleap_artifact_id?: number;
+    title: string;
+    description?: string;
+    acceptance_criteria?: string;
+    status?: string;
+    project_id?: string;
+    project_name?: string;
+    priority?: string;
+    story_points?: number;
+    tuleap_url?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export const bugsApi = {
     list: (params?: { project_id?: string; status?: string; severity?: string; source?: string; limit?: number; offset?: number }) => {
         const clean: Record<string, string> = {};
@@ -354,6 +380,22 @@ export const bugsApi = {
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: Bug }>(`/bugs/${id}`, { method: 'DELETE' }),
+};
+
+export const userStoriesApi = {
+    list: (params?: { page?: number; limit?: number; search?: string; project_id?: string; status?: string; related_type?: string; related_id?: string }) => {
+        const clean: Record<string, string> = {};
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
+            }
+        }
+        const query = new URLSearchParams(clean).toString();
+        return fetchApi<{ data: UserStory[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(`/user-stories${query ? `?${query}` : ''}`);
+    },
+
+    get: (id: string) =>
+        fetchApi<UserStory>(`/user-stories/${id}`),
 };
 
 // ============================================================================
@@ -553,6 +595,8 @@ export const testSuitesApi = {
         search?: string;
         project_id?: string;
         status?: string;
+        related_type?: string;
+        related_id?: string;
         sort_by?: string;
         sort_order?: string;
     }) => {
@@ -1517,7 +1561,7 @@ export interface TuleapSyncConfig {
 
 export const taskTestCaseLinksApi = {
     listTestCases: (taskId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_priority: string }> }>(`/tasks/${taskId}/test-cases`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_priority: string; test_case_project_id: string }> }>(`/tasks/${taskId}/test-cases`),
 
     addTestCase: (taskId: string, testCaseId: string, relationshipType = 'covers') =>
         fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/tasks/${taskId}/test-cases`, {
@@ -1529,7 +1573,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
 
     listTasks: (testCaseId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; created_at: string; task_display_id: string; task_name: string; task_status: string; project_id: string }> }>(`/test-cases/${testCaseId}/tasks`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-cases/${testCaseId}/tasks`),
 
     addTask: (testCaseId: string, taskId: string, relationshipType = 'covers') =>
         fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/tasks`, {
@@ -1539,6 +1583,66 @@ export const taskTestCaseLinksApi = {
 
     removeTask: (testCaseId: string, taskId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/tasks/${taskId}`, { method: 'DELETE' }),
+
+    listBugsForTask: (taskId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/tasks/${taskId}/bugs`),
+
+    addBugToTask: (taskId: string, bugId: string, relationshipType = 'blocks') =>
+        fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/tasks/${taskId}/bugs`, {
+            method: 'POST',
+            body: JSON.stringify({ bug_id: bugId, relationship_type: relationshipType }),
+        }),
+
+    removeBugFromTask: (taskId: string, bugId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/bugs/${bugId}`, { method: 'DELETE' }),
+
+    listBugsForTestCase: (testCaseId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-cases/${testCaseId}/bugs`),
+
+    addBugToTestCase: (testCaseId: string, bugId: string, relationshipType = 'reveals') =>
+        fetchApi<{ data: { id: string; bug_id: string; test_case_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/bugs`, {
+            method: 'POST',
+            body: JSON.stringify({ bug_id: bugId, relationship_type: relationshipType }),
+        }),
+
+    removeBugFromTestCase: (testCaseId: string, bugId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/bugs/${bugId}`, { method: 'DELETE' }),
+
+    listUserStoriesForTestCase: (testCaseId: string) =>
+        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-cases/${testCaseId}/user-stories`),
+
+    addUserStoryToTestCase: (testCaseId: string, userStoryId: string, relationshipType = 'verifies') =>
+        fetchApi<{ data: { id: string; test_case_id: string; user_story_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/user-stories`, {
+            method: 'POST',
+            body: JSON.stringify({ user_story_id: userStoryId, relationship_type: relationshipType }),
+        }),
+
+    removeUserStoryFromTestCase: (testCaseId: string, userStoryId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
+
+    listTestCasesForUserStory: (userStoryId: string) =>
+        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/user-stories/${userStoryId}/test-cases`),
+
+    addTestCaseToUserStory: (userStoryId: string, testCaseId: string, relationshipType = 'verifies') =>
+        fetchApi<{ data: { id: string; test_case_id: string; user_story_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/test-cases`, {
+            method: 'POST',
+            body: JSON.stringify({ test_case_id: testCaseId, relationship_type: relationshipType }),
+        }),
+
+    removeTestCaseFromUserStory: (userStoryId: string, testCaseId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
+
+    listBugsForUserStory: (userStoryId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/user-stories/${userStoryId}/bugs`),
+
+    addBugToUserStory: (userStoryId: string, bugId: string, relationshipType = 'affects') =>
+        fetchApi<{ data: { id: string; bug_id: string; user_story_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/bugs`, {
+            method: 'POST',
+            body: JSON.stringify({ bug_id: bugId, relationship_type: relationshipType }),
+        }),
+
+    removeBugFromUserStory: (userStoryId: string, bugId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/bugs/${bugId}`, { method: 'DELETE' }),
 };
 
 // ============================================================================
@@ -1559,7 +1663,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-executions/${testExecutionId}`, { method: 'DELETE' }),
 
     listTasks: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; created_at: string; task_display_id: string; task_name: string; task_status: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
 
     addTask: (bugId: string, taskId: string, relationshipType = 'reported_against') =>
         fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/bugs/${bugId}/tasks`, {
@@ -1569,6 +1673,30 @@ export const bugLinksApi = {
 
     removeTask: (bugId: string, taskId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/tasks/${taskId}`, { method: 'DELETE' }),
+
+    listTestCases: (bugId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/bugs/${bugId}/test-cases`),
+
+    addTestCase: (bugId: string, testCaseId: string, relationshipType = 'reveals') =>
+        fetchApi<{ data: { id: string; bug_id: string; test_case_id: string; relationship_type: string } }>(`/bugs/${bugId}/test-cases`, {
+            method: 'POST',
+            body: JSON.stringify({ test_case_id: testCaseId, relationship_type: relationshipType }),
+        }),
+
+    removeTestCase: (bugId: string, testCaseId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
+
+    listUserStories: (bugId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/bugs/${bugId}/user-stories`),
+
+    addUserStory: (bugId: string, userStoryId: string, relationshipType = 'affects') =>
+        fetchApi<{ data: { id: string; bug_id: string; user_story_id: string; relationship_type: string } }>(`/bugs/${bugId}/user-stories`, {
+            method: 'POST',
+            body: JSON.stringify({ user_story_id: userStoryId, relationship_type: relationshipType }),
+        }),
+
+    removeUserStory: (bugId: string, userStoryId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
 };
 
 // ============================================================================

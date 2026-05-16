@@ -3,12 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { tuleapApi, type TuleapArtifact, bugLinksApi } from '@/lib/api';
+import { bugsApi, type Bug, bugLinksApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
     LinkedArtifactsSection,
-    type LinkedArtifactRow,
     type LinkedArtifactsSectionConfig,
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
@@ -26,7 +25,7 @@ export default function BugDetailPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
-    const [artifact, setArtifact] = useState<TuleapArtifact | null>(null);
+    const [bug, setBug] = useState<Bug | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -35,8 +34,8 @@ export default function BugDetailPage() {
     useEffect(() => {
         async function load() {
             try {
-                const data = await tuleapApi.get('bug', id);
-                setArtifact(data);
+                const response = await bugsApi.get(id);
+                setBug(response.data);
             } catch (err: any) {
                 setError(err.message || 'Failed to load bug');
             } finally {
@@ -46,7 +45,7 @@ export default function BugDetailPage() {
         if (id) load();
     }, [id]);
 
-    const projectId = (artifact as any)?.project_id as string | undefined;
+    const projectId = bug?.project_id;
 
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
         {
@@ -82,10 +81,10 @@ export default function BugDetailPage() {
                     id: row.id,
                     artifactId: row.task_id,
                     displayId: row.task_display_id || row.task_id.slice(0, 8),
-                    title: row.task_name || '(no title)',
+                    title: row.task_title || '(no title)',
                     status: row.task_status,
-                    href: `/tasks/${row.task_id}`,
-                    source: 'qc',
+                    href: `/work/tasks/${row.task_id}`,
+                    source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'blocks',
                 }));
             },
@@ -98,17 +97,70 @@ export default function BugDetailPage() {
                 await bugLinksApi.removeTask(id, row.artifactId);
             },
         },
-        // TODO: Linked Test Cases and Linked User Stories panels — enable once
-        // the bug_test_cases / bug_user_stories CRUD endpoints from issue #53
-        // are merged. The LinkedArtifactsSection + ArtifactPicker components
-        // here are already wired to plug them in: add `load`/`add`/`remove`
-        // entries against the future bugLinksApi.listTestCases / listUserStories.
+        {
+            title: 'Linked Test Cases',
+            emptyLabel: 'No linked test cases yet.',
+            artifactType: 'test_case',
+            pickerTitle: 'Link test cases to this bug',
+            viewPermission: 'qc.testcases.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listTestCases(id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_case_id,
+                    displayId: row.test_case_display_id || row.test_case_id.slice(0, 8),
+                    title: row.test_case_title || '(no title)',
+                    status: row.test_case_status,
+                    href: `/test/cases/${row.test_case_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'reveals',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await bugLinksApi.addTestCase(id, item.id, 'reveals');
+                }
+            },
+            remove: async (row) => {
+                await bugLinksApi.removeTestCase(id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked User Stories',
+            emptyLabel: 'No linked user stories yet.',
+            artifactType: 'user_story',
+            pickerTitle: 'Link user stories to this bug',
+            viewPermission: 'qc.projects.view',
+            editPermission: 'qc.bugs.edit',
+            load: async () => {
+                const response = await bugLinksApi.listUserStories(id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.user_story_id,
+                    displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
+                    title: row.user_story_title || '(no title)',
+                    status: row.user_story_status,
+                    href: `/work/stories/${row.user_story_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'affects',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[]) => {
+                for (const item of items) {
+                    await bugLinksApi.addUserStory(id, item.id, 'affects');
+                }
+            },
+            remove: async (row) => {
+                await bugLinksApi.removeUserStory(id, row.artifactId);
+            },
+        },
     ], [id]);
 
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await tuleapApi.remove(id);
+            await bugsApi.delete(id);
             router.push('/work/bugs');
             router.refresh();
         } catch (err: any) {
@@ -132,7 +184,7 @@ export default function BugDetailPage() {
         </div>
     );
 
-    if (error && !artifact) return (
+    if (error && !bug) return (
         <div className="max-w-5xl mx-auto py-8 px-4">
             <div className="text-center py-20">
                 <div className="mx-auto w-16 h-16 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mb-4">
@@ -146,10 +198,10 @@ export default function BugDetailPage() {
         </div>
     );
 
-    if (!artifact) return null;
+    if (!bug) return null;
 
-    const title = artifact.title || artifact.summary || `Bug #${id}`;
-    const status = artifact.status || 'New';
+    const title = bug.title || `Bug ${bug.bug_id || id}`;
+    const status = bug.status || 'New';
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
@@ -161,7 +213,7 @@ export default function BugDetailPage() {
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{title}</h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                            Artifact #{id}{artifact.xref ? ` · ${artifact.xref}` : ''}
+                            {bug.bug_id || id}{bug.tuleap_artifact_id ? ` · Tuleap #${bug.tuleap_artifact_id}` : ''}
                         </p>
                     </div>
                 </div>
@@ -169,7 +221,7 @@ export default function BugDetailPage() {
                     <Badge variant={STATUS_VARIANT[status] || 'default'}>
                         {status}
                     </Badge>
-                    <Link href={`/work/bugs/${id}/edit`}>
+                    <Link href={`/work/bugs/${bug.id}/edit`}>
                         <Button variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                             Edit
                         </Button>
@@ -183,7 +235,7 @@ export default function BugDetailPage() {
             <div className="glass-card rounded-2xl p-6">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">Artifact Data</h3>
                 <pre className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl p-4 overflow-auto max-h-[600px]">
-                    {JSON.stringify(artifact, null, 2)}
+                    {JSON.stringify(bug, null, 2)}
                 </pre>
             </div>
 
@@ -205,9 +257,9 @@ export default function BugDetailPage() {
                             <div>
                                 <h3 className="font-semibold text-slate-900 dark:text-white">Delete Bug</h3>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                    Delete artifact <span className="font-mono font-medium">#{id}</span>: {title}?
+                                    Delete bug <span className="font-mono font-medium">{bug.bug_id || id}</span>: {title}?
                                 </p>
-                                <p className="text-xs text-slate-400 mt-2">This will remove the artifact from Tuleap.</p>
+                                <p className="text-xs text-slate-400 mt-2">This removes the bug from QC-Manager only.</p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
