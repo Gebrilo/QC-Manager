@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import Link from 'next/link';
+import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { useTheme } from '@/components/providers/ThemeProvider';
 
 interface TaskTableProps {
@@ -27,6 +28,14 @@ interface TaskTableProps {
         offset: number;
     };
     onPageChange?: (offset: number) => void;
+}
+
+function buildTaskTooltip(task: Task): string {
+    const parts: string[] = [task.task_name];
+    if (task.project_name) parts.push(`Project: ${task.project_name}`);
+    if (task.priority) parts.push(`Priority: ${task.priority}`);
+    if (task.resource1_name) parts.push(`Assignee: ${task.resource1_name}`);
+    return parts.join(' | ');
 }
 
 const columnHelper = createColumnHelper<Task>();
@@ -58,15 +67,22 @@ export function TaskTable({
             columnHelper.accessor('task_name', {
                 id: 'task_name',
                 header: 'Task Name',
+                size: 400,
+                meta: { className: 'whitespace-normal' } as Record<string, string>,
                 cell: (info) => (
-                    <div className="flex flex-col">
-                        <Link href={`/work/tasks/${info.row.original.id}`} className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                            {info.getValue()}
-                        </Link>
-                        {info.row.original.project_name && (
-                            <span className="text-xs text-slate-500 dark:text-slate-500">{info.row.original.project_name}</span>
-                        )}
-                    </div>
+                    <SimpleTooltip content={buildTaskTooltip(info.row.original)} position="top">
+                        <div className="flex flex-col min-w-[280px]">
+                            <Link
+                                href={`/work/tasks/${info.row.original.id}`}
+                                className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-2"
+                            >
+                                {info.getValue()}
+                            </Link>
+                            {info.row.original.project_name && (
+                                <span className="text-xs text-slate-500 dark:text-slate-500">{info.row.original.project_name}</span>
+                            )}
+                        </div>
+                    </SimpleTooltip>
                 ),
             }),
             columnHelper.accessor('project_name', {
@@ -267,7 +283,12 @@ export function TaskTable({
                                     className="group hover:bg-slate-50/80 dark:hover:bg-slate-800/50 even:bg-slate-50/[0.3] dark:even:bg-slate-800/[0.2] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <td key={cell.id} className={`whitespace-nowrap px-6 ${rowPadding} text-sm first:pl-8 last:pr-8 transition-[padding] duration-200`}>
+                                        <td
+                                            key={cell.id}
+                                            className={`px-6 ${rowPadding} text-sm first:pl-8 last:pr-8 transition-[padding] duration-200 ${
+                                                (cell.column.columnDef.meta as { className?: string })?.className ?? 'whitespace-nowrap'
+                                            }`}
+                                        >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
                                     ))}

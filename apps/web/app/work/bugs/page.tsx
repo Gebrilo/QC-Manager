@@ -6,6 +6,16 @@ import Link from 'next/link';
 import { bugsApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { SimpleTooltip } from '@/components/ui/Tooltip';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    flexRender,
+    createColumnHelper,
+    SortingState,
+    VisibilityState,
+} from '@tanstack/react-table';
 
 const SEVERITY_COLORS: Record<string, string> = {
     critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
@@ -22,6 +32,16 @@ const STATUS_COLORS: Record<string, string> = {
     Verified:   'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
     Closed:     'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
 };
+
+const columnHelper = createColumnHelper<Bug>();
+
+function buildBugTooltip(bug: Bug): string {
+    const parts: string[] = [bug.title];
+    if (bug.component) parts.push(`Component: ${bug.component}`);
+    parts.push(`Severity: ${bug.severity}`);
+    parts.push(`Status: ${bug.status}`);
+    return parts.join(' | ');
+}
 
 export default function BugsPage() {
     return (
@@ -53,6 +73,11 @@ function BugsContent() {
     const [deleteTarget, setDeleteTarget] = useState<Bug | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+        submitted_by_resource_name: false,
+        updated_by: false,
+    });
     const PAGE_SIZE = 50;
 
     const updateUrlParams = useCallback(() => {
@@ -135,6 +160,140 @@ function BugsContent() {
             setIsDeleting(false);
         }
     };
+
+    const columns = useMemo(() => [
+        columnHelper.accessor('bug_id', {
+            id: 'bug_id',
+            header: 'ID',
+            cell: (info) => (
+                <Link
+                    href={`/work/bugs/${info.row.original.id}`}
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-mono text-xs"
+                >
+                    {info.row.original.tuleap_artifact_id
+                        ? `TLP-${info.row.original.tuleap_artifact_id}`
+                        : info.getValue()}
+                </Link>
+            ),
+        }),
+        columnHelper.accessor('title', {
+            id: 'title',
+            header: 'Title',
+            size: 400,
+            enableHiding: false,
+            meta: { className: 'whitespace-normal' } as Record<string, string>,
+            cell: (info) => (
+                <SimpleTooltip content={buildBugTooltip(info.row.original)} position="top">
+                    <div className="min-w-[280px]">
+                        <p className="font-medium text-slate-900 dark:text-white line-clamp-2">
+                            {info.getValue()}
+                        </p>
+                        {info.row.original.component && (
+                            <p className="text-xs text-slate-400 mt-0.5">{info.row.original.component}</p>
+                        )}
+                    </div>
+                </SimpleTooltip>
+            ),
+        }),
+        columnHelper.accessor('source', {
+            id: 'source',
+            header: 'Source',
+            cell: (info) => (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    info.getValue() === 'TEST_CASE'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                        : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400'
+                }`}>
+                    {info.getValue() === 'TEST_CASE' ? 'Test Cases' : 'Standalone'}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('severity', {
+            id: 'severity',
+            header: 'Severity',
+            cell: (info) => (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${SEVERITY_COLORS[info.getValue()] || SEVERITY_COLORS.low}`}>
+                    {info.getValue()}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('status', {
+            id: 'status',
+            header: 'Status',
+            cell: (info) => (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[info.getValue()] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    {info.getValue()}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('project_name', {
+            id: 'project_name',
+            header: 'Project',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px] block">
+                    {info.getValue() || '-'}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('submitted_by_resource_name', {
+            id: 'submitted_by_resource_name',
+            header: 'Submitted By',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-xs">{info.getValue() || '-'}</span>
+            ),
+        }),
+        columnHelper.accessor('updated_by', {
+            id: 'updated_by',
+            header: 'Updated By',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px] block">
+                    {info.getValue() || info.row.original.reported_by || '-'}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('assigned_to', {
+            id: 'assigned_to',
+            header: 'Assigned To',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-xs">{info.getValue() || '-'}</span>
+            ),
+        }),
+        columnHelper.accessor('reported_date', {
+            id: 'reported_date',
+            header: 'Reported',
+            cell: (info) => (
+                <span className="text-slate-400 text-xs">
+                    {info.getValue() ? new Date(info.getValue()!).toLocaleDateString() : '-'}
+                </span>
+            ),
+        }),
+        ...(canDelete ? [columnHelper.display({
+            id: 'delete',
+            header: '',
+            enableHiding: false,
+            cell: (info) => (
+                <button
+                    onClick={() => setDeleteTarget(info.row.original)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                    title="Delete bug"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            ),
+        })] : []),
+    ], [canDelete]);
+
+    const table = useReactTable({
+        data: filtered,
+        columns,
+        state: { sorting, columnVisibility },
+        onSortingChange: setSorting,
+        onColumnVisibilityChange: setColumnVisibility,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+    });
 
     return (
         <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
@@ -222,88 +381,86 @@ function BugsContent() {
 
             {/* Table */}
             <div className="glass-card rounded-2xl overflow-hidden">
+                <div className="flex justify-end px-4 pt-3">
+                    <div className="relative group">
+                        <button className="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-30 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 p-2">
+                            <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                                Toggle Columns
+                            </div>
+                            {table.getAllLeafColumns().map(column => {
+                                if (!column.getCanHide()) return null;
+                                return (
+                                    <label
+                                        key={column.id}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={column.getIsVisible()}
+                                            onChange={column.getToggleVisibilityHandler()}
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span>{column.columnDef.header as string || column.id}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">ID</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Title</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Source</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Severity</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-32">Status</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Project</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Submitted By</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Updated By</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-36">Assigned To</th>
-                                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-28">Reported</th>
-                                {canDelete && (
-                                    <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 w-16"></th>
-                                )}
+                                {table.getHeaderGroups()[0].headers.map(header => (
+                                    <th
+                                        key={header.id}
+                                        className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400"
+                                    >
+                                        {header.isPlaceholder ? null : (
+                                            <div
+                                                className={`flex items-center gap-1 ${header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-white' : ''}`}
+                                                onClick={header.column.getToggleSortingHandler()}
+                                            >
+                                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                                {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? null}
+                                            </div>
+                                        )}
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
-                                <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
-                            ) : filtered.length === 0 ? (
-                                <tr><td colSpan={canDelete ? 11 : 10} className="px-4 py-12 text-center text-slate-400">No bugs found.</td></tr>
-                            ) : filtered.map(bug => (
-                                <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                                        <Link href={`/work/bugs/${bug.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                            {bug.tuleap_artifact_id ? `TLP-${bug.tuleap_artifact_id}` : bug.bug_id}
-                                        </Link>
+                                <tr>
+                                    <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-12 text-center text-slate-400">
+                                        Loading...
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <p className="font-medium text-slate-900 dark:text-white line-clamp-1">{bug.title}</p>
-                                        {bug.component && <p className="text-xs text-slate-400 mt-0.5">{bug.component}</p>}
+                                </tr>
+                            ) : table.getRowModel().rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-12 text-center text-slate-400">
+                                        No bugs found.
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                            bug.source === 'TEST_CASE'
-                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
-                                                : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400'
-                                        }`}>
-                                            {bug.source === 'TEST_CASE' ? 'Test Cases' : 'Standalone'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${SEVERITY_COLORS[bug.severity] || SEVERITY_COLORS.low}`}>
-                                            {bug.severity}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[bug.status] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                                            {bug.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
-                                        {bug.project_name || '\u2014'}
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                                        {bug.submitted_by_resource_name || '\u2014'}
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
-                                        {bug.updated_by || bug.reported_by || '\u2014'}
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                                        {bug.assigned_to || '\u2014'}
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-400 text-xs">
-                                        {bug.reported_date ? new Date(bug.reported_date).toLocaleDateString() : '\u2014'}
-                                    </td>
-                                    {canDelete && (
-                                        <td className="px-4 py-3">
-                                            <button
-                                                onClick={() => setDeleteTarget(bug)}
-                                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                                                title="Delete bug"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                                </tr>
+                            ) : table.getRowModel().rows.map(row => (
+                                <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                    {row.getVisibleCells().map(cell => (
+                                        <td
+                                            key={cell.id}
+                                            className={`px-4 py-3 ${
+                                                (cell.column.columnDef.meta as { className?: string })?.className ?? 'whitespace-nowrap'
+                                            }`}
+                                        >
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
-                                    )}
+                                    ))}
                                 </tr>
                             ))}
                         </tbody>
