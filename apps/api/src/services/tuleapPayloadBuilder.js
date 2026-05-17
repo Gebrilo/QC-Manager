@@ -1,3 +1,14 @@
+const SEVERITY_TO_TULEAP = {
+  low: 'Cosmetic impact',
+  medium: 'Minor impact',
+  high: 'Major impact',
+  critical: 'Critical impact',
+};
+
+function toTuleapSeverity(severity) {
+  return SEVERITY_TO_TULEAP[severity?.toLowerCase()] || severity;
+}
+
 function required(value, name) {
   if (value === undefined || value === null || value === '') {
     throw new Error(`'${name}' is required`);
@@ -125,7 +136,7 @@ async function buildBugPayload(input, registry) {
   // assigned_to is sb — label is Tuleap username
   if (input.assignedTo) await push('assigned_to', { bind_value_ids: [(await registry.resolveBindValue(t, 'assigned_to', input.assignedTo)).id] });
   // severity labels: 'Cosmetic impact' | 'Minor impact' | 'Major impact' | 'Critical impact'
-  if (input.severity) await push('severity', { bind_value_ids: [(await registry.resolveBindValue(t, 'severity', input.severity)).id] });
+  if (input.severity) await push('severity', { bind_value_ids: [(await registry.resolveBindValue(t, 'severity', toTuleapSeverity(input.severity))).id] });
   if (input.initialEffort != null) await push('initial_effort', { value: Number(input.initialEffort) });
   if (input.remainingEffort != null) await push('remaining_effort', { value: Number(input.remainingEffort) });
   if (input.testCaseArtifactId) {
