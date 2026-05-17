@@ -87,7 +87,7 @@ export default function EditTestSuitePage() {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             <div className="flex items-center gap-4 mb-6">
-                <Link href={`/test-suites/${id}`}><Button variant="ghost" size="sm">Back</Button></Link>
+                <Link href={`/test/suites/${id}`}><Button variant="ghost" size="sm">Back</Button></Link>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Edit Suite: {suite?.suite_id}</h1>
             </div>
 

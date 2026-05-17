@@ -107,7 +107,7 @@ export default function UserStoryDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href={`/user-stories/${story.tuleap_artifact_id || story.id}/edit`}>
+                    <Link href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}>
                         <Button variant="outline">Edit</Button>
                     </Link>
                     <Button

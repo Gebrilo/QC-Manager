@@ -243,7 +243,7 @@ export default function TestRunDetailPage() {
                 <span>Started: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.started_at), { addSuffix: true })}</strong></span>
                 {run.completed_at && <span>Completed: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.completed_at), { addSuffix: true })}</strong></span>}
                 {run.suite_id && (
-                    <span>Suite: <Link href={`/test-suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
+                    <span>Suite: <Link href={`/test/suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
                 )}
             </div>
 

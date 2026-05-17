@@ -175,10 +175,10 @@ export default function TestSuiteDetailPage() {
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{suite.suite_id}</h1>
                 </div>
                 <div className="flex gap-3">
-                    <Link href={`/test-runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
+                    <Link href={`/test/runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
                     <Button variant="outline" onClick={handleLoadAvailableCases}>+ Add Cases</Button>
                     <Button variant="outline" onClick={handleClone} disabled={cloning}>{cloning ? 'Cloning...' : 'Clone'}</Button>
-                    <Link href={`/test-suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
+                    <Link href={`/test/suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
                     <Button variant="destructive" onClick={handleDelete}>Delete</Button>
                 </div>
             </div>

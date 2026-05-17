@@ -132,12 +132,12 @@ export default function TestSuitesPage() {
                                     {suites.map((suite) => (
                                         <tr key={suite.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                <Link href={`/test-suites/${suite.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                <Link href={`/test/suites/${suite.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                     {suite.suite_id}
                                                 </Link>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <Link href={`/test-suites/${suite.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                                <Link href={`/test/suites/${suite.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
                                                     {suite.name}
                                                 </Link>
                                                 {suite.description && (
@@ -160,8 +160,8 @@ export default function TestSuitesPage() {
                                                 {formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                                <Link href={`/test-suites/${suite.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
-                                                <Link href={`/test-suites/${suite.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
+                                                <Link href={`/test/suites/${suite.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
+                                                <Link href={`/test/suites/${suite.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
                                             </td>
                                         </tr>
                                     ))}

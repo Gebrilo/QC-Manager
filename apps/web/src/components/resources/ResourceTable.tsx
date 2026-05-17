@@ -150,7 +150,7 @@ export function ResourceTable({
                     <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                         {canViewDashboard && (
                             <Link
-                                href={`/resources/${info.row.original.id}`}
+                                href={`/team/resources/${info.row.original.id}`}
                                 className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors border border-indigo-200 dark:border-indigo-800"
                             >
                                 Dashboard

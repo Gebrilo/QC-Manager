@@ -342,7 +342,7 @@ export default function UploadTestResultsPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Link href={`/test-results?project_id=${selectedProjectId}`} className="flex-1">
+              <Link href={`/test/results?project_id=${selectedProjectId}`} className="flex-1">
                 <Button className="w-full">View Test Results</Button>
               </Link>
               <Link href={`/work/projects/${selectedProjectId}`} className="flex-1">

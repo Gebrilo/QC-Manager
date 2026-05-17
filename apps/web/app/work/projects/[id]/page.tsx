@@ -215,7 +215,7 @@ export default function ProjectDetailPage() {
             <div className="glass-card rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">User Stories</h3>
-                    <Link href={`/user-stories/create?projectId=${project.id}`}>
+                    <Link href={`/work/stories/create?projectId=${project.id}`}>
                         <Button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm px-4 py-2 rounded-xl">+ Create User Story</Button>
                     </Link>
                 </div>
@@ -237,7 +237,7 @@ export default function ProjectDetailPage() {
                             {userStories.map(story => (
                                 <tr key={story.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                     <td className="py-2 px-3">
-                                        <Link href={`/user-stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
+                                        <Link href={`/work/stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
                                             {story.xref || story.id}
                                         </Link>
                                     </td>
@@ -248,8 +248,8 @@ export default function ProjectDetailPage() {
                                         </span>
                                     </td>
                                     <td className="py-2 px-3 text-right">
-                                        <Link href={`/user-stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs mr-3">View</Link>
-                                        <Link href={`/user-stories/${story.id}/edit`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">Edit</Link>
+                                        <Link href={`/work/stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs mr-3">View</Link>
+                                        <Link href={`/work/stories/${story.id}/edit`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">Edit</Link>
                                     </td>
                                 </tr>
                             ))}
