@@ -47,7 +47,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const tuleapResources = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
 
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(testCaseSchema) as any,
@@ -205,18 +205,27 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                     placeholder="e.g. Login Module"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
-                <Select
-                    label="Assigned To"
-                    options={[
-                        { value: '', label: '— Unassigned —' },
-                        ...tuleapResources.map(r => ({
-                            value: r.tuleap_username,
-                            label: `${r.resource_name} (${r.tuleap_username})`,
-                        })),
-                    ]}
-                    {...register('assigned_to')}
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                />
+                <div>
+                    <Select
+                        label="Assigned To"
+                        options={[
+                            { value: '', label: '— Unassigned —' },
+                            ...tuleapResources.map(r => ({
+                                value: r.tuleap_username,
+                                label: `${r.resource_name} (${r.tuleap_username})`,
+                            })),
+                        ]}
+                        {...register('assigned_to')}
+                        className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    />
+                    {tuleapLoaded && tuleapResources.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                            No Tuleap-mapped resources found. Go to{' '}
+                            <a href="/team/resources" className="underline font-medium">Team → Resources</a>{' '}
+                            and set a Tuleap Username on each resource.
+                        </p>
+                    )}
+                </div>
                 <Input
                     label="Est. Duration (minutes)"
                     type="number"

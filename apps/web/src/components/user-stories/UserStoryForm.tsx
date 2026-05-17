@@ -44,7 +44,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
-    const tuleapResources = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
@@ -162,18 +162,27 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
                     error={errors.priority?.message}
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
-                <Select
-                    label="Assigned To"
-                    options={[
-                        { value: '', label: '— Unassigned —' },
-                        ...tuleapResources.map(r => ({
-                            value: r.tuleap_username,
-                            label: `${r.resource_name} (${r.tuleap_username})`,
-                        })),
-                    ]}
-                    {...register('assigned_to')}
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                />
+                <div>
+                    <Select
+                        label="Assigned To"
+                        options={[
+                            { value: '', label: '— Unassigned —' },
+                            ...tuleapResources.map(r => ({
+                                value: r.tuleap_username,
+                                label: `${r.resource_name} (${r.tuleap_username})`,
+                            })),
+                        ]}
+                        {...register('assigned_to')}
+                        className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    />
+                    {tuleapLoaded && tuleapResources.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                            No Tuleap-mapped resources found. Go to{' '}
+                            <a href="/team/resources" className="underline font-medium">Team → Resources</a>{' '}
+                            and set a Tuleap Username on each resource.
+                        </p>
+                    )}
+                </div>
             </FormSection>
 
             <FormSection title="Description">

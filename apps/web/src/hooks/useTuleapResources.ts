@@ -8,8 +8,14 @@ export interface TuleapResource {
     tuleap_username: string;
 }
 
-export function useTuleapResources() {
+export interface UseTuleapResourcesResult {
+    resources: TuleapResource[];
+    loaded: boolean;
+}
+
+export function useTuleapResources(): UseTuleapResourcesResult {
     const [resources, setResources] = useState<TuleapResource[]>([]);
+    const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
         resourcesApi.list()
@@ -24,8 +30,9 @@ export function useTuleapResources() {
                         }))
                 );
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => setLoaded(true));
     }, []);
 
-    return resources;
+    return { resources, loaded };
 }
