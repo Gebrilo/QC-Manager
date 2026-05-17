@@ -115,7 +115,10 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: i
                 router.push(`/work/bugs/${bugUUID || artifactId}`);
             } else {
                 const result = await tuleapApi.createUnified(payload);
-                router.push(`/work/bugs/${result.tuleap_artifact_id}`);
+                if (result.tuleap_warning) {
+                    console.warn('Tuleap sync skipped:', result.tuleap_warning);
+                }
+                router.push(`/work/bugs/${result.qc_id || result.tuleap_artifact_id}`);
             }
             router.refresh();
         } catch (err: any) {

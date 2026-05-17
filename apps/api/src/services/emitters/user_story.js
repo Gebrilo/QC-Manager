@@ -117,8 +117,9 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     const newTuleapUrl = `${baseUrl}/plugins/tracker/?aid=${artifact.id}`;
     console.log(`[emit:user_story] tuleap_create_ok artifact_id=${artifact.id} project=${config.qc_project_id}`);
 
+    let persistResult;
     try {
-      await dispatchAction(
+      persistResult = await dispatchAction(
         {
           ...unified,
           action: 'sync',
@@ -135,6 +136,7 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     return {
       tuleap_artifact_id: artifact.id,
       tuleap_url: newTuleapUrl,
+      qc_id: persistResult?.id || null,
       artifact_type: 'user_story',
       xref: artifact.xref || null,
     };
