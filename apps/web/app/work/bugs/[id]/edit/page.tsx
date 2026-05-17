@@ -2,21 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { tuleapApi, type TuleapArtifact } from '@/lib/api';
+import { bugsApi, type Bug } from '@/lib/api';
 import { BugForm } from '@/components/bugs/BugForm';
 
 export default function EditBugPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
-    const [artifact, setArtifact] = useState<TuleapArtifact | null>(null);
+    const [bug, setBug] = useState<Bug | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         async function load() {
             try {
-                const data = await tuleapApi.get('bug', id);
-                setArtifact(data);
+                const response = await bugsApi.get(id);
+                setBug(response.data);
             } catch (err: any) {
                 setError(err.message || 'Failed to load bug');
             } finally {
@@ -41,10 +41,35 @@ export default function EditBugPage() {
         </div>
     );
 
+    if (!bug) return null;
+
+    const initialData = {
+        title: bug.title || '',
+        steps_to_reproduce: bug.description || '',
+        status: bug.status || 'New',
+        assigned_to: bug.assigned_to || '',
+        severity: bug.severity || 'medium',
+        service_name: bug.service_name || '',
+        environment: bug.environment || 'DEV',
+        description: '',
+        cc: '',
+        dev_fix_description: '',
+        qc_verification_notes: '',
+        close_date: '',
+    };
+
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Edit Bug #{id}</h1>
-            {artifact && <BugForm initialData={artifact as Record<string, unknown>} isEdit artifactId={id} />}
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+                Edit Bug {bug.bug_id || `#${id.slice(0, 8)}`}
+            </h1>
+            <BugForm
+                initialData={initialData}
+                isEdit
+                artifactId={bug.tuleap_artifact_id ? String(bug.tuleap_artifact_id) : undefined}
+                bugUUID={id}
+                projectId={bug.project_id}
+            />
         </div>
     );
 }

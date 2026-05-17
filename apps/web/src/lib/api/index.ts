@@ -318,6 +318,7 @@ export interface Bug {
     id: string;
     bug_id: string;
     tuleap_artifact_id?: number;
+    tuleap_tracker_id?: number;
     title: string;
     description?: string;
     status: string;
@@ -325,6 +326,8 @@ export interface Bug {
     priority: string;
     bug_type?: string;
     component?: string;
+    environment?: string;
+    service_name?: string;
     project_id?: string;
     project_name?: string;
     reported_by?: string;
@@ -335,6 +338,7 @@ export interface Bug {
     has_test_link?: boolean;
     source?: 'TEST_CASE' | 'EXPLORATORY';
     submitted_by_resource_name?: string;
+    last_sync_at?: string;
     created_at?: string;
     updated_at?: string;
 }

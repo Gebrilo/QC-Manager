@@ -232,11 +232,52 @@ export default function BugDetailPage() {
                 </div>
             </div>
 
-            <div className="glass-card rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">Artifact Data</h3>
-                <pre className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl p-4 overflow-auto max-h-[600px]">
-                    {JSON.stringify(bug, null, 2)}
-                </pre>
+            <div className="glass-card rounded-2xl p-6 space-y-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">Bug Details</h3>
+
+                {bug.description && (
+                    <div>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Description / Steps to Reproduce</p>
+                        <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{bug.description}</p>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+                    {[
+                        { label: 'Severity', value: bug.severity },
+                        { label: 'Priority', value: bug.priority },
+                        { label: 'Source', value: bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory' },
+                        { label: 'Environment', value: bug.environment },
+                        { label: 'Service', value: bug.service_name },
+                        { label: 'Component', value: bug.component },
+                        { label: 'Type', value: bug.bug_type },
+                        { label: 'Assigned To', value: bug.assigned_to },
+                        { label: 'Reported By', value: bug.reported_by },
+                        { label: 'Updated By', value: bug.updated_by },
+                        { label: 'Project', value: bug.project_name },
+                        { label: 'Reported', value: bug.reported_date ? new Date(bug.reported_date).toLocaleDateString() : undefined },
+                        { label: 'Created', value: bug.created_at ? new Date(bug.created_at).toLocaleDateString() : undefined },
+                        { label: 'Last Updated', value: bug.updated_at ? new Date(bug.updated_at).toLocaleDateString() : undefined },
+                        { label: 'Last Sync', value: bug.last_sync_at ? new Date(bug.last_sync_at).toLocaleString() : undefined },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                        <div key={label}>
+                            <p className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-0.5">{label}</p>
+                            <p className="text-sm text-slate-800 dark:text-slate-200 capitalize">{value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {bug.tuleap_artifact_id && (
+                    <div className="flex items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Tuleap #{bug.tuleap_artifact_id}</span>
+                        {bug.tuleap_url && (
+                            <a href={bug.tuleap_url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                View in Tuleap ↗
+                            </a>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4">

@@ -15,11 +15,12 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    Open:        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    'In Progress':'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-    Resolved:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    Closed:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    Reopened:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    New:        'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+    Open:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    Assigned:   'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    Fixed:      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    Verified:   'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+    Closed:     'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
 };
 
 export default function BugsPage() {
@@ -186,7 +187,7 @@ function BugsContent() {
                     className="py-2 px-3 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                     <option value="">All Statuses</option>
-                    {['Open','In Progress','Resolved','Closed','Reopened'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['New','Open','Assigned','Fixed','Verified','Closed'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
 
                 <select
@@ -271,7 +272,7 @@ function BugsContent() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[bug.status] || STATUS_COLORS.Open}`}>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[bug.status] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                                             {bug.status}
                                         </span>
                                     </td>

@@ -37,10 +37,11 @@ interface BugFormProps {
     initialData?: Record<string, unknown>;
     isEdit?: boolean;
     artifactId?: string;
+    bugUUID?: string;
     projectId?: string;
 }
 
-export function BugForm({ initialData, isEdit, artifactId, projectId }: BugFormProps) {
+export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }: BugFormProps) {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -99,7 +100,7 @@ export function BugForm({ initialData, isEdit, artifactId, projectId }: BugFormP
 
             if (isEdit && artifactId) {
                 await tuleapApi.updateUnified(artifactId, payload);
-                router.push(`/work/bugs/${artifactId}`);
+                router.push(`/work/bugs/${bugUUID || artifactId}`);
             } else {
                 const result = await tuleapApi.createUnified(payload);
                 router.push(`/work/bugs/${result.tuleap_artifact_id}`);
