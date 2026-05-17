@@ -1,11 +1,13 @@
-import { DashboardMetrics, TeamApi, TeamSummaryApi } from '@/lib/api';
+import { DashboardMetrics, TeamApi, TeamSummaryApi, type Task } from '@/lib/api';
 import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
+import { ResourceUtilizationChart } from '@/components/dashboard/ResourceUtilizationChart';
 
 interface Props {
     metrics: DashboardMetrics;
     team: TeamApi;
     summary: TeamSummaryApi;
+    tasks: Task[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -15,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
     ARCHIVED: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
 };
 
-export function ManagerDashboardView({ metrics, team, summary }: Props) {
+export function ManagerDashboardView({ metrics, team, summary, tasks }: Props) {
     const completionPct = Number(metrics.overall_completion_rate_pct ?? 0);
     const members = team.members ?? [];
     const projects = team.projects ?? [];
@@ -117,6 +119,9 @@ export function ManagerDashboardView({ metrics, team, summary }: Props) {
                     )}
                 </div>
             </div>
+
+            {/* Resource Utilization */}
+            <ResourceUtilizationChart tasks={tasks} />
 
             {/* Hours summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

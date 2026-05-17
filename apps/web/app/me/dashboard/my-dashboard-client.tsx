@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
     meDashboardApi, MeDashboard, myJourneysApi, fetchApi, type AssignedJourney,
-    dashboardApi, DashboardMetrics, teamsApi, TeamApi, TeamSummaryApi,
+    dashboardApi, DashboardMetrics, teamsApi, TeamApi, TeamSummaryApi, tasksApi, type Task,
 } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { MyStatCards } from '@/components/my-dashboard/MyStatCards';
@@ -38,6 +38,7 @@ export function MyDashboardClient() {
     const [teams, setTeams] = useState<TeamApi[]>([]);
     const [myTeam, setMyTeam] = useState<TeamApi | null>(null);
     const [summary, setSummary] = useState<TeamSummaryApi | null>(null);
+    const [tasks, setTasks] = useState<Task[]>([]);
 
     // Personal state
     const [data, setData] = useState<MeDashboard | null>(null);
@@ -54,23 +55,27 @@ export function MyDashboardClient() {
             setError(null);
 
             if (isAdmin) {
-                const [m, teamList, sum] = await Promise.all([
+                const [m, teamList, sum, taskList] = await Promise.all([
                     dashboardApi.getMetrics(),
                     teamsApi.list(),
                     teamsApi.getSummary(),
+                    tasksApi.list().catch(() => [] as Task[]),
                 ]);
                 setMetrics(m);
                 setTeams(teamList);
                 setSummary(sum);
+                setTasks(taskList);
             } else if (isManager) {
-                const [m, team, sum] = await Promise.all([
+                const [m, team, sum, taskList] = await Promise.all([
                     dashboardApi.getMetrics(),
                     teamsApi.getMine(),
                     teamsApi.getSummary(),
+                    tasksApi.list().catch(() => [] as Task[]),
                 ]);
                 setMetrics(m);
                 setMyTeam(team);
                 setSummary(sum);
+                setTasks(taskList);
             } else {
                 const [result, meData, journeyData, personalTasksData] = await Promise.all([
                     meDashboardApi.get(),
@@ -122,12 +127,12 @@ export function MyDashboardClient() {
 
     // Admin: org-wide view
     if (isAdmin && metrics && summary) {
-        return <AdminDashboardView metrics={metrics} teams={teams} summary={summary} />;
+        return <AdminDashboardView metrics={metrics} teams={teams} summary={summary} tasks={tasks} />;
     }
 
     // Manager: team view
     if (isManager && metrics && myTeam && summary) {
-        return <ManagerDashboardView metrics={metrics} team={myTeam} summary={summary} />;
+        return <ManagerDashboardView metrics={metrics} team={myTeam} summary={summary} tasks={tasks} />;
     }
 
     // User: personal view

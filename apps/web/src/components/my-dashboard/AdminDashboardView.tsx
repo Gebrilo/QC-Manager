@@ -1,14 +1,16 @@
-import { DashboardMetrics, TeamApi, TeamSummaryApi } from '@/lib/api';
+import { DashboardMetrics, TeamApi, TeamSummaryApi, type Task } from '@/lib/api';
 import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
+import { ResourceUtilizationChart } from '@/components/dashboard/ResourceUtilizationChart';
 
 interface Props {
     metrics: DashboardMetrics;
     teams: TeamApi[];
     summary: TeamSummaryApi;
+    tasks: Task[];
 }
 
-export function AdminDashboardView({ metrics, teams, summary }: Props) {
+export function AdminDashboardView({ metrics, teams, summary, tasks }: Props) {
     const completionPct = Number(metrics.overall_completion_rate_pct ?? 0);
 
     return (
@@ -74,6 +76,9 @@ export function AdminDashboardView({ metrics, teams, summary }: Props) {
                     </p>
                 </div>
             </div>
+
+            {/* Resource Utilization */}
+            <ResourceUtilizationChart tasks={tasks} />
 
             {/* Teams table */}
             <div className="glass-card rounded-2xl p-6">
