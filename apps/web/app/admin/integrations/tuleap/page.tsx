@@ -95,6 +95,8 @@ export default function TuleapSettingsPage() {
     const [savingFieldMap, setSavingFieldMap] = useState(false);
     const [savingStatusMap, setSavingStatusMap] = useState(false);
     const [savingValueMaps, setSavingValueMaps] = useState(false);
+    const [trackerSchemas, setTrackerSchemas] = useState<Record<string, Array<{ field_id: number; name: string; label: string; type: string; values: Array<{ id: number; label: string }> }>>>({});
+    const [fetchingSchema, setFetchingSchema] = useState<string | null>(null);
 
     // Unconfigured trackers
     const [unconfigured, setUnconfigured] = useState<{ tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[]>([]);
@@ -368,16 +370,22 @@ export default function TuleapSettingsPage() {
 
     // ── Auto-detect fields ────────────────────────────────────────────────────
     const handleDiscover = async (config: TuleapSyncConfig) => {
+        setFetchingSchema(config.id);
         try {
             const res = await tuleapConfigApi.discover(config.tuleap_tracker_id);
             if (res.suggested_mappings && Object.keys(res.suggested_mappings).length > 0) {
                 setFieldMapEdits((prev) => ({ ...prev, ...res.suggested_mappings }));
                 showSuccessMsg(`Discovered ${Object.keys(res.suggested_mappings).length} field suggestions`);
             } else {
-                showSuccessMsg('No field suggestions found');
+                showSuccessMsg('Tracker schema fetched — no auto-suggestions found');
+            }
+            if (res.fields && res.fields.length > 0) {
+                setTrackerSchemas(prev => ({ ...prev, [config.id]: res.fields }));
             }
         } catch (err: any) {
             showErrorMsg(err.message);
+        } finally {
+            setFetchingSchema(null);
         }
     };
 
@@ -809,8 +817,9 @@ export default function TuleapSettingsPage() {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => handleDiscover(config)}
+                                                            disabled={fetchingSchema === config?.id}
                                                         >
-                                                            Auto-Detect
+                                                            {fetchingSchema === config?.id ? 'Fetching…' : 'Fetch from Tuleap'}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -835,12 +844,26 @@ export default function TuleapSettingsPage() {
                                                                 onChange={(e) => updateFieldMapKey(key, e.target.value)}
                                                                 className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
                                                             />
-                                                            <input
-                                                                type="text"
-                                                                value={value}
-                                                                onChange={(e) => updateFieldMapValue(key, e.target.value)}
-                                                                className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                            />
+                                                            {trackerSchemas[config?.id]?.length > 0 ? (
+                                                                <select
+                                                                    value={value}
+                                                                    onChange={(e) => updateFieldMapValue(key, e.target.value)}
+                                                                    className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
+                                                                >
+                                                                    <option value="">Select Tuleap field…</option>
+                                                                    {trackerSchemas[config.id].map(f => (
+                                                                        <option key={f.name} value={f.name}>{f.label} ({f.name})</option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                <input
+                                                                    type="text"
+                                                                    value={value}
+                                                                    onChange={(e) => updateFieldMapValue(key, e.target.value)}
+                                                                    className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
+                                                                    placeholder="Tuleap field name"
+                                                                />
+                                                            )}
                                                             <button
                                                                 onClick={() => removeFieldMapRow(key)}
                                                                 className="text-rose-400 hover:text-rose-300 px-1"
@@ -913,12 +936,33 @@ export default function TuleapSettingsPage() {
                                                     </div>
                                                     {Object.entries(statusMapEdits).map(([key, value]) => (
                                                         <div key={key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={key}
-                                                                onChange={(e) => updateStatusMapKey(key, e.target.value)}
-                                                                className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                            />
+                                                            {(() => {
+                                                                const statusField = trackerSchemas[config?.id]?.find(
+                                                                    f => f.name === 'status' || f.label?.toLowerCase() === 'status'
+                                                                );
+                                                                return (statusField?.values?.length ?? 0) > 0 ? (
+                                                                    <select
+                                                                        value={key}
+                                                                        onChange={(e) => {
+                                                                            const newKey = e.target.value;
+                                                                            if (newKey !== key) updateStatusMapKey(key, newKey);
+                                                                        }}
+                                                                        className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
+                                                                    >
+                                                                        <option value={key}>{key || 'Select Tuleap status…'}</option>
+                                                                        {statusField!.values.map(v => (
+                                                                            <option key={v.id} value={v.label}>{v.label}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={key}
+                                                                        onChange={(e) => updateStatusMapKey(key, e.target.value)}
+                                                                        className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
+                                                                    />
+                                                                );
+                                                            })()}
                                                             <select
                                                                 value={value}
                                                                 onChange={(e) => updateStatusMapValue(key, e.target.value)}
@@ -1009,16 +1053,34 @@ export default function TuleapSettingsPage() {
                                                         <div className="space-y-1 ml-2">
                                                             {Object.entries(mapping).map(([tuleapVal, qcVal], idx) => (
                                                                 <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={tuleapVal}
-                                                                        onChange={(e) => {
-                                                                            const oldKey = tuleapVal;
-                                                                            updateValueMapEntry(field, oldKey, e.target.value, qcVal);
-                                                                        }}
-                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                        placeholder="Tuleap value"
-                                                                    />
+                                                                    {(() => {
+                                                                        const fieldDef = trackerSchemas[config?.id]?.find(f => f.name === field);
+                                                                        return (fieldDef?.values?.length ?? 0) > 0 ? (
+                                                                            <select
+                                                                                value={tuleapVal}
+                                                                                onChange={(e) => {
+                                                                                    updateValueMapEntry(field, tuleapVal, e.target.value, qcVal);
+                                                                                }}
+                                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
+                                                                            >
+                                                                                <option value={tuleapVal}>{tuleapVal || 'Select…'}</option>
+                                                                                {fieldDef!.values.map(v => (
+                                                                                    <option key={v.id} value={v.label}>{v.label}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        ) : (
+                                                                            <input
+                                                                                type="text"
+                                                                                value={tuleapVal}
+                                                                                onChange={(e) => {
+                                                                                    const oldKey = tuleapVal;
+                                                                                    updateValueMapEntry(field, oldKey, e.target.value, qcVal);
+                                                                                }}
+                                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
+                                                                                placeholder="Tuleap value"
+                                                                            />
+                                                                        );
+                                                                    })()}
                                                                     <input
                                                                         type="text"
                                                                         value={qcVal}
