@@ -265,12 +265,12 @@ export default function TestSuiteDetailPage() {
                                     <tr key={tc.junction_id || tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{tc.sort_order || idx + 1}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">
-                                            <Link href={`/test-cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                            <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                 {tc.test_case_id_display || tc.test_case_id}
                                             </Link>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Link href={`/test-cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                            <Link href={`/test/cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
                                                 {tc.title}
                                             </Link>
                                         </td>

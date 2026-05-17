@@ -60,7 +60,7 @@ export function TaskTable({
                 header: 'Task Name',
                 cell: (info) => (
                     <div className="flex flex-col">
-                        <Link href={`/tasks/${info.row.original.id}`} className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                        <Link href={`/work/tasks/${info.row.original.id}`} className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                             {info.getValue()}
                         </Link>
                         {info.row.original.project_name && (
@@ -138,7 +138,7 @@ export function TaskTable({
                 cell: (info) => {
                     return (
                         <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Link href={`/tasks/${info.row.original.id}/edit`}>
+                            <Link href={`/work/tasks/${info.row.original.id}/edit`}>
                                 <Button size="sm" variant="ghost" className="h-8 text-xs hover:bg-white dark:hover:bg-slate-700">Edit</Button>
                             </Link>
                         </div>

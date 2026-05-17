@@ -236,7 +236,7 @@ export default function ProjectsPage() {
                         const variant = statusVariants[project.computedStatus] || 'notasks';
 
                         return (
-                            <Link key={project.id} href={`/projects/${project.id}`}>
+                            <Link key={project.id} href={`/work/projects/${project.id}`}>
                                 <Card hover className="group transition-all duration-300">
                                     {/* Header: Logo + Name */}
                                     <div className="flex items-start gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">

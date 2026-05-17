@@ -211,7 +211,7 @@ export default function TestCasesPage() {
                                     {testCases.map((tc) => (
                                         <tr key={tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                <Link href={`/test-cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                     {tc.test_case_id}
                                                 </Link>
                                             </td>
@@ -247,8 +247,8 @@ export default function TestCasesPage() {
                                                 {tc.latest_execution_date ? formatDistanceToNow(new Date(tc.latest_execution_date), { addSuffix: true }) : 'Never'}
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                                <Link href={`/test-cases/${tc.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
-                                                <Link href={`/test-cases/${tc.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
+                                                <Link href={`/test/cases/${tc.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
+                                                <Link href={`/test/cases/${tc.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
                                             </td>
                                         </tr>
                                     ))}

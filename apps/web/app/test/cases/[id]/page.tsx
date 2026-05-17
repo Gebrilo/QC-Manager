@@ -88,7 +88,7 @@ export default function TestCaseDetailPage() {
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{testCase.test_case_id}</h1>
                 </div>
                 <div className="flex gap-3">
-                    <Link href={`/test-cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
+                    <Link href={`/test/cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
                     <Button variant="destructive" onClick={handleDelete}>Delete</Button>
                 </div>
             </div>

@@ -55,7 +55,7 @@ export default function EditTestCasePage() {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             <div className="flex items-center gap-4 mb-6">
-                <Link href={`/test-cases/${id}`}><Button variant="ghost" size="sm">Cancel</Button></Link>
+                <Link href={`/test/cases/${id}`}><Button variant="ghost" size="sm">Cancel</Button></Link>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
                     Edit Test Case <span className="text-gray-500 font-normal">{testCase.test_case_id}</span>
                 </h1>

@@ -531,7 +531,7 @@ export default function ResourceDashboardPage() {
                                     return (
                                         <tr key={task.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                             <td className="px-4 py-3">
-                                                <Link href={`/tasks/${task.id}`} className="block text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate">
+                                                <Link href={`/work/tasks/${task.id}`} className="block text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate">
                                                     <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{task.task_id}</span>
                                                     {task.task_name}
                                                 </Link>

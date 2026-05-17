@@ -345,7 +345,7 @@ export default function UploadTestResultsPage() {
               <Link href={`/test-results?project_id=${selectedProjectId}`} className="flex-1">
                 <Button className="w-full">View Test Results</Button>
               </Link>
-              <Link href={`/projects/${selectedProjectId}`} className="flex-1">
+              <Link href={`/work/projects/${selectedProjectId}`} className="flex-1">
                 <Button variant="secondary" className="w-full">View Project</Button>
               </Link>
               <Button variant="secondary" onClick={handleReset}>
