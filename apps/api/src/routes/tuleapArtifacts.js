@@ -246,7 +246,39 @@ async function handleBugCreate(req, res) {
   }
 
   if (!config) {
-    return res.status(400).json({ error: `No active bug config for project ${pid}` });
+    try {
+      const bugData = (artifact_type && common) ? common : {
+        title: req.body.summary || req.body.bugTitle || req.body.title,
+        description: req.body.description || '',
+        status: req.body.status || 'New',
+        assigned_to: req.body.assignedTo || null,
+        priority: req.body.priority || 'medium',
+      };
+      const bugFields = (artifact_type && fields) ? fields : {
+        severity: req.body.severity || 'medium',
+        environment: req.body.environment || null,
+        service_name: req.body.serviceName || req.body.service_name || null,
+      };
+      const bugId = `BUG-${Date.now().toString(36).toUpperCase()}`;
+      const result = await db.pool.query(
+        `INSERT INTO bugs (bug_id, project_id, title, description, status, severity,
+                           priority, environment, service_name, assigned_to, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'EXPLORATORY') RETURNING id`,
+        [bugId, pid, bugData.title, bugData.description || null, bugData.status || 'New',
+         bugFields.severity || 'medium', bugData.priority || 'medium',
+         bugFields.environment || null, bugFields.service_name || null,
+         bugData.assigned_to || null]
+      );
+      return res.status(201).json({
+        qc_id: result.rows[0].id,
+        tuleap_artifact_id: null,
+        tuleap_url: null,
+        artifact_type: 'bug',
+        tuleap_warning: `No active Tuleap sync config for this project. Bug saved locally only.`,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `Failed to save bug locally: ${err.message}` });
+    }
   }
 
   let unified;
@@ -302,7 +334,35 @@ async function handleUserStoryCreate(req, res) {
     return res.status(500).json({ error: `DB error resolving user_story config: ${err.message}` });
   }
   if (!config) {
-    return res.status(400).json({ error: `No active user_story config for project ${pid}` });
+    try {
+      const usData = (artifact_type && common) ? common : {
+        title: req.body.summary || req.body.title,
+        description: req.body.description || req.body.overviewDescription || '',
+        status: req.body.status || 'Draft',
+        priority: req.body.priority || 'P3-Medium',
+      };
+      const usFields = (artifact_type && fields) ? fields : {
+        acceptance_criteria: req.body.acceptanceCriteria || req.body.acceptance_criteria || null,
+        requirement_version: req.body.requirementVersion || req.body.requirement_version || '1',
+      };
+      const result = await db.pool.query(
+        `INSERT INTO user_stories (title, description, status, priority,
+                                    acceptance_criteria, requirement_version, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [usData.title, usData.description || null, usData.status || 'Draft',
+         usData.priority || 'P3-Medium', usFields.acceptance_criteria || null,
+         usFields.requirement_version || '1', pid]
+      );
+      return res.status(201).json({
+        qc_id: result.rows[0].id,
+        tuleap_artifact_id: null,
+        tuleap_url: null,
+        artifact_type: 'user_story',
+        tuleap_warning: `No active Tuleap sync config for this project. User story saved locally only.`,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `Failed to save user story locally: ${err.message}` });
+    }
   }
 
   let unified;
