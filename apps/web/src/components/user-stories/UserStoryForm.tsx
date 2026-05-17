@@ -13,6 +13,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
+import { useTuleapResources } from '@/hooks/useTuleapResources';
 
 const userStorySchema = z.object({
     title: z.string().min(1, 'Summary is required'),
@@ -43,6 +44,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
+    const tuleapResources = useTuleapResources();
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
@@ -158,6 +160,18 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
                     ]}
                     {...register('priority')}
                     error={errors.priority?.message}
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Select
+                    label="Assigned To"
+                    options={[
+                        { value: '', label: '— Unassigned —' },
+                        ...tuleapResources.map(r => ({
+                            value: r.tuleap_username,
+                            label: `${r.resource_name} (${r.tuleap_username})`,
+                        })),
+                    ]}
+                    {...register('assigned_to')}
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
             </FormSection>
