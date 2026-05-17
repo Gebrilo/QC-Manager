@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi } from '@/lib/api';
+import { stripHtml } from '@/lib/stripHtml';
 
 const bugSchema = z.object({
     title: z.string().min(1, 'Bug title is required'),
@@ -49,9 +50,9 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }:
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(bugSchema) as any,
         defaultValues: {
-            title: (initialData?.title as string) || (initialData?.bugTitle as string) || '',
-            description: (initialData?.description as string) || '',
-            steps_to_reproduce: (initialData?.steps_to_reproduce as string) || (initialData?.stepsToReproduce as string) || '',
+            title: stripHtml((initialData?.title as string) || (initialData?.bugTitle as string)),
+            description: stripHtml(initialData?.description as string),
+            steps_to_reproduce: stripHtml((initialData?.steps_to_reproduce as string) || (initialData?.stepsToReproduce as string)),
             status: (initialData?.status as any) || 'New',
             assigned_to: (initialData?.assigned_to as string) || '',
             severity: (initialData?.severity as any) || 'medium',
@@ -59,8 +60,8 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }:
             service_name: (initialData?.service_name as string) || (initialData?.serviceName as string) || '',
             environment: (initialData?.environment as any) || 'DEV',
             cc: Array.isArray(initialData?.cc) ? (initialData.cc as string[]).join(', ') : ((initialData?.cc as string) || ''),
-            dev_fix_description: (initialData?.dev_fix_description as string) || '',
-            qc_verification_notes: (initialData?.qc_verification_notes as string) || '',
+            dev_fix_description: stripHtml(initialData?.dev_fix_description as string),
+            qc_verification_notes: stripHtml(initialData?.qc_verification_notes as string),
             initial_effort: initialData?.initial_effort != null ? Number(initialData.initial_effort) : null,
             remaining_effort: initialData?.remaining_effort != null ? Number(initialData.remaining_effort) : null,
             linked_test_case_ids: Array.isArray(initialData?.linked_test_case_ids)

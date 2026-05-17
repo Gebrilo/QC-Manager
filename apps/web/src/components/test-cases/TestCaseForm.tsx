@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { testCasesApi } from '@/lib/api';
+import { stripHtml } from '@/lib/stripHtml';
 
 const testCaseSchema = z.object({
     title: z.string().min(3, 'Title must be at least 3 characters').max(500),
@@ -49,11 +50,11 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(testCaseSchema) as any,
         defaultValues: {
-            title: (initialData?.title as string) || '',
-            description: (initialData?.description as string) || '',
-            preconditions: (initialData?.preconditions as string) || '',
-            test_steps: (initialData?.test_steps as string) || '',
-            expected_result: (initialData?.expected_result as string) || '',
+            title: stripHtml(initialData?.title as string),
+            description: stripHtml(initialData?.description as string),
+            preconditions: stripHtml(initialData?.preconditions as string),
+            test_steps: stripHtml(initialData?.test_steps as string),
+            expected_result: stripHtml(initialData?.expected_result as string),
             priority: ((initialData?.priority as string) || 'medium') as FormData['priority'],
             severity: ((initialData?.severity as string) || 'normal') as FormData['severity'],
             test_type: ((initialData?.test_type as string) || 'functional') as FormData['test_type'],

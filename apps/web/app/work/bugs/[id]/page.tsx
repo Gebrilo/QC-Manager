@@ -11,10 +11,7 @@ import {
     type LinkedArtifactsSectionConfig,
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
-
-function stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
-}
+import { stripHtml } from '@/lib/stripHtml';
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',

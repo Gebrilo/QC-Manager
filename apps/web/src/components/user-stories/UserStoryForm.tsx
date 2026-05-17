@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi } from '@/lib/api';
+import { stripHtml } from '@/lib/stripHtml';
 
 const userStorySchema = z.object({
     title: z.string().min(1, 'Summary is required'),
@@ -44,10 +45,10 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId }: Us
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(userStorySchema) as any,
         defaultValues: {
-            title: (initialData?.title as string) || (initialData?.story_title as string) || (initialData?.summary as string) || '',
-            description: (initialData?.description as string) || (initialData?.overview_description as string) || '',
-            acceptance_criteria: (initialData?.acceptance_criteria as string) || '',
-            change_reason: (initialData?.change_reason as string) || '',
+            title: stripHtml((initialData?.title as string) || (initialData?.story_title as string) || (initialData?.summary as string)),
+            description: stripHtml((initialData?.description as string) || (initialData?.overview_description as string)),
+            acceptance_criteria: stripHtml(initialData?.acceptance_criteria as string),
+            change_reason: stripHtml(initialData?.change_reason as string),
             status: (initialData?.status as any) || 'Draft',
             priority: (initialData?.priority as any) || 'P3-Medium',
             requirement_version: (initialData?.requirement_version as string) || '1',
