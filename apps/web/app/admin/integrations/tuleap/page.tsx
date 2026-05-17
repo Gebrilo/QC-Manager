@@ -44,7 +44,12 @@ const TRACKER_COLORS: Record<TrackerType, string> = {
     test_case: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
 };
 
-const QC_STATUSES = ['Backlog', 'In Progress', 'Done', 'Cancelled'];
+const QC_STATUSES_BY_TYPE: Record<TrackerType, string[]> = {
+    bug:        ['open', 'in_progress', 'resolved', 'closed'],
+    task:       ['Backlog', 'In Progress', 'Done', 'Cancelled'],
+    user_story: ['Backlog', 'In Progress', 'Done', 'Cancelled'],
+    test_case:  ['draft', 'active', 'deprecated', 'archived'],
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page
@@ -920,7 +925,7 @@ export default function TuleapSettingsPage() {
                                                                 className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
                                                             >
                                                                 <option value="">Select status...</option>
-                                                                {QC_STATUSES.map((s) => (
+                                                                {QC_STATUSES_BY_TYPE[t].map((s) => (
                                                                     <option key={s} value={s}>{s}</option>
                                                                 ))}
                                                             </select>

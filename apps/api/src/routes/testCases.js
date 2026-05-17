@@ -118,11 +118,8 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
         const validatedData = testCaseCreateSchema.parse(req.body);
         await client.query('BEGIN');
 
-        const idResult = await client.query(
-            `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id
-             FROM test_case WHERE test_case_id ~ '^TC-[0-9]+$'`);
-        const nextId = idResult.rows[0].next_id;
-        const testCaseId = `TC-${String(nextId).padStart(5, '0')}`;
+        const idResult = await client.query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
+        const testCaseId = idResult.rows[0].next_id;
 
         const result = await client.query(
             `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
@@ -257,9 +254,8 @@ router.post('/bulk-import', requireAuth, requirePermission('qc.testcases.create'
                     results.duplicates.push({ row: i + 1, title: validatedData.title, existing_id: duplicateCheck.rows[0].test_case_id });
                     continue;
                 }
-                const idResult = await client.query(
-                    `SELECT COALESCE(MAX(CAST(SUBSTRING(test_case_id FROM 4) AS INTEGER)), 0) + 1 AS next_id FROM test_case WHERE test_case_id ~ '^TC-[0-9]+$'`);
-                const testCaseId = `TC-${String(idResult.rows[0].next_id).padStart(5, '0')}`;
+                const idResult = await client.query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
+                const testCaseId = idResult.rows[0].next_id;
 
                 const result = await client.query(
                     `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,

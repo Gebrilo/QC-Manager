@@ -2,12 +2,22 @@ const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
 
 const VALID_TEST_CASE_ACTIONS = new Set(['sync', 'delete']);
 
+const VALID_TEST_CASE_STATUSES = new Set(['draft', 'active', 'deprecated', 'archived']);
+
 async function generateTestCaseId(query) {
-  const result = await query(
-    "SELECT test_case_id FROM test_case WHERE test_case_id LIKE 'TC-%' ORDER BY test_case_id DESC LIMIT 1"
-  );
-  const lastId = result.rows.length > 0 ? parseInt(result.rows[0].test_case_id.replace('TC-', ''), 10) : 0;
-  return `TC-${String(lastId + 1).padStart(3, '0')}`;
+  const result = await query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
+  return result.rows[0].next_id;
+}
+
+function normalizeTestCaseStatus(status) {
+  if (!status) return 'draft';
+  if (VALID_TEST_CASE_STATUSES.has(status)) return status;
+  const lower = status.toLowerCase().trim();
+  if (['backlog', 'to do', 'todo', 'new', 'open'].includes(lower)) return 'draft';
+  if (['in progress', 'running', 'wip'].includes(lower)) return 'active';
+  if (['done', 'closed', 'resolved', 'passed', 'complete', 'completed', 'fail', 'failed'].includes(lower)) return 'deprecated';
+  if (['cancelled', 'canceled', 'rejected'].includes(lower)) return 'archived';
+  return 'draft';
 }
 
 async function dispatchAction(unified, config, deps) {
@@ -76,7 +86,7 @@ async function handleSync(unified, config, { query }) {
       UPDATE test_case SET
         title = COALESCE($1, title),
         description = COALESCE($2, description),
-        status = COALESCE($3, status),
+        status = COALESCE($3::text, status),
         priority = COALESCE($4, priority),
         tuleap_url = COALESCE($5, tuleap_url),
         last_tuleap_sync = NOW(),
@@ -86,7 +96,7 @@ async function handleSync(unified, config, { query }) {
     `, [
       common.title || null,
       common.description || null,
-      common.status || null,
+      common.status ? normalizeTestCaseStatus(common.status) : null,
       common.priority || null,
       tuleapUrl,
       existing.rows[0].id,
@@ -113,7 +123,7 @@ async function handleSync(unified, config, { query }) {
         updated_at = NOW()
       WHERE id = $6
       RETURNING *
-    `, [common.title || '', common.description || null, common.status || 'active', common.priority || 'medium', tuleapUrl, deleted.rows[0].id]);
+    `, [common.title || '', common.description || null, normalizeTestCaseStatus(common.status), common.priority || 'medium', tuleapUrl, deleted.rows[0].id]);
 
     if (resolved.length > 0) {
       await drainPending({
@@ -141,7 +151,7 @@ async function handleSync(unified, config, { query }) {
     test_case_id,
     common.title || '',
     common.description || null,
-    common.status || 'active',
+    normalizeTestCaseStatus(common.status),
     common.priority || 'medium',
     projectId,
     tuleapArtifactId,
