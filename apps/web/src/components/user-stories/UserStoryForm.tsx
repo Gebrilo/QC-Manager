@@ -119,7 +119,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
                         label="Project *"
                         options={[
                             { value: '', label: 'Select a project...' },
-                            ...projects.map(p => ({ value: p.project_id, label: p.project_name })),
+                            ...projects.map(p => ({ value: p.id, label: `${p.project_name} (${p.project_id})` })),
                         ]}
                         value={selectedProjectId}
                         onChange={e => setSelectedProjectId(e.target.value)}

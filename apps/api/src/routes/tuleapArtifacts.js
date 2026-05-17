@@ -177,11 +177,16 @@ async function handleTaskCreate(req, res) {
     return res.status(400).json({ error: 'project_id is required' });
   }
 
-  const configResult = await db.pool.query(
-    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
-    [pid]
-  );
-  const config = configResult.rows[0];
+  let config;
+  try {
+    const configResult = await db.pool.query(
+      `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
+      [pid]
+    );
+    config = configResult.rows[0];
+  } catch (err) {
+    return res.status(500).json({ error: `DB error resolving task config: ${err.message}` });
+  }
   if (!config) {
     return res.status(400).json({ error: `No active task config for project ${pid}` });
   }
@@ -228,11 +233,18 @@ async function handleBugCreate(req, res) {
   }
 
   const pid = project_id || req.body.project_id;
-  const configResult = await db.pool.query(
-    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
-    [pid]
-  );
-  const config = configResult.rows[0];
+
+  let config;
+  try {
+    const configResult = await db.pool.query(
+      `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
+      [pid]
+    );
+    config = configResult.rows[0];
+  } catch (err) {
+    return res.status(500).json({ error: `DB error resolving bug config: ${err.message}` });
+  }
+
   if (!config) {
     return res.status(400).json({ error: `No active bug config for project ${pid}` });
   }
@@ -279,11 +291,16 @@ async function handleUserStoryCreate(req, res) {
     return res.status(400).json({ error: 'project_id is required' });
   }
 
-  const configResult = await db.pool.query(
-    `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,
-    [pid]
-  );
-  const config = configResult.rows[0];
+  let config;
+  try {
+    const configResult = await db.pool.query(
+      `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,
+      [pid]
+    );
+    config = configResult.rows[0];
+  } catch (err) {
+    return res.status(500).json({ error: `DB error resolving user_story config: ${err.message}` });
+  }
   if (!config) {
     return res.status(400).json({ error: `No active user_story config for project ${pid}` });
   }
