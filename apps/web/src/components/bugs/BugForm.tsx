@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
-import { tuleapApi } from '@/lib/api';
+import { tuleapApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 
 const bugSchema = z.object({
@@ -42,10 +42,16 @@ interface BugFormProps {
     projectId?: string;
 }
 
-export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }: BugFormProps) {
+export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: initialProjectId }: BugFormProps) {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
+
+    useEffect(() => {
+        projectsApi.list().then(setProjects).catch(() => {});
+    }, []);
 
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(bugSchema) as any,
@@ -74,9 +80,14 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }:
         setIsSubmitting(true);
         setError(null);
         try {
+            if (!selectedProjectId) {
+                setError('Please select a project before creating a bug.');
+                setIsSubmitting(false);
+                return;
+            }
             const payload = {
                 artifact_type: 'bug' as const,
-                project_id: projectId,
+                project_id: selectedProjectId,
                 common: {
                     title: data.title,
                     description: data.description || undefined,
@@ -119,6 +130,19 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId }:
             <ErrorBanner message={error} />
 
             <FormSection title="General">
+                <div className="md:col-span-2">
+                    <Select
+                        label="Project *"
+                        options={[
+                            { value: '', label: 'Select a project...' },
+                            ...projects.map(p => ({ value: p.project_id, label: p.project_name })),
+                        ]}
+                        value={selectedProjectId}
+                        onChange={e => setSelectedProjectId(e.target.value)}
+                        disabled={isEdit}
+                        className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    />
+                </div>
                 <Select
                     label="Status"
                     options={[
