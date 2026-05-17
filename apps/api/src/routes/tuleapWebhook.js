@@ -8,6 +8,8 @@ const router = express.Router();
 const crypto = require('crypto');
 const db = require('../config/db');
 const pool = db.pool;
+const { defaultClient } = require('../services/tuleapClient');
+const { requireAuth } = require('../middleware/authMiddleware');
 
 function findDuplicateValues(obj) {
     if (!obj || typeof obj !== 'object') return [];
@@ -905,6 +907,26 @@ router.post('/reconcile-deletes', async (req, res) => {
             error: 'Failed to reconcile deletes',
             message: error.message,
         });
+    }
+});
+
+router.get('/users', requireAuth, async (req, res) => {
+    try {
+        const { query = '', limit = 100 } = req.query;
+        const params = { limit: Number(limit) };
+        if (query) params.query = JSON.stringify({ username: query });
+        const response = await defaultClient.get('/users', { params });
+        const raw = Array.isArray(response.data)
+            ? response.data
+            : (response.data?.collection || []);
+        return res.json(raw.map(u => ({
+            id: u.id,
+            username: u.username || u.login_name || '',
+            display_name: u.display_name || u.real_name || u.username || '',
+            email: u.email || null,
+        })));
+    } catch (err) {
+        return res.status(err.status || 502).json({ error: err.message });
     }
 });
 

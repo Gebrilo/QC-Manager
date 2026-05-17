@@ -261,7 +261,68 @@ router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, 
         await auditLog('tasks', task.id, 'CREATE', task, null);
         triggerWorkflow('task-created', task);
 
-        res.status(201).json(task);
+        let tuleapWarning = null;
+
+        if (data.project_id) {
+            try {
+                const configResult = await db.query(
+                    `SELECT * FROM tuleap_sync_config
+                     WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true
+                     LIMIT 1`,
+                    [data.project_id]
+                );
+                const config = configResult.rows[0];
+
+                if (config) {
+                    let tuleapAssignedTo = null;
+                    if (data.resource1_uuid) {
+                        const resourceRes = await db.query(
+                            `SELECT tuleap_username FROM resources WHERE id = $1`,
+                            [data.resource1_uuid]
+                        );
+                        tuleapAssignedTo = resourceRes.rows[0]?.tuleap_username || null;
+                    }
+
+                    const unified = {
+                        artifact_type: 'task',
+                        project_id: data.project_id,
+                        common: {
+                            title: data.task_name,
+                            description: data.notes || null,
+                            status: data.status,
+                            assigned_to: tuleapAssignedTo,
+                        },
+                        fields: {},
+                    };
+
+                    const emitResult = await emitTask(unified, config, 'create', {
+                        client: defaultClient,
+                        registry: defaultRegistry,
+                        query: db.query.bind(db),
+                        skipPersist: true,
+                    });
+
+                    if (emitResult?.tuleap_artifact_id) {
+                        const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+                        await db.query(
+                            `UPDATE tasks SET tuleap_artifact_id = $1, tuleap_url = $2 WHERE id = $3`,
+                            [emitResult.tuleap_artifact_id, `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}`, task.id]
+                        );
+                        task.tuleap_artifact_id = emitResult.tuleap_artifact_id;
+                    }
+                } else {
+                    tuleapWarning = 'No active Tuleap sync config for this project. Task saved locally only.';
+                }
+            } catch (tuleapErr) {
+                console.warn(`[tasks] tuleap_push_failed task_id=${task.id} err="${tuleapErr.message}"`);
+                tuleapWarning = `Tuleap sync failed: ${tuleapErr.message}`;
+            }
+        }
+
+        res.status(201).json({
+            ...task,
+            ...(tuleapWarning ? { tuleap_warning: tuleapWarning } : {}),
+        });
     } catch (err) {
         next(err);
     }

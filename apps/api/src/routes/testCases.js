@@ -4,7 +4,6 @@ const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
-const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
@@ -147,7 +146,78 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
 
         await client.query('COMMIT');
         const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [result.rows[0].id]);
-        res.status(201).json(fullResult.rows[0]);
+        const testCase = fullResult.rows[0];
+
+        let tuleapWarning = null;
+        const projectId = validatedData.project_id;
+
+        if (projectId) {
+            try {
+                const configResult = await pool.query(
+                    `SELECT * FROM tuleap_sync_config
+                     WHERE qc_project_id = $1 AND tracker_type = 'test_case' AND is_active = true
+                     LIMIT 1`,
+                    [projectId]
+                );
+                const config = configResult.rows[0];
+
+                if (config) {
+                    const trackerId = config.tuleap_tracker_id;
+                    const valueMap = config.value_map || {};
+
+                    const values = [];
+
+                    const titleField = await defaultRegistry.getField(trackerId, 'title', 'string');
+                    if (titleField) {
+                        values.push({ field_id: titleField.field_id, value: validatedData.title });
+                    }
+
+                    const descField = await defaultRegistry.getField(trackerId, 'description', 'text');
+                    if (descField) {
+                        values.push({ field_id: descField.field_id, value: validatedData.description || '' });
+                    }
+
+                    const statusField = await defaultRegistry.getField(trackerId, 'status', 'sb');
+                    if (statusField) {
+                        const statusValue = valueMap.status?.[validatedData.status] || validatedData.status;
+                        const bindValue = await defaultRegistry.resolveBindValue(trackerId, 'status', statusValue);
+                        if (bindValue) {
+                            values.push({ field_id: statusField.field_id, bind_value_ids: [bindValue.id] });
+                        }
+                    }
+
+                    const priorityField = await defaultRegistry.getField(trackerId, 'priority', 'sb');
+                    if (priorityField) {
+                        const priorityValue = valueMap.priority?.[validatedData.priority] || validatedData.priority;
+                        const bindValue = await defaultRegistry.resolveBindValue(trackerId, 'priority', priorityValue);
+                        if (bindValue) {
+                            values.push({ field_id: priorityField.field_id, bind_value_ids: [bindValue.id] });
+                        }
+                    }
+
+                    const payload = { tracker: { id: trackerId }, values };
+                    const response = await defaultClient.post('/artifacts', payload);
+                    const artifact = response.data;
+
+                    if (artifact?.id) {
+                        const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+                        await pool.query(
+                            `UPDATE test_case SET tuleap_artifact_id = $1, tuleap_url = $2, sync_status = 'synced' WHERE id = $3`,
+                            [artifact.id, `${baseUrl}/plugins/tracker/?aid=${artifact.id}`, testCase.id]
+                        );
+                        testCase.tuleap_artifact_id = artifact.id;
+                        testCase.sync_status = 'synced';
+                    }
+                } else {
+                    tuleapWarning = 'No active Tuleap sync config for this project. Test case saved locally only.';
+                }
+            } catch (tuleapErr) {
+                console.warn(`[testCases] tuleap_push_failed id=${testCase.id} err="${tuleapErr.message}"`);
+                tuleapWarning = `Tuleap sync failed: ${tuleapErr.message}`;
+            }
+        }
+
+        res.status(201).json({ ...testCase, ...(tuleapWarning ? { tuleap_warning: tuleapWarning } : {}) });
     } catch (error) {
         await client.query('ROLLBACK');
         if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: error.errors });

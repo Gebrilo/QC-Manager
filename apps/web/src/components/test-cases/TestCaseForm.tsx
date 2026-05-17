@@ -13,6 +13,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { testCasesApi } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
+import { useTuleapResources } from '@/hooks/useTuleapResources';
 
 const testCaseSchema = z.object({
     title: z.string().min(3, 'Title must be at least 3 characters').max(500),
@@ -46,6 +47,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const tuleapResources = useTuleapResources();
 
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(testCaseSchema) as any,
@@ -203,10 +205,16 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                     placeholder="e.g. Login Module"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
-                <Input
-                    label="Assigned To (User ID)"
+                <Select
+                    label="Assigned To"
+                    options={[
+                        { value: '', label: '— Unassigned —' },
+                        ...tuleapResources.map(r => ({
+                            value: r.tuleap_username,
+                            label: `${r.resource_name} (${r.tuleap_username})`,
+                        })),
+                    ]}
                     {...register('assigned_to')}
-                    placeholder="UUID"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
                 <Input

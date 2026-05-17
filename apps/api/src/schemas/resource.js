@@ -7,7 +7,8 @@ const createResourceSchema = z.object({
     email: z.string().email().optional().nullable(),
     department: z.string().max(100).optional(),
     role: z.string().max(100).optional(),
-    is_active: z.boolean().default(true)
+    is_active: z.boolean().default(true),
+    tuleap_username: z.string().max(100).optional().nullable()
 });
 
 const updateResourceSchema = createResourceSchema.partial();

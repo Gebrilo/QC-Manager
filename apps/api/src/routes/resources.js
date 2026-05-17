@@ -18,7 +18,7 @@ router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), require
     try {
         if (req.user.role !== 'manager') {
             const result = await db.query(
-                `SELECT * FROM v_resources_with_utilization ORDER BY resource_name ASC`
+                `SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v JOIN resources r ON r.id = v.id ORDER BY v.resource_name ASC`
             );
             return res.json(result.rows);
         }
@@ -28,7 +28,8 @@ router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), require
         if (!teamId) return res.json([]);
 
         const result = await db.query(`
-            SELECT v.* FROM v_resources_with_utilization v
+            SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v
+            JOIN resources r ON r.id = v.id
             JOIN app_user u ON u.id = v.user_id
             WHERE u.team_id = $1
             ORDER BY v.resource_name ASC
@@ -44,7 +45,7 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
 
         // 1. Profile + utilization from view
         const profileResult = await db.query(`
-            SELECT * FROM v_resources_with_utilization WHERE id = $1
+            SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v JOIN resources r ON r.id = v.id WHERE v.id = $1
         `, [id]);
 
         if (profileResult.rows.length === 0) {
@@ -191,9 +192,10 @@ router.get('/:id', requireAuth, requirePermission('qc.resources.view'), async (r
     try {
         const { id } = req.params;
         const result = await db.query(`
-            SELECT * 
-            FROM v_resources_with_utilization 
-            WHERE id = $1
+            SELECT v.*, r.tuleap_username 
+            FROM v_resources_with_utilization v
+            JOIN resources r ON r.id = v.id
+            WHERE v.id = $1
         `, [id]);
 
         if (result.rows.length === 0) {
@@ -316,7 +318,7 @@ router.post('/', requireAuth, requirePermission('qc.resources.create'), async (r
 
         // Return with utilization metrics from view
         const viewResult = await db.query(`
-            SELECT * FROM v_resources_with_utilization WHERE id = $1
+            SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v JOIN resources r ON r.id = v.id WHERE v.id = $1
         `, [resource.id]);
 
         res.status(201).json(viewResult.rows[0]);
@@ -367,6 +369,10 @@ router.patch('/:id', requireAuth, requirePermission('qc.resources.edit'), async 
             fields.push(`is_active = $${idx++}`);
             values.push(data.is_active);
         }
+        if (data.tuleap_username !== undefined) {
+            fields.push(`tuleap_username = $${idx++}`);
+            values.push(data.tuleap_username || null);
+        }
 
         if (fields.length === 0) {
             return res.json(original);
@@ -387,7 +393,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.resources.edit'), async 
 
         // Return with utilization metrics from view
         const viewResult = await db.query(`
-            SELECT * FROM v_resources_with_utilization WHERE id = $1
+            SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v JOIN resources r ON r.id = v.id WHERE v.id = $1
         `, [id]);
 
         res.json(viewResult.rows[0]);

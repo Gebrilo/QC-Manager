@@ -144,6 +144,7 @@ export interface Resource {
     email?: string;
     department?: string;
     role?: string;
+    tuleap_username?: string | null;
     current_allocation_hrs?: number;
     utilization_pct?: number;
     available_hrs?: number;
@@ -1520,7 +1521,7 @@ export const tuleapApi = {
     get: async (type: string, id: string | number) =>
         fetchApi<TuleapArtifact>(`/tuleap/artifacts/${type}/${id}`),
     create: async (type: string, data: Record<string, unknown>) =>
-        fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; artifact_type: string; xref: string }>(`/tuleap/artifacts/${type}`, {
+        fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; qc_id: string | null; artifact_type: string; xref: string; tuleap_warning?: string }>(`/tuleap/artifacts/${type}`, {
             method: 'POST',
             body: JSON.stringify(data),
         }),
@@ -1535,7 +1536,7 @@ export const tuleapApi = {
         }),
     createUnified: async (payload: UnifiedPayload) => {
         const type = payload.artifact_type.replace('_', '-');
-        return fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; artifact_type: string; xref: string }>(`/tuleap/artifacts/${type}`, {
+        return fetchApi<{ tuleap_artifact_id: number; tuleap_url: string; qc_id: string | null; artifact_type: string; xref: string; tuleap_warning?: string }>(`/tuleap/artifacts/${type}`, {
             method: 'POST',
             body: JSON.stringify(payload),
         });
@@ -1545,6 +1546,10 @@ export const tuleapApi = {
             method: 'PATCH',
             body: JSON.stringify(payload),
         }),
+    listUsers: (query?: string) =>
+        fetchApi<Array<{ id: number; username: string; display_name: string; email: string | null }>>(
+            `/tuleap-webhook/users${query ? `?query=${encodeURIComponent(query)}` : ''}`
+        ),
 };
 
 export interface TuleapSyncConfig {
