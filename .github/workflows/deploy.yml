@@ -50,8 +50,8 @@ jobs:
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
           file: ./apps/api/Dockerfile
+          context: .
           push: true
           tags: |
             ${{ env.API_IMAGE }}:${{ steps.tag.outputs.tag }}
@@ -89,8 +89,8 @@ jobs:
       - name: Build and push Web image
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/web
           file: ./apps/web/Dockerfile
+          context: .
           push: true
           tags: |
             ${{ env.WEB_IMAGE }}:${{ steps.args.outputs.tag }}

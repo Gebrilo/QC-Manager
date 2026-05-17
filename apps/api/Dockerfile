@@ -1,7 +1,7 @@
 # =============================================================================
 # QC API — Production Dockerfile (multi-stage)
 # =============================================================================
-# Build:  docker build -t <user>/qc-api:latest ./apps/api
+# Build:  docker build -f apps/api/Dockerfile -t <user>/qc-api:latest .
 # Run:    docker run -p 3001:3001 --env-file .env <user>/qc-api:latest
 # =============================================================================
 
@@ -10,7 +10,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
 # --- Stage 2: Production runtime ---
@@ -33,8 +33,9 @@ RUN apk add --no-cache wget && \
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application files
-COPY package.json ./
-COPY src/ ./src/
+COPY apps/api/package.json ./
+COPY apps/api/src/ ./src/
+COPY apps/shared/ /shared/
 
 # Pre-create uploads directory with correct ownership before dropping privileges
 RUN mkdir -p /app/uploads/avatars && chown -R apiuser:nodejs /app/uploads

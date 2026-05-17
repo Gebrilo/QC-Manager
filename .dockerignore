@@ -1,0 +1,39 @@
+# Dependencies are installed inside each image.
+node_modules
+**/node_modules
+
+# Version control and local workspace metadata.
+.git
+.gitignore
+.github
+.claude
+.vscode
+.idea
+
+# Secrets and local env files must not be baked into images.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Build and test output.
+.next
+**/.next
+dist
+build
+coverage
+playwright-report
+test-results
+graphify-out
+
+# Logs and local artifacts.
+*.log
+npm-debug.log*
+api-server.log
+server.log
+.DS_Store
+Thumbs.db
+
+# Docker metadata is not needed inside the image filesystem.
+Dockerfile
+docker-compose*.yml

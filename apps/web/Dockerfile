@@ -2,7 +2,7 @@
 # QC Web — Production Dockerfile (multi-stage, Next.js standalone)
 # =============================================================================
 # Build:  docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
-#           -t <user>/qc-web:latest ./apps/web
+#           -f apps/web/Dockerfile -t <user>/qc-web:latest .
 # Run:    docker run -p 3000:3000 <user>/qc-web:latest
 # =============================================================================
 
@@ -11,7 +11,7 @@ FROM node:18-alpine AS deps
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --ignore-scripts
 
 # --- Stage 2: Build the Next.js app ---
@@ -20,7 +20,8 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY apps/web/ ./
+COPY apps/shared/ /shared/
 
 # NEXT_PUBLIC_* vars must be set at BUILD time (baked into JS bundle)
 ARG NEXT_PUBLIC_API_URL
