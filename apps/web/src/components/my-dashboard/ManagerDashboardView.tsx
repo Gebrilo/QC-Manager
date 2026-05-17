@@ -2,6 +2,8 @@ import { DashboardMetrics, TeamApi, TeamSummaryApi, type Task } from '@/lib/api'
 import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
 import { ResourceUtilizationChart } from '@/components/dashboard/ResourceUtilizationChart';
+import { ResourceStats } from '@/components/dashboard/ResourceStats';
+import { DashboardTaskSection } from '@/components/my-dashboard/DashboardTaskSection';
 
 interface Props {
     metrics: DashboardMetrics;
@@ -120,8 +122,18 @@ export function ManagerDashboardView({ metrics, team, summary, tasks }: Props) {
                 </div>
             </div>
 
-            {/* Resource Utilization */}
-            <ResourceUtilizationChart tasks={tasks} />
+            {/* Resource Analysis */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2">
+                    <ResourceUtilizationChart tasks={tasks} />
+                </div>
+                <div>
+                    <ResourceStats tasks={tasks} />
+                </div>
+            </div>
+
+            {/* Task overview with resource + project filters */}
+            <DashboardTaskSection tasks={tasks} />
 
             {/* Hours summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
