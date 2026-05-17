@@ -144,6 +144,7 @@ export interface Resource {
     email?: string;
     department?: string;
     role?: string;
+    tuleap_username?: string | null;
     current_allocation_hrs?: number;
     utilization_pct?: number;
     available_hrs?: number;
@@ -1545,6 +1546,10 @@ export const tuleapApi = {
             method: 'PATCH',
             body: JSON.stringify(payload),
         }),
+    listUsers: (query?: string) =>
+        fetchApi<Array<{ id: number; username: string; display_name: string; email: string | null }>>(
+            `/tuleap-webhook/users${query ? `?query=${encodeURIComponent(query)}` : ''}`
+        ),
 };
 
 export interface TuleapSyncConfig {

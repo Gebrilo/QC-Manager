@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { resourcesApi, type Resource } from '@/lib/api';
+import { resourcesApi, tuleapApi, type Resource } from '@/lib/api';
 
 const resourceSchema = z.object({
     resource_name: z.string().min(1, 'Name is required').max(100),
@@ -28,6 +28,17 @@ interface ResourceFormProps {
 export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [tuleapUsers, setTuleapUsers] = useState<Array<{ username: string; display_name: string }>>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [tuleapUsername, setTuleapUsername] = useState<string>(resource?.tuleap_username || '');
+
+    useEffect(() => {
+        setLoadingUsers(true);
+        tuleapApi.listUsers()
+            .then(users => setTuleapUsers(users))
+            .catch(() => {})
+            .finally(() => setLoadingUsers(false));
+    }, []);
 
     const isEdit = !!resource;
     const isLinkedUser = !!resource?.user_id;
@@ -59,7 +70,8 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
                 is_active: data.is_active
             };
 
-            // Don't send name/email for user-linked resources (synced from user)
+            payload.tuleap_username = tuleapUsername || null;
+
             if (!isLinkedUser) {
                 payload.resource_name = data.resource_name;
                 payload.email = data.email || undefined;
@@ -152,6 +164,37 @@ export function ResourceForm({ resource, onSuccess, onCancel }: ResourceFormProp
                     placeholder="e.g. Senior Developer"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
+
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Tuleap Username
+                    </label>
+                    {tuleapUsers.length > 0 ? (
+                        <select
+                            value={tuleapUsername}
+                            onChange={e => setTuleapUsername(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="">— Not mapped —</option>
+                            {tuleapUsers.map(u => (
+                                <option key={u.username} value={u.username}>
+                                    {u.display_name} ({u.username})
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input
+                            type="text"
+                            value={tuleapUsername}
+                            onChange={e => setTuleapUsername(e.target.value)}
+                            placeholder={loadingUsers ? 'Loading Tuleap users…' : 'e.g. belal.z'}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                        />
+                    )}
+                    <p className="mt-1 text-xs text-slate-500">
+                        Used in "Assigned To" dropdowns when creating artifacts in Tuleap.
+                    </p>
+                </div>
 
                 <div className="md:col-span-2">
                     <label className="flex items-center gap-3 cursor-pointer">
