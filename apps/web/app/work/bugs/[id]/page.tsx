@@ -12,6 +12,10 @@ import {
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 
+function stripHtml(html: string): string {
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+}
+
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',
     Open: 'ontrack',
@@ -238,7 +242,21 @@ export default function BugDetailPage() {
                 {bug.description && (
                     <div>
                         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Description / Steps to Reproduce</p>
-                        <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{bug.description}</p>
+                        <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{stripHtml(bug.description)}</p>
+                    </div>
+                )}
+
+                {bug.dev_fix_description && (
+                    <div>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Dev Fix Description</p>
+                        <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{stripHtml(bug.dev_fix_description)}</p>
+                    </div>
+                )}
+
+                {bug.qc_verification_notes && (
+                    <div>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">QC Verification Notes</p>
+                        <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{stripHtml(bug.qc_verification_notes)}</p>
                     </div>
                 )}
 
@@ -251,6 +269,9 @@ export default function BugDetailPage() {
                         { label: 'Service', value: bug.service_name },
                         { label: 'Component', value: bug.component },
                         { label: 'Type', value: bug.bug_type },
+                        { label: 'Initial Effort', value: bug.initial_effort != null ? `${bug.initial_effort}h` : undefined },
+                        { label: 'Remaining Effort', value: bug.remaining_effort != null ? `${bug.remaining_effort}h` : undefined },
+                        { label: 'CC', value: bug.cc?.length ? bug.cc.join(', ') : undefined },
                         { label: 'Assigned To', value: bug.assigned_to },
                         { label: 'Reported By', value: bug.reported_by },
                         { label: 'Updated By', value: bug.updated_by },

@@ -321,6 +321,11 @@ export interface Bug {
     tuleap_tracker_id?: number;
     title: string;
     description?: string;
+    dev_fix_description?: string;
+    qc_verification_notes?: string;
+    initial_effort?: number | null;
+    remaining_effort?: number | null;
+    cc?: string[];
     status: string;
     severity: string;
     priority: string;

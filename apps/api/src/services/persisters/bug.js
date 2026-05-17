@@ -118,8 +118,9 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       status, severity, priority, bug_type, component, project_id,
       linked_test_case_ids, assigned_to, reported_by,
       reported_date, last_sync_at, raw_tuleap_payload, source,
-      owner_resource_id, pending_links, environment, service_name
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22)
+      owner_resource_id, pending_links, environment, service_name,
+      dev_fix_description, qc_verification_notes, initial_effort, remaining_effort, cc
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
     RETURNING *`,
     [
       tuleapArtifactId,
@@ -144,6 +145,11 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       JSON.stringify(pending),
       fields.environment || null,
       fields.service_name || null,
+      fields.dev_fix_description || null,
+      fields.qc_verification_notes || null,
+      fields.initial_effort != null ? fields.initial_effort : null,
+      fields.remaining_effort != null ? fields.remaining_effort : null,
+      Array.isArray(fields.cc) ? fields.cc : (fields.cc ? [fields.cc] : null),
     ]
   );
 
@@ -180,12 +186,17 @@ async function updateBug(bugId, unified, config, projectId, source, resolvedTest
       source = $10,
       environment = COALESCE($11, environment),
       service_name = COALESCE($12, service_name),
+      dev_fix_description = COALESCE($13, dev_fix_description),
+      qc_verification_notes = COALESCE($14, qc_verification_notes),
+      initial_effort = COALESCE($15, initial_effort),
+      remaining_effort = COALESCE($16, remaining_effort),
+      cc = COALESCE($17, cc),
       last_sync_at = NOW(),
       updated_at = NOW(),
       deleted_at = NULL,
       pending_links = '[]'::jsonb,
-      raw_tuleap_payload = COALESCE($13, raw_tuleap_payload)
-    WHERE id = $14
+      raw_tuleap_payload = COALESCE($18, raw_tuleap_payload)
+    WHERE id = $19
     RETURNING *`,
     [
       common.title || null,
@@ -200,6 +211,11 @@ async function updateBug(bugId, unified, config, projectId, source, resolvedTest
       source,
       fields.environment || null,
       fields.service_name || null,
+      fields.dev_fix_description || null,
+      fields.qc_verification_notes || null,
+      fields.initial_effort != null ? fields.initial_effort : null,
+      fields.remaining_effort != null ? fields.remaining_effort : null,
+      Array.isArray(fields.cc) ? fields.cc : (fields.cc ? [fields.cc] : null),
       unified.raw_payload ? JSON.stringify(unified.raw_payload) : null,
       bugId,
     ]

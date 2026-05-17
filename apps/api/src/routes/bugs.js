@@ -396,7 +396,9 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
         const allowedFields = [
             'title', 'description', 'status', 'severity', 'priority',
             'bug_type', 'component', 'assigned_to', 'updated_by',
-            'resolved_date',
+            'resolved_date', 'environment', 'service_name',
+            'dev_fix_description', 'qc_verification_notes',
+            'initial_effort', 'remaining_effort', 'cc',
             'linked_test_case_ids', 'linked_test_execution_ids', 'raw_tuleap_payload',
             'source', 'triage_status'
         ];
