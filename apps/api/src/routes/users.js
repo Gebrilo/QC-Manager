@@ -31,7 +31,7 @@ router.get('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { role, active, activated, manager_id } = req.body;
+        const { role, active, status, manager_id } = req.body;
 
         if (id === req.user.id && role && role !== 'admin') {
             return res.status(400).json({ error: 'Cannot demote yourself' });
@@ -62,9 +62,13 @@ router.patch('/:id', async (req, res, next) => {
             values.push(active);
         }
 
-        if (activated !== undefined) {
-            fields.push(`activated = $${idx++}`);
-            values.push(activated);
+        if (status !== undefined) {
+            const validStatuses = ['PREPARATION', 'ACTIVE', 'SUSPENDED', 'ARCHIVED'];
+            if (!validStatuses.includes(status)) {
+                return res.status(400).json({ error: `Invalid status '${status}'` });
+            }
+            fields.push(`status = $${idx++}`);
+            values.push(status);
         }
 
         // Allow admin to set manager_id (links user to a manager for legacy hierarchy)
@@ -91,7 +95,7 @@ router.patch('/:id', async (req, res, next) => {
 
         const result = await db.query(
             `UPDATE app_user SET ${fields.join(', ')} WHERE id = $${idx}
-             RETURNING id, name, email, phone, role, active, activated, manager_id, team_id, created_at, updated_at, last_login`,
+             RETURNING id, name, email, phone, role, active, status, manager_id, team_id, created_at, updated_at, last_login`,
             values
         );
 
@@ -101,17 +105,16 @@ router.patch('/:id', async (req, res, next) => {
 
         const updatedUser = result.rows[0];
 
-        if (role || activated) {
+        // Apply role permissions when role changes OR when activating a user
+        if (role || status === 'ACTIVE') {
             const effectiveRole = role || updatedUser.role;
-            if (updatedUser.activated) {
-                await setDefaultPermissions(id, effectiveRole);
-            }
+            await setDefaultPermissions(id, effectiveRole);
         }
 
         res.json(updatedUser);
 
         // Notify user if they were just activated + auto-assign journeys
-        if (activated && updatedUser.activated) {
+        if (status === 'ACTIVE' && updatedUser.status === 'ACTIVE') {
             createNotification(
                 id,
                 'user_activated',
