@@ -6,6 +6,7 @@ const { z } = require('zod');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 
 const testCaseCreateSchema = z.object({
     title: z.string().min(3).max(500),
@@ -115,6 +116,17 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
     const client = await pool.connect();
     try {
         const validatedData = testCaseCreateSchema.parse(req.body);
+
+        // assigned_to is a resource UUID from the form; resolve to app_user.id for the FK
+        let assignedToUserId = null;
+        if (validatedData.assigned_to) {
+            const resRow = await pool.query(
+                'SELECT user_id FROM resources WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+                [validatedData.assigned_to]
+            );
+            assignedToUserId = resRow.rows[0]?.user_id || null;
+        }
+
         await client.query('BEGIN');
 
         const idResult = await client.query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
@@ -132,7 +144,7 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
              validatedData.severity, validatedData.test_type, validatedData.category,
              validatedData.component || null, validatedData.automation_status, validatedData.status,
              validatedData.estimated_duration_minutes || null, validatedData.tags, validatedData.project_id,
-             validatedData.assigned_to || null, validatedData.linked_requirement_id || null,
+             assignedToUserId, validatedData.linked_requirement_id || null,
              validatedData.linked_bug_ids, req.user?.id || null, req.user?.id || null]);
 
         await logTestCaseHistory(client, {
@@ -151,6 +163,9 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
         let tuleapWarning = null;
         const projectId = validatedData.project_id;
 
+        // Map QC test-case statuses to the Tuleap tracker's select-box labels
+        const STATUS_TO_TULEAP = { draft: 'Not Run', active: 'Not Run', deprecated: 'Fail', archived: 'Blocked' };
+
         if (projectId) {
             try {
                 const configResult = await pool.query(
@@ -162,50 +177,34 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
                 const config = configResult.rows[0];
 
                 if (config) {
-                    const trackerId = config.tuleap_tracker_id;
-                    const valueMap = config.value_map || {};
+                    const unified = {
+                        artifact_type: 'test_case',
+                        project_id: projectId,
+                        common: {
+                            title: validatedData.title,
+                            status: STATUS_TO_TULEAP[validatedData.status] || 'Not Run',
+                        },
+                        fields: {
+                            note: validatedData.description || null,
+                            preconditions: validatedData.preconditions || null,
+                            test_steps: validatedData.test_steps || null,
+                            expected_result: validatedData.expected_result || null,
+                        },
+                    };
 
-                    const values = [];
+                    const emitResult = await emitTestCase(unified, config, 'create', {
+                        client: defaultClient,
+                        registry: defaultRegistry,
+                        skipPersist: true,
+                    });
 
-                    const titleField = await defaultRegistry.getField(trackerId, 'title', 'string');
-                    if (titleField) {
-                        values.push({ field_id: titleField.field_id, value: validatedData.title });
-                    }
-
-                    const descField = await defaultRegistry.getField(trackerId, 'description', 'text');
-                    if (descField) {
-                        values.push({ field_id: descField.field_id, value: validatedData.description || '' });
-                    }
-
-                    const statusField = await defaultRegistry.getField(trackerId, 'status', 'sb');
-                    if (statusField) {
-                        const statusValue = valueMap.status?.[validatedData.status] || validatedData.status;
-                        const bindValue = await defaultRegistry.resolveBindValue(trackerId, 'status', statusValue);
-                        if (bindValue) {
-                            values.push({ field_id: statusField.field_id, bind_value_ids: [bindValue.id] });
-                        }
-                    }
-
-                    const priorityField = await defaultRegistry.getField(trackerId, 'priority', 'sb');
-                    if (priorityField) {
-                        const priorityValue = valueMap.priority?.[validatedData.priority] || validatedData.priority;
-                        const bindValue = await defaultRegistry.resolveBindValue(trackerId, 'priority', priorityValue);
-                        if (bindValue) {
-                            values.push({ field_id: priorityField.field_id, bind_value_ids: [bindValue.id] });
-                        }
-                    }
-
-                    const payload = { tracker: { id: trackerId }, values };
-                    const response = await defaultClient.post('/artifacts', payload);
-                    const artifact = response.data;
-
-                    if (artifact?.id) {
+                    if (emitResult?.tuleap_artifact_id) {
                         const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
                         await pool.query(
                             `UPDATE test_case SET tuleap_artifact_id = $1, tuleap_url = $2, sync_status = 'synced' WHERE id = $3`,
-                            [artifact.id, `${baseUrl}/plugins/tracker/?aid=${artifact.id}`, testCase.id]
+                            [emitResult.tuleap_artifact_id, `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}`, testCase.id]
                         );
-                        testCase.tuleap_artifact_id = artifact.id;
+                        testCase.tuleap_artifact_id = emitResult.tuleap_artifact_id;
                         testCase.sync_status = 'synced';
                     }
                 } else {

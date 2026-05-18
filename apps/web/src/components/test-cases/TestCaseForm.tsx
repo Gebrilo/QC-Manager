@@ -211,7 +211,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                         options={[
                             { value: '', label: '— Unassigned —' },
                             ...tuleapResources.map(r => ({
-                                value: r.tuleap_username,
+                                value: r.id,
                                 label: `${r.resource_name} (${r.tuleap_username})`,
                             })),
                         ]}

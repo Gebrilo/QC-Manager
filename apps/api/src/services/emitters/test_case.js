@@ -117,19 +117,21 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     const newTuleapUrl = `${baseUrl}/plugins/tracker/?aid=${artifact.id}`;
     console.log(`[emit:test_case] tuleap_create_ok artifact_id=${artifact.id} project=${config.qc_project_id}`);
 
-    try {
-      await dispatchAction(
-        {
-          ...unified,
-          action: 'sync',
-          tuleap: { ...(unified.tuleap || {}), artifact_id: artifact.id, url: newTuleapUrl },
-        },
-        config,
-        { query: deps.query }
-      );
-      console.log(`[emit:test_case] persist_create_ok artifact_id=${artifact.id}`);
-    } catch (persistErr) {
-      console.warn(`[emit:test_case] persist_create_failed artifact_id=${artifact.id} err="${persistErr.message}" — drift; poll will repair`);
+    if (!deps.skipPersist) {
+      try {
+        await dispatchAction(
+          {
+            ...unified,
+            action: 'sync',
+            tuleap: { ...(unified.tuleap || {}), artifact_id: artifact.id, url: newTuleapUrl },
+          },
+          config,
+          { query: deps.query }
+        );
+        console.log(`[emit:test_case] persist_create_ok artifact_id=${artifact.id}`);
+      } catch (persistErr) {
+        console.warn(`[emit:test_case] persist_create_failed artifact_id=${artifact.id} err="${persistErr.message}" — drift; poll will repair`);
+      }
     }
 
     return {
