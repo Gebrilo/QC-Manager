@@ -1051,19 +1051,34 @@ export default function TuleapSettingsPage() {
                                                             </div>
                                                         </div>
                                                         <div className="space-y-1 ml-2">
-                                                            {Object.entries(mapping).map(([tuleapVal, qcVal], idx) => (
+                                                            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-slate-400 font-medium px-1 mb-1">
+                                                                <span>QC value (e.g. critical)</span>
+                                                                <span>Tuleap label (e.g. Critical impact)</span>
+                                                                <span className="w-5" />
+                                                            </div>
+                                                            {Object.entries(mapping).map(([qcVal, tuleapVal], idx) => (
                                                                 <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={qcVal}
+                                                                        onChange={(e) => {
+                                                                            const oldKey = qcVal;
+                                                                            updateValueMapEntry(field, oldKey, e.target.value, tuleapVal);
+                                                                        }}
+                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
+                                                                        placeholder="QC value (e.g. critical)"
+                                                                    />
                                                                     {(() => {
                                                                         const fieldDef = trackerSchemas[config?.id]?.find(f => f.name === field);
                                                                         return (fieldDef?.values?.length ?? 0) > 0 ? (
                                                                             <select
                                                                                 value={tuleapVal}
                                                                                 onChange={(e) => {
-                                                                                    updateValueMapEntry(field, tuleapVal, e.target.value, qcVal);
+                                                                                    updateValueMapEntry(field, qcVal, qcVal, e.target.value);
                                                                                 }}
                                                                                 className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
                                                                             >
-                                                                                <option value={tuleapVal}>{tuleapVal || 'Select…'}</option>
+                                                                                <option value={tuleapVal}>{tuleapVal || 'Select Tuleap label…'}</option>
                                                                                 {fieldDef!.values.map(v => (
                                                                                     <option key={v.id} value={v.label}>{v.label}</option>
                                                                                 ))}
@@ -1073,25 +1088,15 @@ export default function TuleapSettingsPage() {
                                                                                 type="text"
                                                                                 value={tuleapVal}
                                                                                 onChange={(e) => {
-                                                                                    const oldKey = tuleapVal;
-                                                                                    updateValueMapEntry(field, oldKey, e.target.value, qcVal);
+                                                                                    updateValueMapEntry(field, qcVal, qcVal, e.target.value);
                                                                                 }}
                                                                                 className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                                placeholder="Tuleap value"
+                                                                                placeholder="Tuleap label"
                                                                             />
                                                                         );
                                                                     })()}
-                                                                    <input
-                                                                        type="text"
-                                                                        value={qcVal}
-                                                                        onChange={(e) => {
-                                                                            updateValueMapEntry(field, tuleapVal, tuleapVal, e.target.value);
-                                                                        }}
-                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                        placeholder="QC value"
-                                                                    />
                                                                     <button
-                                                                        onClick={() => removeValueMapEntry(field, tuleapVal)}
+                                                                        onClick={() => removeValueMapEntry(field, qcVal)}
                                                                         className="text-rose-400 hover:text-rose-300 px-1"
                                                                     >
                                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

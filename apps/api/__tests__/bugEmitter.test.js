@@ -131,6 +131,27 @@ describe('bug emitter — emitToTuleap', () => {
     expect(linkValue.links).toEqual([{ id: 140 }, { id: 141 }]);
   });
 
+  it('converts severity to Tuleap labels via built-in map when no value_map configured', async () => {
+    const unified = {
+      artifact_type: 'bug',
+      project_id: 'proj-1',
+      common: { title: 'Critical bug', status: 'Open' },
+      fields: { severity: 'critical' },
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'severity') return { field_id: 103, name: 'severity', type: 'sb' };
+      if (fn === 'status') return { field_id: 104, name: 'status', type: 'sb' };
+      return { field_id: 100, name: fn, type: 'string' };
+    });
+    defaultRegistry.resolveBindValue.mockImplementation(async (tid, fn, val) => ({ id: 500 }));
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 88888 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    expect(defaultRegistry.resolveBindValue).toHaveBeenCalledWith(102, 'severity', 'Critical impact');
+  });
+
   it('applies value_maps from config for outbound field translation', async () => {
     const configWithMaps = {
       ...config,

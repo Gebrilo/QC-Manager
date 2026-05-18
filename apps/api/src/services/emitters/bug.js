@@ -3,6 +3,13 @@ const { defaultRegistry } = require('../tuleapFieldRegistry');
 const { defaultClient } = require('../tuleapClient');
 const { dispatchAction } = require('../persisters/bug');
 
+const SEVERITY_TO_TULEAP = {
+  low: 'Cosmetic impact',
+  medium: 'Minor impact',
+  high: 'Major impact',
+  critical: 'Critical impact',
+};
+
 function applyValueMap(fieldName, value, valueMaps) {
   if (!valueMaps || !valueMaps[fieldName] || value === null || value === undefined) return value;
   return valueMaps[fieldName][value] || value;
@@ -93,6 +100,11 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     for (const [key, val] of Object.entries(mappedPayload)) {
       if (key === 'status') {
         mappedPayload[key] = applyValueMap(key, val, valueMaps) || val;
+      } else if (key === 'severity') {
+        const hasSeverityMap = valueMaps && valueMaps[key] && valueMaps[key][val] != null;
+        mappedPayload[key] = hasSeverityMap
+          ? valueMaps[key][val]
+          : (SEVERITY_TO_TULEAP[val?.toLowerCase()] || val);
       } else if (valueMaps[key]) {
         mappedPayload[key] = applyValueMap(key, val, valueMaps);
       }
