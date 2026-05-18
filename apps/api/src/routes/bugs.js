@@ -225,6 +225,10 @@ router.get('/:id', requireAuth, requirePermission('qc.bugs.view'), async (req, r
     try {
         const { id } = req.params;
 
+        if (!UUID_RE.test(id)) {
+            return res.status(404).json({ success: false, error: 'Bug not found' });
+        }
+
         const query = `
             SELECT
                 b.*,

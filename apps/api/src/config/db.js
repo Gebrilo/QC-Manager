@@ -1566,7 +1566,9 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS cc TEXT[],
                 ADD COLUMN IF NOT EXISTS dev_fix_description TEXT,
                 ADD COLUMN IF NOT EXISTS qc_verification_notes TEXT,
-                ADD COLUMN IF NOT EXISTS service_name VARCHAR(100)
+                ADD COLUMN IF NOT EXISTS service_name VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS initial_effort NUMERIC,
+                ADD COLUMN IF NOT EXISTS remaining_effort NUMERIC
         `);
 
         await client.query(`

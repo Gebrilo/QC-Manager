@@ -120,7 +120,11 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: i
                 if (result.tuleap_warning) {
                     console.warn('Tuleap sync skipped:', result.tuleap_warning);
                 }
-                router.push(`/work/bugs/${result.qc_id || result.tuleap_artifact_id}`);
+                if (result.qc_id) {
+                    router.push(`/work/bugs/${result.qc_id}`);
+                } else {
+                    router.push('/work/bugs');
+                }
             }
             router.refresh();
         } catch (err: any) {
