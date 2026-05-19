@@ -31,7 +31,7 @@ const CommonFields = z.object({
 });
 
 const BugFields = z.object({
-  severity: z.enum(['critical', 'high', 'medium', 'low']).optional().default('medium'),
+  severity: z.enum(['None', 'Cosmetic impact', 'Minor Impact', 'Major impact', 'Critical Impact']).optional().default('None'),
   environment: z.enum(['DEV', 'TEST', 'PROD']).optional(),
   service_name: z.string().optional(),
   steps_to_reproduce: z.string().optional(),

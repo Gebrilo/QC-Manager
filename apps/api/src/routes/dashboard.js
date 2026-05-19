@@ -31,8 +31,8 @@ async function getTeamMetrics(teamId) {
             COUNT(DISTINCT t.id) AS total_tasks,
             SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done,
             SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress,
-            SUM(CASE WHEN t.status = 'Backlog' THEN 1 ELSE 0 END) AS tasks_backlog,
-            SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS tasks_cancelled,
+            SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog,
+            SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END) AS tasks_cancelled,
             CASE
                 WHEN SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
                     ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END) /

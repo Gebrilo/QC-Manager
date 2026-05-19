@@ -208,9 +208,9 @@ export async function getBugSummary(projectId?: string): Promise<BugSummaryData>
             },
             by_severity: {
                 critical: 0,
-                high: 0,
-                medium: 0,
-                low: 0
+                major: 0,
+                minor: 0,
+                cosmetic: 0,
             },
             by_source: {
                 test_case: 0,

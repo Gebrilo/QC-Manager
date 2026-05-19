@@ -102,9 +102,9 @@ router.get('/summary', requireAuth, requirePermission('qc.bugs.view'), async (re
                 },
                 by_severity: {
                     critical: parseInt(totals.critical_bugs) || 0,
-                    high: parseInt(totals.high_bugs) || 0,
-                    medium: parseInt(totals.medium_bugs) || 0,
-                    low: parseInt(totals.low_bugs) || 0
+                    major: parseInt(totals.major_bugs) || 0,
+                    minor: parseInt(totals.minor_bugs) || 0,
+                    cosmetic: parseInt(totals.cosmetic_bugs) || 0,
                 },
                 by_source: {
                     test_case: parseInt(totals.bugs_from_test_cases) || 0,
@@ -305,8 +305,8 @@ router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, r
             bug_id,
             title,
             description,
-            status = 'Open',
-            severity = 'medium',
+            status = 'New',
+            severity = 'None',
             priority = 'medium',
             bug_type,
             component,

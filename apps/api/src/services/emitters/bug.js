@@ -4,10 +4,11 @@ const { defaultClient } = require('../tuleapClient');
 const { dispatchAction } = require('../persisters/bug');
 
 const SEVERITY_TO_TULEAP = {
-  low: 'Cosmetic impact',
-  medium: 'Minor impact',
-  high: 'Major impact',
-  critical: 'Critical impact',
+  'None': '',
+  'Cosmetic impact': 'Cosmetic impact',
+  'Minor Impact': 'Minor impact',
+  'Major impact': 'Major impact',
+  'Critical Impact': 'Critical impact',
 };
 
 function applyValueMap(fieldName, value, valueMaps) {

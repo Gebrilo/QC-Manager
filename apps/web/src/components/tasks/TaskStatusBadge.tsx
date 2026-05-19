@@ -19,13 +19,17 @@ export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
         case 'Running':
             variant = 'inprogress';
             break;
+        case 'Canceled':
         case 'Cancelled':
         case 'Failed':
             variant = 'cancelled';
             break;
+        case 'Blocked':
+            variant = 'cancelled';
+            break;
+        case 'Todo':
         case 'Backlog':
         case 'Pending':
-        case 'Todo':
             variant = 'backlog';
             break;
         default:

@@ -26,7 +26,9 @@ interface LinkedTasksPanelProps {
 const TASK_STATUS_VARIANT: Record<string, 'complete' | 'inprogress' | 'notasks' | 'default'> = {
     'Done': 'complete',
     'In Progress': 'inprogress',
-    'Backlog': 'notasks',
+    'Todo': 'notasks',
+    'Blocked': 'default',
+    'Canceled': 'default',
     'Cancelled': 'default',
 };
 

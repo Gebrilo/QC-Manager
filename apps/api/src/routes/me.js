@@ -72,7 +72,7 @@ async function dashboardHandler(req, res) {
             projectMap[key].total++;
             if (t.status === 'Done') projectMap[key].done++;
             else if (t.status === 'In Progress') projectMap[key].in_progress++;
-            else if (t.status === 'Backlog') projectMap[key].backlog++;
+            else if (t.status === 'Todo') projectMap[key].backlog++;
         }
         const tasksByProject = Object.values(projectMap);
 

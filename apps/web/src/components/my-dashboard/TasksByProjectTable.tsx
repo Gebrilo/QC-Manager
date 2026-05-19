@@ -26,7 +26,7 @@ export function TasksByProjectTable({ tasksByProject }: TasksByProjectTableProps
                                     <th className="text-left pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Project</th>
                                     <th className="text-right pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Total</th>
                                     <th className="text-right pb-2 text-xs font-semibold text-indigo-500">In Progress</th>
-                                    <th className="text-right pb-2 text-xs font-semibold text-slate-400">Backlog</th>
+                                    <th className="text-right pb-2 text-xs font-semibold text-slate-400">Todo</th>
                                     <th className="text-right pb-2 text-xs font-semibold text-emerald-500">Done</th>
                                 </tr>
                             </thead>

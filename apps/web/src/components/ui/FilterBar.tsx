@@ -16,7 +16,7 @@ export interface FilterConfig {
 }
 
 const ATTRIBUTES: { label: string; value: FilterAttribute; options: string[] }[] = [
-    { label: 'Status', value: 'status', options: ['Backlog', 'In Progress', 'Done', 'Cancelled'] },
+    { label: 'Status', value: 'status', options: ['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled'] },
     { label: 'Priority', value: 'priority', options: ['High', 'Medium', 'Low'] }, // Assuming priority exists on Task
     { label: 'Assignee', value: 'resource', options: [] }, // We might need to fetch resources or just allow text input for now? Or mock it.
 ];
@@ -28,7 +28,7 @@ export function FilterBar() {
     const defaultViews: FilterConfig[] = [
         { id: 'all', name: 'All Tasks', filters: { search: '', attributes: {} } },
         { id: 'high-pri', name: 'My High Priority', filters: { search: '', attributes: { priority: 'High' } } },
-        { id: 'late', name: 'Late Tasks', filters: { search: '', attributes: { status: 'Backlog' } } }, // formalized 'Late' distinct logic might be needed in client, but for now specific attribs
+        { id: 'late', name: 'Late Tasks', filters: { search: '', attributes: { status: 'Todo' } } },
     ];
 
     const [savedViews, setSavedViews] = useState<FilterConfig[]>(defaultViews);

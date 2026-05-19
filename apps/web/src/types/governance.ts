@@ -247,8 +247,8 @@ export function formatDate(dateString: string | null): string {
 // Bug Types (Tuleap Integration)
 // =====================================================
 
-export type BugSeverity = 'critical' | 'high' | 'medium' | 'low';
-export type BugStatus = 'Open' | 'In Progress' | 'Reopened' | 'Resolved' | 'Closed';
+export type BugSeverity = 'None' | 'Cosmetic impact' | 'Minor Impact' | 'Major impact' | 'Critical Impact';
+export type BugStatus = 'New' | 'In Progress' | 'Assigned' | 'Verified' | 'Reopened' | 'Fixed' | 'Blocked' | 'Duplicate' | 'Closed';
 
 export interface Bug {
     id: string;
@@ -287,9 +287,10 @@ export interface BugSummaryTotals {
 
 export interface BugSummarySeverity {
     critical: number;
-    high: number;
-    medium: number;
-    low: number;
+    major: number;
+    minor: number;
+    cosmetic: number;
+    none?: number;
 }
 
 export interface BugSummaryByProject {
@@ -299,9 +300,9 @@ export interface BugSummaryByProject {
     open_bugs: number;
     closed_bugs: number;
     critical_bugs: number;
-    high_bugs: number;
-    medium_bugs: number;
-    low_bugs: number;
+    major_bugs: number;
+    minor_bugs: number;
+    cosmetic_bugs: number;
     bugs_from_testing: number;
     standalone_bugs: number;
     latest_bug_date: string | null;
@@ -323,25 +324,31 @@ export interface BugSummaryData {
 // =====================================================
 
 export const BUG_SEVERITY_COLORS: Record<BugSeverity, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-gray-400 text-white'
+    'None': 'bg-gray-300 text-gray-700',
+    'Cosmetic impact': 'bg-gray-400 text-white',
+    'Minor Impact': 'bg-yellow-500 text-black',
+    'Major impact': 'bg-orange-500 text-white',
+    'Critical Impact': 'bg-red-600 text-white',
 };
 
 export const BUG_SEVERITY_BADGE_COLORS: Record<BugSeverity, string> = {
-    critical: 'bg-red-100 text-red-800 border-red-300',
-    high: 'bg-orange-100 text-orange-800 border-orange-300',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    low: 'bg-gray-100 text-gray-800 border-gray-300'
+    'None': 'bg-gray-100 text-gray-600 border-gray-300',
+    'Cosmetic impact': 'bg-gray-100 text-gray-800 border-gray-300',
+    'Minor Impact': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    'Major impact': 'bg-orange-100 text-orange-800 border-orange-300',
+    'Critical Impact': 'bg-red-100 text-red-800 border-red-300',
 };
 
 export const BUG_STATUS_COLORS: Record<BugStatus, string> = {
-    'Open': 'bg-blue-100 text-blue-800',
+    'New': 'bg-blue-100 text-blue-800',
     'In Progress': 'bg-indigo-100 text-indigo-800',
+    'Assigned': 'bg-sky-100 text-sky-800',
+    'Verified': 'bg-teal-100 text-teal-800',
     'Reopened': 'bg-orange-100 text-orange-800',
-    'Resolved': 'bg-green-100 text-green-800',
-    'Closed': 'bg-gray-100 text-gray-800'
+    'Fixed': 'bg-green-100 text-green-800',
+    'Blocked': 'bg-rose-100 text-rose-800',
+    'Duplicate': 'bg-purple-100 text-purple-800',
+    'Closed': 'bg-gray-100 text-gray-800',
 };
 
 // =====================================================

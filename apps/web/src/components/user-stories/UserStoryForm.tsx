@@ -21,7 +21,7 @@ const userStorySchema = z.object({
     acceptance_criteria: z.string().optional().default(''),
     change_reason: z.string().optional().default(''),
     status: z.enum(['Draft', 'Changes', 'Review', 'Approved']).optional().default('Draft'),
-    priority: z.enum(['P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low']).optional().default('P3-Medium'),
+    priority: z.enum(['None', 'P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low']).optional().default('None'),
     requirement_version: z.string().optional().default('1'),
     ba_author: z.string().optional().default(''),
     initial_effort: z.coerce.number().nullable().optional(),
@@ -58,7 +58,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
             acceptance_criteria: stripHtml(initialData?.acceptance_criteria as string),
             change_reason: stripHtml(initialData?.change_reason as string),
             status: (initialData?.status as any) || 'Draft',
-            priority: (initialData?.priority as any) || 'P3-Medium',
+            priority: (initialData?.priority as any) || 'None',
             requirement_version: (initialData?.requirement_version as string) || '1',
             ba_author: (initialData?.ba_author as string) || '',
             initial_effort: initialData?.initial_effort != null ? Number(initialData.initial_effort) : null,
@@ -153,6 +153,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
                 <Select
                     label="Priority"
                     options={[
+                        { value: 'None', label: 'None' },
                         { value: 'P1-Critical', label: 'P1 - Critical' },
                         { value: 'P2-High', label: 'P2 - High' },
                         { value: 'P3-Medium', label: 'P3 - Medium' },

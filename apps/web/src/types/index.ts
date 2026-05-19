@@ -96,7 +96,7 @@ export interface Task {
     parent_user_story_id?: string;
     task_name: string;
     description?: string;
-    status: 'Backlog' | 'In Progress' | 'Done' | 'Cancelled';
+    status: 'Todo' | 'In Progress' | 'Blocked' | 'Done' | 'Canceled';
     priority?: 'High' | 'Medium' | 'Low'; // Added for dashboard filtering
 
     resource1_uuid?: string;
@@ -245,7 +245,7 @@ export interface TestResultsUploadResponse {
 
 // Test Case Management Types (enhanced)
 export type TestCategory = string;
-export type TestCaseStatus = 'draft' | 'active' | 'deprecated' | 'archived';
+export type TestCaseStatus = 'None' | 'Not Run' | 'Review' | 'Pass' | 'Fail' | 'Blocked';
 export type TestCasePriority = 'critical' | 'high' | 'medium' | 'low';
 export type TestCaseSeverity = 'critical' | 'major' | 'normal' | 'minor' | 'trivial';
 export type TestCaseType = 'functional' | 'regression' | 'smoke' | 'integration' | 'performance' | 'security' | 'usability' | 'exploratory' | 'automated';

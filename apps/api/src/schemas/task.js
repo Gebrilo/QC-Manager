@@ -5,7 +5,7 @@ const baseTaskSchema = z.object({
     project_id: z.string().uuid(), // Links to projects.id (UUID)
     task_name: z.string().min(1).max(200),
     description: z.string().optional(),
-    status: z.enum(['Backlog', 'In Progress', 'Done', 'Cancelled']).default('Backlog'),
+    status: z.enum(['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled']).default('Todo'),
     priority: z.enum(['High', 'Medium', 'Low']).default('Medium'),
 
     // Resources & Hours

@@ -70,10 +70,10 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
 
     // Prepare donut chart data for severity breakdown
     const severityDonutData = severity ? [
-        { label: 'Critical', value: severity.critical, color: '#dc2626' },
-        { label: 'High', value: severity.high, color: '#f97316' },
-        { label: 'Medium', value: severity.medium, color: '#eab308' },
-        { label: 'Low', value: severity.low, color: '#94a3b8' },
+        { label: 'Critical Impact', value: severity.critical, color: '#dc2626' },
+        { label: 'Major impact',    value: severity.major,    color: '#f97316' },
+        { label: 'Minor Impact',    value: severity.minor,    color: '#eab308' },
+        { label: 'Cosmetic impact', value: severity.cosmetic, color: '#94a3b8' },
     ].filter(d => d.value > 0) : [];
 
     // Prepare donut chart for bugs from testing vs standalone
@@ -128,7 +128,7 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                         color="purple"
                     />
                     <StatCard
-                        label="Critical"
+                        label="Critical Impact"
                         value={severity?.critical || 0}
                         color="red"
                     />
@@ -197,10 +197,10 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                 {hasBugs && (
                     <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div className="flex flex-wrap gap-4 justify-center">
-                            <SeverityBadge severity="critical" count={severity?.critical || 0} />
-                            <SeverityBadge severity="high" count={severity?.high || 0} />
-                            <SeverityBadge severity="medium" count={severity?.medium || 0} />
-                            <SeverityBadge severity="low" count={severity?.low || 0} />
+                            <SeverityBadge severity="Critical Impact" count={severity?.critical || 0} />
+                            <SeverityBadge severity="Major impact" count={severity?.major || 0} />
+                            <SeverityBadge severity="Minor Impact" count={severity?.minor || 0} />
+                            <SeverityBadge severity="Cosmetic impact" count={severity?.cosmetic || 0} />
                         </div>
                     </div>
                 )}
@@ -292,10 +292,11 @@ function BugRow({ bug }: { bug: Bug }) {
 function SeverityBadge({ severity, count }: { severity: BugSeverity; count: number }) {
     const colors = BUG_SEVERITY_BADGE_COLORS[severity];
     const labels: Record<BugSeverity, string> = {
-        critical: 'Critical',
-        high: 'High',
-        medium: 'Medium',
-        low: 'Low'
+        'None': 'None',
+        'Cosmetic impact': 'Cosmetic',
+        'Minor Impact': 'Minor',
+        'Major impact': 'Major',
+        'Critical Impact': 'Critical',
     };
 
     return (

@@ -22,12 +22,12 @@ const testCaseSchema = z.object({
     test_steps: z.string().max(10000).optional().default(''),
     expected_result: z.string().max(5000).optional().default(''),
     priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
-    severity: z.enum(['critical', 'major', 'normal', 'minor', 'trivial']).default('normal'),
+    severity: z.enum(['critical', 'major', 'normal', 'minor', 'trivial']).default('normal').optional(),
     test_type: z.enum(['functional', 'regression', 'smoke', 'integration', 'performance', 'security', 'usability', 'exploratory', 'automated']).default('functional'),
     category: z.string().max(50).optional().default(''),
     component: z.string().max(100).optional().default(''),
     automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
-    status: z.enum(['draft', 'active', 'deprecated', 'archived']).default('draft'),
+    status: z.enum(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']).default('Not Run'),
     estimated_duration_minutes: z.coerce.number().int().min(0).max(480).optional().nullable(),
     tags: z.string().optional().default(''),
     assigned_to: z.string().optional().default(''),
@@ -63,7 +63,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
             category: (initialData?.category as string) || '',
             component: (initialData?.component as string) || '',
             automation_status: ((initialData?.automation_status as string) || 'manual') as FormData['automation_status'],
-            status: ((initialData?.status as string) || 'draft') as FormData['status'],
+            status: ((initialData?.status as string) || 'Not Run') as FormData['status'],
             estimated_duration_minutes: initialData?.estimated_duration_minutes != null ? Number(initialData.estimated_duration_minutes) : null,
             tags: Array.isArray(initialData?.tags) ? (initialData.tags as string[]).join(', ') : (initialData?.tags as string) || '',
             assigned_to: (initialData?.assigned_to as string) || '',
@@ -130,10 +130,12 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                 <Select
                     label="Status"
                     options={[
-                        { value: 'draft', label: 'Draft' },
-                        { value: 'active', label: 'Active' },
-                        { value: 'deprecated', label: 'Deprecated' },
-                        { value: 'archived', label: 'Archived' },
+                        { value: 'None', label: 'None' },
+                        { value: 'Not Run', label: 'Not Run' },
+                        { value: 'Review', label: 'Review' },
+                        { value: 'Pass', label: 'Pass' },
+                        { value: 'Fail', label: 'Fail' },
+                        { value: 'Blocked', label: 'Blocked' },
                     ]}
                     {...register('status')}
                     error={errors.status?.message}

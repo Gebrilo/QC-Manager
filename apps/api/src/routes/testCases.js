@@ -20,7 +20,7 @@ const testCaseCreateSchema = z.object({
     category: z.string().max(50).default('other'),
     component: z.string().max(100).optional(),
     automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
-    status: z.enum(['draft', 'active', 'deprecated', 'archived']).default('draft'),
+    status: z.enum(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']).default('Not Run'),
     estimated_duration_minutes: z.number().int().min(0).max(480).optional(),
     tags: z.array(z.string().max(50)).max(20).default([]),
     project_id: z.string().uuid(),
@@ -164,7 +164,7 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
         const projectId = validatedData.project_id;
 
         // Map QC test-case statuses to the Tuleap tracker's select-box labels
-        const STATUS_TO_TULEAP = { draft: 'Not Run', active: 'Not Run', deprecated: 'Fail', archived: 'Blocked' };
+        const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
 
         if (projectId) {
             try {

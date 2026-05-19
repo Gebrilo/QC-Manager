@@ -2,7 +2,7 @@ const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
 
 const VALID_TEST_CASE_ACTIONS = new Set(['sync', 'delete']);
 
-const VALID_TEST_CASE_STATUSES = new Set(['draft', 'active', 'deprecated', 'archived']);
+const VALID_TEST_CASE_STATUSES = new Set(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']);
 
 async function generateTestCaseId(query) {
   const result = await query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
@@ -10,14 +10,15 @@ async function generateTestCaseId(query) {
 }
 
 function normalizeTestCaseStatus(status) {
-  if (!status) return 'draft';
+  if (!status) return 'Not Run';
   if (VALID_TEST_CASE_STATUSES.has(status)) return status;
   const lower = status.toLowerCase().trim();
-  if (['backlog', 'to do', 'todo', 'new', 'open'].includes(lower)) return 'draft';
-  if (['in progress', 'running', 'wip'].includes(lower)) return 'active';
-  if (['done', 'closed', 'resolved', 'passed', 'complete', 'completed', 'fail', 'failed'].includes(lower)) return 'deprecated';
-  if (['cancelled', 'canceled', 'rejected'].includes(lower)) return 'archived';
-  return 'draft';
+  if (['backlog', 'to do', 'todo', 'new', 'open', 'draft', 'active'].includes(lower)) return 'Not Run';
+  if (['in review', 'review', 'wip'].includes(lower)) return 'Review';
+  if (['done', 'closed', 'resolved', 'passed', 'complete', 'completed', 'pass'].includes(lower)) return 'Pass';
+  if (['fail', 'failed'].includes(lower)) return 'Fail';
+  if (['blocked', 'cancelled', 'canceled', 'rejected', 'archived', 'deprecated'].includes(lower)) return 'Blocked';
+  return 'Not Run';
 }
 
 async function dispatchAction(unified, config, deps) {

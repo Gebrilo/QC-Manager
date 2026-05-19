@@ -5,10 +5,11 @@ import { DonutChart } from '@/components/dashboard/ChartComponents';
 import { InfoTooltip } from '@/components/ui/Tooltip';
 
 const STATUS_COLORS: Record<string, string> = {
-    'Backlog':     '#64748b',
+    'Todo':        '#64748b',
     'In Progress': '#6366f1',
+    'Blocked':     '#f97316',
     'Done':        '#10b981',
-    'Cancelled':   '#f43f5e',
+    'Canceled':    '#f43f5e',
 };
 
 interface TaskDistributionChartProps {

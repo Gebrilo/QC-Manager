@@ -19,9 +19,9 @@ const bugSchema = z.object({
     title: z.string().min(1, 'Bug title is required'),
     description: z.string().optional().default(''),
     steps_to_reproduce: z.string().optional().default(''),
-    status: z.enum(['New', 'Open', 'Assigned', 'Fixed', 'Verified', 'Closed']).optional().default('New'),
+    status: z.enum(['New', 'In Progress', 'Assigned', 'Verified', 'Reopened', 'Fixed', 'Blocked', 'Duplicate', 'Closed']).optional().default('New'),
     assigned_to: z.string().optional().default(''),
-    severity: z.enum(['critical', 'high', 'medium', 'low']).optional().default('medium'),
+    severity: z.enum(['None', 'Cosmetic impact', 'Minor Impact', 'Major impact', 'Critical Impact']).optional().default('None'),
     close_date: z.string().optional().default(''),
     service_name: z.string().optional().default(''),
     environment: z.enum(['DEV', 'TEST', 'PROD']).optional().default('DEV'),
@@ -63,7 +63,7 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: i
             steps_to_reproduce: stripHtml((initialData?.steps_to_reproduce as string) || (initialData?.stepsToReproduce as string)),
             status: (initialData?.status as any) || 'New',
             assigned_to: (initialData?.assigned_to as string) || '',
-            severity: (initialData?.severity as any) || 'medium',
+            severity: (initialData?.severity as any) || 'None',
             close_date: (initialData?.close_date as string) || '',
             service_name: (initialData?.service_name as string) || (initialData?.serviceName as string) || '',
             environment: (initialData?.environment as any) || 'DEV',
@@ -156,10 +156,13 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: i
                     label="Status"
                     options={[
                         { value: 'New', label: 'New' },
-                        { value: 'Open', label: 'Open' },
+                        { value: 'In Progress', label: 'In Progress' },
                         { value: 'Assigned', label: 'Assigned' },
-                        { value: 'Fixed', label: 'Fixed' },
                         { value: 'Verified', label: 'Verified' },
+                        { value: 'Reopened', label: 'Reopened' },
+                        { value: 'Fixed', label: 'Fixed' },
+                        { value: 'Blocked', label: 'Blocked' },
+                        { value: 'Duplicate', label: 'Duplicate' },
                         { value: 'Closed', label: 'Closed' },
                     ]}
                     {...register('status')}
@@ -190,10 +193,11 @@ export function BugForm({ initialData, isEdit, artifactId, bugUUID, projectId: i
                 <Select
                     label="Severity"
                     options={[
-                        { value: 'critical', label: 'Critical' },
-                        { value: 'high', label: 'High' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'low', label: 'Low' },
+                        { value: 'None', label: 'None' },
+                        { value: 'Cosmetic impact', label: 'Cosmetic impact' },
+                        { value: 'Minor Impact', label: 'Minor Impact' },
+                        { value: 'Major impact', label: 'Major impact' },
+                        { value: 'Critical Impact', label: 'Critical Impact' },
                     ]}
                     {...register('severity')}
                     error={errors.severity?.message}

@@ -89,7 +89,7 @@ const runMigrations = async () => {
                 project_id UUID,
                 task_name VARCHAR(255) NOT NULL,
                 description TEXT,
-                status VARCHAR(50) NOT NULL DEFAULT 'Backlog',
+                status VARCHAR(50) NOT NULL DEFAULT 'Todo',
                 assignee VARCHAR(255),
                 priority VARCHAR(20) DEFAULT 'medium',
                 tags TEXT[],
@@ -591,7 +591,7 @@ const runMigrations = async () => {
                 COUNT(t.id) AS tasks_total_count,
                 SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done_count,
                 SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress_count,
-                SUM(CASE WHEN t.status = 'Backlog' THEN 1 ELSE 0 END) AS tasks_backlog_count,
+                SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog_count,
                 CASE WHEN COUNT(t.id) = 0 THEN 'No Tasks' WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete' ELSE 'Active' END AS status,
                 CASE
                     WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
@@ -645,7 +645,7 @@ const runMigrations = async () => {
                     ELSE 0
                 END AS utilization_pct,
                 (SELECT COUNT(*) FROM tasks t WHERE (t.resource1_id = r.id OR t.resource2_id = r.id) AND t.deleted_at IS NULL AND t.status = 'In Progress') AS active_tasks_count,
-                (SELECT COUNT(*) FROM tasks t WHERE (t.resource1_id = r.id OR t.resource2_id = r.id) AND t.deleted_at IS NULL AND t.status = 'Backlog') AS backlog_tasks_count,
+                (SELECT COUNT(*) FROM tasks t WHERE (t.resource1_id = r.id OR t.resource2_id = r.id) AND t.deleted_at IS NULL AND t.status = 'Todo') AS backlog_tasks_count,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at
@@ -659,8 +659,8 @@ const runMigrations = async () => {
                 COUNT(DISTINCT t.id) AS total_tasks,
                 SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done,
                 SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress,
-                SUM(CASE WHEN t.status = 'Backlog' THEN 1 ELSE 0 END) AS tasks_backlog,
-                SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS tasks_cancelled,
+                SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog,
+                SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END) AS tasks_cancelled,
                 CASE 
                     WHEN SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
                         ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END) / 

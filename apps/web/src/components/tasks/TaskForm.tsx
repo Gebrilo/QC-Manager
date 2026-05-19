@@ -18,7 +18,7 @@ const taskSchema = z.object({
     task_id: z.string().regex(/^TSK-[0-9]{3}$/, 'Format: TSK-XXX'),
     project_id: z.string().uuid(),
     task_name: z.string().min(1, 'Required'),
-    status: z.enum(['Backlog', 'In Progress', 'Done', 'Cancelled']),
+    status: z.enum(['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled']),
     priority: z.enum(['High', 'Medium', 'Low']).optional(),
     description: z.string().optional().default(''),
     team: z.string().optional().default(''),
@@ -68,7 +68,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
             task_id: initialData?.task_id || `TSK-${Math.floor(Math.random() * 900) + 100}`,
             project_id: initialData?.project_id || '',
             task_name: initialData?.task_name || '',
-            status: (initialData?.status as any) || 'Backlog',
+            status: (initialData?.status as any) || 'Todo',
             priority: normalizePriority(initialData?.priority),
             description: initialData?.notes || (initialData as any)?.description || '',
             team: (initialData as any)?.team || '',
@@ -167,10 +167,11 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                 <Select
                     label="Status"
                     options={[
-                        { value: 'Backlog', label: 'Backlog' },
+                        { value: 'Todo', label: 'Todo' },
                         { value: 'In Progress', label: 'In Progress' },
+                        { value: 'Blocked', label: 'Blocked' },
                         { value: 'Done', label: 'Done' },
-                        { value: 'Cancelled', label: 'Cancelled' },
+                        { value: 'Canceled', label: 'Canceled' },
                     ]}
                     {...register('status')}
                     error={errors.status?.message}
