@@ -63,12 +63,16 @@ router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, 
 
 router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (req, res, next) => {
     try {
+        const { id } = req.params;
+        const isTuleapId = /^\d+$/.test(id);
+        const whereClause = isTuleapId ? 'us.tuleap_artifact_id = $1' : 'us.id = $1';
+        const paramValue = isTuleapId ? parseInt(id, 10) : id;
         const result = await pool.query(
             `SELECT us.*, p.project_name
              FROM user_stories us
              LEFT JOIN projects p ON p.id = us.project_id
-             WHERE us.id = $1 AND us.deleted_at IS NULL`,
-            [req.params.id]
+             WHERE ${whereClause} AND us.deleted_at IS NULL`,
+            [paramValue]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User story not found' });
         res.json(result.rows[0]);
