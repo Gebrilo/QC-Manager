@@ -78,7 +78,7 @@ router.get('/:type', requireAuth, async (req, res) => {
   const offset = Number(req.query.offset) || 0;
 
   try {
-    const response = await defaultClient.get('/artifacts', { params: { tracker: trackerId, limit, offset } });
+    const response = await defaultClient.get(`/trackers/${trackerId}/artifacts`, { params: { limit, offset } });
     const items = Array.isArray(response.data) ? response.data : (response.data.collection || []);
     return res.status(200).json({ data: items, total: items.length });
   } catch (err) {

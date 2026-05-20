@@ -75,6 +75,11 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN}
       - TULEAP_BASE_URL=${TULEAP_BASE_URL}
       - TULEAP_ACCESS_KEY=${TULEAP_ACCESS_KEY}
+      - TULEAP_DEFAULT_PROJECT_ID=101
+      - TULEAP_TRACKER_USER_STORY=6
+      - TULEAP_TRACKER_TASK=5
+      - TULEAP_TRACKER_TEST_CASE=9
+      - TULEAP_TRACKER_BUG=1
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=qc-shared-network"

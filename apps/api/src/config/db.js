@@ -2419,6 +2419,24 @@ const runMigrations = async () => {
             `, [canonicalKey, legacyKey]);
         }
 
+        // Fix tuleap_sync_config tracker_type constraint to include user_story (underscore form)
+        await client.query(`
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'tuleap_sync_config_tracker_type_check'
+                    AND conrelid = 'tuleap_sync_config'::regclass
+                ) THEN
+                    ALTER TABLE tuleap_sync_config DROP CONSTRAINT tuleap_sync_config_tracker_type_check;
+                END IF;
+            END $$;
+        `);
+        await client.query(`
+            ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check
+            CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user_story', 'user-story', 'test-case'))
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
