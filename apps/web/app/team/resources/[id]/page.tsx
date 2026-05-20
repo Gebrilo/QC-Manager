@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import Link from 'next/link';
 import { usePagination } from '@/hooks/usePagination';
@@ -68,133 +68,137 @@ interface ResourceAnalytics {
     }>;
 }
 
-const HEALTH_CONFIG: Record<string, {
-    label: string;
-    color: string;
-    lightBg: string;
-    lightBorder: string;
-    lightText: string;
-    pulse: boolean;
-}> = {
+const HEALTH_DISPLAY: Record<string, { dot: string; pill: string; label: string }> = {
     on_track: {
-        label: 'On Track',
-        color: '#10b981',
-        lightBg: '#ecfdf5',
-        lightBorder: '#a7f3d0',
-        lightText: '#065f46',
-        pulse: true,
+        dot: 'bg-emerald-500',
+        pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+        label: 'ON TRACK',
     },
     at_risk: {
-        label: 'At Risk',
-        color: '#f59e0b',
-        lightBg: '#fffbeb',
-        lightBorder: '#fde68a',
-        lightText: '#92400e',
-        pulse: true,
+        dot: 'bg-amber-500',
+        pill: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        label: 'AT RISK',
     },
     overdue: {
-        label: 'Overdue',
-        color: '#ef4444',
-        lightBg: '#fef2f2',
-        lightBorder: '#fecaca',
-        lightText: '#991b1b',
-        pulse: false,
+        dot: 'bg-rose-500',
+        pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+        label: 'OVERDUE',
     },
     completed_early: {
-        label: 'Early',
-        color: '#3b82f6',
-        lightBg: '#eff6ff',
-        lightBorder: '#bfdbfe',
-        lightText: '#1e40af',
-        pulse: false,
+        dot: 'bg-blue-500',
+        pill: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        label: 'EARLY',
     },
 };
 
-const BADGE_CLASSES: Record<string, string> = {
-    emerald:  'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
-    blue:     'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
-    amber:    'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
-    slate:    'bg-slate-50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400',
-    rose:     'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400',
-    red:      'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400',
-    violet:   'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400',
-    orange:   'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
+const TIMELINE_BUCKETS: Array<{ key: keyof ResourceAnalytics['timeline_summary']; label: string; dot: string }> = [
+    { key: 'on_track',       label: 'On Track', dot: 'bg-emerald-500' },
+    { key: 'at_risk',        label: 'At Risk',  dot: 'bg-amber-500' },
+    { key: 'overdue',        label: 'Overdue',  dot: 'bg-rose-500' },
+    { key: 'completed_early', label: 'Early',   dot: 'bg-blue-500' },
+];
+
+const SEV_TONE: Record<string, string> = {
+    critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    high:     'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    medium:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    low:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
 };
 
-function tasksToRows(tasks: ResourceAnalytics['tasks']) {
-  return tasks.map(t => ({
-    'Task ID': t.task_id,
-    'Task Name': t.task_name,
-    'Project': t.project_name ?? '',
-    'Status': t.status,
-    'Priority': t.priority ?? '',
-    'Health Status': t.health_status ?? '',
-    'Start Variance (days)': t.start_variance ?? '',
-    'Completion Variance (days)': t.completion_variance ?? '',
-    'Execution Variance (days)': t.execution_variance ?? '',
-    'Estimated Hrs': Number(t.estimate_hrs).toFixed(1),
-    'Actual Hrs': Number(t.actual_hrs).toFixed(1),
-  }));
-}
+const STATUS_TONE: Record<string, string> = {
+    Done:          'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    'In Progress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    Cancelled:     'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    Backlog:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    Open:          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    Closed:        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    Resolved:      'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+};
 
-function bugsToRows(bugs: ResourceAnalytics['bugs']) {
-  return bugs.map(b => ({
-    'Bug ID': b.bug_id,
-    'Title': b.title,
-    'Source': b.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory',
-    'Status': b.status,
-    'Severity': b.severity,
-    'Project': b.project_name ?? '',
-    'Created': b.creation_date
-      ? new Date(b.creation_date).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
-      : '',
-  }));
-}
+const SOURCE_TONE: Record<string, string> = {
+    TEST_CASE:   'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+    EXPLORATORY: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+};
 
-function StatusIndicator({ config, size = 'sm' }: { config: typeof HEALTH_CONFIG[string]; size?: 'sm' | 'lg' }) {
-    const dotSize = size === 'lg' ? 12 : 8;
-    const pingSize = size === 'lg' ? 12 : 8;
+const PRIORITY_TONE: Record<string, string> = {
+    critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    high:     'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    medium:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    low:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+};
+
+const FALLBACK_PILL = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+
+function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
     return (
-        <span className="relative flex items-center justify-center" style={{ width: dotSize, height: dotSize }}>
-            {config.pulse && (
-                <span
-                    className="animate-ping absolute rounded-full opacity-30"
-                    style={{ width: pingSize, height: pingSize, backgroundColor: config.color }}
-                />
-            )}
-            <span
-                className="relative block rounded-full"
-                style={{
-                    width: dotSize,
-                    height: dotSize,
-                    backgroundColor: config.color,
-                    boxShadow: `0 0 ${size === 'lg' ? '8px' : '4px'} ${config.color}40`,
-                }}
-            />
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
+            {children}
         </span>
     );
 }
 
-function formatVariance(val: number | null): string {
-    if (val === null || val === undefined) return '—';
-    if (val === 0) return '0d';
-    return val > 0 ? `+${val}d` : `${val}d`;
+function HealthPill({ kind }: { kind: string }) {
+    const h = HEALTH_DISPLAY[kind];
+    if (!h) return <span className="text-xs text-slate-400">—</span>;
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${h.pill}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${h.dot}`} />
+            {h.label}
+        </span>
+    );
 }
 
-function varianceColor(val: number | null): string {
-    if (val === null || val === undefined) return 'text-slate-400 dark:text-slate-500';
-    if (val > 0) return 'text-rose-600 dark:text-rose-400';
-    if (val < 0) return 'text-emerald-600 dark:text-emerald-400';
-    return 'text-slate-600 dark:text-slate-300';
+function VarianceCell({ value }: { value: number | null }) {
+    if (value === null || value === undefined) {
+        return <span className="font-mono text-xs text-slate-400 dark:text-slate-500">—</span>;
+    }
+    if (value === 0) {
+        return <span className="font-mono text-xs text-slate-500 dark:text-slate-400">0d</span>;
+    }
+    const cls = value > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400';
+    return (
+        <span className={`font-mono text-xs font-semibold ${cls}`}>
+            {value > 0 ? '+' : ''}{value}d
+        </span>
+    );
+}
+
+function getInitials(name: string): string {
+    return name.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+}
+
+function tasksToRows(tasks: ResourceAnalytics['tasks']) {
+    return tasks.map(t => ({
+        'Task ID': t.task_id,
+        'Task Name': t.task_name,
+        'Project': t.project_name ?? '',
+        'Status': t.status,
+        'Priority': t.priority ?? '',
+        'Health Status': t.health_status ?? '',
+        'Start Variance (days)': t.start_variance ?? '',
+        'Completion Variance (days)': t.completion_variance ?? '',
+        'Execution Variance (days)': t.execution_variance ?? '',
+        'Estimated Hrs': Number(t.estimate_hrs).toFixed(1),
+        'Actual Hrs': Number(t.actual_hrs).toFixed(1),
+    }));
+}
+
+function bugsToRows(bugs: ResourceAnalytics['bugs']) {
+    return bugs.map(b => ({
+        'Bug ID': b.bug_id,
+        'Title': b.title,
+        'Source': b.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory',
+        'Status': b.status,
+        'Severity': b.severity,
+        'Project': b.project_name ?? '',
+        'Created': b.creation_date
+            ? new Date(b.creation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '',
+    }));
 }
 
 export default function ResourceDashboardPage() {
     const params = useParams();
-    const router = useRouter();
     const { user, token, isAdmin } = useAuth();
     const [data, setData] = useState<ResourceAnalytics | null>(null);
     const [loading, setLoading] = useState(true);
@@ -269,7 +273,13 @@ export default function ResourceDashboardPage() {
     }
 
     const { profile, utilization, timeline_summary } = data;
-    const utilizationColor = utilization.utilization_pct > 100 ? 'rose' : utilization.utilization_pct > 80 ? 'amber' : 'emerald';
+    const utilizationPct = Math.min(utilization.utilization_pct, 100);
+    const weekPct = utilization.weekly_capacity_hrs > 0
+        ? Math.min((data.current_week_actual_hrs / utilization.weekly_capacity_hrs) * 100, 100)
+        : 0;
+    const weekPctDisplay = utilization.weekly_capacity_hrs > 0
+        ? ((data.current_week_actual_hrs / utilization.weekly_capacity_hrs) * 100).toFixed(0)
+        : '0';
 
     const statusCounts = data.tasks.reduce((acc, t) => {
         acc[t.status] = (acc[t.status] || 0) + 1;
@@ -277,139 +287,176 @@ export default function ResourceDashboardPage() {
     }, {} as Record<string, number>);
 
     return (
-        <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-5">
+
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link href="/team/resources" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                    <Link
+                        href="/team/resources"
+                        className="mt-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        title="Back"
+                    >
+                        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+                            <path d="M15 18l-6-6 6-6" />
                         </svg>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{profile.resource_name}</h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Resource Analytics Dashboard</p>
+                        <div className="flex items-center gap-3 mb-1">
+                            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                {profile.resource_name}
+                            </h1>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${profile.is_active ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${profile.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                {profile.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Resource Analytics Dashboard{profile.department ? ` · ${profile.department}` : ''}{profile.role ? ` · ${profile.role}` : ''}
+                        </p>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${profile.is_active
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                    }`}>
-                    {profile.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                        onClick={() => downloadXLSX(
+                            `resource_${safeFilename(profile.resource_name)}.xlsx`,
+                            tasksToRows(data.tasks)
+                        )}
+                        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-medium bg-white/50 hover:bg-white/70 dark:bg-slate-800/50 dark:hover:bg-slate-700/70 backdrop-blur-md text-slate-800 dark:text-slate-100 border border-slate-200/40 dark:border-slate-600/40 shadow-sm active:scale-95 transition-all"
+                    >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                        </svg>
+                        Export Excel
+                    </button>
+                    <Link
+                        href={`/team/resources/create?edit=${resourceId}`}
+                        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-medium bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                    >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                        Edit profile
+                    </Link>
+                </div>
             </div>
 
-            {/* Profile Card */}
-            <div className="glass-card rounded-2xl p-6">
-                <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Profile</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Full Name</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.resource_name}</p>
+            {/* Profile card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-violet-500/30 flex-shrink-0">
+                        {getInitials(profile.resource_name)}
                     </div>
                     <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Job Title</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.role || '—'}</p>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Profile</div>
+                        <div className="text-sm text-slate-700 dark:text-slate-200">Identity & department</div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6">
+                    <div>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Full Name</div>
+                        <div className="text-sm text-slate-800 dark:text-slate-100 font-medium truncate">{profile.resource_name}</div>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Email</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.email || '—'}</p>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Job Title</div>
+                        <div className="text-sm text-slate-800 dark:text-slate-100 font-medium truncate">{profile.role || '—'}</div>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Department</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.department || '—'}</p>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Email</div>
+                        <div className="text-sm text-slate-800 dark:text-slate-100 font-medium font-mono truncate" title={profile.email}>{profile.email || '—'}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Department</div>
+                        <div className="text-sm text-slate-800 dark:text-slate-100 font-medium truncate">{profile.department || '—'}</div>
                     </div>
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {/* KPI tiles */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Overall Utilization */}
-                <div className="glass-card rounded-2xl p-6">
-                    <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Overall Utilization</h4>
-                    <div className="flex items-end gap-3">
-                        <span className={`text-3xl font-bold text-${utilizationColor}-600 dark:text-${utilizationColor}-400`}>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Overall Utilization</div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-4xl font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
                             {utilization.utilization_pct.toFixed(0)}%
                         </span>
-                        <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">
-                            {utilization.current_allocation_hrs.toFixed(1)} / {utilization.weekly_capacity_hrs} hrs
-                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">of capacity</span>
                     </div>
-                    <div className="mt-3 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-1.5">
                         <div
-                            className={`h-full bg-${utilizationColor}-500 rounded-full transition-all duration-500`}
-                            style={{ width: `${Math.min(utilization.utilization_pct, 100)}%` }}
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000"
+                            style={{ width: `${utilizationPct}%` }}
                         />
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {utilization.current_allocation_hrs.toFixed(1)} / {utilization.weekly_capacity_hrs} hrs · last 30 days
                     </div>
                 </div>
 
                 {/* Current Week Actuals */}
-                <div className="glass-card rounded-2xl p-6">
-                    <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Current Week Actuals</h4>
-                    <div className="flex items-end gap-3">
-                        <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Current Week Actuals</div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-4xl font-bold text-violet-500 dark:text-violet-400 tabular-nums">
                             {data.current_week_actual_hrs.toFixed(1)}
                         </span>
-                        <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">hours logged</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">hours logged</span>
                     </div>
-                    <div className="mt-3 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-1.5">
                         <div
-                            className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min((data.current_week_actual_hrs / utilization.weekly_capacity_hrs) * 100, 100)}%` }}
+                            className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-1000"
+                            style={{ width: `${weekPct}%` }}
                         />
                     </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                        {((data.current_week_actual_hrs / utilization.weekly_capacity_hrs) * 100).toFixed(0)}% of weekly capacity
-                    </p>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {weekPctDisplay}% of weekly capacity
+                    </div>
                 </div>
 
                 {/* Backlog */}
-                <div className="glass-card rounded-2xl p-6">
-                    <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Backlog</h4>
-                    <div className="flex items-end gap-3">
-                        <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Backlog</div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-4xl font-bold text-amber-500 dark:text-amber-400 tabular-nums">
                             {data.backlog_hrs.toFixed(1)}
                         </span>
-                        <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">estimated hours</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">estimated hours</span>
                     </div>
-                    <div className="flex items-center gap-4 mt-3">
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">{statusCounts['In Progress'] || 0}</span> In Progress
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-3.5 border-t border-slate-100 dark:border-slate-800">
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            {statusCounts['In Progress'] || 0} in progress
                         </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">{statusCounts['Backlog'] || 0}</span> Backlog
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            {statusCounts['Backlog'] || 0} backlog
                         </span>
                     </div>
                 </div>
             </div>
 
-            {/* Timeline Health Summary */}
-            <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Timeline Health</h3>
+            {/* Timeline Health */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-6 py-3.5 border-b border-slate-100 dark:border-slate-800">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Timeline Health</h2>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800">
-                    {Object.entries(HEALTH_CONFIG).map(([key, cfg]) => {
-                        const count = timeline_summary[key as keyof typeof timeline_summary] || 0;
+                    {TIMELINE_BUCKETS.map(b => {
+                        const count = timeline_summary[b.key] || 0;
                         return (
                             <div
-                                key={key}
-                                className="relative p-5 transition-all"
-                                style={{ backgroundColor: count > 0 ? `${cfg.lightBg}` : undefined }}
+                                key={b.key}
+                                className="px-6 py-5 hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
                             >
-                                <div className="flex items-center gap-2.5 mb-3">
-                                    <StatusIndicator config={cfg} size="lg" />
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{cfg.label}</span>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`w-2 h-2 rounded-full ${b.dot}`} />
+                                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
+                                        {b.label}
+                                    </span>
                                 </div>
-                                <p
-                                    className="text-3xl font-bold tracking-tight"
-                                    style={{ color: count > 0 ? cfg.lightText : '#94a3b8' }}
-                                >
-                                    {count}
-                                </p>
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                                    {count === 1 ? 'task' : 'tasks'}
-                                </p>
+                                <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums leading-none">{count}</div>
+                                <div className="text-xs text-slate-400 mt-1.5">{count === 1 ? 'task' : 'tasks'}</div>
                             </div>
                         );
                     })}
@@ -417,52 +464,38 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Task Summary */}
-            <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                        Task Summary
-                    </h3>
-                </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Task Summary</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Status</p>
-                        <div className="space-y-2">
-                            {Object.entries(data.task_summary.by_status).map(([status, count]) => {
-                                const color = status === 'Done' ? 'emerald' : status === 'In Progress' ? 'blue' : status === 'Cancelled' ? 'slate' : 'amber';
-                                return (
-                                    <div key={status} className="flex items-center justify-between">
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[color]}`}>
-                                            {status}
-                                        </span>
-                                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
-                                    </div>
-                                );
-                            })}
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2.5">By Status</div>
+                        <div className="space-y-1.5">
+                            {Object.entries(data.task_summary.by_status).map(([status, count]) => (
+                                <div key={status} className="flex items-center justify-between text-sm">
+                                    <Pill tone={STATUS_TONE[status] ?? FALLBACK_PILL}>{status}</Pill>
+                                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{count}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                     <div>
-                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Priority</p>
-                        <div className="space-y-2">
-                            {Object.entries(data.task_summary.by_priority).map(([priority, count]) => {
-                                const color = priority === 'critical' ? 'red' : priority === 'high' ? 'rose' : priority === 'medium' ? 'amber' : 'slate';
-                                return (
-                                    <div key={priority} className="flex items-center justify-between">
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded capitalize ${BADGE_CLASSES[color]}`}>
-                                            {priority}
-                                        </span>
-                                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
-                                    </div>
-                                );
-                            })}
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2.5">By Priority</div>
+                        <div className="space-y-1.5">
+                            {Object.entries(data.task_summary.by_priority).map(([priority, count]) => (
+                                <div key={priority} className="flex items-center justify-between text-sm">
+                                    <Pill tone={PRIORITY_TONE[priority.toLowerCase()] ?? FALLBACK_PILL}>{priority}</Pill>
+                                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{count}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                     <div>
-                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">By Project</p>
-                        <div className="space-y-2">
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2.5">By Project</div>
+                        <div className="space-y-1.5 text-sm">
                             {Object.entries(data.task_summary.by_project).map(([project, count]) => (
                                 <div key={project} className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate max-w-[140px]">{project}</span>
-                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-2">{count}</span>
+                                    <span className="text-slate-700 dark:text-slate-200 font-medium truncate max-w-[180px]">{project}</span>
+                                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums ml-2">{count}</span>
                                 </div>
                             ))}
                         </div>
@@ -470,12 +503,12 @@ export default function ResourceDashboardPage() {
                 </div>
             </div>
 
-            {/* Assigned Tasks Table with Timeline Columns */}
-            <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                        Assigned Tasks ({data.tasks.length})
-                    </h3>
+            {/* Assigned Tasks */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Assigned Tasks <span className="text-slate-400 font-normal">({data.tasks.length})</span>
+                    </h2>
                     {data.tasks.length > 0 && (
                         <div className="flex items-center gap-2">
                             <button
@@ -484,7 +517,7 @@ export default function ResourceDashboardPage() {
                                     `resource_tasks_${safeFilename(profile.resource_name)}.csv`,
                                     tasksToRows(data.tasks)
                                 )}
-                                className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                className="h-8 px-3 text-xs inline-flex items-center gap-1.5 rounded-lg font-medium bg-white/50 hover:bg-white/70 dark:bg-slate-800/50 dark:hover:bg-slate-700/70 backdrop-blur-md text-slate-800 dark:text-slate-100 border border-slate-200/40 dark:border-slate-600/40 shadow-sm active:scale-95 transition-all"
                             >
                                 Export CSV
                             </button>
@@ -494,7 +527,7 @@ export default function ResourceDashboardPage() {
                                     `resource_tasks_${safeFilename(profile.resource_name)}.xlsx`,
                                     tasksToRows(data.tasks)
                                 )}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white transition-colors shadow-sm"
+                                className="h-8 px-3 text-xs inline-flex items-center gap-1.5 rounded-lg font-medium bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-sm active:scale-95 transition-all"
                             >
                                 Export Excel
                             </button>
@@ -507,76 +540,64 @@ export default function ResourceDashboardPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table data-testid="tasks-table" className="w-full table-fixed">
-                            <thead className="bg-slate-50 dark:bg-slate-800/50">
-                                <tr>
-                                    <th className="w-[26%] px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Task</th>
-                                    <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
-                                    <th className="w-[9%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                                    <th className="w-[11%] px-3 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Health</th>
-                                    <th className="w-[9%] px-3 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap" title="Start Variance (working days)">Start Var.</th>
-                                    <th className="w-[9%] px-3 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap" title="Completion Variance (working days)">Comp. Var.</th>
-                                    <th className="w-[9%] px-3 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap" title="Execution Variance (working days)">Exec. Var.</th>
-                                    <th className="w-[9%] px-3 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">Est. Hrs</th>
-                                    <th className="w-[10%] px-3 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">Actual Hrs</th>
+                        <table data-testid="tasks-table" className="w-full text-sm" style={{ minWidth: 1100 }}>
+                            <thead>
+                                <tr className="bg-slate-50/60 dark:bg-slate-900/40 text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                                    <th className="text-left font-bold py-3 pl-5 pr-3" style={{ minWidth: 280 }}>Task</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 80 }}>Project</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 90 }}>Status</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 100 }}>Health</th>
+                                    <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Start var.</th>
+                                    <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Comp. var.</th>
+                                    <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Exec. var.</th>
+                                    <th className="text-right font-bold py-3 px-3" style={{ minWidth: 75 }}>Est hrs</th>
+                                    <th className="text-right font-bold py-3 pl-3 pr-5" style={{ minWidth: 80 }}>Actual hrs</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {tasksPagination.slice(data.tasks).map(task => {
-                                    const healthCfg = task.health_status ? HEALTH_CONFIG[task.health_status] : null;
-                                    const statusColor =
-                                        task.status === 'Done' ? 'emerald' :
-                                            task.status === 'In Progress' ? 'blue' :
-                                                task.status === 'Cancelled' ? 'slate' : 'amber';
-                                    return (
-                                        <tr key={task.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-4 py-3">
-                                                <Link href={`/work/tasks/${task.id}`} className="block text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate">
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{task.task_id}</span>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {tasksPagination.slice(data.tasks).map(task => (
+                                    <tr key={task.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors">
+                                        <td className="py-3.5 pl-5 pr-3">
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono text-[11px] font-semibold text-violet-600 dark:text-violet-300 flex-shrink-0">
+                                                    {task.task_id}
+                                                </span>
+                                                <Link
+                                                    href={`/work/tasks/${task.id}`}
+                                                    className="text-slate-800 dark:text-slate-100 font-medium truncate max-w-[220px] hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                    title={task.task_name}
+                                                >
                                                     {task.task_name}
                                                 </Link>
-                                            </td>
-                                            <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400 truncate">{task.project_name || '—'}</td>
-                                            <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-1 rounded-lg bg-${statusColor}-50 dark:bg-${statusColor}-900/20 text-${statusColor}-600 dark:text-${statusColor}-400`}>
-                                                    {task.status}
-                                                </span>
-                                            </td>
-                                            {/* Health Status */}
-                                            <td className="px-3 py-3 text-center whitespace-nowrap">
-                                                {healthCfg ? (
-                                                    <span
-                                                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
-                                                        style={{
-                                                            backgroundColor: healthCfg.lightBg,
-                                                            color: healthCfg.lightText,
-                                                            border: `1px solid ${healthCfg.lightBorder}`,
-                                                        }}
-                                                    >
-                                                        <StatusIndicator config={healthCfg} size="sm" />
-                                                        {healthCfg.label}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
-                                                )}
-                                            </td>
-                                            {/* Start Variance */}
-                                            <td className={`px-3 py-3 text-center text-sm font-semibold tabular-nums whitespace-nowrap ${varianceColor(task.start_variance)}`}>
-                                                {formatVariance(task.start_variance)}
-                                            </td>
-                                            {/* Completion Variance */}
-                                            <td className={`px-3 py-3 text-center text-sm font-semibold tabular-nums whitespace-nowrap ${varianceColor(task.completion_variance)}`}>
-                                                {formatVariance(task.completion_variance)}
-                                            </td>
-                                            {/* Execution Variance */}
-                                            <td className={`px-3 py-3 text-center text-sm font-semibold tabular-nums whitespace-nowrap ${varianceColor(task.execution_variance)}`}>
-                                                {formatVariance(task.execution_variance)}
-                                            </td>
-                                            <td className="px-3 py-3 text-right text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">{Number(task.estimate_hrs).toFixed(1)}</td>
-                                            <td className="px-3 py-3 text-right text-sm font-medium text-slate-900 dark:text-white whitespace-nowrap">{Number(task.actual_hrs).toFixed(1)}</td>
-                                        </tr>
-                                    );
-                                })}
+                                            </div>
+                                        </td>
+                                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300 font-medium">{task.project_name || '—'}</td>
+                                        <td className="py-3.5 px-3">
+                                            <Pill tone={STATUS_TONE[task.status] ?? FALLBACK_PILL}>{task.status}</Pill>
+                                        </td>
+                                        <td className="py-3.5 px-3">
+                                            {task.health_status
+                                                ? <HealthPill kind={task.health_status} />
+                                                : <span className="text-xs text-slate-400">—</span>
+                                            }
+                                        </td>
+                                        <td className="py-3.5 px-3 text-right">
+                                            <VarianceCell value={task.start_variance} />
+                                        </td>
+                                        <td className="py-3.5 px-3 text-right">
+                                            <VarianceCell value={task.completion_variance} />
+                                        </td>
+                                        <td className="py-3.5 px-3 text-right">
+                                            <VarianceCell value={task.execution_variance} />
+                                        </td>
+                                        <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-600 dark:text-slate-300 tabular-nums">
+                                            {Number(task.estimate_hrs).toFixed(1)}
+                                        </td>
+                                        <td className="py-3.5 pl-3 pr-5 text-right font-mono text-xs text-slate-700 dark:text-slate-200 font-semibold tabular-nums">
+                                            {Number(task.actual_hrs).toFixed(1)}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                         <Pagination
@@ -591,11 +612,11 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Reported Bugs */}
-            <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                        Reported Bugs ({data.bugs.length})
-                    </h3>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Reported Bugs <span className="text-slate-400 font-normal">({data.bugs.length})</span>
+                    </h2>
                     {data.bugs.length > 0 && (
                         <div className="flex items-center gap-2">
                             <button
@@ -604,7 +625,7 @@ export default function ResourceDashboardPage() {
                                     `resource_bugs_${safeFilename(profile.resource_name)}.csv`,
                                     bugsToRows(data.bugs)
                                 )}
-                                className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                className="h-8 px-3 text-xs inline-flex items-center gap-1.5 rounded-lg font-medium bg-white/50 hover:bg-white/70 dark:bg-slate-800/50 dark:hover:bg-slate-700/70 backdrop-blur-md text-slate-800 dark:text-slate-100 border border-slate-200/40 dark:border-slate-600/40 shadow-sm active:scale-95 transition-all"
                             >
                                 Export CSV
                             </button>
@@ -614,7 +635,7 @@ export default function ResourceDashboardPage() {
                                     `resource_bugs_${safeFilename(profile.resource_name)}.xlsx`,
                                     bugsToRows(data.bugs)
                                 )}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white transition-colors shadow-sm"
+                                className="h-8 px-3 text-xs inline-flex items-center gap-1.5 rounded-lg font-medium bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-sm active:scale-95 transition-all"
                             >
                                 Export Excel
                             </button>
@@ -627,51 +648,46 @@ export default function ResourceDashboardPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table data-testid="bugs-table" className="w-full table-fixed">
-                            <thead className="bg-slate-50 dark:bg-slate-800/50">
-                                <tr>
-                                    <th className="w-[8%] px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID</th>
-                                    <th className="w-[28%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Title</th>
-                                    <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Source</th>
-                                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Severity</th>
-                                    <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
-                                    <th className="w-[14%] px-3 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created</th>
+                        <table data-testid="bugs-table" className="w-full text-sm" style={{ minWidth: 1000 }}>
+                            <thead>
+                                <tr className="bg-slate-50/60 dark:bg-slate-900/40 text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                                    <th className="text-left font-bold py-3 pl-5 pr-3" style={{ minWidth: 80 }}>ID</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 300 }}>Title</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 110 }}>Source</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 90 }}>Status</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 90 }}>Severity</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 90 }}>Project</th>
+                                    <th className="text-left font-bold py-3 pl-3 pr-5" style={{ minWidth: 110 }}>Created</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {bugsPagination.slice(data.bugs).map(bug => {
-                                    const sourceColor = bug.source === 'TEST_CASE' ? 'violet' : 'orange';
-                                    const statusColor = bug.status === 'Closed' || bug.status === 'Resolved' ? 'emerald' : bug.status === 'Open' ? 'rose' : 'amber';
-                                    const severityColor = bug.severity === 'critical' ? 'red' : bug.severity === 'high' ? 'rose' : bug.severity === 'medium' ? 'amber' : 'slate';
-                                    return (
-                                        <tr key={bug.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400">{bug.bug_id}</td>
-                                            <td className="px-3 py-3 text-sm text-slate-900 dark:text-white truncate">{bug.title}</td>
-                                            <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[sourceColor]}`}>
-                                                    {bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory'}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${BADGE_CLASSES[statusColor]}`}>
-                                                    {bug.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-3 whitespace-nowrap">
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded capitalize ${BADGE_CLASSES[severityColor]}`}>
-                                                    {bug.severity}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400 truncate">{bug.project_name || '—'}</td>
-                                            <td className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                                {bug.creation_date
-                                                    ? new Date(bug.creation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                                                    : '—'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {bugsPagination.slice(data.bugs).map(bug => (
+                                    <tr key={bug.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors">
+                                        <td className="py-3.5 pl-5 pr-3 font-mono text-[11px] font-semibold text-violet-600 dark:text-violet-300">
+                                            {bug.bug_id}
+                                        </td>
+                                        <td className="py-3.5 px-3 text-slate-800 dark:text-slate-100 font-medium" dir="auto">
+                                            <div className="truncate max-w-[300px]" title={bug.title}>{bug.title}</div>
+                                        </td>
+                                        <td className="py-3.5 px-3">
+                                            <Pill tone={SOURCE_TONE[bug.source] ?? FALLBACK_PILL}>
+                                                {bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory'}
+                                            </Pill>
+                                        </td>
+                                        <td className="py-3.5 px-3">
+                                            <Pill tone={STATUS_TONE[bug.status] ?? FALLBACK_PILL}>{bug.status}</Pill>
+                                        </td>
+                                        <td className="py-3.5 px-3">
+                                            <Pill tone={SEV_TONE[bug.severity?.toLowerCase()] ?? FALLBACK_PILL}>{bug.severity}</Pill>
+                                        </td>
+                                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300 font-medium">{bug.project_name || '—'}</td>
+                                        <td className="py-3.5 pl-3 pr-5 text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">
+                                            {bug.creation_date
+                                                ? new Date(bug.creation_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                : '—'}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                         <Pagination
@@ -686,16 +702,19 @@ export default function ResourceDashboardPage() {
             </div>
 
             {/* Variance Legend */}
-            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Variance Legend (Working Days, Sun–Thu)</p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                    <span><strong>Start Var.</strong> = Actual Start − Expected Start</span>
-                    <span><strong>Comp. Var.</strong> = Actual End − Deadline</span>
-                    <span><strong>Exec. Var.</strong> = Actual Duration − Estimate Days</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">Negative = early/under</span>
-                    <span className="text-rose-600 dark:text-rose-400">Positive = late/over</span>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">
+                    Variance Legend (Working Days, Sun–Thu)
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div><span className="font-semibold">Start Var.</span> = Actual Start − Expected Start</div>
+                    <div><span className="font-semibold">Comp. Var.</span> = Actual End − Deadline</div>
+                    <div><span className="font-semibold">Exec. Var.</span> = Actual Duration − Estimate Days</div>
+                    <div><span className="text-emerald-600 dark:text-emerald-400 font-semibold">Negative</span> = early / under</div>
+                    <div><span className="text-rose-600 dark:text-rose-400 font-semibold">Positive</span> = late / over</div>
                 </div>
             </div>
+
         </div>
     );
 }
