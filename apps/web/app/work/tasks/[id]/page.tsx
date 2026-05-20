@@ -103,7 +103,7 @@ export default function TaskDetailPage() {
     if (!task) return <div className="p-10 text-center text-slate-500">Task not found</div>;
 
     const status = task.status || '';
-    const progress = task.overall_completion_pct || 0;
+    const progress = Number(task.overall_completion_pct || 0);
     const progressGradient = PROGRESS_GRADIENT[status] ?? 'from-slate-400 to-slate-300';
     const progressTextColor = PROGRESS_TEXT[status] ?? 'text-slate-500';
 
