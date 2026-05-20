@@ -2,6 +2,16 @@ const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
 
 const VALID_TASK_ACTIONS = new Set(['sync', 'delete', 'reject', 'archive']);
 
+const TASK_STATUS_MAP = {
+  'Backlog': 'Todo',
+  'Cancelled': 'Canceled',
+};
+
+function normalizeTaskStatus(status) {
+  if (!status) return 'Todo';
+  return TASK_STATUS_MAP[status] ?? status;
+}
+
 async function generateTaskId(query) {
   const result = await query(
     "SELECT task_id FROM tasks WHERE task_id LIKE 'TSK-%' ORDER BY task_id DESC LIMIT 1"
@@ -197,7 +207,7 @@ async function handleSync(unified, config, { query }) {
     `, [
       common.title || null,
       common.description || null,
-      common.status || null,
+      common.status ? normalizeTaskStatus(common.status) : null,
       common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null,
       tuleapUrl,
       parentStoryTuleapArtifactId,
@@ -233,7 +243,7 @@ async function handleSync(unified, config, { query }) {
         updated_at = NOW()
       WHERE id = $8
       RETURNING *
-    `, [common.status || 'Backlog', common.title, common.description, resourceId, tuleapUrl,
+    `, [normalizeTaskStatus(common.status), common.title, common.description, resourceId, tuleapUrl,
       parentStoryTuleapArtifactId, parentUserStoryId, task.id]);
 
     if (resolved.length > 0) {
@@ -261,7 +271,7 @@ async function handleSync(unified, config, { query }) {
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10)
     RETURNING *
   `, [
-    task_id, common.title, common.description || '', common.status || 'Backlog',
+    task_id, common.title, common.description || '', normalizeTaskStatus(common.status),
     projectId, resourceId,
     tuleapArtifactId, tuleapUrl, parentStoryTuleapArtifactId, parentUserStoryId,
   ]);

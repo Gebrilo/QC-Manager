@@ -23,7 +23,7 @@ export default function ProjectDetailPage() {
     const loadUserStories = async () => {
         setStoriesLoading(true);
         try {
-            const result = await tuleapApi.list('user-story', { limit: 100 });
+            const result = await tuleapApi.list('user-story', { project_id: id, limit: 100 });
             setUserStories(result.data);
         } catch (err) {
             console.error(err);

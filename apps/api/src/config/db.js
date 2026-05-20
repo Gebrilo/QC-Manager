@@ -548,6 +548,7 @@ const runMigrations = async () => {
         await client.query(`DROP VIEW IF EXISTS v_dashboard_metrics CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_resources_with_utilization CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_projects_with_metrics CASCADE`);
+        await client.query(`DROP VIEW IF EXISTS v_bug_summary CASCADE`);
 
         // Bug Summary View (no dependency on normalized tables)
         await client.query(`
@@ -2328,7 +2329,7 @@ const runMigrations = async () => {
             )
         `);
 
-        const { ALL_PERMISSION_VALUES } = require('../../shared/rbac/catalog.ts');
+        const { ALL_PERMISSION_VALUES } = require('../../../shared/rbac/catalog.ts');
         for (const permKey of ALL_PERMISSION_VALUES) {
             const domain = permKey.split('.').slice(0, -1).join('.');
             await client.query(`
@@ -2394,6 +2395,17 @@ const runMigrations = async () => {
             'action:governance:approve_release': 'qc.governance.approve_release',
         };
         for (const [legacyKey, canonicalKey] of Object.entries(LEGACY_TO_CANONICAL)) {
+            // Delete legacy rows where the canonical key already exists for the same user (avoid duplicate conflict)
+            await client.query(`
+                DELETE FROM user_permissions up
+                WHERE up.permission_key = $2
+                  AND EXISTS (
+                      SELECT 1 FROM user_permissions dup
+                      WHERE dup.user_id = up.user_id AND dup.permission_key = $1
+                  )
+            `, [canonicalKey, legacyKey]);
+
+            // Update remaining legacy rows to canonical
             await client.query(`
                 UPDATE user_permissions
                 SET permission_key = $1
