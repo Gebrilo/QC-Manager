@@ -5,9 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { fetchApi, taskTestCaseLinksApi } from '@/lib/api';
 import { Task } from '@/types';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
 import { TaskCommentSection } from '@/components/tasks/TaskCommentSection';
 import {
@@ -16,6 +13,58 @@ import {
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import Link from 'next/link';
+
+// ── Status pill config ──────────────────────────────────────────────────────
+
+const STATUS_STYLE: Record<string, { dot: string; pill: string }> = {
+    'Done':        { dot: 'bg-emerald-500', pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+    'In Progress': { dot: 'bg-blue-500',    pill: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+    'Backlog':     { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+    'To Do':       { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+    'Blocked':     { dot: 'bg-rose-500',    pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+    'Cancelled':   { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+};
+
+const PROGRESS_GRADIENT: Record<string, string> = {
+    'Done':        'from-emerald-500 to-emerald-400',
+    'In Progress': 'from-blue-500 to-blue-400',
+    'Blocked':     'from-rose-500 to-rose-400',
+};
+
+const PROGRESS_TEXT: Record<string, string> = {
+    'Done':        'text-emerald-500 dark:text-emerald-400',
+    'In Progress': 'text-blue-500 dark:text-blue-400',
+    'Blocked':     'text-rose-500 dark:text-rose-400',
+};
+
+// ── Local primitives ────────────────────────────────────────────────────────
+
+function StatusPill({ status }: { status: string }) {
+    const s = STATUS_STYLE[status] ?? STATUS_STYLE['Backlog'];
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${s.pill}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+            {status}
+        </span>
+    );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">{children}</div>;
+}
+
+function QCCard({ className = '', children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+    return (
+        <div
+            className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm ${className}`}
+            {...props}
+        >
+            {children}
+        </div>
+    );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export default function TaskDetailPage() {
     const params = useParams();
@@ -40,9 +89,7 @@ export default function TaskDetailPage() {
 
     const handleDelete = async () => {
         if (!task) return;
-        if (!confirm(`Are you sure you want to delete task "${task.task_name}"? This will archive the task.`)) {
-            return;
-        }
+        if (!confirm(`Are you sure you want to delete task "${task.task_name}"? This will archive the task.`)) return;
         try {
             await fetchApi(`/tasks/${task.id}`, { method: 'DELETE' });
             alert('Task deleted successfully');
@@ -52,182 +99,261 @@ export default function TaskDetailPage() {
         }
     };
 
-    const getStatusVariant = (status: string | undefined) => {
-        switch (status) {
-            case 'Done': return 'complete';
-            case 'In Progress': return 'ontrack'; // using ontrack color (blue) for in progress
-            case 'Backlog': return 'notasks';
-            case 'Cancelled': return 'atrisk'; // or generic error
-            default: return 'default';
-        }
-    };
-
     if (isLoading) return <div className="p-10 text-center"><Spinner size="lg" /></div>;
-    if (!task) return <div className="p-10 text-center">Task not found</div>;
+    if (!task) return <div className="p-10 text-center text-slate-500">Task not found</div>;
 
-    const variant = getStatusVariant(task.status);
+    const status = task.status || '';
+    const progress = task.overall_completion_pct || 0;
+    const progressGradient = PROGRESS_GRADIENT[status] ?? 'from-slate-400 to-slate-300';
+    const progressTextColor = PROGRESS_TEXT[status] ?? 'text-slate-500';
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => router.back()}>
+        <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                        onClick={() => router.back()}
+                        className="mt-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                    >
                         ← Back
-                    </Button>
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{task.task_name}</h1>
-                            <Badge variant={variant === 'complete' ? 'complete' : variant === 'ontrack' ? 'inprogress' : 'default'}>
-                                {task.status}
-                            </Badge>
+                    </button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" dir="auto">
+                                {task.task_name}
+                            </h1>
+                            <StatusPill status={status} />
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                             {task.tuleap_url ? (
                                 <a
                                     href={task.tuleap_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                                    className="font-mono font-semibold text-violet-600 dark:text-violet-300 hover:underline"
                                 >
                                     {task.task_id}
                                 </a>
                             ) : (
-                                task.task_id
+                                <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">
+                                    {task.task_id}
+                                </span>
                             )}
-                            {' '}• {task.project_name || 'No Project'}
-                        </p>
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                            <span>{task.project_name || 'No Project'}</span>
+                        </div>
                         {task.parent_user_story_id && (
                             <Link
                                 href={`/work/stories/${task.parent_user_story_id}`}
                                 className="mt-1 inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
                             >
-                                Parent user story
+                                ↗ Parent user story
                             </Link>
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/work/tasks/${task.id}/edit`}>
-                        <Button variant="outline">Edit Task</Button>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                            </svg>
+                            Edit Task
+                        </Button>
                     </Link>
                     <Button
                         variant="outline"
+                        size="sm"
                         onClick={handleDelete}
-                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                        className="gap-1.5 text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
                     >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
+                        </svg>
                         Delete
                     </Button>
                 </div>
             </div>
 
-            {/* Content Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Main Info */}
-                <div className="md:col-span-2 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Description</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                                {task.description || 'No description provided.'}
-                            </p>
-                        </CardContent>
-                    </Card>
+            {/* ── Two-column layout ───────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-5">
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Work & Time</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-6">
-                                <DetailItem label="Estimated Hours" value={Number(task.total_est_hrs || 0).toFixed(1)} />
-                                <DetailItem label="Actual Hours" value={Number(task.total_actual_hrs || 0).toFixed(1)} />
-                                <DetailItem label="Progress" value={`${task.overall_completion_pct || 0}%`} />
-                                {/* Visual Progress */}
-                                <div className="col-span-2 mt-2">
-                                    <ProgressBar value={task.overall_completion_pct || 0} variant={variant === 'complete' ? 'complete' : 'ontrack'} />
+                {/* Left (2/3) */}
+                <div className="col-span-2 space-y-5">
+
+                    {/* Description */}
+                    <QCCard>
+                        <SectionLabel>Description</SectionLabel>
+                        {task.description ? (
+                            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                                {task.description}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">No description provided.</p>
+                        )}
+                    </QCCard>
+
+                    {/* Work & Time */}
+                    <QCCard>
+                        <SectionLabel>Work & Time</SectionLabel>
+                        <div className="grid grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
+                                    Estimated Hours
+                                </div>
+                                <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+                                    {Number(task.total_est_hrs || 0).toFixed(1)}
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <div>
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
+                                    Actual Hours
+                                </div>
+                                <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">
+                                    {Number(task.total_actual_hrs || 0).toFixed(1)}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-baseline justify-between mb-2">
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Progress</div>
+                            <div className={`text-sm font-bold tabular-nums ${progressTextColor}`}>
+                                {progress.toFixed(2)}%
+                            </div>
+                        </div>
+                        <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full bg-gradient-to-r ${progressGradient} transition-all duration-700`}
+                                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                            />
+                        </div>
+                    </QCCard>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Notes</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {task.notes ? (
-                                <div
-                                    className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-indigo-600 [&_a]:underline"
-                                    dangerouslySetInnerHTML={{ __html: task.notes.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '') }}
-                                />
-                            ) : (
-                                <p className="text-slate-700 dark:text-slate-300 italic">No notes added.</p>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* Notes */}
+                    <QCCard>
+                        <SectionLabel>Notes</SectionLabel>
+                        {task.notes ? (
+                            <div
+                                className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-indigo-600 [&_a]:underline"
+                                dangerouslySetInnerHTML={{
+                                    __html: task.notes
+                                        .replace(/<script[\s\S]*?<\/script>/gi, '')
+                                        .replace(/<iframe[\s\S]*?<\/iframe>/gi, ''),
+                                }}
+                            />
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">No notes added.</p>
+                        )}
+                    </QCCard>
+
+                    {/* Comments */}
+                    <TaskCommentSection taskId={task.id} />
                 </div>
 
-                {/* Sidebar Info */}
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Resources</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-xs">R1</div>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900 dark:text-white">{task.resource1_name || 'Unassigned'}</p>
-                                        <p className="text-xs text-slate-500">Primary Resource</p>
+                {/* Right column (1/3) */}
+                <div className="space-y-5">
+
+                    {/* Resources */}
+                    <QCCard>
+                        <SectionLabel>Resources</SectionLabel>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-violet-500/30 flex-shrink-0">
+                                    R1
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                                        {task.resource1_name || 'Unassigned'}
+                                    </p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Primary Resource</p>
+                                </div>
+                            </div>
+                            {task.resource2_name && (
+                                <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-indigo-500/30 flex-shrink-0">
+                                        R2
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                                            {task.resource2_name}
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Secondary Resource</p>
                                     </div>
                                 </div>
-                                {task.resource2_name && (
-                                    <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
-                                        <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center text-violet-700 dark:text-violet-400 font-bold text-xs">R2</div>
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-900 dark:text-white">{task.resource2_name}</p>
-                                            <p className="text-xs text-slate-500">Secondary Resource</p>
-                                        </div>
+                            )}
+                        </div>
+                    </QCCard>
+
+                    {/* Dates */}
+                    <QCCard>
+                        <SectionLabel>Dates</SectionLabel>
+                        <div className="space-y-0">
+                            {([
+                                { label: 'Expected Start', value: task.expected_start_date, cls: 'text-slate-700 dark:text-slate-200' },
+                                { label: 'Actual Start',   value: task.actual_start_date,   cls: 'text-slate-700 dark:text-slate-200' },
+                                { label: 'Deadline',       value: task.deadline,             cls: 'text-rose-600 dark:text-rose-400' },
+                                { label: 'Completed',      value: task.completed_date,       cls: 'text-emerald-600 dark:text-emerald-400' },
+                            ] as const).map(({ label, value, cls }) => (
+                                <div
+                                    key={label}
+                                    className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 last:border-0 py-3 last:pb-0 first:pt-0"
+                                >
+                                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                                        {label}
                                     </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    <div className={`text-sm font-semibold tabular-nums ${value ? cls : 'text-slate-400'}`}>
+                                        {value ? new Date(value).toLocaleDateString() : '—'}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </QCCard>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm uppercase tracking-wider text-slate-400">Dates</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <DetailItem
-                                    label="Expected Start"
-                                    value={task.expected_start_date ? new Date(task.expected_start_date).toLocaleDateString() : '-'}
-                                />
-                                <DetailItem
-                                    label="Actual Start"
-                                    value={task.actual_start_date ? new Date(task.actual_start_date).toLocaleDateString() : '-'}
-                                />
-                                <DetailItem label="Deadline" value={task.deadline ? new Date(task.deadline).toLocaleDateString() : '-'} />
-                                <DetailItem label="Completed Date" value={task.completed_date ? new Date(task.completed_date).toLocaleDateString() : '-'} />
-                            </div>
-                        </CardContent>
-                    </Card>
-
+                    {/* Quick Actions */}
+                    <QCCard>
+                        <SectionLabel>Quick Actions</SectionLabel>
+                        <div className="space-y-1">
+                            <Link
+                                href={`/work/tasks/${task.id}/edit`}
+                                className="w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center gap-2"
+                            >
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75M8.5 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                Reassign resource
+                            </Link>
+                            <Link
+                                href={`/work/tasks/${task.id}/edit`}
+                                className="w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center gap-2"
+                            >
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+                                </svg>
+                                Reschedule
+                            </Link>
+                            <button
+                                disabled
+                                className="w-full px-3 py-2 rounded-lg text-sm text-left text-slate-400 cursor-not-allowed flex items-center gap-2"
+                            >
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                                </svg>
+                                Export task
+                            </button>
+                        </div>
+                    </QCCard>
                 </div>
             </div>
 
-            {/* Comments — full width */}
-            <TaskCommentSection taskId={task.id} />
-
+            {/* ── Linked Artifacts ────────────────────────────────────── */}
             <TaskLinkedArtifactsSections taskId={task.id} projectId={task.project_id || null} />
         </div>
     );
 }
+
+// ── Linked artifacts ─────────────────────────────────────────────────────────
 
 function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; projectId: string | null }) {
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
@@ -296,15 +422,6 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
             {sections.map(section => (
                 <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
             ))}
-        </div>
-    );
-}
-
-function DetailItem({ label, value }: { label: string, value: string | number }) {
-    return (
-        <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">{label}</span>
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">{value}</span>
         </div>
     );
 }
