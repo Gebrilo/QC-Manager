@@ -70,3 +70,4 @@ backups-staging/
 playwright-report/
 test-results/
 .worktrees/
+.claude/worktrees/
