@@ -262,113 +262,128 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
             onDelete?.(pendingDelete.id);
         } catch (err) {
             console.error(err);
-        } finally {
+    } finally {
             setDeletingId(null);
             setPendingDelete(null);
         }
     }
-    if (isLoading) {
-        return (
-            <div className="glass-card rounded-xl overflow-hidden">
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {[1, 2, 3, 4, 5].map(index => (
-                        <div key={index} className="px-6 py-4 flex items-center gap-4 animate-pulse">
-                            <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-4 flex-1 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    if (stories.length === 0) {
-        return (
-            <div className="glass-card rounded-xl p-12 text-center">
-                <svg className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-slate-500 dark:text-slate-400">No user stories found.</p>
-            </div>
-        );
-    }
 
     return (
-        <div className="glass-card rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-24">ID</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Title</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-28">Status</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-28">Priority</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-16">Points</th>
-                        <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-24">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {stories.map(story => (
-                        <tr key={story.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <td className="px-6 py-3">
-                                <span className="font-mono text-xs text-slate-400">
-                                    {story.tuleap_artifact_id ? `#${story.tuleap_artifact_id}` : '-'}
-                                </span>
-                            </td>
-                            <td className="px-6 py-3">
-                                <Link
-                                    href={`/work/stories/${story.id}`}
-                                    className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-1"
-                                >
-                                    {story.title || <span className="text-slate-400 italic">Untitled</span>}
-                                </Link>
-                            </td>
-                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400 text-sm truncate max-w-[180px]">
-                                {story.project_name ?? '-'}
-                            </td>
-                            <td className="px-6 py-3">
-                                {story.status ? (
-                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[story.status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
-                                        {story.status}
-                                    </span>
-                                ) : '-'}
-                            </td>
-                            <td className="px-6 py-3">
-                                {story.priority && story.priority !== 'None' ? (
-                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_BADGE[story.priority] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
-                                        {story.priority}
-                                    </span>
-                                ) : (
-                                    <span className="text-slate-300 dark:text-slate-600">-</span>
-                                )}
-                            </td>
-                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400 text-sm">
-                                {story.story_points ?? '-'}
-                            </td>
-                            <td className="px-6 py-3 text-right">
-                                <div className="flex items-center justify-end gap-3">
-                                    <Link
-                                        href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
-                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
-                                    >
-                                        Edit
-                                    </Link>
-                                    <button
-                                        onClick={() => setPendingDelete(story)}
-                                        disabled={deletingId === story.id}
-                                        className="text-xs text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors disabled:opacity-40"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h2 className="font-semibold text-slate-900 dark:text-white">All User Stories</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{stories.length} rows</p>
+                </div>
+                <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
+                    <span>Scroll to see all columns</span>
+                </div>
+            </div>
+            <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
+                <style jsx>{`
+                    .bugs-table-scroll::-webkit-scrollbar {
+                        height: 8px;
+                    }
+                    .bugs-table-scroll::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .bugs-table-scroll::-webkit-scrollbar-thumb {
+                        background-color: #cbd5e1;
+                        border-radius: 999px;
+                    }
+                    .dark .bugs-table-scroll::-webkit-scrollbar-thumb {
+                        background-color: #475569;
+                    }
+                `}</style>
+                <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1000 }}>
+                    <thead>
+                        <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400 sticky left-0 z-10 bg-slate-50 dark:bg-slate-900">ID</th>
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Title</th>
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Project</th>
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Status</th>
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Priority</th>
+                            <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Points</th>
+                            <th className="text-right px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Actions</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
+                                    Loading user stories...
+                                </td>
+                            </tr>
+                        ) : stories.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
+                                    No user stories found.
+                                </td>
+                            </tr>
+                        ) : stories.map(story => (
+                            <tr key={story.id} className="group hover:bg-violet-50/40 dark:hover:bg-violet-950/10 transition-colors">
+                                <td className="px-5 py-3.5 sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-violet-50 dark:group-hover:bg-slate-900">
+                                    <span className="font-mono text-xs text-slate-400">
+                                        {story.tuleap_artifact_id ? `#${story.tuleap_artifact_id}` : '-'}
+                                    </span>
+                                </td>
+                                <td className="px-5 py-3.5">
+                                    <Link
+                                        href={`/work/stories/${story.id}`}
+                                        className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-1"
+                                    >
+                                        {story.title || <span className="text-slate-400 italic">Untitled</span>}
+                                    </Link>
+                                </td>
+                                <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 text-sm truncate max-w-[180px]">
+                                    {story.project_name ?? '-'}
+                                </td>
+                                <td className="px-5 py-3.5">
+                                    {story.status ? (
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[story.status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
+                                            {story.status}
+                                        </span>
+                                    ) : '-'}
+                                </td>
+                                <td className="px-5 py-3.5">
+                                    {story.priority && story.priority !== 'None' ? (
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_BADGE[story.priority] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
+                                            {story.priority}
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-300 dark:text-slate-600">-</span>
+                                    )}
+                                </td>
+                                <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 text-sm">
+                                    {story.story_points ?? '-'}
+                                </td>
+                                <td className="px-5 py-3.5 text-right">
+                                    <div className="flex items-center justify-end gap-3">
+                                        <Link
+                                            href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
+                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
+                                        >
+                                            Edit
+                                        </Link>
+                                        <button
+                                            onClick={() => setPendingDelete(story)}
+                                            disabled={deletingId === story.id}
+                                            className="text-xs text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors disabled:opacity-40"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                <span>
+                    Showing <span className="font-medium text-slate-700 dark:text-slate-300">{isLoading ? 0 : stories.length}</span> of {isLoading ? 0 : stories.length}
+                </span>
+            </div>
 
             {pendingDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">

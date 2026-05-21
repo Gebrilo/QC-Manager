@@ -6,7 +6,6 @@ import { TestSuite, TestSuiteListResponse } from '@/types';
 import { testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/ui/Spinner';
 import { formatDistanceToNow } from 'date-fns';
 
 const STATUS_OPTIONS = [
@@ -104,85 +103,110 @@ export default function TestSuitesPage() {
                 </div>
             </div>
 
-            {loading && suites.length === 0 ? (
-                <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
-            ) : suites.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">No test suites found. Create your first suite to organize test cases.</p>
-                    <Link href="/test/suites/create"><Button>Create Suite</Button></Link>
-                </div>
-            ) : (
-                <>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">ID</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Project</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cases</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Last Run</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Created</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {suites.map((suite) => (
-                                        <tr key={suite.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <Link href={`/test/suites/${suite.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
-                                                    {suite.suite_id}
-                                                </Link>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Link href={`/test/suites/${suite.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
-                                                    {suite.name}
-                                                </Link>
-                                                {suite.description && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-xs">{suite.description}</div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                                {suite.project_name || '\u2014'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <Badge variant={getSuiteStatusVariant(suite.status)}>{suite.status}</Badge>
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                                {suite.test_case_count ?? 0}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                                {suite.last_run_date ? formatDistanceToNow(new Date(suite.last_run_date), { addSuffix: true }) : 'Never'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                                                {formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                                <Link href={`/test/suites/${suite.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
-                                                <Link href={`/test/suites/${suite.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                        <h2 className="font-semibold text-slate-900 dark:text-white">All Test Suites</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{suites.length} rows</p>
                     </div>
-
+                    <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
+                        <span>Scroll to see all columns</span>
+                    </div>
+                </div>
+                <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
+                    <style jsx>{`
+                        .bugs-table-scroll::-webkit-scrollbar {
+                            height: 8px;
+                        }
+                        .bugs-table-scroll::-webkit-scrollbar-track {
+                            background: transparent;
+                        }
+                        .bugs-table-scroll::-webkit-scrollbar-thumb {
+                            background-color: #cbd5e1;
+                            border-radius: 999px;
+                        }
+                        .dark .bugs-table-scroll::-webkit-scrollbar-thumb {
+                            background-color: #475569;
+                        }
+                    `}</style>
+                    <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1050 }}>
+                        <thead>
+                            <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400 sticky left-0 z-10 bg-slate-50 dark:bg-slate-900">ID</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Name</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Project</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Status</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Cases</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Last Run</th>
+                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Created</th>
+                                <th className="text-right px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {loading && suites.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
+                                        Loading test suites...
+                                    </td>
+                                </tr>
+                            ) : suites.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
+                                        No test suites found.
+                                    </td>
+                                </tr>
+                            ) : suites.map((suite) => (
+                                <tr key={suite.id} className="group hover:bg-violet-50/40 dark:hover:bg-violet-950/10 transition-colors">
+                                    <td className="px-5 py-3.5 whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-violet-50 dark:group-hover:bg-slate-900">
+                                        <Link href={`/test/suites/${suite.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                            {suite.suite_id}
+                                        </Link>
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                        <Link href={`/test/suites/${suite.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                            {suite.name}
+                                        </Link>
+                                        {suite.description && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-xs">{suite.description}</div>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
+                                        {suite.project_name || '-'}
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap">
+                                        <Badge variant={getSuiteStatusVariant(suite.status)}>{suite.status}</Badge>
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
+                                        {suite.test_case_count ?? 0}
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
+                                        {suite.last_run_date ? formatDistanceToNow(new Date(suite.last_run_date), { addSuffix: true }) : 'Never'}
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                                        {formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}
+                                    </td>
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-right">
+                                        <Link href={`/test/suites/${suite.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
+                                        <Link href={`/test/suites/${suite.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                    <span>
+                        Showing <span className="font-medium text-slate-700 dark:text-slate-300">{suites.length}</span> of {pagination.total}
+                    </span>
                     {pagination.total_pages > 1 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                Showing {((pagination.page - 1) * pagination.limit) + 1}{'\u2013'}{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
-                            </span>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => loadSuites(pagination.page - 1)}>Previous</Button>
-                                <Button variant="outline" size="sm" disabled={pagination.page >= pagination.total_pages} onClick={() => loadSuites(pagination.page + 1)}>Next</Button>
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => loadSuites(pagination.page - 1)}>Prev</Button>
+                            <span className="text-slate-400">Page {pagination.page} of {pagination.total_pages}</span>
+                            <Button variant="outline" size="sm" disabled={pagination.page >= pagination.total_pages} onClick={() => loadSuites(pagination.page + 1)}>Next</Button>
                         </div>
                     )}
-                </>
-            )}
+                </div>
+            </div>
         </div>
     );
 }

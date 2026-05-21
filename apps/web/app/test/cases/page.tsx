@@ -6,7 +6,6 @@ import { TestCase, TestCaseListResponse } from '@/types';
 import { testCasesApi, projectsApi, type Project } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/ui/Spinner';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { stripHtml } from '@/lib/stripHtml';
 import { formatDistanceToNow } from 'date-fns';
@@ -300,6 +299,7 @@ export default function TestCasesPage() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
     });
+    const visibleColumnCount = table.getVisibleLeafColumns().length;
 
     return (
         <div className="p-6">
@@ -361,111 +361,139 @@ export default function TestCasesPage() {
                 </div>
             </div>
 
-            {loading && testCases.length === 0 ? (
-                <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
-            ) : testCases.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                        No test cases found. Create your first test case to get started.
-                    </p>
-                    <Link href="/test/cases/create"><Button>Create Test Case</Button></Link>
-                </div>
-            ) : (
-                <>
-                    <div className="space-y-2">
-                        <div className="flex justify-end">
-                            <div className="relative group">
-                                <button className="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                </button>
-                                <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-30 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 p-2">
-                                    <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                                        Toggle Columns
-                                    </div>
-                                    {table.getAllLeafColumns().map(column => {
-                                        if (!column.getCanHide()) return null;
-                                        return (
-                                            <label
-                                                key={column.id}
-                                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={column.getIsVisible()}
-                                                    onChange={column.getToggleVisibilityHandler()}
-                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <span>{column.columnDef.header as string || column.id}</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+            <div className="space-y-4">
+                <div className="flex justify-end">
+                    <div className="relative group">
+                        <button className="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-30 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 p-2">
+                            <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                                Toggle Columns
                             </div>
-                        </div>
-
-                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                        {table.getHeaderGroups().map(headerGroup => (
-                                            <tr key={headerGroup.id}>
-                                                {headerGroup.headers.map(header => (
-                                                    <th
-                                                        key={header.id}
-                                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                                                    >
-                                                        {header.isPlaceholder ? null : (
-                                                            <div
-                                                                className={`flex items-center gap-1 ${header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-white' : ''}`}
-                                                                onClick={header.column.getToggleSortingHandler()}
-                                                            >
-                                                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                                                {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? null}
-                                                            </div>
-                                                        )}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {table.getRowModel().rows.map(row => (
-                                            <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                                {row.getVisibleCells().map(cell => (
-                                                    <td
-                                                        key={cell.id}
-                                                        className={`px-4 py-3 text-sm ${
-                                                            (cell.column.columnDef.meta as { className?: string })?.className ?? 'whitespace-nowrap'
-                                                        }`}
-                                                    >
-                                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            {table.getAllLeafColumns().map(column => {
+                                if (!column.getCanHide()) return null;
+                                return (
+                                    <label
+                                        key={column.id}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={column.getIsVisible()}
+                                            onChange={column.getToggleVisibilityHandler()}
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span>{column.columnDef.header as string || column.id}</span>
+                                    </label>
+                                );
+                            })}
                         </div>
                     </div>
+                </div>
 
-                    {pagination.total_pages > 1 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                Showing {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
-                            </span>
-                            <div className="flex gap-2">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+                        <div>
+                            <h2 className="font-semibold text-slate-900 dark:text-white">All Test Cases</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{testCases.length} rows</p>
+                        </div>
+                        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
+                            <span>Scroll to see all columns</span>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
+                        <style jsx>{`
+                            .bugs-table-scroll::-webkit-scrollbar {
+                                height: 8px;
+                            }
+                            .bugs-table-scroll::-webkit-scrollbar-track {
+                                background: transparent;
+                            }
+                            .bugs-table-scroll::-webkit-scrollbar-thumb {
+                                background-color: #cbd5e1;
+                                border-radius: 999px;
+                            }
+                            .dark .bugs-table-scroll::-webkit-scrollbar-thumb {
+                                background-color: #475569;
+                            }
+                        `}</style>
+                        <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1200 }}>
+                            <thead>
+                                {table.getHeaderGroups().map(headerGroup => (
+                                    <tr key={headerGroup.id} className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
+                                        {headerGroup.headers.map(header => (
+                                            <th
+                                                key={header.id}
+                                                className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400 first:sticky first:left-0 first:z-10 first:bg-slate-50 dark:first:bg-slate-900 last:text-right"
+                                            >
+                                                {header.isPlaceholder ? null : (
+                                                    <div
+                                                        className={`flex items-center gap-1 ${header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-white' : ''}`}
+                                                        onClick={header.column.getToggleSortingHandler()}
+                                                    >
+                                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                                        {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? null}
+                                                    </div>
+                                                )}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {loading && testCases.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={visibleColumnCount} className="px-5 py-12 text-center text-slate-400">
+                                            Loading test cases...
+                                        </td>
+                                    </tr>
+                                ) : testCases.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={visibleColumnCount} className="px-5 py-12 text-center text-slate-400">
+                                            No test cases found.
+                                        </td>
+                                    </tr>
+                                ) : table.getRowModel().rows.map(row => (
+                                    <tr key={row.id} className="group hover:bg-violet-50/40 dark:hover:bg-violet-950/10 transition-colors">
+                                        {row.getVisibleCells().map((cell, index) => {
+                                            const metaClass = (cell.column.columnDef.meta as { className?: string })?.className ?? 'whitespace-nowrap';
+                                            return (
+                                                <td
+                                                    key={cell.id}
+                                                    className={`px-5 py-3.5 text-sm ${metaClass} ${
+                                                        index === 0
+                                                            ? 'sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-violet-50 dark:group-hover:bg-slate-900'
+                                                            : ''
+                                                    } ${index === row.getVisibleCells().length - 1 ? 'text-right' : ''}`}
+                                                >
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                        <span>
+                            Showing <span className="font-medium text-slate-700 dark:text-slate-300">{testCases.length}</span> of {pagination.total}
+                        </span>
+                        {pagination.total_pages > 1 && (
+                            <div className="flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     disabled={pagination.page <= 1}
                                     onClick={() => loadTestCases(pagination.page - 1)}
                                 >
-                                    Previous
+                                    Prev
                                 </Button>
+                                <span className="text-slate-400">Page {pagination.page} of {pagination.total_pages}</span>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -475,10 +503,10 @@ export default function TestCasesPage() {
                                     Next
                                 </Button>
                             </div>
-                        </div>
-                    )}
-                </>
-            )}
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
