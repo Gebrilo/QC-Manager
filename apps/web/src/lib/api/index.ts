@@ -406,6 +406,9 @@ export const userStoriesApi = {
 
     get: (id: string) =>
         fetchApi<UserStory>(`/user-stories/${id}`),
+
+    delete: (id: string) =>
+        fetchApi<{ success: boolean; message: string; data: UserStory }>(`/user-stories/${id}`, { method: 'DELETE' }),
 };
 
 // ============================================================================

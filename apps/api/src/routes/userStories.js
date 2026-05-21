@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { auditLog } = require('../middleware/audit');
+const { emitToTuleap } = require('../services/emitters/user_story');
+const { defaultClient } = require('../services/tuleapClient');
+const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
 function parseCsvParam(value) {
     if (!value) return [];
@@ -78,6 +82,81 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
         res.json(result.rows[0]);
     } catch (err) {
         next(err);
+    }
+});
+
+router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const originalRes = await pool.query('SELECT * FROM user_stories WHERE id = $1', [id]);
+        if (originalRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'User story not found' });
+        }
+        const original = originalRes.rows[0];
+
+        if (original.deleted_at) {
+            return res.status(400).json({ success: false, error: 'User story already deleted' });
+        }
+
+        if (original.tuleap_artifact_id) {
+            const configResult = await pool.query(
+                `SELECT * FROM tuleap_sync_config
+                 WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,
+                [original.project_id]
+            );
+            const config = configResult.rows[0];
+            if (!config) {
+                return res.status(400).json({
+                    success: false,
+                    error: `No active user story sync config for project ${original.project_id}`,
+                });
+            }
+
+            try {
+                await emitToTuleap(
+                    {
+                        artifact_type: 'user_story',
+                        project_id: original.project_id,
+                        tuleap: { artifact_id: original.tuleap_artifact_id },
+                    },
+                    config,
+                    'delete',
+                    { client: defaultClient, registry: defaultRegistry, query: pool.query.bind(pool) }
+                );
+            } catch (emitErr) {
+                console.error(`[route:user-stories:delete] emit_failed id=${id} err="${emitErr.message}"`);
+                return res.status(emitErr.status || 502).json({
+                    success: false,
+                    error: 'Failed to delete in Tuleap',
+                    message: emitErr.message,
+                });
+            }
+
+            const refreshed = await pool.query('SELECT * FROM user_stories WHERE id = $1', [id]);
+            const deleted = refreshed.rows[0];
+            await auditLog('user_stories', id, 'DELETE', deleted, original);
+            return res.json({
+                success: true,
+                message: `User story '${deleted.title}' has been deleted`,
+                data: deleted,
+            });
+        }
+
+        const result = await pool.query(
+            'UPDATE user_stories SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *',
+            [id]
+        );
+        const deleted = result.rows[0];
+        await auditLog('user_stories', id, 'DELETE', deleted, original);
+
+        res.json({
+            success: true,
+            message: `User story '${deleted.title}' has been deleted`,
+            data: deleted,
+        });
+    } catch (error) {
+        console.error('Error deleting user story:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete user story' });
     }
 });
 

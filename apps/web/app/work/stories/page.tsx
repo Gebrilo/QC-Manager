@@ -240,13 +240,33 @@ export default function UserStoriesPage() {
                     onStoryClick={(id) => router.push(`/work/stories/${id}`)}
                 />
             ) : (
-                <StoriesTableView stories={filtered} isLoading={isLoading} />
+                <StoriesTableView
+                    stories={filtered}
+                    isLoading={isLoading}
+                    onDelete={(id) => setStories(prev => prev.filter(s => s.id !== id))}
+                />
             )}
         </div>
     );
 }
 
-function StoriesTableView({ stories, isLoading }: { stories: UserStory[]; isLoading: boolean }) {
+function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory[]; isLoading: boolean; onDelete?: (id: string) => void }) {
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<UserStory | null>(null);
+
+    async function confirmDelete() {
+        if (!pendingDelete) return;
+        setDeletingId(pendingDelete.id);
+        try {
+            await userStoriesApi.delete(pendingDelete.id);
+            onDelete?.(pendingDelete.id);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setDeletingId(null);
+            setPendingDelete(null);
+        }
+    }
     if (isLoading) {
         return (
             <div className="glass-card rounded-xl overflow-hidden">
@@ -303,7 +323,7 @@ function StoriesTableView({ stories, isLoading }: { stories: UserStory[]; isLoad
                                     href={`/work/stories/${story.id}`}
                                     className="font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-1"
                                 >
-                                    {story.title}
+                                    {story.title || <span className="text-slate-400 italic">Untitled</span>}
                                 </Link>
                             </td>
                             <td className="px-6 py-3 text-slate-500 dark:text-slate-400 text-sm truncate max-w-[180px]">
@@ -329,17 +349,55 @@ function StoriesTableView({ stories, isLoading }: { stories: UserStory[]; isLoad
                                 {story.story_points ?? '-'}
                             </td>
                             <td className="px-6 py-3 text-right">
-                                <Link
-                                    href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
-                                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
-                                >
-                                    Edit
-                                </Link>
+                                <div className="flex items-center justify-end gap-3">
+                                    <Link
+                                        href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
+                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
+                                    >
+                                        Edit
+                                    </Link>
+                                    <button
+                                        onClick={() => setPendingDelete(story)}
+                                        disabled={deletingId === story.id}
+                                        className="text-xs text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors disabled:opacity-40"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {pendingDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">Delete User Story</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                            Delete &quot;{pendingDelete.title || 'Untitled'}&quot;?
+                            {pendingDelete.tuleap_artifact_id && (
+                                <span className="block mt-1 text-rose-500 dark:text-rose-400">This will also delete the artifact from Tuleap.</span>
+                            )}
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setPendingDelete(null)}
+                                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={deletingId !== null}
+                                className="px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {deletingId ? 'Deleting…' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
