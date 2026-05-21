@@ -125,8 +125,8 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
                 label: 'Work Tracking',
                 icon: ClipboardList,
                 children: [
-                    { path: '/work/tasks', label: 'Tasks', icon: ListTodo },
                     { path: '/work/stories', label: 'Stories', icon: BookOpen },
+                    { path: '/work/tasks', label: 'Tasks', icon: ListTodo },
                     { path: '/work/bugs', label: 'Bugs', icon: Bug },
                 ],
             },
