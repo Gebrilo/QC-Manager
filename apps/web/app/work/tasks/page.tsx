@@ -6,22 +6,43 @@ import { fetchApi, projectsApi, resourcesApi } from '@/lib/api';
 import { Task } from '@/types';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { ViewToggle } from '@/components/tasks/ViewToggle';
-import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 
-interface Project {
-    id: string;
-    project_id: string;
-    project_name: string;
-}
+interface Project { id: string; project_id: string; project_name: string; }
+interface Resource { id: string; resource_name: string; }
 
-interface Resource {
-    id: string;
-    resource_name: string;
-}
+const STATUS_OPTIONS = ['Backlog', 'In Progress', 'Done', 'Cancelled'];
 
-const STATUS_OPTIONS = ['All', 'Backlog', 'In Progress', 'Done', 'Cancelled'];
+const PRIORITY_COLORS: Record<string, string> = {
+    High:   'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+    Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
+};
+
+const TASK_BOARD_COLUMNS = [
+    { status: 'Backlog',     label: 'Backlog',     badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',      border: 'border-slate-300 dark:border-slate-600' },
+    { status: 'In Progress', label: 'In Progress', badge: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', border: 'border-indigo-300 dark:border-indigo-600' },
+    { status: 'Done',        label: 'Done',        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-600' },
+    { status: 'Cancelled',   label: 'Cancelled',   badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',        border: 'border-rose-300 dark:border-rose-600' },
+];
+
+function GlassSelect({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+    return (
+        <div className="relative">
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                className="appearance-none h-10 pl-3.5 pr-8 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 text-sm text-slate-600 dark:text-slate-300 hover:border-violet-400/60 transition-colors focus:outline-none focus:border-violet-500 cursor-pointer"
+            >
+                {children}
+            </select>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <path d="M6 9l6 6 6-6" />
+            </svg>
+        </div>
+    );
+}
 
 export default function TasksPage() {
     const router = useRouter();
@@ -31,14 +52,12 @@ export default function TasksPage() {
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedAssignee, setSelectedAssignee] = useState('');
     const [selectedPriority, setSelectedPriority] = useState('');
 
-    // View mode with localStorage persistence
     const [viewMode, setViewMode] = useState<'table' | 'board'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('tasks_view_mode') as 'table' | 'board') || 'table';
@@ -73,7 +92,6 @@ export default function TasksPage() {
 
     const filteredTasks = useMemo(() => {
         return tasks.filter(task => {
-            // Search filter
             if (searchTerm) {
                 const lower = searchTerm.toLowerCase();
                 const matchesSearch =
@@ -83,202 +101,114 @@ export default function TasksPage() {
                     task.resource1_name?.toLowerCase().includes(lower);
                 if (!matchesSearch) return false;
             }
-
-            // Project filter
-            if (selectedProject && task.project_id !== selectedProject) {
-                return false;
-            }
-
-            // Status filter
-            if (selectedStatus && selectedStatus !== 'All' && task.status !== selectedStatus) {
-                return false;
-            }
-
-            // Assignee filter
-            if (selectedAssignee) {
-                if (task.resource1_id !== selectedAssignee && task.resource2_id !== selectedAssignee) {
-                    return false;
-                }
-            }
-
-            // Priority filter
-            if (selectedPriority && task.priority !== selectedPriority) {
-                return false;
-            }
-
+            if (selectedProject && task.project_id !== selectedProject) return false;
+            if (selectedStatus && task.status !== selectedStatus) return false;
+            if (selectedAssignee && task.resource1_id !== selectedAssignee && task.resource2_id !== selectedAssignee) return false;
+            if (selectedPriority && task.priority !== selectedPriority) return false;
             return true;
         });
     }, [tasks, searchTerm, selectedProject, selectedStatus, selectedAssignee, selectedPriority]);
 
-    const clearFilters = () => {
-        setSearchTerm('');
-        setSelectedProject('');
-        setSelectedStatus('');
-        setSelectedAssignee('');
-        setSelectedPriority('');
-    };
+    const stats = useMemo(() => ({
+        total:       tasks.length,
+        inProgress:  tasks.filter(t => t.status === 'In Progress').length,
+        done:        tasks.filter(t => t.status === 'Done').length,
+        highPriority: tasks.filter(t => t.priority === 'High').length,
+    }), [tasks]);
 
-    const hasActiveFilters = searchTerm || selectedProject || selectedStatus || selectedAssignee || selectedPriority;
+    const hasAnyFilter = !!(searchTerm || selectedProject || selectedStatus || selectedAssignee || selectedPriority);
 
     return (
-        <div className="space-y-6 py-6 px-4 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-end justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Tasks</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage all tasks across projects.</p>
+                    <h1 className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Tasks</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+                        All tasks across projects · Total{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{tasks.length}</span>
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
                     {hasPermission('qc.tasks.create') && (
-                        <Link href="/work/tasks/create">
-                            <Button className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30 border-none">
-                                + New Task
-                            </Button>
+                        <Link
+                            href="/work/tasks/create"
+                            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                        >
+                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            New Task
                         </Link>
                     )}
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="glass-card rounded-xl p-4">
-                <div className="flex flex-col lg:flex-row gap-4">
-                    {/* Search Input */}
-                    <div className="relative flex-1 min-w-0">
-                        <input
-                            type="text"
-                            placeholder="Search tasks by name, ID..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none"
-                        />
-                        <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+            {/* ── Stat strip ─────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                    { label: 'Total',        value: isLoading ? '—' : stats.total,        dot: 'bg-slate-400' },
+                    { label: 'In Progress',  value: isLoading ? '—' : stats.inProgress,   dot: 'bg-indigo-500' },
+                    { label: 'Done',         value: isLoading ? '—' : stats.done,          dot: 'bg-emerald-500' },
+                    { label: 'High Priority', value: isLoading ? '—' : stats.highPriority, dot: 'bg-rose-500' },
+                ].map(s => (
+                    <div key={s.label} className="glass-card rounded-xl px-4 py-3 flex items-center justify-between">
+                        <div>
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{s.label}</div>
+                            <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                        </div>
+                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
                     </div>
+                ))}
+            </div>
 
-                    {/* Filter Dropdowns */}
-                    <div className="flex flex-wrap items-center gap-3">
-                        {/* Project Filter */}
-                        <div className="relative">
-                            <select
-                                value={selectedProject}
-                                onChange={(e) => setSelectedProject(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[140px]"
-                            >
-                                <option value="">All Projects</option>
-                                {projects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.project_name}</option>
-                                ))}
-                            </select>
-                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-
-                        {/* Status Filter */}
-                        <div className="relative">
-                            <select
-                                value={selectedStatus}
-                                onChange={(e) => setSelectedStatus(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[130px]"
-                            >
-                                <option value="">All Statuses</option>
-                                {STATUS_OPTIONS.filter(s => s !== 'All').map(status => (
-                                    <option key={status} value={status}>{status}</option>
-                                ))}
-                            </select>
-                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-
-                        {/* Assignee Filter */}
-                        <div className="relative">
-                            <select
-                                value={selectedAssignee}
-                                onChange={(e) => setSelectedAssignee(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[140px]"
-                            >
-                                <option value="">All Assignees</option>
-                                {resources.map(r => (
-                                    <option key={r.id} value={r.id}>{r.resource_name}</option>
-                                ))}
-                            </select>
-                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-
-                        {/* Priority Filter */}
-                        <div className="relative">
-                            <select
-                                value={selectedPriority}
-                                onChange={(e) => setSelectedPriority(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all outline-none cursor-pointer min-w-[130px]"
-                            >
-                                <option value="">All Priorities</option>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
-                            </select>
-                            <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-
-                        {/* Clear Filters */}
-                        {hasActiveFilters && (
-                            <button
-                                onClick={clearFilters}
-                                className="px-3 py-2 text-sm text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                Clear
-                            </button>
-                        )}
-                    </div>
+            {/* ── Filter bar ─────────────────────────────────────────── */}
+            <div className="glass-card rounded-2xl p-3 flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[240px]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                        <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                    </svg>
+                    <input
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Search name, ID, project…"
+                        className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 transition-colors"
+                    />
                 </div>
-
-                {/* Active Filters Display */}
-                {hasActiveFilters && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active:</span>
-                        {searchTerm && (
-                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Search: &quot;{searchTerm}&quot;
-                            </span>
-                        )}
-                        {selectedProject && (
-                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Project: {projects.find(p => p.id === selectedProject)?.project_name}
-                            </span>
-                        )}
-                        {selectedStatus && (
-                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Status: {selectedStatus}
-                            </span>
-                        )}
-                        {selectedAssignee && (
-                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Assignee: {resources.find(r => r.id === selectedAssignee)?.resource_name}
-                            </span>
-                        )}
-                        {selectedPriority && (
-                            <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs rounded-md">
-                                Priority: {selectedPriority}
-                            </span>
-                        )}
-                        <span className="text-xs text-slate-400 ml-2">
-                            ({filteredTasks.length} of {tasks.length} tasks)
-                        </span>
-                    </div>
+                <GlassSelect value={selectedProject} onChange={setSelectedProject}>
+                    <option value="">All Projects</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                </GlassSelect>
+                <GlassSelect value={selectedStatus} onChange={setSelectedStatus}>
+                    <option value="">All Statuses</option>
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </GlassSelect>
+                <GlassSelect value={selectedAssignee} onChange={setSelectedAssignee}>
+                    <option value="">All Assignees</option>
+                    {resources.map(r => <option key={r.id} value={r.id}>{r.resource_name}</option>)}
+                </GlassSelect>
+                <GlassSelect value={selectedPriority} onChange={setSelectedPriority}>
+                    <option value="">All Priorities</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </GlassSelect>
+                {hasAnyFilter && (
+                    <button
+                        onClick={() => { setSearchTerm(''); setSelectedProject(''); setSelectedStatus(''); setSelectedAssignee(''); setSelectedPriority(''); }}
+                        className="h-10 px-3 rounded-lg text-sm text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 flex items-center gap-1.5 transition-colors"
+                    >
+                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                        Clear
+                    </button>
                 )}
             </div>
 
-            {/* Task Table / Board */}
+            {/* ── Table / Board ──────────────────────────────────────── */}
             {viewMode === 'board' ? (
                 <TaskBoardView
                     tasks={filteredTasks}
@@ -292,22 +222,7 @@ export default function TasksPage() {
     );
 }
 
-// ─── Board View ───────────────────────────────────────────────────────────────
-
-const TASK_BOARD_COLUMNS = [
-    { status: 'Backlog',     label: 'Backlog',      badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',  border: 'border-slate-300 dark:border-slate-600' },
-    { status: 'In Progress', label: 'In Progress',  badge: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', border: 'border-indigo-300 dark:border-indigo-600' },
-    { status: 'Done',        label: 'Done',         badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-600' },
-    { status: 'Cancelled',   label: 'Cancelled',    badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',    border: 'border-rose-300 dark:border-rose-600' },
-];
-
-const PRIORITY_COLORS: Record<string, string> = {
-    High:   'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-    Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
-};
-
-function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[], isLoading: boolean, onTaskClick: (id: string) => void }) {
+function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[]; isLoading: boolean; onTaskClick: (id: string) => void }) {
     const grouped = useMemo(() => {
         const g: Record<string, Task[]> = { Backlog: [], 'In Progress': [], Done: [], Cancelled: [] };
         tasks.forEach(t => { if (g[t.status]) g[t.status].push(t); });
@@ -320,7 +235,7 @@ function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[], isLoa
                 {TASK_BOARD_COLUMNS.map(col => (
                     <div key={col.status} className="space-y-3">
                         <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-                        {[1,2,3].map(i => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
+                        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
                     </div>
                 ))}
             </div>

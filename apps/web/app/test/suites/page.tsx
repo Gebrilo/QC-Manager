@@ -1,36 +1,69 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { TestSuite, TestSuiteListResponse } from '@/types';
-import { testSuitesApi } from '@/lib/api';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { testSuitesApi, projectsApi, type Project } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    flexRender,
+    createColumnHelper,
+    SortingState,
+} from '@tanstack/react-table';
 
-const STATUS_OPTIONS = [
-    { value: '', label: 'All Statuses' },
-    { value: 'draft', label: 'Draft' },
-    { value: 'active', label: 'Active' },
-    { value: 'archived', label: 'Archived' },
-];
+// ── Pill colour maps ────────────────────────────────────────────────────────
+const STATUS_PILL: Record<string, string> = {
+    active:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    draft:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    archived: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+};
 
-function getSuiteStatusVariant(status: string): 'success' | 'warning' | 'default' {
-    const map: Record<string, 'success' | 'warning' | 'default'> = {
-        active: 'success', draft: 'warning', archived: 'default',
-    };
-    return map[status] || 'default';
+function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
+    return (
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
+            {children}
+        </span>
+    );
 }
+
+function GlassSelect({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+    return (
+        <div className="relative">
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                className="appearance-none h-10 pl-3.5 pr-8 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 text-sm text-slate-600 dark:text-slate-300 hover:border-violet-400/60 transition-colors focus:outline-none focus:border-violet-500 cursor-pointer"
+            >
+                {children}
+            </select>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <path d="M6 9l6 6 6-6" />
+            </svg>
+        </div>
+    );
+}
+
+const columnHelper = createColumnHelper<TestSuite>();
 
 export default function TestSuitesPage() {
     const [suites, setSuites] = useState<TestSuite[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, total_pages: 0 });
 
     const [search, setSearch] = useState('');
+    const [projectFilter, setProjectFilter] = useState('');
     const [status, setStatus] = useState('');
     const [sortBy] = useState('created_at');
     const [sortOrder] = useState<'asc' | 'desc'>('desc');
+    const [sorting, setSorting] = useState<SortingState>([]);
+
+    useEffect(() => {
+        projectsApi.list().then(setProjects).catch(() => {});
+    }, []);
 
     const loadSuites = useCallback(async (page = 1) => {
         try {
@@ -39,6 +72,7 @@ export default function TestSuitesPage() {
                 page,
                 limit: 25,
                 search: search || undefined,
+                project_id: projectFilter || undefined,
                 status: status || undefined,
                 sort_by: sortBy,
                 sort_order: sortOrder,
@@ -52,157 +86,308 @@ export default function TestSuitesPage() {
         } finally {
             setLoading(false);
         }
-    }, [search, status, sortBy, sortOrder]);
+    }, [search, projectFilter, status, sortBy, sortOrder]);
 
     useEffect(() => {
         loadSuites(1);
     }, [loadSuites]);
 
-    const clearFilters = () => {
-        setSearch('');
-        setStatus('');
-    };
+    const stats = useMemo(() => ({
+        total:      pagination.total,
+        active:     suites.filter(s => s.status === 'active').length,
+        totalCases: suites.reduce((sum, s) => sum + (s.test_case_count ?? 0), 0),
+        archived:   suites.filter(s => s.status === 'archived').length,
+    }), [suites, pagination.total]);
 
-    const hasActiveFilters = status || search;
+    const hasAnyFilter = !!(search || projectFilter || status);
+
+    const columns = useMemo(() => [
+        columnHelper.accessor('suite_id', {
+            id: 'suite_id',
+            header: 'ID',
+            enableHiding: false,
+            cell: (info) => (
+                <Link
+                    href={`/test/suites/${info.row.original.id}`}
+                    className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
+                >
+                    {info.getValue()}
+                </Link>
+            ),
+        }),
+        columnHelper.accessor('name', {
+            id: 'name',
+            header: 'Name',
+            enableHiding: false,
+            cell: (info) => (
+                <div style={{ minWidth: 240, maxWidth: 360 }}>
+                    <Link
+                        href={`/test/suites/${info.row.original.id}`}
+                        className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
+                    >
+                        {info.getValue()}
+                    </Link>
+                    {info.row.original.description && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">{info.row.original.description}</p>
+                    )}
+                </div>
+            ),
+        }),
+        columnHelper.accessor('project_name', {
+            id: 'project_name',
+            header: 'Project',
+            cell: (info) => (
+                <span className="text-slate-600 dark:text-slate-300 font-medium text-sm">{info.getValue() || '—'}</span>
+            ),
+        }),
+        columnHelper.accessor('status', {
+            id: 'status',
+            header: 'Status',
+            cell: (info) => {
+                const v = info.getValue();
+                return <Pill tone={STATUS_PILL[v] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}>{v}</Pill>;
+            },
+        }),
+        columnHelper.accessor('test_case_count', {
+            id: 'test_case_count',
+            header: 'Cases',
+            cell: (info) => (
+                <span className="text-slate-600 dark:text-slate-300 text-sm tabular-nums">{info.getValue() ?? 0}</span>
+            ),
+        }),
+        columnHelper.accessor('last_run_date', {
+            id: 'last_run_date',
+            header: 'Last Run',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-sm tabular-nums whitespace-nowrap">
+                    {info.getValue()
+                        ? formatDistanceToNow(new Date(info.getValue()!), { addSuffix: true })
+                        : '—'}
+                </span>
+            ),
+        }),
+        columnHelper.accessor('created_at', {
+            id: 'created_at',
+            header: 'Created',
+            cell: (info) => (
+                <span className="text-slate-500 dark:text-slate-400 text-sm tabular-nums whitespace-nowrap">
+                    {formatDistanceToNow(new Date(info.getValue()), { addSuffix: true })}
+                </span>
+            ),
+        }),
+        columnHelper.display({
+            id: 'actions',
+            header: '',
+            enableHiding: false,
+            cell: (info) => (
+                <div className="flex justify-end gap-3 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link href={`/test/suites/${info.row.original.id}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
+                    <Link href={`/test/suites/${info.row.original.id}`} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
+                </div>
+            ),
+        }),
+    ], []);
+
+    const table = useReactTable({
+        data: suites,
+        columns,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+    });
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-end justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Test Suites</h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">Organize test cases into runnable suites</p>
+                    <h1 className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Test Suites</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+                        Organize test cases into runnable suites · Total{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span>
+                    </p>
                 </div>
-                <Link href="/test/suites/create">
-                    <Button>+ New Suite</Button>
+                <Link
+                    href="/test/suites/create"
+                    className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    New Suite
                 </Link>
             </div>
 
-            <div className="mb-6 space-y-4">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && loadSuites(1)}
-                        placeholder="Search by name, description, or ID..."
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <Button onClick={() => loadSuites(1)}>Search</Button>
-                </div>
-
-                <div className="flex flex-wrap gap-3 items-center">
-                    <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-slate-900 dark:text-white text-sm">
-                        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>Clear All</Button>
-                    )}
-                    <span className="ml-auto text-sm text-gray-600 dark:text-gray-400">
-                        {pagination.total} suite{pagination.total !== 1 ? 's' : ''}
-                    </span>
-                </div>
+            {/* ── Stat strip ─────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                    { label: 'Total',       value: loading ? '—' : stats.total,      dot: 'bg-slate-400' },
+                    { label: 'Active',      value: loading ? '—' : stats.active,     dot: 'bg-emerald-500' },
+                    { label: 'Total Cases', value: loading ? '—' : stats.totalCases, dot: 'bg-violet-500' },
+                    { label: 'Archived',    value: loading ? '—' : stats.archived,   dot: 'bg-amber-500' },
+                ].map(s => (
+                    <div key={s.label} className="glass-card rounded-xl px-4 py-3 flex items-center justify-between">
+                        <div>
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{s.label}</div>
+                            <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                        </div>
+                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
+                    </div>
+                ))}
             </div>
 
+            {/* ── Filter bar ─────────────────────────────────────────── */}
+            <div className="glass-card rounded-2xl p-3 flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[240px]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                        <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                    </svg>
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search name, description, ID…"
+                        className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 transition-colors"
+                    />
+                </div>
+                <GlassSelect value={projectFilter} onChange={setProjectFilter}>
+                    <option value="">All Projects</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                </GlassSelect>
+                <GlassSelect value={status} onChange={setStatus}>
+                    <option value="">All Statuses</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="archived">Archived</option>
+                </GlassSelect>
+                {hasAnyFilter && (
+                    <button
+                        onClick={() => { setSearch(''); setProjectFilter(''); setStatus(''); }}
+                        className="h-10 px-3 rounded-lg text-sm text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 flex items-center gap-1.5 transition-colors"
+                    >
+                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                        Clear
+                    </button>
+                )}
+            </div>
+
+            {/* ── Table ──────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-                    <div>
-                        <h2 className="font-semibold text-slate-900 dark:text-white">All Test Suites</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{suites.length} rows</p>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">All Test Suites</h2>
+                        <span className="text-xs text-slate-400 tabular-nums">{suites.length} rows</span>
                     </div>
-                    <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
-                        <span>Scroll to see all columns</span>
+                    <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M5 12h14M13 5l7 7-7 7" />
+                        </svg>
+                        Scroll to see all columns
                     </div>
                 </div>
-                <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
-                    <style jsx>{`
-                        .bugs-table-scroll::-webkit-scrollbar {
-                            height: 8px;
-                        }
-                        .bugs-table-scroll::-webkit-scrollbar-track {
-                            background: transparent;
-                        }
-                        .bugs-table-scroll::-webkit-scrollbar-thumb {
-                            background-color: #cbd5e1;
-                            border-radius: 999px;
-                        }
-                        .dark .bugs-table-scroll::-webkit-scrollbar-thumb {
-                            background-color: #475569;
-                        }
+                <div
+                    className="overflow-x-auto"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(124,58,237,0.25) transparent' }}
+                >
+                    <style>{`
+                        .ts-table-scroll::-webkit-scrollbar { height: 10px; }
+                        .ts-table-scroll::-webkit-scrollbar-track { background: transparent; }
+                        .ts-table-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 5px; }
+                        .ts-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
                     `}</style>
-                    <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1050 }}>
+                    <table className="w-full text-sm ts-table-scroll" style={{ minWidth: 1050 }}>
                         <thead>
                             <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400 sticky left-0 z-10 bg-slate-50 dark:bg-slate-900">ID</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Name</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Project</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Status</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Cases</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Last Run</th>
-                                <th className="text-left px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Created</th>
-                                <th className="text-right px-5 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400">Actions</th>
+                                {table.getHeaderGroups()[0].headers.map((header, i) => (
+                                    <th
+                                        key={header.id}
+                                        className={[
+                                            'text-left py-3 text-[10px] uppercase tracking-wider font-bold text-slate-400',
+                                            i === 0
+                                                ? 'pl-5 pr-3 sticky left-0 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm'
+                                                : i === table.getHeaderGroups()[0].headers.length - 1
+                                                    ? 'pl-3 pr-5'
+                                                    : 'px-3',
+                                            header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200' : '',
+                                        ].join(' ')}
+                                        style={i === 0 ? { minWidth: 90 } : {}}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                    >
+                                        {header.isPlaceholder ? null : (
+                                            <span className="flex items-center gap-1">
+                                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                                {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? null}
+                                            </span>
+                                        )}
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                            {loading && suites.length === 0 ? (
+                            {loading ? (
                                 <tr>
-                                    <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
-                                        Loading test suites...
+                                    <td colSpan={table.getVisibleLeafColumns().length} className="px-5 py-12 text-center text-slate-400">
+                                        Loading…
                                     </td>
                                 </tr>
-                            ) : suites.length === 0 ? (
+                            ) : table.getRowModel().rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
+                                    <td colSpan={table.getVisibleLeafColumns().length} className="px-5 py-12 text-center text-slate-400">
                                         No test suites found.
                                     </td>
                                 </tr>
-                            ) : suites.map((suite) => (
-                                <tr key={suite.id} className="group hover:bg-violet-50/40 dark:hover:bg-violet-950/10 transition-colors">
-                                    <td className="px-5 py-3.5 whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-violet-50 dark:group-hover:bg-slate-900">
-                                        <Link href={`/test/suites/${suite.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
-                                            {suite.suite_id}
-                                        </Link>
-                                    </td>
-                                    <td className="px-5 py-3.5">
-                                        <Link href={`/test/suites/${suite.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
-                                            {suite.name}
-                                        </Link>
-                                        {suite.description && (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-xs">{suite.description}</div>
-                                        )}
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                        {suite.project_name || '-'}
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap">
-                                        <Badge variant={getSuiteStatusVariant(suite.status)}>{suite.status}</Badge>
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                        {suite.test_case_count ?? 0}
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                                        {suite.last_run_date ? formatDistanceToNow(new Date(suite.last_run_date), { addSuffix: true }) : 'Never'}
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                                        {formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}
-                                    </td>
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-sm text-right">
-                                        <Link href={`/test/suites/${suite.id}/edit`} className="text-blue-600 dark:text-blue-400 hover:underline mr-3">Edit</Link>
-                                        <Link href={`/test/suites/${suite.id}`} className="text-gray-600 dark:text-gray-400 hover:underline">View</Link>
-                                    </td>
-                                </tr>
-                            ))}
+                            ) : (
+                                table.getRowModel().rows.map(row => (
+                                    <tr key={row.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
+                                        {row.getVisibleCells().map((cell, ci) => (
+                                            <td
+                                                key={cell.id}
+                                                className={[
+                                                    'py-3.5',
+                                                    ci === 0
+                                                        ? 'pl-5 pr-3 sticky left-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm group-hover:bg-violet-50/95 dark:group-hover:bg-violet-900/20'
+                                                        : ci === row.getVisibleCells().length - 1
+                                                            ? 'pl-3 pr-5 text-right'
+                                                            : 'px-3 whitespace-nowrap',
+                                                ].join(' ')}
+                                            >
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
-                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                     <span>
-                        Showing <span className="font-medium text-slate-700 dark:text-slate-300">{suites.length}</span> of {pagination.total}
+                        Showing{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{suites.length}</span>{' '}
+                        of {pagination.total}
                     </span>
                     {pagination.total_pages > 1 && (
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => loadSuites(pagination.page - 1)}>Prev</Button>
-                            <span className="text-slate-400">Page {pagination.page} of {pagination.total_pages}</span>
-                            <Button variant="outline" size="sm" disabled={pagination.page >= pagination.total_pages} onClick={() => loadSuites(pagination.page + 1)}>Next</Button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => loadSuites(pagination.page - 1)}
+                                disabled={pagination.page <= 1}
+                                className="px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                            >
+                                ‹ Prev
+                            </button>
+                            <span className="px-2.5 tabular-nums">
+                                Page {pagination.page} of {pagination.total_pages}
+                            </span>
+                            <button
+                                onClick={() => loadSuites(pagination.page + 1)}
+                                disabled={pagination.page >= pagination.total_pages}
+                                className="px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                            >
+                                Next ›
+                            </button>
                         </div>
                     )}
                 </div>
