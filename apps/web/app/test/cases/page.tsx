@@ -267,15 +267,28 @@ export default function TestCasesPage() {
                         <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span>
                     </p>
                 </div>
-                <Link
-                    href="/test/cases/create"
-                    className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
-                >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    New Test Case
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/test/cases/bulk-upload"
+                        className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 hover:border-violet-400/60 hover:text-violet-700 dark:hover:text-violet-300 active:scale-95 transition-all"
+                    >
+                        <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <path d="M17 8l-5-5-5 5"/>
+                            <path d="M12 3v12"/>
+                        </svg>
+                        Bulk upload
+                    </Link>
+                    <Link
+                        href="/test/cases/create"
+                        className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                    >
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        New Test Case
+                    </Link>
+                </div>
             </div>
 
             {/* ── Stat strip ─────────────────────────────────────────── */}
