@@ -129,7 +129,7 @@ export default function TestCasesPage() {
 
     const stats = useMemo(() => ({
         total:     pagination.total,
-        active:    testCases.filter(tc => tc.status === 'active').length,
+        active:    testCases.filter(tc => tc.status === 'Not Run').length,
         critical:  testCases.filter(tc => tc.priority === 'critical').length,
         automated: testCases.filter(tc => tc.automation_status === 'automated').length,
     }), [testCases, pagination.total]);
