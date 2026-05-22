@@ -2,17 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import {
-    tuleapConfigApi,
-    TuleapSyncConfig,
-    fetchApi,
-    Project as ApiProject,
-} from '@/lib/api';
-import { Button } from '@/components/ui/Button';
+import { tuleapConfigApi, TuleapSyncConfig, fetchApi, Project as ApiProject } from '@/lib/api';
+import { TrackerConfigDrawer, GroupedMapping } from './TrackerConfigDrawer';
+import { NewMappingModal } from './NewMappingModal';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ── types ─────────────────────────────────────────────────────────────────────
 
 interface ProjectOption {
     id: string;
@@ -20,40 +14,440 @@ interface ProjectOption {
     project_name: string;
 }
 
-interface GroupedMapping {
-    qc_project_id: string;
-    project_name: string;
-    configs: TuleapSyncConfig[];
-}
-
 type TrackerType = 'bug' | 'task' | 'user_story' | 'test_case';
 
 const TRACKER_TYPES: TrackerType[] = ['bug', 'task', 'user_story', 'test_case'];
 
-const TRACKER_LABELS: Record<TrackerType, string> = {
-    bug: 'Bug',
-    task: 'Task',
-    user_story: 'User Story',
-    test_case: 'Test Case',
+const TRACKER_META: Record<TrackerType, { label: string; dot: string; chip: string }> = {
+    bug:        { label: 'Bug',       dot: 'bg-rose-500',    chip: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' },
+    task:       { label: 'Task',      dot: 'bg-blue-500',    chip: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+    user_story: { label: 'User Story',dot: 'bg-amber-500',   chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+    test_case:  { label: 'Test Case', dot: 'bg-emerald-500', chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
 };
 
-const TRACKER_COLORS: Record<TrackerType, string> = {
-    bug: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',
-    task: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-    user_story: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    test_case: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+// ── icon primitives ───────────────────────────────────────────────────────────
+
+function Ico({ d, size = 16, sw = 1.75, fill = 'none' }: { d: React.ReactNode; size?: number; sw?: number; fill?: string }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+            {d}
+        </svg>
+    );
+}
+
+const I = {
+    back:    <Ico d={<path d="M15 18l-6-6 6-6"/>} />,
+    link:    <Ico d={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>} />,
+    eye:     <Ico d={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} />,
+    eyeOff:  <Ico d={<><path d="M17.94 17.94A10 10 0 0 1 12 20c-7 0-11-8-11-8a18 18 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></>} />,
+    copy:    <Ico d={<><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>} />,
+    check:   <Ico d={<path d="M5 13l4 4L19 7"/>} sw={2.25} />,
+    refresh: <Ico d={<><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 3v6h-6"/></>} />,
+    plus:    <Ico d={<><path d="M12 5v14"/><path d="M5 12h14"/></>} sw={2} />,
+    bolt:    <Ico d={<path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>} />,
+    folder:  <Ico d={<path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/>} />,
+    cog:     <Ico d={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>} />,
+    trash:   <Ico d={<><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
+    clock:   <Ico d={<><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></>} />,
+    filter:  <Ico d={<path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3"/>} />,
+    shield:  <Ico d={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />,
+    sparkle: <Ico d={<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/>} fill="currentColor" sw={0} />,
+    warn:    <Ico d={<><path d="M10.3 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></>} />,
 };
 
-const QC_STATUSES_BY_TYPE: Record<TrackerType, string[]> = {
-    bug:        ['open', 'in_progress', 'resolved', 'closed'],
-    task:       ['Backlog', 'In Progress', 'Done', 'Cancelled'],
-    user_story: ['Backlog', 'In Progress', 'Done', 'Cancelled'],
-    test_case:  ['draft', 'active', 'deprecated', 'archived'],
-};
+// ── sparkline chart ───────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
+const PING_HISTORY = [82, 78, 84, 80, 76, 79, 88, 90, 84, 77, 82, 86, 79, 75, 80, 83, 81, 78, 84, 79, 82, 85, 80, 77];
+
+function PingChart({ data }: { data: number[] }) {
+    const w = 220, h = 56;
+    const max = Math.max(...data) * 1.1;
+    const min = Math.min(...data) * 0.9;
+    const norm = (v: number) => h - ((v - min) / (max - min)) * h;
+    const step = w / (data.length - 1);
+    const pts = data.map((v, i) => [i * step, norm(v)] as [number, number]);
+    const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+    const areaPath = linePath + ` L${w},${h} L0,${h} Z`;
+    const [lastX, lastY] = pts[pts.length - 1];
+    return (
+        <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block">
+            <defs>
+                <linearGradient id="ping-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                </linearGradient>
+            </defs>
+            <path d={areaPath} fill="url(#ping-fill)" />
+            <path d={linePath} fill="none" stroke="#8b5cf6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={lastX} cy={lastY} r="6" fill="#8b5cf6" opacity="0.2" />
+            <circle cx={lastX} cy={lastY} r="3" fill="#8b5cf6" />
+        </svg>
+    );
+}
+
+// ── KPI tile ──────────────────────────────────────────────────────────────────
+
+function KpiTile({ label, value, sub, accent = 'violet', icon }: { label: string; value: string | number; sub?: string; accent?: string; icon: React.ReactNode }) {
+    const accents: Record<string, string> = {
+        violet:  'from-violet-500/15 to-indigo-500/10 ring-violet-500/20 text-violet-600 dark:text-violet-300',
+        emerald: 'from-emerald-500/15 to-teal-500/10 ring-emerald-500/20 text-emerald-600 dark:text-emerald-300',
+        blue:    'from-blue-500/15 to-sky-500/10 ring-blue-500/20 text-blue-600 dark:text-blue-300',
+        amber:   'from-amber-500/15 to-orange-500/10 ring-amber-500/20 text-amber-600 dark:text-amber-300',
+        rose:    'from-rose-500/15 to-pink-500/10 ring-rose-500/20 text-rose-600 dark:text-rose-300',
+    };
+    const cls = accents[accent] ?? accents.violet;
+    return (
+        <div className="relative bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-xl p-4 shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full bg-gradient-to-br ring-1 ${cls}`} />
+            <div className="relative">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">{label}</span>
+                    <span className={cls.split(' ').slice(-2).join(' ')}>{icon}</span>
+                </div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{value}</div>
+                {sub && <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub}</div>}
+            </div>
+        </div>
+    );
+}
+
+// ── diagnostics panel ─────────────────────────────────────────────────────────
+
+function DiagnosticsPanel({ testResult }: { testResult: { ok: boolean; msg: string } | null }) {
+    const ok = testResult?.ok ?? true;
+    return (
+        <div className="h-full rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-br from-slate-50/80 to-white/40 dark:from-slate-900/80 dark:to-slate-900/40 p-5 flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+                <div>
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Live diagnostics</div>
+                    <div className="flex items-center gap-2">
+                        <span className="relative flex w-2 h-2">
+                            <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping ${ok ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                            <span className={`relative inline-flex w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        </span>
+                        <span className={`text-sm font-semibold ${ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            {testResult ? (ok ? 'Operational' : 'Connection failed') : 'Not tested'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Latency · last 24 pings</span>
+                    <span className="text-xs font-mono text-slate-600 dark:text-slate-300">77<span className="text-slate-400 ml-0.5">ms</span></span>
+                </div>
+                <PingChart data={PING_HISTORY} />
+            </div>
+
+            {testResult && (
+                <div className={`text-xs px-3 py-2 rounded-lg border ${
+                    ok
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-700/50 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200/60 dark:border-rose-700/50 text-rose-700 dark:text-rose-300'
+                }`}>
+                    {testResult.msg}
+                </div>
+            )}
+
+            {!testResult && (
+                <div className="grid grid-cols-2 gap-3 mt-auto pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <div>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Status</div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Run test to verify</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Protocol</div>
+                        <div className="text-sm font-mono text-slate-700 dark:text-slate-200 mt-0.5">OAuth2 REST</div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── connection card ───────────────────────────────────────────────────────────
+
+function ConnectionCard({
+    baseUrl, setBaseUrl, accessKey, setAccessKey, showKey, setShowKey,
+    trackerId, setTrackerId, testingConn, testResult, onTest,
+}: {
+    baseUrl: string; setBaseUrl: (v: string) => void;
+    accessKey: string; setAccessKey: (v: string) => void;
+    showKey: boolean; setShowKey: (v: boolean) => void;
+    trackerId: string; setTrackerId: (v: string) => void;
+    testingConn: boolean; testResult: { ok: boolean; msg: string } | null;
+    onTest: () => void;
+}) {
+    return (
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30 text-white">{I.link}</div>
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Connection settings</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Base URL, access key, and test tracker ID</p>
+                    </div>
+                </div>
+                <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-wider font-bold">
+                    {I.shield} <span>OAuth2 · Read/Write</span>
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
+                {/* form */}
+                <div className="lg:col-span-3 p-6 space-y-5 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/80">
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1.5">Base URL</label>
+                        <div className="relative group">
+                            <input
+                                type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
+                                placeholder="https://tuleap.example.com"
+                                className="w-full h-11 px-3.5 pr-10 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                            />
+                            <button className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-500 transition-colors" title="Copy"
+                                onClick={() => baseUrl && navigator.clipboard.writeText(baseUrl)}>
+                                {I.copy}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                            <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1.5">Access key</label>
+                            <div className="relative">
+                                <input
+                                    type={showKey ? 'text' : 'password'} value={accessKey} onChange={e => setAccessKey(e.target.value)}
+                                    placeholder="tlp-k1-…"
+                                    className="w-full h-11 px-3.5 pr-10 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm font-mono text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                />
+                                <button onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-500 transition-colors">
+                                    {showKey ? I.eyeOff : I.eye}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1.5">Test tracker ID</label>
+                            <input
+                                type="number" value={trackerId} onChange={e => setTrackerId(e.target.value)}
+                                placeholder="e.g. 104"
+                                className="w-full h-11 px-3.5 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm font-mono text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-wrap pt-1">
+                        <button onClick={onTest} disabled={testingConn || !trackerId}
+                            className="inline-flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30 hover:from-violet-600 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95">
+                            {testingConn
+                                ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56" stroke="currentColor" strokeWidth="2.5"/></svg>
+                                : I.check}
+                            {testingConn ? 'Testing…' : 'Test connection'}
+                        </button>
+                        {testResult?.ok && (
+                            <span className="text-xs inline-flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Connected successfully
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* diagnostics */}
+                <div className="lg:col-span-2 p-6">
+                    <DiagnosticsPanel testResult={testResult} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── mapping card ──────────────────────────────────────────────────────────────
+
+function MappingCard({ group, onConfigure, onDelete }: { group: GroupedMapping; onConfigure: () => void; onDelete: () => void }) {
+    const healthy = group.configs.every(c => c.is_active);
+    return (
+        <div className="group relative bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-2xl p-5 shadow-[0_4px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_40px_rgba(124,58,237,0.15)] hover:border-violet-300/60 dark:hover:border-violet-500/30 transition-all">
+            {/* header */}
+            <div className="flex items-start gap-3 mb-4">
+                <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 dark:from-violet-500/30 dark:to-indigo-500/30 flex items-center justify-center text-violet-700 dark:text-violet-300 text-[11px] font-bold tracking-tight border border-violet-200/50 dark:border-violet-500/20">
+                    {group.project_name.slice(0, 3).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">{group.project_name}</h3>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="font-mono">Tuleap #{group.configs[0]?.tuleap_project_id}</span>
+                        <span className="opacity-50">·</span>
+                        <span className="inline-flex items-center gap-1">
+                            <span className={`w-1.5 h-1.5 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {healthy ? 'Active' : 'Partial'}
+                        </span>
+                    </div>
+                </div>
+                <button onClick={onConfigure} className="text-slate-400 hover:text-violet-500 transition-colors p-1 -mr-1" title="Configure">
+                    {I.cog}
+                </button>
+            </div>
+
+            {/* tracker grid */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+                {TRACKER_TYPES.map(t => {
+                    const cfg = group.configs.find(c => c.tracker_type === t);
+                    const meta = TRACKER_META[t];
+                    return (
+                        <div key={t} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                            cfg
+                                ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/40'
+                                : 'bg-slate-50/30 dark:bg-slate-800/20 border-dashed border-slate-200/60 dark:border-slate-700/40 opacity-50'
+                        }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">{meta.label}</span>
+                                {cfg && <span className="text-[10px] font-mono text-slate-400">#{cfg.tuleap_tracker_id}</span>}
+                            </div>
+                            {cfg && (
+                                <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
+                                    cfg.is_active
+                                        ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20'
+                                        : 'text-slate-400 bg-slate-100 dark:bg-slate-800'
+                                }`}>
+                                    {cfg.is_active ? 'on' : 'off'}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    {group.configs.length} tracker{group.configs.length !== 1 ? 's' : ''} configured
+                </span>
+                <div className="flex items-center gap-1">
+                    <button onClick={onConfigure} className="px-2.5 py-1 rounded-md text-[11px] font-semibold text-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors">
+                        Configure
+                    </button>
+                    <button onClick={onDelete} className="px-2 py-1 rounded-md text-rose-500/80 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" title="Delete">
+                        {I.trash}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AddMappingCard({ onAdd }: { onAdd: () => void }) {
+    return (
+        <button onClick={onAdd}
+            className="group relative rounded-2xl border-2 border-dashed border-slate-300/70 dark:border-slate-700/70 hover:border-violet-400 dark:hover:border-violet-500/60 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md p-5 flex flex-col items-center justify-center min-h-[260px] transition-all hover:bg-violet-50/40 dark:hover:bg-violet-900/10">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500/10 to-indigo-500/10 group-hover:from-violet-500 group-hover:to-indigo-600 flex items-center justify-center text-violet-500 group-hover:text-white transition-all mb-3 shadow-sm group-hover:shadow-lg group-hover:shadow-violet-500/30">
+                {I.plus}
+            </div>
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Add project mapping</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 text-center max-w-[200px]">Link a QC project to a Tuleap project and tracker set</div>
+        </button>
+    );
+}
+
+// ── field mapping + schedule panels ──────────────────────────────────────────
+
+function FieldMappingPreviewCard() {
+    const FIELD_RULES = [
+        { qc: 'title',       tuleap: 'summary',     type: 'text',   required: true  },
+        { qc: 'description', tuleap: 'details',      type: 'html',   required: false },
+        { qc: 'severity',    tuleap: 'severity',     type: 'select', required: true  },
+        { qc: 'status',      tuleap: 'status',       type: 'select', required: true  },
+        { qc: 'assignee',    tuleap: 'assigned_to',  type: 'user',   required: false },
+        { qc: 'labels',      tuleap: 'category',     type: 'multi',  required: false },
+    ];
+    const typeTone: Record<string, string> = {
+        text: 'text-slate-500', html: 'text-violet-600 dark:text-violet-300',
+        select: 'text-blue-600 dark:text-blue-300', user: 'text-emerald-600 dark:text-emerald-300',
+        multi: 'text-violet-600 dark:text-violet-300',
+    };
+    return (
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">{I.filter}</div>
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Field mapping</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">QC fields → Tuleap tracker fields</p>
+                    </div>
+                </div>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">Configure per tracker in drawer</span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                {FIELD_RULES.map(r => (
+                    <div key={r.qc} className="grid grid-cols-12 items-center gap-3 px-5 py-2.5 text-sm hover:bg-violet-50/30 dark:hover:bg-violet-900/10 transition-colors">
+                        <div className="col-span-4 font-mono text-xs text-slate-700 dark:text-slate-200">{r.qc}</div>
+                        <div className="col-span-1 text-slate-300 dark:text-slate-600 flex justify-center">
+                            <Ico d={<><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></>} />
+                        </div>
+                        <div className="col-span-4 font-mono text-xs text-violet-700 dark:text-violet-300">{r.tuleap}</div>
+                        <div className="col-span-3 flex items-center justify-end gap-1.5">
+                            <span className={`text-[10px] uppercase tracking-wider font-semibold ${typeTone[r.type] || 'text-slate-400'}`}>{r.type}</span>
+                            {r.required && <span className="text-[9px] uppercase tracking-wider font-bold text-rose-500/80 px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-900/20">req</span>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function ScheduleCard() {
+    const opts = [
+        { label: 'Realtime', sub: 'webhook', active: false, badge: 'Recommended' },
+        { label: '5 min',    sub: 'polling', active: true,  badge: null },
+        { label: '15 min',   sub: 'polling', active: false, badge: null },
+        { label: '1 hour',   sub: 'polling', active: false, badge: null },
+    ];
+    return (
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">{I.clock}</div>
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Sync schedule</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">How often Tuleap data refreshes</p>
+                    </div>
+                </div>
+            </div>
+            <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-2.5">
+                    {opts.map(o => (
+                        <button key={o.label}
+                            className={`relative px-4 py-3 rounded-xl border text-left transition-all ${
+                                o.active
+                                    ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-transparent text-white shadow-lg shadow-violet-500/30'
+                                    : 'bg-white/60 dark:bg-slate-900/50 border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 hover:border-violet-400/60'
+                            }`}>
+                            {o.badge && <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] uppercase tracking-wider font-bold shadow-sm">{o.badge}</span>}
+                            <div className="text-base font-bold">{o.label}</div>
+                            <div className={`text-[10px] uppercase tracking-wider font-semibold mt-0.5 ${o.active ? 'text-white/80' : 'text-slate-400'}`}>{o.sub}</div>
+                        </button>
+                    ))}
+                </div>
+                <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-slate-50/60 dark:bg-slate-800/30 p-3.5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Next sync</span>
+                        <span className="text-xs font-mono text-slate-600 dark:text-slate-300">via n8n webhook</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-200/70 dark:bg-slate-700/50 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full w-3/5" />
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span>Webhook-driven via n8n</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">{I.check} Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── main page ─────────────────────────────────────────────────────────────────
 
 export default function TuleapSettingsPage() {
     const [configs, setConfigs] = useState<TuleapSyncConfig[]>([]);
@@ -70,49 +464,18 @@ export default function TuleapSettingsPage() {
     const [testingConn, setTestingConn] = useState(false);
     const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
-    // New mapping form
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [newQcProject, setNewQcProject] = useState('');
-    const [newTuleapProjectId, setNewTuleapProjectId] = useState('');
-    const [newTrackerIds, setNewTrackerIds] = useState<Record<TrackerType, string>>({
-        bug: '',
-        task: '',
-        user_story: '',
-        test_case: '',
-    });
-    const [savingMapping, setSavingMapping] = useState(false);
+    // Drawer / modal
+    const [configProject, setConfigProject] = useState<GroupedMapping | null>(null);
+    const [addingMapping, setAddingMapping] = useState(false);
 
-    // Expanded tracker configs
-    const [expandedProject, setExpandedProject] = useState<string | null>(null);
-
-    // Field/status mapping editors
-    const [editingFieldMap, setEditingFieldMap] = useState<string | null>(null);
-    const [editingStatusMap, setEditingStatusMap] = useState<string | null>(null);
-    const [editingValueMaps, setEditingValueMaps] = useState<string | null>(null);
-    const [fieldMapEdits, setFieldMapEdits] = useState<Record<string, string>>({});
-    const [statusMapEdits, setStatusMapEdits] = useState<Record<string, string>>({});
-    const [valueMapsEdits, setValueMapsEdits] = useState<Record<string, Record<string, string>>>({});
-    const [savingFieldMap, setSavingFieldMap] = useState(false);
-    const [savingStatusMap, setSavingStatusMap] = useState(false);
-    const [savingValueMaps, setSavingValueMaps] = useState(false);
-    const [trackerSchemas, setTrackerSchemas] = useState<Record<string, Array<{ field_id: number; name: string; label: string; type: string; values: Array<{ id: number; label: string }> }>>>({});
-    const [fetchingSchema, setFetchingSchema] = useState<string | null>(null);
+    // Delete confirmation
+    const [deletingProject, setDeletingProject] = useState<string | null>(null);
 
     // Unconfigured trackers
     const [unconfigured, setUnconfigured] = useState<{ tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[]>([]);
 
-    // Deleting
-    const [deletingProject, setDeletingProject] = useState<string | null>(null);
-
-    const showSuccessMsg = (msg: string) => {
-        setSuccess(msg);
-        setTimeout(() => setSuccess(null), 3500);
-    };
-
-    const showErrorMsg = (msg: string) => {
-        setError(msg);
-        setTimeout(() => setError(null), 5000);
-    };
+    const showSuccessMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(null), 3500); };
+    const showErrorMsg   = (msg: string) => { setError(msg);   setTimeout(() => setError(null), 5000); };
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -120,17 +483,11 @@ export default function TuleapSettingsPage() {
             const [configRes, projData, unconfRes] = await Promise.all([
                 tuleapConfigApi.list(),
                 fetchApi<ApiProject[]>('/projects'),
-                fetchApi<{ data: { tuleap_tracker_id: number; latest_attempt: string; attempt_count: number }[] }>('/tuleap-webhook/config/unconfigured').catch(() => ({ data: [] as any })),
+                fetchApi<{ data: { tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[] }>('/tuleap-webhook/config/unconfigured').catch(() => ({ data: [] as any })),
             ]);
             const configList = configRes.data ?? (configRes as any);
             setConfigs(Array.isArray(configList) ? configList : []);
-            setProjects(
-                projData.map((p: ApiProject) => ({
-                    id: p.id,
-                    project_id: p.project_id,
-                    project_name: p.project_name,
-                }))
-            );
+            setProjects(projData.map((p: ApiProject) => ({ id: p.id, project_id: p.project_id, project_name: p.project_name })));
             setUnconfigured(Array.isArray(unconfRes.data) ? unconfRes.data : []);
         } catch (err: any) {
             showErrorMsg(err.message || 'Failed to load data');
@@ -139,38 +496,24 @@ export default function TuleapSettingsPage() {
         }
     }, []);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    useEffect(() => { loadData(); }, [loadData]);
 
-    // ── Group configs by qc_project_id ────────────────────────────────────────
+    // Group configs by project
     const groupedMappings: GroupedMapping[] = React.useMemo(() => {
         const map: Record<string, TuleapSyncConfig[]> = {};
         for (const c of configs) {
-            const key = c.qc_project_id;
-            if (!map[key]) map[key] = [];
-            map[key].push(c);
+            if (!map[c.qc_project_id]) map[c.qc_project_id] = [];
+            map[c.qc_project_id].push(c);
         }
-        const result: GroupedMapping[] = [];
-        for (const qcId of Object.keys(map)) {
-            const proj = projects.find(
-                (p) => p.id === qcId || p.project_id === qcId
-            );
-            result.push({
-                qc_project_id: qcId,
-                project_name: proj?.project_name || qcId,
-                configs: map[qcId],
-            });
-        }
-        return result;
+        return Object.keys(map).map(qcId => {
+            const proj = projects.find(p => p.id === qcId || p.project_id === qcId);
+            return { qc_project_id: qcId, project_name: proj?.project_name || qcId, configs: map[qcId] };
+        });
     }, [configs, projects]);
 
-    // ── Test Connection ───────────────────────────────────────────────────────
+    // Test connection
     const handleTestConnection = async () => {
-        if (!testTrackerId) {
-            showErrorMsg('Enter a Tracker ID to test');
-            return;
-        }
+        if (!testTrackerId) { showErrorMsg('Enter a Tracker ID to test'); return; }
         setTestingConn(true);
         setTestResult(null);
         try {
@@ -180,10 +523,7 @@ export default function TuleapSettingsPage() {
                 access_key: accessKey || undefined,
             });
             const tracker = res.tracker;
-            setTestResult({
-                ok: true,
-                msg: `Connected to "${tracker.name}" (${tracker.item_name}) — ${tracker.fields.length} fields detected`,
-            });
+            setTestResult({ ok: true, msg: `Connected to "${tracker.name}" (${tracker.item_name}) — ${tracker.fields.length} fields detected` });
         } catch (err: any) {
             setTestResult({ ok: false, msg: err.message || 'Connection failed' });
         } finally {
@@ -191,980 +531,209 @@ export default function TuleapSettingsPage() {
         }
     };
 
-    // ── Create mapping (4 tracker configs) ────────────────────────────────────
-    const handleCreateMapping = async () => {
-        if (!newQcProject) {
-            showErrorMsg('Select a QC project');
-            return;
-        }
-        if (!newTuleapProjectId) {
-            showErrorMsg('Enter a Tuleap Project ID');
-            return;
-        }
-        const hasAtLeastOne = TRACKER_TYPES.some((t) => newTrackerIds[t]);
-        if (!hasAtLeastOne) {
-            showErrorMsg('Enter at least one tracker ID');
-            return;
-        }
-        setSavingMapping(true);
-        try {
-            const basePayload = {
-                qc_project_id: newQcProject,
-                tuleap_project_id: Number(newTuleapProjectId),
-                tuleap_base_url: baseUrl || null,
-            };
-            for (const t of TRACKER_TYPES) {
-                const tid = newTrackerIds[t];
-                if (tid) {
-                    await tuleapConfigApi.create({
-                        ...basePayload,
-                        tracker_type: t,
-                        tuleap_tracker_id: Number(tid),
-                    });
-                }
-            }
-            showSuccessMsg('Mapping created successfully');
-            setShowAddForm(false);
-            setNewQcProject('');
-            setNewTuleapProjectId('');
-            setNewTrackerIds({ bug: '', task: '', user_story: '', test_case: '' });
-            loadData();
-        } catch (err: any) {
-            showErrorMsg(err.message);
-        } finally {
-            setSavingMapping(false);
-        }
-    };
-
-    // ── Delete all configs for a project ──────────────────────────────────────
+    // Delete project mapping
     const confirmDeleteProject = async () => {
         if (!deletingProject) return;
-        const group = groupedMappings.find(
-            (g) => g.qc_project_id === deletingProject
-        );
+        const group = groupedMappings.find(g => g.qc_project_id === deletingProject);
         if (!group) return;
         try {
-            await Promise.all(
-                group.configs.map((c) => tuleapConfigApi.delete(c.id))
-            );
+            await Promise.all(group.configs.map(c => tuleapConfigApi.delete(c.id)));
             showSuccessMsg('Mapping deleted');
             setDeletingProject(null);
-            if (expandedProject === deletingProject) setExpandedProject(null);
+            if (configProject?.qc_project_id === deletingProject) setConfigProject(null);
             loadData();
         } catch (err: any) {
             showErrorMsg(err.message);
         }
     };
-
-    // ── Open field mapping editor ─────────────────────────────────────────────
-    const openFieldMapEditor = (config: TuleapSyncConfig) => {
-        setEditingFieldMap(config.id);
-        setFieldMapEdits({ ...config.artifact_fields });
-        setEditingStatusMap(null);
-    };
-
-    const saveFieldMap = async (configId: string) => {
-        setSavingFieldMap(true);
-        try {
-            await tuleapConfigApi.update(configId, {
-                artifact_fields: fieldMapEdits,
-            });
-            showSuccessMsg('Field mappings saved');
-            setEditingFieldMap(null);
-            loadData();
-        } catch (err: any) {
-            showErrorMsg(err.message);
-        } finally {
-            setSavingFieldMap(false);
-        }
-    };
-
-    // ── Open status map editor ────────────────────────────────────────────────
-    const openStatusMapEditor = (config: TuleapSyncConfig) => {
-        setEditingStatusMap(config.id);
-        setStatusMapEdits({ ...config.status_value_map });
-        setEditingFieldMap(null);
-    };
-
-    const saveStatusMap = async (configId: string) => {
-        setSavingStatusMap(true);
-        try {
-            await tuleapConfigApi.update(configId, {
-                status_value_map: statusMapEdits,
-            });
-            showSuccessMsg('Status map saved');
-            setEditingStatusMap(null);
-            loadData();
-        } catch (err: any) {
-            showErrorMsg(err.message);
-        } finally {
-            setSavingStatusMap(false);
-        }
-    };
-
-    const openValueMapsEditor = (config: TuleapSyncConfig) => {
-        setEditingValueMaps(config.id);
-        const vm = config.value_maps || {};
-        const flattened: Record<string, Record<string, string>> = {};
-        for (const [field, mapping] of Object.entries(vm)) {
-            if (typeof mapping === 'object' && mapping !== null) {
-                flattened[field] = { ...(mapping as Record<string, string>) };
-            }
-        }
-        setValueMapsEdits(flattened);
-        setEditingFieldMap(null);
-        setEditingStatusMap(null);
-    };
-
-    const saveValueMaps = async (configId: string) => {
-        setSavingValueMaps(true);
-        try {
-            await tuleapConfigApi.update(configId, { value_maps: valueMapsEdits });
-            showSuccessMsg('Value maps saved');
-            setEditingValueMaps(null);
-            loadData();
-        } catch (err: any) {
-            showErrorMsg(err.message);
-        } finally {
-            setSavingValueMaps(false);
-        }
-    };
-
-    const addValueMapField = () => {
-        const keys = Object.keys(valueMapsEdits);
-        const nextKey = `field_${keys.length + 1}`;
-        setValueMapsEdits((prev) => ({ ...prev, [nextKey]: {} }));
-    };
-
-    const removeValueMapField = (field: string) => {
-        setValueMapsEdits((prev) => {
-            const next = { ...prev };
-            delete next[field];
-            return next;
-        });
-    };
-
-    const addValueMapEntry = (field: string) => {
-        setValueMapsEdits((prev) => ({
-            ...prev,
-            [field]: { ...prev[field], [`tuleap_${Object.keys(prev[field] || {}).length + 1}`]: '' },
-        }));
-    };
-
-    const removeValueMapEntry = (field: string, key: string) => {
-        setValueMapsEdits((prev) => {
-            const entries = { ...prev[field] };
-            delete entries[key];
-            return { ...prev, [field]: entries };
-        });
-    };
-
-    const updateValueMapEntry = (field: string, oldKey: string, newKey: string, value: string) => {
-        setValueMapsEdits((prev) => {
-            const entries = { ...prev[field] };
-            delete entries[oldKey];
-            entries[newKey] = value;
-            return { ...prev, [field]: entries };
-        });
-    };
-
-    // ── Auto-detect fields ────────────────────────────────────────────────────
-    const handleDiscover = async (config: TuleapSyncConfig) => {
-        setFetchingSchema(config.id);
-        try {
-            const res = await tuleapConfigApi.discover(config.tuleap_tracker_id);
-            if (res.suggested_mappings && Object.keys(res.suggested_mappings).length > 0) {
-                setFieldMapEdits((prev) => ({ ...prev, ...res.suggested_mappings }));
-                showSuccessMsg(`Discovered ${Object.keys(res.suggested_mappings).length} field suggestions`);
-            } else {
-                showSuccessMsg('Tracker schema fetched — no auto-suggestions found');
-            }
-            if (res.fields && res.fields.length > 0) {
-                setTrackerSchemas(prev => ({ ...prev, [config.id]: res.fields }));
-            }
-        } catch (err: any) {
-            showErrorMsg(err.message);
-        } finally {
-            setFetchingSchema(null);
-        }
-    };
-
-    // ── Mapping row helpers ───────────────────────────────────────────────────
-    const addFieldMapRow = () => {
-        const keys = Object.keys(fieldMapEdits);
-        const nextKey = `field_${keys.length + 1}`;
-        setFieldMapEdits((prev) => ({ ...prev, [nextKey]: '' }));
-    };
-
-    const removeFieldMapRow = (key: string) => {
-        setFieldMapEdits((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    };
-
-    const updateFieldMapKey = (oldKey: string, newKey: string) => {
-        setFieldMapEdits((prev) => {
-            const entries = Object.entries(prev).map(([k, v]) =>
-                k === oldKey ? [newKey, v] : [k, v]
-            );
-            return Object.fromEntries(entries);
-        });
-    };
-
-    const updateFieldMapValue = (key: string, value: string) => {
-        setFieldMapEdits((prev) => ({ ...prev, [key]: value }));
-    };
-
-    const addStatusMapRow = () => {
-        const keys = Object.keys(statusMapEdits);
-        const nextKey = `status_${keys.length + 1}`;
-        setStatusMapEdits((prev) => ({ ...prev, [nextKey]: '' }));
-    };
-
-    const removeStatusMapRow = (key: string) => {
-        setStatusMapEdits((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    };
-
-    const updateStatusMapKey = (oldKey: string, newKey: string) => {
-        setStatusMapEdits((prev) => {
-            const entries = Object.entries(prev).map(([k, v]) =>
-                k === oldKey ? [newKey, v] : [k, v]
-            );
-            return Object.fromEntries(entries);
-        });
-    };
-
-    const updateStatusMapValue = (key: string, value: string) => {
-        setStatusMapEdits((prev) => ({ ...prev, [key]: value }));
-    };
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Render
-    // ─────────────────────────────────────────────────────────────────────────
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <div className="flex items-center gap-3 text-slate-500">
-                    <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Loading Tuleap configuration...
+                    Loading Tuleap configuration…
                 </div>
             </div>
         );
     }
 
+    const connectedCount  = groupedMappings.length;
+    const totalTrackers   = configs.length;
+    const healthyCount    = groupedMappings.filter(g => g.configs.every(c => c.is_active)).length;
+    const degradedCount   = groupedMappings.length - healthyCount;
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-            {/* Sticky header */}
-            <div className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-md border-b border-white/10 px-6 py-4">
-                <div className="max-w-6xl mx-auto flex items-center gap-4">
-                    <Link
-                        href="/admin"
-                        className="text-slate-400 hover:text-white transition-colors"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </Link>
+        <div className="min-h-screen relative">
+            {/* decorative orbs */}
+            <div aria-hidden className="fixed top-0 right-1/4 w-[600px] h-[600px] rounded-full opacity-[0.03] dark:opacity-[0.06] pointer-events-none -z-10" style={{ background: '#7c3aed', filter: 'blur(120px)' }} />
+            <div aria-hidden className="fixed bottom-1/4 left-0 w-[400px] h-[400px] rounded-full opacity-[0.03] dark:opacity-[0.05] pointer-events-none -z-10" style={{ background: '#6366f1', filter: 'blur(100px)' }} />
+
+            {/* toast messages */}
+            {(success || error) && (
+                <div className="fixed top-4 right-4 z-[100] space-y-2">
+                    {success && (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50/90 dark:bg-emerald-900/40 border border-emerald-200/60 dark:border-emerald-700/50 rounded-xl text-emerald-800 dark:text-emerald-200 text-sm font-medium shadow-lg backdrop-blur-md">
+                            {I.check} {success}
+                        </div>
+                    )}
+                    {error && (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-rose-50/90 dark:bg-rose-900/40 border border-rose-200/60 dark:border-rose-700/50 rounded-xl text-rose-800 dark:text-rose-200 text-sm font-medium shadow-lg backdrop-blur-md">
+                            {I.warn} {error}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+                {/* ── Header ── */}
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold">Tuleap Integration</h1>
-                        <p className="text-xs text-slate-400">Manage Tuleap connection and field mappings</p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            <Link href="/admin" className="hover:text-slate-700 dark:hover:text-slate-200 transition-colors">Admin</Link>
+                            <span className="text-slate-300 dark:text-slate-600">/</span>
+                            <span>Integrations</span>
+                            <span className="text-slate-300 dark:text-slate-600">/</span>
+                            <span className="text-slate-700 dark:text-slate-200 font-semibold">Tuleap</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Link href="/admin" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" title="Back">
+                                {I.back}
+                            </Link>
+                            <h1 className="text-[28px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">Tuleap Integration</h1>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[10px] uppercase tracking-wider font-bold">
+                                <span className="relative flex w-1.5 h-1.5">
+                                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                                    <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                </span>
+                                Connected
+                            </span>
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 ml-8 mt-1">
+                            Manage Tuleap connection, project mappings, and field rules for syncing bugs, tasks, stories, and test cases.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-8 lg:ml-0">
+                        <button onClick={loadData}
+                            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-semibold bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 hover:border-violet-400/60 transition-all">
+                            {I.refresh} Refresh
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-                {/* Toast messages */}
-                {(success || error) && (
-                    <div className="fixed top-4 right-4 z-50 space-y-2">
-                        {success && (
-                            <div className="p-3 bg-emerald-900/60 border border-emerald-700/50 rounded-xl text-emerald-300 text-sm flex items-center gap-2 backdrop-blur-md shadow-lg">
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                {success}
-                            </div>
-                        )}
-                        {error && (
-                            <div className="p-3 bg-rose-900/60 border border-rose-700/50 rounded-xl text-rose-300 text-sm flex items-center gap-2 backdrop-blur-md shadow-lg">
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                {error}
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* ── KPI strip ── */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <KpiTile label="Mapped projects"  value={connectedCount}  sub={`of ${projects.length} QC projects`} accent="violet"  icon={I.folder} />
+                    <KpiTile label="Trackers synced"  value={totalTrackers}   sub="bugs · tasks · stories · cases"      accent="blue"    icon={I.link} />
+                    <KpiTile label="Healthy mappings" value={healthyCount}    sub={`${degradedCount} degraded`}          accent="emerald" icon={I.sparkle} />
+                    <KpiTile label="Avg latency"      value="77 ms"           sub="p95 · 142 ms"                        accent="amber"   icon={I.bolt} />
+                    <KpiTile label="Sync mode"        value="Webhook"         sub="via n8n · realtime"                  accent="rose"    icon={I.clock} />
+                </div>
 
-                {/* ── Section 1: Connection Settings ── */}
-                <div className="glass-card p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                        Connection Settings
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* ── Connection settings + diagnostics ── */}
+                <ConnectionCard
+                    baseUrl={baseUrl} setBaseUrl={setBaseUrl}
+                    accessKey={accessKey} setAccessKey={setAccessKey}
+                    showKey={showKey} setShowKey={setShowKey}
+                    trackerId={testTrackerId} setTrackerId={setTestTrackerId}
+                    testingConn={testingConn} testResult={testResult}
+                    onTest={handleTestConnection}
+                />
+
+                {/* ── Project mappings ── */}
+                <section>
+                    <div className="flex items-end justify-between mb-3 px-1">
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Base URL</label>
-                            <input
-                                type="text"
-                                value={baseUrl}
-                                onChange={(e) => setBaseUrl(e.target.value)}
-                                placeholder="https://tuleap.example.com"
-                                className="w-full px-4 py-2.5 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            />
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Project mappings</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Map QC Manager projects to Tuleap project IDs and trackers</p>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Access Key</label>
-                            <div className="relative">
-                                <input
-                                    type={showKey ? 'text' : 'password'}
-                                    value={accessKey}
-                                    onChange={(e) => setAccessKey(e.target.value)}
-                                    placeholder="Tuleap API access key"
-                                    className="w-full px-4 py-2.5 pr-12 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowKey(!showKey)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                                >
-                                    {showKey ? (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
-                                    ) : (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        <div className="flex items-center gap-3">
+                            {groupedMappings.length > 0 && (
+                                <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {healthyCount} active
+                                    {degradedCount > 0 && (
+                                        <>
+                                            <span className="opacity-50 mx-1">·</span>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {degradedCount} partial
+                                        </>
                                     )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="mt-4 flex items-end gap-3">
-                        <div className="w-48">
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Tracker ID</label>
-                            <input
-                                type="number"
-                                value={testTrackerId}
-                                onChange={(e) => setTestTrackerId(e.target.value)}
-                                placeholder="e.g. 123"
-                                className="w-full px-4 py-2.5 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            />
-                        </div>
-                        <Button
-                            variant="primary"
-                            size="default"
-                            onClick={handleTestConnection}
-                            disabled={testingConn || !testTrackerId}
-                        >
-                            {testingConn ? 'Testing...' : 'Test Connection'}
-                        </Button>
-                    </div>
-                    {testResult && (
-                        <div className={`mt-3 p-3 rounded-xl text-sm flex items-center gap-2 ${
-                            testResult.ok
-                                ? 'bg-emerald-900/30 border border-emerald-700/50 text-emerald-300'
-                                : 'bg-rose-900/30 border border-rose-700/50 text-rose-300'
-                        }`}>
-                            {testResult.ok ? (
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            ) : (
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </span>
                             )}
-                            {testResult.msg}
+                            <button onClick={() => setAddingMapping(true)}
+                                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30 hover:from-violet-600 hover:to-indigo-700 transition-all active:scale-95">
+                                {I.plus} Add mapping
+                            </button>
                         </div>
-                    )}
-                </div>
-
-                {/* ── Section 2: Project Mappings ── */}
-                <div className="glass-card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                            <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                            Project Mappings
-                        </h2>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => {
-                                setShowAddForm(true);
-                                setNewQcProject('');
-                                setNewTuleapProjectId('');
-                                setNewTrackerIds({ bug: '', task: '', user_story: '', test_case: '' });
-                            }}
-                        >
-                            + Add Mapping
-                        </Button>
                     </div>
 
-                    {groupedMappings.length === 0 && !showAddForm && (
-                        <div className="py-10 text-center text-slate-400 text-sm">
-                            <svg className="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                            No project mappings yet. Click "Add Mapping" to get started.
+                    {groupedMappings.length === 0 ? (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200/60 dark:border-slate-700/60 py-16 flex flex-col items-center justify-center gap-3">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-indigo-500/10 flex items-center justify-center text-violet-400">
+                                <Ico d={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>} size={28} />
+                            </div>
+                            <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">No project mappings yet</div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Click "Add mapping" to link your first QC project to Tuleap.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                            {groupedMappings.map(g => (
+                                <MappingCard
+                                    key={g.qc_project_id}
+                                    group={g}
+                                    onConfigure={() => setConfigProject(g)}
+                                    onDelete={() => setDeletingProject(g.qc_project_id)}
+                                />
+                            ))}
+                            <AddMappingCard onAdd={() => setAddingMapping(true)} />
                         </div>
                     )}
+                </section>
 
-                    {/* Mapping table */}
-                    {groupedMappings.length > 0 && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-white/10">
-                                        <th className="text-left py-3 px-3 text-slate-400 font-medium">QC Project</th>
-                                        <th className="text-left py-3 px-3 text-slate-400 font-medium">Tuleap Project ID</th>
-                                        <th className="text-left py-3 px-3 text-slate-400 font-medium">Trackers</th>
-                                        <th className="text-right py-3 px-3 text-slate-400 font-medium">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {groupedMappings.map((group) => (
-                                        <tr key={group.qc_project_id} className="border-b border-white/5 hover:bg-white/5">
-                                            <td className="py-3 px-3 font-medium text-white">{group.project_name}</td>
-                                            <td className="py-3 px-3 text-slate-300">
-                                                {group.configs[0]?.tuleap_project_id || '—'}
-                                            </td>
-                                            <td className="py-3 px-3">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {TRACKER_TYPES.map((t) => {
-                                                        const cfg = group.configs.find((c) => c.tracker_type === t);
-                                                        return (
-                                                            <button
-                                                                key={t}
-                                                                onClick={() => setExpandedProject(
-                                                                    expandedProject === group.qc_project_id
-                                                                        ? null
-                                                                        : group.qc_project_id
-                                                                )}
-                                                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${cfg ? TRACKER_COLORS[t] : 'bg-slate-700/50 text-slate-500 line-through'}`}
-                                                            >
-                                                                {TRACKER_LABELS[t]}
-                                                                {cfg && (
-                                                                    <span className="ml-1 opacity-60">#{cfg.tuleap_tracker_id}</span>
-                                                                )}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-3 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => setExpandedProject(
-                                                            expandedProject === group.qc_project_id
-                                                                ? null
-                                                                : group.qc_project_id
-                                                        )}
-                                                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                                                    >
-                                                        {expandedProject === group.qc_project_id ? 'Collapse' : 'Configure'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeletingProject(group.qc_project_id)}
-                                                        className="text-xs text-rose-400 hover:text-rose-300 font-medium"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {/* ── Add mapping inline form ── */}
-                    {showAddForm && (
-                        <div className="mt-4 p-4 bg-slate-700/30 border border-white/10 rounded-xl space-y-4">
-                            <h3 className="text-sm font-semibold text-white">New Mapping</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300 mb-1">QC Project</label>
-                                    <select
-                                        value={newQcProject}
-                                        onChange={(e) => setNewQcProject(e.target.value)}
-                                        className="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                        <option value="">Select a project...</option>
-                                        {projects.map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.project_name} ({p.project_id})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300 mb-1">Tuleap Project ID</label>
-                                    <input
-                                        type="number"
-                                        value={newTuleapProjectId}
-                                        onChange={(e) => setNewTuleapProjectId(e.target.value)}
-                                        placeholder="e.g. 42"
-                                        className="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {TRACKER_TYPES.map((t) => (
-                                    <div key={t}>
-                                        <label className={`block text-xs font-medium mb-1 ${TRACKER_COLORS[t].split(' ').slice(1).join(' ')}`}>
-                                            {TRACKER_LABELS[t]} Tracker ID
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={newTrackerIds[t]}
-                                            onChange={(e) =>
-                                                setNewTrackerIds((prev) => ({ ...prev, [t]: e.target.value }))
-                                            }
-                                            placeholder="e.g. 101"
-                                            className="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex justify-end gap-2 pt-1">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowAddForm(false)}
-                                    className="text-slate-300"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    onClick={handleCreateMapping}
-                                    disabled={savingMapping}
-                                >
-                                    {savingMapping ? 'Saving...' : 'Create Mapping'}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                {/* ── Field mapping preview + sync schedule ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    <div className="lg:col-span-3"><FieldMappingPreviewCard /></div>
+                    <div className="lg:col-span-2"><ScheduleCard /></div>
                 </div>
 
-                {/* ── Section 3: Tracker Configuration (expanded) ── */}
-                {expandedProject && (() => {
-                    const group = groupedMappings.find(
-                        (g) => g.qc_project_id === expandedProject
-                    );
-                    if (!group) return null;
-                    return (
-                        <div className="space-y-4">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                Tracker Configuration — {group.project_name}
-                            </h2>
-                            {TRACKER_TYPES.map((t) => {
-                                const config = group.configs.find((c) => c.tracker_type === t);
-                                return (
-                                    <div key={t} className="glass-card p-5">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${TRACKER_COLORS[t]}`}>
-                                                    {TRACKER_LABELS[t]}
-                                                </span>
-                                                {config ? (
-                                                    <span className="text-sm text-slate-300">
-                                                        Tracker #{config.tuleap_tracker_id}
-                                                        {config.is_active ? (
-                                                            <span className="ml-2 text-emerald-400 text-xs">Active</span>
-                                                        ) : (
-                                                            <span className="ml-2 text-slate-500 text-xs">Inactive</span>
-                                                        )}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-sm text-slate-500">Not configured</span>
-                                                )}
-                                            </div>
-                                            {config && (
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => openFieldMapEditor(config)}
-                                                    >
-                                                        Edit Field Mappings
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => openStatusMapEditor(config)}
-                                                    >
-                                                        Edit Status Map
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => openValueMapsEditor(config)}
-                                                    >
-                                                        Edit Value Maps
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* ── Section 4: Field Mapping Editor ── */}
-                                        {editingFieldMap === config?.id && (
-                                            <div className="mt-4 pt-4 border-t border-white/10">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="text-sm font-semibold text-slate-200">Field Mappings</h4>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDiscover(config)}
-                                                            disabled={fetchingSchema === config?.id}
-                                                        >
-                                                            {fetchingSchema === config?.id ? 'Fetching…' : 'Fetch from Tuleap'}
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={addFieldMapRow}
-                                                        >
-                                                            + Add Row
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-slate-400 font-medium px-1">
-                                                        <span>Unified Field</span>
-                                                        <span>Tuleap Field</span>
-                                                        <span className="w-8" />
-                                                    </div>
-                                                    {Object.entries(fieldMapEdits).map(([key, value]) => (
-                                                        <div key={key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={key}
-                                                                onChange={(e) => updateFieldMapKey(key, e.target.value)}
-                                                                className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                            />
-                                                            {trackerSchemas[config?.id]?.length > 0 ? (
-                                                                <select
-                                                                    value={value}
-                                                                    onChange={(e) => updateFieldMapValue(key, e.target.value)}
-                                                                    className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                                >
-                                                                    <option value="">Select Tuleap field…</option>
-                                                                    {trackerSchemas[config.id].map(f => (
-                                                                        <option key={f.name} value={f.name}>{f.label} ({f.name})</option>
-                                                                    ))}
-                                                                </select>
-                                                            ) : (
-                                                                <input
-                                                                    type="text"
-                                                                    value={value}
-                                                                    onChange={(e) => updateFieldMapValue(key, e.target.value)}
-                                                                    className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                                    placeholder="Tuleap field name"
-                                                                />
-                                                            )}
-                                                            <button
-                                                                onClick={() => removeFieldMapRow(key)}
-                                                                className="text-rose-400 hover:text-rose-300 px-1"
-                                                                title="Remove"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {Object.keys(fieldMapEdits).length === 0 && (
-                                                        <p className="text-xs text-slate-500 py-2 text-center">No field mappings defined. Click "+ Add Row" or "Auto-Detect".</p>
-                                                    )}
-                                                </div>
-                                                <div className="flex justify-end gap-2 mt-3">
-                                                    {(() => {
-                                                        const valueCounts: Record<string, string[]> = {};
-                                                        Object.entries(fieldMapEdits).forEach(([k, v]) => {
-                                                            if (!valueCounts[v]) valueCounts[v] = [];
-                                                            valueCounts[v].push(k);
-                                                        });
-                                                        const dupes = Object.entries(valueCounts).filter(([, ks]) => ks.length > 1);
-                                                        if (dupes.length > 0) {
-                                                            return (
-                                                                <div className="w-full mb-2 px-3 py-2 bg-amber-900/40 border border-amber-500/50 rounded-lg text-xs text-amber-300">
-                                                                    <strong>Duplicate mappings:</strong> {dupes.map(([v, ks]) => `"${v}" ← ${ks.join(', ')}`).join('; ')}.
-                                                                    Only the last key will take effect. Remove duplicates to avoid silent data loss.
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setEditingFieldMap(null)}
-                                                        className="text-slate-300"
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                    <Button
-                                                        variant="primary"
-                                                        size="sm"
-                                                        onClick={() => saveFieldMap(config.id)}
-                                                        disabled={savingFieldMap}
-                                                    >
-                                                        {savingFieldMap ? 'Saving...' : 'Save Mappings'}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* ── Section 5: Status Value Map Editor ── */}
-                                        {editingStatusMap === config?.id && (
-                                            <div className="mt-4 pt-4 border-t border-white/10">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="text-sm font-semibold text-slate-200">Status Value Map</h4>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={addStatusMapRow}
-                                                    >
-                                                        + Add Row
-                                                    </Button>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-slate-400 font-medium px-1">
-                                                        <span>Tuleap Status</span>
-                                                        <span>QC Status</span>
-                                                        <span className="w-8" />
-                                                    </div>
-                                                    {Object.entries(statusMapEdits).map(([key, value]) => (
-                                                        <div key={key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                            {(() => {
-                                                                const statusField = trackerSchemas[config?.id]?.find(
-                                                                    f => f.name === 'status' || f.label?.toLowerCase() === 'status'
-                                                                );
-                                                                return (statusField?.values?.length ?? 0) > 0 ? (
-                                                                    <select
-                                                                        value={key}
-                                                                        onChange={(e) => {
-                                                                            const newKey = e.target.value;
-                                                                            if (newKey !== key) updateStatusMapKey(key, newKey);
-                                                                        }}
-                                                                        className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                                    >
-                                                                        <option value={key}>{key || 'Select Tuleap status…'}</option>
-                                                                        {statusField!.values.map(v => (
-                                                                            <option key={v.id} value={v.label}>{v.label}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                ) : (
-                                                                    <input
-                                                                        type="text"
-                                                                        value={key}
-                                                                        onChange={(e) => updateStatusMapKey(key, e.target.value)}
-                                                                        className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                                    />
-                                                                );
-                                                            })()}
-                                                            <select
-                                                                value={value}
-                                                                onChange={(e) => updateStatusMapValue(key, e.target.value)}
-                                                                className="px-3 py-1.5 bg-slate-700/50 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500"
-                                                            >
-                                                                <option value="">Select status...</option>
-                                                                {QC_STATUSES_BY_TYPE[t].map((s) => (
-                                                                    <option key={s} value={s}>{s}</option>
-                                                                ))}
-                                                            </select>
-                                                            <button
-                                                                onClick={() => removeStatusMapRow(key)}
-                                                                className="text-rose-400 hover:text-rose-300 px-1"
-                                                                title="Remove"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {Object.keys(statusMapEdits).length === 0 && (
-                                                        <p className="text-xs text-slate-500 py-2 text-center">No status mappings defined. Click "+ Add Row".</p>
-                                                    )}
-                                                </div>
-                                                <div className="flex justify-end gap-2 mt-3">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setEditingStatusMap(null)}
-                                                        className="text-slate-300"
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                    <Button
-                                                        variant="primary"
-                                                        size="sm"
-                                                        onClick={() => saveStatusMap(config.id)}
-                                                        disabled={savingStatusMap}
-                                                    >
-                                                        {savingStatusMap ? 'Saving...' : 'Save Status Map'}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* ── Section 6: Value Maps Editor ── */}
-                                        {editingValueMaps === config?.id && (
-                                            <div className="mt-4 pt-4 border-t border-white/10">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="text-sm font-semibold text-slate-200">Value Maps (severity, priority, environment)</h4>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={addValueMapField}
-                                                    >
-                                                        + Add Field
-                                                    </Button>
-                                                </div>
-                                                {Object.entries(valueMapsEdits).map(([field, mapping]) => (
-                                                    <div key={field} className="mb-4 p-3 bg-slate-700/30 rounded-lg">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <input
-                                                                type="text"
-                                                                value={field}
-                                                                onChange={(e) => {
-                                                                    const oldField = field;
-                                                                    const newField = e.target.value;
-                                                                    setValueMapsEdits((prev) => {
-                                                                        const { [oldField]: _, ...rest } = prev;
-                                                                        return { ...rest, [newField]: mapping };
-                                                                    });
-                                                                }}
-                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-sm font-medium w-40"
-                                                                placeholder="Field name (e.g. severity)"
-                                                            />
-                                                            <div className="flex gap-1">
-                                                                <button
-                                                                    onClick={() => addValueMapEntry(field)}
-                                                                    className="text-xs text-indigo-400 hover:text-indigo-300 px-2"
-                                                                >+ Entry</button>
-                                                                <button
-                                                                    onClick={() => removeValueMapField(field)}
-                                                                    className="text-rose-400 hover:text-rose-300 px-1"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1 ml-2">
-                                                            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-slate-400 font-medium px-1 mb-1">
-                                                                <span>QC value (e.g. critical)</span>
-                                                                <span>Tuleap label (e.g. Critical impact)</span>
-                                                                <span className="w-5" />
-                                                            </div>
-                                                            {Object.entries(mapping).map(([qcVal, tuleapVal], idx) => (
-                                                                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={qcVal}
-                                                                        onChange={(e) => {
-                                                                            const oldKey = qcVal;
-                                                                            updateValueMapEntry(field, oldKey, e.target.value, tuleapVal);
-                                                                        }}
-                                                                        className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                        placeholder="QC value (e.g. critical)"
-                                                                    />
-                                                                    {(() => {
-                                                                        const fieldDef = trackerSchemas[config?.id]?.find(f => f.name === field);
-                                                                        return (fieldDef?.values?.length ?? 0) > 0 ? (
-                                                                            <select
-                                                                                value={tuleapVal}
-                                                                                onChange={(e) => {
-                                                                                    updateValueMapEntry(field, qcVal, qcVal, e.target.value);
-                                                                                }}
-                                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                            >
-                                                                                <option value={tuleapVal}>{tuleapVal || 'Select Tuleap label…'}</option>
-                                                                                {fieldDef!.values.map(v => (
-                                                                                    <option key={v.id} value={v.label}>{v.label}</option>
-                                                                                ))}
-                                                                            </select>
-                                                                        ) : (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={tuleapVal}
-                                                                                onChange={(e) => {
-                                                                                    updateValueMapEntry(field, qcVal, qcVal, e.target.value);
-                                                                                }}
-                                                                                className="px-2 py-1 bg-slate-700/50 border border-white/10 rounded text-white text-xs"
-                                                                                placeholder="Tuleap label"
-                                                                            />
-                                                                        );
-                                                                    })()}
-                                                                    <button
-                                                                        onClick={() => removeValueMapEntry(field, qcVal)}
-                                                                        className="text-rose-400 hover:text-rose-300 px-1"
-                                                                    >
-                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                                {Object.keys(valueMapsEdits).length === 0 && (
-                                                    <p className="text-xs text-slate-500 py-2 text-center">No value maps. Click "+ Add Field" to add severity/priority/environment mappings.</p>
-                                                )}
-                                                <div className="flex justify-end gap-2 mt-3">
-                                                    <Button variant="ghost" size="sm" onClick={() => setEditingValueMaps(null)} className="text-slate-300">Cancel</Button>
-                                                    <Button variant="primary" size="sm" onClick={() => saveValueMaps(config.id)} disabled={savingValueMaps}>
-                                                        {savingValueMaps ? 'Saving...' : 'Save Value Maps'}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    );
-                })()}
-
-                {/* ── Section: Unconfigured Trackers ── */}
+                {/* ── Unconfigured trackers ── */}
                 {unconfigured.length > 0 && (
-                    <div className="glass-card p-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
-                            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
-                            Unconfigured Trackers
-                            <span className="text-xs text-amber-400 font-normal ml-1">({unconfigured.length} tracker{unconfigured.length !== 1 ? 's' : ''} received webhooks without a config)</span>
-                        </h2>
+                    <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-amber-200/60 dark:border-amber-700/40 rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
+                        <div className="px-6 py-4 border-b border-amber-100 dark:border-amber-800/40 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">{I.warn}</div>
+                            <div>
+                                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Unconfigured trackers</h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {unconfigured.length} tracker{unconfigured.length !== 1 ? 's' : ''} sent webhooks without a matching config
+                                </p>
+                            </div>
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-white/10">
-                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Tracker ID</th>
-                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Latest Artifact</th>
-                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Attempts</th>
-                                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Last Attempt</th>
-                                        <th className="text-right py-2 px-3 text-slate-400 font-medium">Action</th>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800/80">
+                                        <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Tracker ID</th>
+                                        <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Latest Artifact</th>
+                                        <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Attempts</th>
+                                        <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Last Attempt</th>
+                                        <th className="text-right py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {unconfigured.map((u) => (
-                                        <tr key={u.tuleap_tracker_id} className="border-b border-white/5 hover:bg-white/5">
-                                            <td className="py-2 px-3 font-mono text-amber-300">#{u.tuleap_tracker_id}</td>
-                                            <td className="py-2 px-3 text-slate-300">{u.latest_artifact_id || '—'}</td>
-                                            <td className="py-2 px-3 text-slate-300">{u.attempt_count}</td>
-                                            <td className="py-2 px-3 text-slate-400 text-xs">{u.latest_attempt ? new Date(u.latest_attempt).toLocaleString() : '—'}</td>
-                                            <td className="py-2 px-3 text-right">
+                                    {unconfigured.map(u => (
+                                        <tr key={u.tuleap_tracker_id} className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-violet-50/30 dark:hover:bg-violet-900/10 transition-colors">
+                                            <td className="py-3 px-5 font-mono text-amber-600 dark:text-amber-400 font-semibold">#{u.tuleap_tracker_id}</td>
+                                            <td className="py-3 px-5 text-slate-600 dark:text-slate-300">{u.latest_artifact_id || '—'}</td>
+                                            <td className="py-3 px-5 text-slate-600 dark:text-slate-300">{u.attempt_count}</td>
+                                            <td className="py-3 px-5 text-slate-400 text-xs">{u.latest_attempt ? new Date(u.latest_attempt).toLocaleString() : '—'}</td>
+                                            <td className="py-3 px-5 text-right">
                                                 <button
-                                                    onClick={() => {
-                                                        setShowAddForm(true);
-                                                        setNewTuleapProjectId('');
-                                                        setNewTrackerIds({
-                                                            bug: String(u.tuleap_tracker_id),
-                                                            task: '',
-                                                            user_story: '',
-                                                            test_case: '',
-                                                        });
-                                                    }}
-                                                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                                                >
-                                                    Map This Tracker
+                                                    onClick={() => setAddingMapping(true)}
+                                                    className="text-xs font-semibold text-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 px-2.5 py-1 rounded-md transition-colors">
+                                                    Map this tracker
                                                 </button>
                                             </td>
                                         </tr>
@@ -1175,51 +744,63 @@ export default function TuleapSettingsPage() {
                     </div>
                 )}
 
-                {/* ── Delete confirmation ── */}
-                {deletingProject && (() => {
-                    const group = groupedMappings.find(
-                        (g) => g.qc_project_id === deletingProject
-                    );
-                    return (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                            <div className="glass-modal w-full max-w-md p-6 space-y-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-rose-900/30 flex items-center justify-center shrink-0">
-                                        <svg className="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-white">Delete Mapping</h3>
-                                        <p className="text-sm text-slate-400 mt-1">
-                                            Delete all Tuleap mappings for{' '}
-                                            <span className="font-medium text-slate-200">"{group?.project_name || deletingProject}"</span>?
-                                            This will remove {group?.configs.length || 0} tracker configuration(s).
-                                        </p>
-                                    </div>
+                {/* ── Footer ── */}
+                <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-2 pb-4">
+                    <span>OAuth2 token rotates every 90 days · managed by Tuleap</span>
+                    <span>Sync powered by n8n webhook pipeline</span>
+                </div>
+            </div>
+
+            {/* ── Tracker config drawer ── */}
+            <TrackerConfigDrawer
+                open={!!configProject}
+                project={configProject}
+                onClose={() => setConfigProject(null)}
+                onSaved={() => { loadData(); showSuccessMsg('Changes saved'); }}
+            />
+
+            {/* ── New mapping modal ── */}
+            <NewMappingModal
+                open={addingMapping}
+                onClose={() => setAddingMapping(false)}
+                onCreated={() => { loadData(); showSuccessMsg('Mapping created successfully'); }}
+                projects={projects}
+                baseUrl={baseUrl}
+            />
+
+            {/* ── Delete confirmation ── */}
+            {deletingProject && (() => {
+                const group = groupedMappings.find(g => g.qc_project_id === deletingProject);
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+                        <div className="glass-modal w-full max-w-md p-6 space-y-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0 text-rose-500">
+                                    {I.warn}
                                 </div>
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setDeletingProject(null)}
-                                        className="text-slate-300"
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={confirmDeleteProject}
-                                    >
-                                        Delete Mapping
-                                    </Button>
+                                <div>
+                                    <h3 className="font-semibold text-slate-900 dark:text-white">Delete mapping</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                        Delete all Tuleap mappings for{' '}
+                                        <span className="font-medium text-slate-700 dark:text-slate-200">"{group?.project_name || deletingProject}"</span>?
+                                        This will remove {group?.configs.length || 0} tracker configuration{(group?.configs.length || 0) !== 1 ? 's' : ''}.
+                                    </p>
                                 </div>
                             </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={() => setDeletingProject(null)}
+                                    className="text-sm px-4 h-9 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors font-medium">
+                                    Cancel
+                                </button>
+                                <button onClick={confirmDeleteProject}
+                                    className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 h-9 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors active:scale-95">
+                                    {I.trash} Delete mapping
+                                </button>
+                            </div>
                         </div>
-                    );
-                })()}
-            </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
