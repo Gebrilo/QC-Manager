@@ -15,9 +15,19 @@ import { TaskStatusBadge } from './TaskStatusBadge';
 import Link from 'next/link';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 
+export const HIDEABLE_TASK_COLUMNS: { id: string; header: string }[] = [
+    { id: 'project_name',       header: 'Project' },
+    { id: 'expected_start_date', header: 'Expected Start' },
+    { id: 'actual_start_date',  header: 'Actual Start' },
+    { id: 'resource1_name',     header: 'Assignee' },
+    { id: 'total_est_hrs',      header: 'Est. Hours' },
+];
+
 interface TaskTableProps {
     tasks: Task[];
     isLoading: boolean;
+    columnVisibility?: VisibilityState;
+    onColumnVisibilityChange?: (v: VisibilityState) => void;
     pagination?: {
         total: number;
         limit: number;
@@ -39,14 +49,18 @@ const columnHelper = createColumnHelper<Task>();
 export function TaskTable({
     tasks,
     isLoading,
+    columnVisibility: controlledVisibility,
+    onColumnVisibilityChange,
     pagination,
     onPageChange,
 }: TaskTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    const [internalVisibility, setInternalVisibility] = useState<VisibilityState>({
         expected_start_date: false,
         actual_start_date: false,
     });
+    const columnVisibility = controlledVisibility ?? internalVisibility;
+    const setColumnVisibility = onColumnVisibilityChange ?? setInternalVisibility;
 
     const columns = useMemo(() => [
         columnHelper.accessor('task_id', {
@@ -172,44 +186,11 @@ export function TaskTable({
                     <h2 className="text-sm font-semibold text-slate-900 dark:text-white">All Tasks</h2>
                     <span className="text-xs text-slate-400 tabular-nums">{tasks.length} rows</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M5 12h14M13 5l7 7-7 7" />
-                        </svg>
-                        Scroll to see all columns
-                    </div>
-                    {/* Column visibility toggle */}
-                    <div className="relative group">
-                        <button className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-colors">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
-                                <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 z-30 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 p-2">
-                            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                Columns
-                            </div>
-                            {table.getAllLeafColumns().map(column => {
-                                if (!column.getCanHide()) return null;
-                                return (
-                                    <label
-                                        key={column.id}
-                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg cursor-pointer"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={column.getIsVisible()}
-                                            onChange={column.getToggleVisibilityHandler()}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span>{column.columnDef.header as string || column.id}</span>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    </div>
+                <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 12h14M13 5l7 7-7 7" />
+                    </svg>
+                    Scroll to see all columns
                 </div>
             </div>
 
