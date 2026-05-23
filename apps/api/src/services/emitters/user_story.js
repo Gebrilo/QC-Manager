@@ -8,8 +8,9 @@ function applyValueMap(fieldName, value, valueMaps) {
   return valueMaps[fieldName][value] || value;
 }
 
-async function buildTuleapValues(tuleapPayload, trackerId, registry) {
+async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'update') {
   const values = [];
+  const requiredPermission = mode === 'create' ? 'submit' : 'update';
   for (const [tuleapFieldName, fieldValue] of Object.entries(tuleapPayload)) {
     if (fieldValue === undefined || fieldValue === null) continue;
 
@@ -17,6 +18,11 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
     try {
       field = await registry.getField(trackerId, tuleapFieldName);
     } catch {
+      continue;
+    }
+
+    if (Array.isArray(field.permissions) && field.permissions.length > 0 && !field.permissions.includes(requiredPermission)) {
+      console.log(`[emit:user_story] skip field '${tuleapFieldName}' — no '${requiredPermission}' permission`);
       continue;
     }
 
@@ -89,7 +95,7 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
       }
     }
 
-    const values = await buildTuleapValues(mappedPayload, trackerId, registry);
+    const values = await buildTuleapValues(mappedPayload, trackerId, registry, mode);
 
     if (mode === 'update') {
       const artifactId = unified.tuleap?.artifact_id;

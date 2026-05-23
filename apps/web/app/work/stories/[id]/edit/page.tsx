@@ -360,7 +360,7 @@ function EditForm({
                     description: data.description || undefined,
                     status: data.status,
                     assigned_to: data.assigned_to || null,
-                    priority: data.priority,
+                    priority: data.priority === 'None' ? undefined : data.priority,
                 },
                 fields: {
                     acceptance_criteria: data.acceptance_criteria || undefined,
