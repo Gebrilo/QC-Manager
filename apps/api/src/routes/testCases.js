@@ -285,7 +285,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), asy
         const existing = existingResult.rows[0];
 
         const result = await client.query(
-            `UPDATE test_case SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1, status = 'archived'
+            `UPDATE test_case SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1
              WHERE id = $2 AND deleted_at IS NULL RETURNING *`, [req.user?.id || null, id]);
 
         await logTestCaseHistory(client, {
