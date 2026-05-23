@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { fetchApi } from '@/lib/api';
 import { Task, Project, Resource } from '@/types';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import Link from 'next/link';
@@ -549,6 +550,12 @@ function EditForm({
 
                 </div>
             </div>
+
+            <AttachmentSection
+                artifactType="task"
+                artifactId={taskId}
+                tempId={null}
+            />
 
             {/* ── Footer actions ───────────────────────────────────────── */}
             <div className="flex items-center justify-between pt-2 pb-6">

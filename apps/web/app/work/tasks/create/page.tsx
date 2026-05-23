@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { fetchApi } from '@/lib/api';
 import { Project, Resource } from '@/types';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import Link from 'next/link';
@@ -213,6 +214,8 @@ function CreateForm({
         },
     });
 
+    const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
+
     const resource2Value = watch('resource2_uuid');
     const statusValue = watch('status');
 
@@ -240,7 +243,7 @@ function CreateForm({
             };
             await fetchApi('/tasks', {
                 method: 'POST',
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ ...payload, temp_id: tempId }),
             });
             router.push('/work/tasks');
             router.refresh();
@@ -561,6 +564,12 @@ function CreateForm({
 
                 </div>
             </div>
+
+            <AttachmentSection
+                artifactType="task"
+                artifactId={null}
+                tempId={tempId}
+            />
 
             {/* ── Footer actions ───────────────────────────────────────── */}
             <div className="flex items-center justify-between pt-2 pb-6">

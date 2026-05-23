@@ -12,6 +12,7 @@ import {
     type LinkedArtifactsSectionConfig,
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
 
 // ── Status pill config ──────────────────────────────────────────────────────
@@ -349,6 +350,12 @@ export default function TaskDetailPage() {
 
             {/* ── Linked Artifacts ────────────────────────────────────── */}
             <TaskLinkedArtifactsSections taskId={task.id} projectId={task.project_id || null} />
+
+            <AttachmentSection
+                artifactType="task"
+                artifactId={task.id}
+                tempId={null}
+            />
         </div>
     );
 }
