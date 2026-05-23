@@ -80,6 +80,74 @@ async function createSignedUrl(storagePath, expiresIn = 3600) {
     return data.signedUrl;
 }
 
+const ARTIFACT_ATTACHMENTS_BUCKET = 'artifact-attachments';
+
+async function ensureArtifactBucketExists() {
+    const client = getStorageClient();
+    const { data: buckets } = await client.storage.listBuckets();
+    const exists = buckets.some(b => b.name === ARTIFACT_ATTACHMENTS_BUCKET);
+    if (!exists) {
+        await client.storage.createBucket(ARTIFACT_ATTACHMENTS_BUCKET, {
+            public: false,
+            fileSizeLimit: '20MB',
+            allowedMimeTypes: [
+                'application/pdf',
+                'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/plain', 'text/csv',
+                'application/zip',
+            ],
+        });
+    }
+}
+
+async function uploadArtifactFile(storagePath, buffer, mimeType) {
+    const client = getStorageClient();
+    const { data, error } = await client.storage
+        .from(ARTIFACT_ATTACHMENTS_BUCKET)
+        .upload(storagePath, buffer, { contentType: mimeType, upsert: false });
+    if (error) throw error;
+    return data;
+}
+
+async function downloadArtifactFile(storagePath) {
+    const client = getStorageClient();
+    const { data, error } = await client.storage
+        .from(ARTIFACT_ATTACHMENTS_BUCKET)
+        .download(storagePath);
+    if (error) throw error;
+    return data;
+}
+
+async function deleteArtifactFile(storagePath) {
+    const client = getStorageClient();
+    const { error } = await client.storage
+        .from(ARTIFACT_ATTACHMENTS_BUCKET)
+        .remove([storagePath]);
+    if (error) throw error;
+}
+
+async function createArtifactSignedUrl(storagePath, expiresIn = 3600) {
+    const client = getStorageClient();
+    const { data, error } = await client.storage
+        .from(ARTIFACT_ATTACHMENTS_BUCKET)
+        .createSignedUrl(storagePath, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
+}
+
+async function listArtifactFiles(prefix) {
+    const client = getStorageClient();
+    const { data, error } = await client.storage
+        .from(ARTIFACT_ATTACHMENTS_BUCKET)
+        .list(prefix);
+    if (error) throw error;
+    return data || [];
+}
+
 module.exports = {
     getStorageClient,
     ensureBucketExists,
@@ -88,4 +156,11 @@ module.exports = {
     deleteFile,
     createSignedUrl,
     IDP_ATTACHMENTS_BUCKET,
+    ARTIFACT_ATTACHMENTS_BUCKET,
+    ensureArtifactBucketExists,
+    uploadArtifactFile,
+    downloadArtifactFile,
+    deleteArtifactFile,
+    createArtifactSignedUrl,
+    listArtifactFiles,
 };
