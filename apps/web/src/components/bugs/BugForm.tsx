@@ -480,7 +480,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                 </svg>
             ) : <CheckIcon />}
-            {isSubmitting ? 'Saving…' : 'Save Changes'}
+            {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Bug'}
         </Button>
     );
 
@@ -522,7 +522,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                             </span>
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
-                            Update fields and click Save to persist changes.
+                            {isEdit ? 'Update fields and click Save to persist changes.' : 'Fill in the fields below to create a new bug.'}
                         </p>
                     </div>
                 </div>
