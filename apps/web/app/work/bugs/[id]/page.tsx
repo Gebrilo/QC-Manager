@@ -12,6 +12,7 @@ import {
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { stripHtml } from '@/lib/stripHtml';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',
@@ -303,6 +304,12 @@ export default function BugDetailPage() {
                     <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
                 ))}
             </div>
+
+            <AttachmentSection
+                artifactType="bug"
+                artifactId={bug.id}
+                tempId={null}
+            />
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

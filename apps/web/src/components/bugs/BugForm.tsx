@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { tuleapApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import type { Bug } from '@/lib/api';
 
 const bugSchema = z.object({
@@ -370,6 +371,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
     const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
     const { activeId, scrollTo } = useSectionNav(SECTIONS.map(s => s.id));
+    const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
@@ -440,7 +442,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                 await tuleapApi.updateUnified(artifactId, payload);
                 router.push(`/work/bugs/${bugUUID || artifactId}`);
             } else {
-                const result = await tuleapApi.createUnified(payload);
+                const result = await tuleapApi.createUnified({ ...payload, temp_id: tempId });
                 if (result.tuleap_warning) console.warn('Tuleap sync skipped:', result.tuleap_warning);
                 router.push(result.qc_id ? `/work/bugs/${result.qc_id}` : '/work/bugs');
             }
@@ -726,6 +728,12 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                     </div>
                 </aside>
             </div>
+
+            <AttachmentSection
+                artifactType="bug"
+                artifactId={isEdit ? bugUUID || null : null}
+                tempId={isEdit ? null : tempId}
+            />
 
             {/* ── Sticky action bar ─────────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">
