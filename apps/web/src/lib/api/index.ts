@@ -1512,6 +1512,7 @@ export interface UnifiedPayload {
         artifact_id?: number;
         url?: string;
     };
+    temp_id?: string;
 }
 
 export const tuleapApi = {
@@ -1764,4 +1765,55 @@ export const tuleapConfigApi = {
 
     discover: async (trackerId: number) =>
         fetchApi<{ tracker_id: number; fields: Array<{ field_id: number; name: string; label: string; type: string; values: Array<{ id: number; label: string }> }>; suggested_mappings: Record<string, string> }>(`/tuleap-webhook/config/discover/${trackerId}`),
+};
+
+export interface Attachment {
+    id: string;
+    original_name: string;
+    mime_type: string;
+    size_bytes: number;
+    created_at: string;
+    uploaded_by_name?: string;
+}
+
+async function uploadFormData<T>(endpoint: string, form: FormData): Promise<T> {
+    const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    let authToken: string | null = null;
+    if (typeof window !== 'undefined') {
+        const { supabase } = await import('../supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        authToken = session?.access_token || null;
+    }
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const response = await fetch(url, { method: 'POST', headers, body: form });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed (${response.status})`);
+    }
+    return response.json();
+}
+
+export const attachmentsApi = {
+    list: (artifactType: string, artifactId: string) =>
+        fetchApi<Attachment[]>(`/attachments/${artifactType}/${artifactId}`),
+
+    upload: (artifactType: string, artifactId: string, file: File): Promise<Attachment> => {
+        const form = new FormData();
+        form.append('file', file);
+        return uploadFormData<Attachment>(`/attachments/${artifactType}/${artifactId}`, form);
+    },
+
+    uploadStaged: (tempId: string, file: File): Promise<{ storagePath: string; originalName: string }> => {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('temp_id', tempId);
+        return uploadFormData<{ storagePath: string; originalName: string }>('/attachments/staged', form);
+    },
+
+    getUrl: (attachmentId: string) =>
+        fetchApi<{ url: string; originalName: string; mimeType: string; sizeBytes: number }>(`/attachments/file/${attachmentId}/url`),
+
+    delete: (attachmentId: string) =>
+        fetchApi<{ success: boolean }>(`/attachments/file/${attachmentId}`, { method: 'DELETE' }),
 };
