@@ -58,7 +58,20 @@ router.get('/:type/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const response = await defaultClient.get(`/artifacts/${id}`);
-    return res.status(200).json(response.data);
+    const artifact = { ...response.data };
+    const trackerId = artifact?.tracker?.id;
+    if (trackerId) {
+      try {
+        const configResult = await db.pool.query(
+          'SELECT qc_project_id FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
+          [trackerId]
+        );
+        if (configResult.rows[0]) {
+          artifact.project_id = configResult.rows[0].qc_project_id;
+        }
+      } catch (_) { /* enrichment is non-fatal */ }
+    }
+    return res.status(200).json(artifact);
   } catch (err) {
     if (err.status === 404) return res.status(404).json({ error: 'Artifact not found' });
     return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
@@ -90,7 +103,23 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
 
   if (req.body && req.body.artifact_type) {
-    const parsed = UnifiedPatchSchema.safeParse(req.body);
+    let body = req.body;
+    if (!body.project_id || body.project_id === '') {
+      try {
+        const artResponse = await defaultClient.get(`/artifacts/${id}`);
+        const trackerId = artResponse.data?.tracker?.id;
+        if (trackerId) {
+          const configResult = await db.pool.query(
+            'SELECT qc_project_id FROM tuleap_sync_config WHERE tuleap_tracker_id = $1 AND is_active = true LIMIT 1',
+            [trackerId]
+          );
+          if (configResult.rows[0]) {
+            body = { ...body, project_id: configResult.rows[0].qc_project_id };
+          }
+        }
+      } catch (_) { /* fallback lookup is non-fatal; schema will surface the error */ }
+    }
+    const parsed = UnifiedPatchSchema.safeParse(body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid unified patch payload', details: parsed.error.format() });
     }
