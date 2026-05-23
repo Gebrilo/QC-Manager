@@ -15,6 +15,7 @@ const { emitToTuleap: emitTask } = require('../services/emitters/task');
 const { emitToTuleap: emitUserStory } = require('../services/emitters/user_story');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { UnifiedPatchSchema } = require('../schemas/tuleapUnified');
+const { adoptStagedAttachments } = require('./artifactAttachments');
 
 const FALLBACK_TRACKER_IDS = {
   'user-story': () => Number(process.env.TULEAP_TRACKER_USER_STORY),
@@ -255,6 +256,7 @@ async function handleTaskCreate(req, res) {
 
 async function handleBugCreate(req, res) {
   const { artifact_type, project_id, common, fields } = req.body;
+  const temp_id = req.body.temp_id;
   const resolvedType = artifact_type || 'bug';
 
   if (!project_id && !req.body.project_id) {
@@ -298,8 +300,13 @@ async function handleBugCreate(req, res) {
          bugFields.environment || null, bugFields.service_name || null,
          bugData.assigned_to || null]
       );
+      const qcId = result.rows[0].id;
+      if (temp_id && qcId) {
+          await adoptStagedAttachments('bug', qcId, temp_id, req.user?.id)
+              .catch(err => console.error('[attachments:adopt] bug-local', err.message));
+      }
       return res.status(201).json({
-        qc_id: result.rows[0].id,
+        qc_id: qcId,
         tuleap_artifact_id: null,
         tuleap_url: null,
         artifact_type: 'bug',
@@ -338,6 +345,10 @@ async function handleBugCreate(req, res) {
       registry: defaultRegistry,
       query: db.pool.query.bind(db.pool),
     });
+    if (temp_id && result.qc_id) {
+        await adoptStagedAttachments('bug', result.qc_id, temp_id, req.user?.id)
+            .catch(err => console.error('[attachments:adopt] bug', err.message));
+    }
     return res.status(201).json(result);
   } catch (err) {
     return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });
@@ -346,6 +357,7 @@ async function handleBugCreate(req, res) {
 
 async function handleUserStoryCreate(req, res) {
   const { artifact_type, project_id, common, fields } = req.body;
+  const temp_id = req.body.temp_id;
   const pid = project_id || req.body.project_id;
 
   if (!pid) {
@@ -421,6 +433,10 @@ async function handleUserStoryCreate(req, res) {
       registry: defaultRegistry,
       query: db.pool.query.bind(db.pool),
     });
+    if (temp_id && result.qc_id) {
+        await adoptStagedAttachments('user_story', result.qc_id, temp_id, req.user?.id)
+            .catch(err => console.error('[attachments:adopt] user_story', err.message));
+    }
     return res.status(201).json(result);
   } catch (err) {
     return res.status(err.status || 502).json({ error: err.message, tuleap_status: err.status, details: err.raw });

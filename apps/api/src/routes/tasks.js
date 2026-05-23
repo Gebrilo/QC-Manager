@@ -7,6 +7,7 @@ const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const { emitToTuleap: emitTask } = require('../services/emitters/task');
+const { adoptStagedAttachments } = require('./artifactAttachments');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 
@@ -182,6 +183,7 @@ router.get('/:id', requireAuth, requirePermission('qc.tasks.view'), async (req, 
 // POST create task — validate project and assignees belong to manager's team
 router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, res, next) => {
     try {
+        const temp_id = req.body.temp_id;
         const data = createTaskSchema.parse(req.body);
 
         // Team-scope validation for managers
@@ -319,6 +321,10 @@ router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, 
             }
         }
 
+        if (temp_id && task.id) {
+            await adoptStagedAttachments('task', task.id, temp_id, req.user?.id)
+                .catch(err => console.error('[attachments:adopt] task', err.message));
+        }
         res.status(201).json({
             ...task,
             ...(tuleapWarning ? { tuleap_warning: tuleapWarning } : {}),

@@ -52,6 +52,7 @@ apiRouter.use('/tasks', coverageLinks.taskSide);
 apiRouter.use('/test-cases', coverageLinks.testCaseSide);
 apiRouter.use('/user-stories', require('./routes/userStories'));
 apiRouter.use('/user-stories', coverageLinks.userStorySide);
+apiRouter.use('/attachments', require('./routes/artifactAttachments'));
 apiRouter.use('/tuleap-webhook', require('./routes/tuleapWebhook'));
 apiRouter.use('/tuleap/artifacts', require('./routes/tuleapArtifacts'));
 apiRouter.use('/my-tasks', require('./routes/personalTasks'));
