@@ -11,6 +11,7 @@ import {
     type LinkedArtifactsSectionConfig,
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
 
 function getStatusBadgeVariant(status: string | undefined): 'info' | 'warning' | 'default' | 'success' {
@@ -136,6 +137,12 @@ export default function UserStoryDetailPage() {
             </div>
 
             <UserStoryLinkedArtifactsSections story={story} />
+
+            <AttachmentSection
+                artifactType="user_story"
+                artifactId={story.id}
+                tempId={null}
+            />
         </div>
     );
 }

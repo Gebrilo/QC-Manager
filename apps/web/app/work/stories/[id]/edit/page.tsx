@@ -9,6 +9,7 @@ import { tuleapApi, projectsApi, type TuleapArtifact, type Project } from '@/lib
 import { Spinner } from '@/components/ui/Spinner';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -304,8 +305,13 @@ function EditForm({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('story-general');
+    const [storyUUID, setStoryUUID] = useState<string | null>(null);
 
     const { resources: tuleapResources } = useTuleapResources();
+
+    useEffect(() => {
+        setStoryUUID(artifactId);
+    }, [artifactId]);
 
     const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
@@ -713,6 +719,12 @@ function EditForm({
                 </aside>
 
             </div>
+
+            <AttachmentSection
+                artifactType="user_story"
+                artifactId={storyUUID}
+                tempId={null}
+            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

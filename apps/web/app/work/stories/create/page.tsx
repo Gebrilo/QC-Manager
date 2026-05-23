@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { tuleapApi, projectsApi, type Project } from '@/lib/api';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
+import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -193,6 +194,7 @@ function CreateUserStoryContent() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('story-general');
+    const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
     const { resources: tuleapResources } = useTuleapResources();
 
@@ -264,7 +266,7 @@ function CreateUserStoryContent() {
                     remaining_effort: data.remaining_effort ?? null,
                 },
             };
-            const result = await tuleapApi.createUnified(payload);
+            const result = await tuleapApi.createUnified({ ...payload, temp_id: tempId });
             router.push(`/work/stories/${result.qc_id || result.tuleap_artifact_id}`);
             router.refresh();
         } catch (err: any) {
@@ -523,6 +525,12 @@ function CreateUserStoryContent() {
 
                 </div>
             </div>
+
+            <AttachmentSection
+                artifactType="user_story"
+                artifactId={null}
+                tempId={tempId}
+            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">
