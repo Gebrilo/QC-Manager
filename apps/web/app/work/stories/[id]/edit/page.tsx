@@ -129,10 +129,11 @@ function SectionCard({
 // ── Section navigation ──────────────────────────────────────────────────────
 
 const SECTIONS = [
-    { id: 'story-general',     title: 'General' },
-    { id: 'story-description', title: 'Description' },
-    { id: 'story-progress',    title: 'Progress' },
-    { id: 'story-references',  title: 'References' },
+    { id: 'story-general',      title: 'General' },
+    { id: 'story-description',  title: 'Description' },
+    { id: 'story-progress',     title: 'Progress' },
+    { id: 'story-references',   title: 'References' },
+    { id: 'story-attachments',  title: 'Attachments' },
 ];
 
 function SectionNav({ activeId }: { activeId: string }) {
@@ -655,6 +656,13 @@ function EditForm({
                         </div>
                     </SectionCard>
 
+                    <AttachmentSection
+                        id="story-attachments"
+                        artifactType="user_story"
+                        artifactId={storyUUID}
+                        tempId={null}
+                    />
+
                 </div>
 
                 {/* Meta panel */}
@@ -719,12 +727,6 @@ function EditForm({
                 </aside>
 
             </div>
-
-            <AttachmentSection
-                artifactType="user_story"
-                artifactId={storyUUID}
-                tempId={null}
-            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

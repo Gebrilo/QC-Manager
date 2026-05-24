@@ -329,10 +329,11 @@ const InfoIcon = () => (
 // ── Section nav ───────────────────────────────────────────────────────────────
 
 const SECTIONS = [
-    { id: 'bug-general', title: 'General' },
-    { id: 'bug-description', title: 'Description' },
-    { id: 'bug-progress', title: 'Progress' },
-    { id: 'bug-references', title: 'References' },
+    { id: 'bug-general',      title: 'General' },
+    { id: 'bug-description',  title: 'Description' },
+    { id: 'bug-progress',     title: 'Progress' },
+    { id: 'bug-references',   title: 'References' },
+    { id: 'bug-attachments',  title: 'Attachments' },
 ];
 
 function SectionNav({ activeId, onScrollTo }: { activeId: string; onScrollTo: (id: string) => void }) {
@@ -708,6 +709,13 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                             <EFInput {...register('linked_test_case_ids')} placeholder="T-123, T-456" />
                         </Field>
                     </SectionCard>
+
+                    <AttachmentSection
+                        id="bug-attachments"
+                        artifactType="bug"
+                        artifactId={isEdit ? bugUUID || null : null}
+                        tempId={isEdit ? null : tempId}
+                    />
                 </div>
 
                 {/* Right: meta panel */}
@@ -728,12 +736,6 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                     </div>
                 </aside>
             </div>
-
-            <AttachmentSection
-                artifactType="bug"
-                artifactId={isEdit ? bugUUID || null : null}
-                tempId={isEdit ? null : tempId}
-            />
 
             {/* ── Sticky action bar ─────────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

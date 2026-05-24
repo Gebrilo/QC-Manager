@@ -160,12 +160,13 @@ function MetaRow({ label, value, mono }: { label: string; value?: string | null;
 // ── Section nav ─────────────────────────────────────────────────────────────
 
 const SECTIONS = [
-    { id: 'task-general',     title: 'General' },
-    { id: 'task-description', title: 'Description' },
-    { id: 'task-assignment',  title: 'Assignment' },
-    { id: 'task-planning',    title: 'Planning' },
-    { id: 'task-dates',       title: 'Dates' },
-    { id: 'task-links',       title: 'Links' },
+    { id: 'task-general',      title: 'General' },
+    { id: 'task-description',  title: 'Description' },
+    { id: 'task-assignment',   title: 'Assignment' },
+    { id: 'task-planning',     title: 'Planning' },
+    { id: 'task-dates',        title: 'Dates' },
+    { id: 'task-links',        title: 'Links' },
+    { id: 'task-attachments',  title: 'Attachments' },
 ];
 
 function SectionNav({ activeId }: { activeId: string }) {
@@ -772,6 +773,13 @@ function EditForm({
                         </div>
                     </SectionCard>
 
+                    <AttachmentSection
+                        id="task-attachments"
+                        artifactType="task"
+                        artifactId={taskId}
+                        tempId={null}
+                    />
+
                 </div>
 
                 {/* Meta sidebar */}
@@ -789,12 +797,6 @@ function EditForm({
                 </aside>
 
             </div>
-
-            <AttachmentSection
-                artifactType="task"
-                artifactId={taskId}
-                tempId={null}
-            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

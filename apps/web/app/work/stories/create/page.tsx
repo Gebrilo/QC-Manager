@@ -121,10 +121,11 @@ function SectionCard({
 // ── Section navigation ──────────────────────────────────────────────────────
 
 const SECTIONS = [
-    { id: 'story-general',     title: 'General' },
-    { id: 'story-description', title: 'Description' },
-    { id: 'story-progress',    title: 'Progress' },
-    { id: 'story-references',  title: 'References' },
+    { id: 'story-general',      title: 'General' },
+    { id: 'story-description',  title: 'Description' },
+    { id: 'story-progress',     title: 'Progress' },
+    { id: 'story-references',   title: 'References' },
+    { id: 'story-attachments',  title: 'Attachments' },
 ];
 
 function SectionNav({ activeId }: { activeId: string }) {
@@ -523,14 +524,15 @@ function CreateUserStoryContent() {
                         </div>
                     </SectionCard>
 
+                    <AttachmentSection
+                        id="story-attachments"
+                        artifactType="user_story"
+                        artifactId={null}
+                        tempId={tempId}
+                    />
+
                 </div>
             </div>
-
-            <AttachmentSection
-                artifactType="user_story"
-                artifactId={null}
-                tempId={tempId}
-            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

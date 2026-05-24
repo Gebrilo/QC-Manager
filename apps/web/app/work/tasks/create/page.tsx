@@ -129,12 +129,13 @@ function SectionCard({
 // ── Section nav ─────────────────────────────────────────────────────────────
 
 const SECTIONS = [
-    { id: 'task-general',     title: 'General' },
-    { id: 'task-description', title: 'Description' },
-    { id: 'task-assignment',  title: 'Assignment' },
-    { id: 'task-planning',    title: 'Planning' },
-    { id: 'task-dates',       title: 'Dates' },
-    { id: 'task-links',       title: 'Links' },
+    { id: 'task-general',      title: 'General' },
+    { id: 'task-description',  title: 'Description' },
+    { id: 'task-assignment',   title: 'Assignment' },
+    { id: 'task-planning',     title: 'Planning' },
+    { id: 'task-dates',        title: 'Dates' },
+    { id: 'task-links',        title: 'Links' },
+    { id: 'task-attachments',  title: 'Attachments' },
 ];
 
 function SectionNav({ activeId }: { activeId: string }) {
@@ -712,14 +713,15 @@ function CreateForm({
                         </div>
                     </SectionCard>
 
+                    <AttachmentSection
+                        id="task-attachments"
+                        artifactType="task"
+                        artifactId={null}
+                        tempId={tempId}
+                    />
+
                 </div>
             </div>
-
-            <AttachmentSection
-                artifactType="task"
-                artifactId={null}
-                tempId={tempId}
-            />
 
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">

@@ -7,6 +7,7 @@ interface Props {
     artifactType: 'bug' | 'user_story' | 'task';
     artifactId: string | null;
     tempId: string | null;
+    id?: string;
 }
 
 function formatSize(bytes: number) {
@@ -25,7 +26,7 @@ function FileIcon({ mimeType }: { mimeType: string }) {
     return <span className="text-base">📎</span>;
 }
 
-export function AttachmentSection({ artifactType, artifactId, tempId }: Props) {
+export function AttachmentSection({ artifactType, artifactId, tempId, id }: Props) {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -88,7 +89,7 @@ export function AttachmentSection({ artifactType, artifactId, tempId }: Props) {
 
     return (
         <>
-            <div className="mt-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+            <div id={id} className="scroll-mt-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
 
                 {/* Section header — matches SectionCard style */}
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
