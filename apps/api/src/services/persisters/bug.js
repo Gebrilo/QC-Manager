@@ -3,6 +3,46 @@ const { UnifiedPayloadSchema } = require('../../schemas/tuleapUnified');
 
 const VALID_BUG_ACTIONS = new Set(['sync', 'delete']);
 
+// Canonical status/severity labels per migration 033. Tuleap and legacy QC
+// data ship in mixed-case and use older synonyms; map them to the labels the
+// v_bug_summary views filter on, otherwise the dashboards count zero.
+const STATUS_MAP = {
+  'open':        'New',
+  'new':         'New',
+  'backlog':     'New',
+  'in progress': 'In Progress',
+  'assigned':    'Assigned',
+  'reopened':    'Reopened',
+  'blocked':     'Blocked',
+  'resolved':    'Fixed',
+  'fixed':       'Fixed',
+  'verified':    'Verified',
+  'duplicate':   'Duplicate',
+  'closed':      'Closed',
+};
+
+const SEVERITY_MAP = {
+  'critical':        'Critical Impact',
+  'critical impact': 'Critical Impact',
+  'high':            'Major impact',
+  'major impact':    'Major impact',
+  'medium':          'Minor Impact',
+  'minor impact':    'Minor Impact',
+  'low':             'Cosmetic impact',
+  'cosmetic impact': 'Cosmetic impact',
+  'none':            'None',
+};
+
+function normalizeBugStatus(raw) {
+  if (raw == null || raw === '') return 'New';
+  return STATUS_MAP[String(raw).toLowerCase().trim()] || 'New';
+}
+
+function normalizeBugSeverity(raw) {
+  if (raw == null || raw === '') return 'None';
+  return SEVERITY_MAP[String(raw).toLowerCase().trim()] || 'None';
+}
+
 async function dispatchAction(unified, config, deps) {
   const { query, skipUpdate = false } = deps;
 
@@ -92,7 +132,8 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
 
   const title = common.title || '';
   const description = common.description || '';
-  const status = common.status || 'Open';
+  const status = normalizeBugStatus(common.status);
+  const severity = normalizeBugSeverity(fields.severity);
   const assignedTo = common.assigned_to || null;
   const priority = common.priority || 'medium';
 
@@ -130,7 +171,7 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       title,
       description,
       status,
-      fields.severity || 'medium',
+      severity,
       priority,
       fields.bug_type || null,
       fields.component || null,
@@ -201,8 +242,8 @@ async function updateBug(bugId, unified, config, projectId, source, resolvedTest
     [
       common.title || null,
       common.description || null,
-      common.status || null,
-      fields.severity || null,
+      common.status ? normalizeBugStatus(common.status) : null,
+      fields.severity ? normalizeBugSeverity(fields.severity) : null,
       common.priority || null,
       fields.bug_type || null,
       fields.component || null,
