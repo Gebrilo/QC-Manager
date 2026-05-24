@@ -42,11 +42,13 @@ const projectRow = {
   open_bugs: '2',
   closed_bugs: '1',
   critical_bugs: '1',
-  high_bugs: '1',
-  medium_bugs: '1',
-  low_bugs: '0',
+  major_bugs: '1',
+  minor_bugs: '1',
+  cosmetic_bugs: '0',
   bugs_from_test_cases: '1',
   bugs_from_exploratory: '2',
+  bugs_from_testing: '1',
+  standalone_bugs: '2',
 };
 
 const emptyByProject = { rows: [] };
@@ -95,7 +97,7 @@ describe('GET /bugs/summary', () => {
     expect(mockQuery.mock.calls[0][1]).toEqual([projectId]);
   });
 
-  test('project-scoped defaults bugs_from_testing and standalone_bugs to 0', async () => {
+  test('project-scoped totals include bugs_from_testing and standalone_bugs', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [projectRow] })
       .mockResolvedValueOnce({ rows: [projectRow] })
@@ -103,8 +105,8 @@ describe('GET /bugs/summary', () => {
 
     const res = await request(app).get(`/bugs/summary?project_id=${projectId}`);
 
-    expect(res.body.data.totals.bugs_from_testing).toBe(0);
-    expect(res.body.data.totals.standalone_bugs).toBe(0);
+    expect(res.body.data.totals.bugs_from_testing).toBe(1);
+    expect(res.body.data.totals.standalone_bugs).toBe(2);
     expect(res.body.data.totals.total_bugs).toBe(3);
     expect(res.body.data.totals.open_bugs).toBe(2);
     expect(res.body.data.totals.closed_bugs).toBe(1);
@@ -120,9 +122,9 @@ describe('GET /bugs/summary', () => {
 
     expect(res.body.data.by_severity).toEqual({
       critical: 1,
-      high: 1,
-      medium: 1,
-      low: 0,
+      major: 1,
+      minor: 1,
+      cosmetic: 0,
     });
     expect(res.body.data.by_source).toEqual({
       test_case: 1,

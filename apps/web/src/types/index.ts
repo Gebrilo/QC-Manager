@@ -323,6 +323,11 @@ export interface TestCaseListResponse {
         total: number;
         total_pages: number;
     };
+    stats?: {
+        active: number;
+        critical: number;
+        automated: number;
+    };
 }
 
 // Test Suite Management Types
@@ -371,6 +376,11 @@ export interface TestSuiteListResponse {
         limit: number;
         total: number;
         total_pages: number;
+    };
+    stats?: {
+        active: number;
+        archived: number;
+        total_cases: number;
     };
 }
 

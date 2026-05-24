@@ -79,6 +79,7 @@ export default function TestCasesPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, total_pages: 0 });
+    const [listStats, setListStats] = useState({ active: 0, critical: 0, automated: 0 });
 
     const [search, setSearch] = useState('');
     const [projectFilter, setProjectFilter] = useState('');
@@ -113,8 +114,10 @@ export default function TestCasesPage() {
                 sort_order: sortOrder,
             });
             if (response && typeof response === 'object' && 'data' in response) {
-                setTestCases((response as TestCaseListResponse).data);
-                setPagination((response as TestCaseListResponse).pagination);
+                const r = response as TestCaseListResponse;
+                setTestCases(r.data);
+                setPagination(r.pagination);
+                if (r.stats) setListStats(r.stats);
             }
         } catch (error) {
             console.error('Failed to load test cases:', error);
@@ -129,10 +132,10 @@ export default function TestCasesPage() {
 
     const stats = useMemo(() => ({
         total:     pagination.total,
-        active:    testCases.filter(tc => tc.status === 'Not Run').length,
-        critical:  testCases.filter(tc => tc.priority === 'critical').length,
-        automated: testCases.filter(tc => tc.automation_status === 'automated').length,
-    }), [testCases, pagination.total]);
+        active:    listStats.active,
+        critical:  listStats.critical,
+        automated: listStats.automated,
+    }), [pagination.total, listStats]);
 
     const hasAnyFilter = !!(search || projectFilter || status || priority || testType || automationStatus || syncStatus);
 

@@ -167,7 +167,11 @@ function BugsContent() {
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
-        bugsApi.summary().then(res => {
+    }, []);
+
+    useEffect(() => {
+        setSummaryLoading(true);
+        bugsApi.summary(projectFilter || undefined).then(res => {
             setSummary({
                 open:      res.data.totals.open_bugs,
                 closed:    res.data.totals.closed_bugs,
@@ -179,7 +183,7 @@ function BugsContent() {
         }).finally(() => {
             setSummaryLoading(false);
         });
-    }, []);
+    }, [projectFilter]);
 
     useEffect(() => {
         setPage(0);

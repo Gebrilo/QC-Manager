@@ -53,6 +53,7 @@ export default function TestSuitesPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, total_pages: 0 });
+    const [listStats, setListStats] = useState({ active: 0, archived: 0, total_cases: 0 });
 
     const [search, setSearch] = useState('');
     const [projectFilter, setProjectFilter] = useState('');
@@ -78,8 +79,10 @@ export default function TestSuitesPage() {
                 sort_order: sortOrder,
             });
             if (response && typeof response === 'object' && 'data' in response) {
-                setSuites((response as TestSuiteListResponse).data);
-                setPagination((response as TestSuiteListResponse).pagination);
+                const r = response as TestSuiteListResponse;
+                setSuites(r.data);
+                setPagination(r.pagination);
+                if (r.stats) setListStats(r.stats);
             }
         } catch (error) {
             console.error('Failed to load test suites:', error);
@@ -94,10 +97,10 @@ export default function TestSuitesPage() {
 
     const stats = useMemo(() => ({
         total:      pagination.total,
-        active:     suites.filter(s => s.status === 'active').length,
-        totalCases: suites.reduce((sum, s) => sum + (s.test_case_count ?? 0), 0),
-        archived:   suites.filter(s => s.status === 'archived').length,
-    }), [suites, pagination.total]);
+        active:     listStats.active,
+        totalCases: listStats.total_cases,
+        archived:   listStats.archived,
+    }), [pagination.total, listStats]);
 
     const hasAnyFilter = !!(search || projectFilter || status);
 

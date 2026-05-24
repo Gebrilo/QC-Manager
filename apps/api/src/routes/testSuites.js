@@ -90,8 +90,22 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
 
         const countQuery = `
             SELECT COUNT(*) as total FROM test_suites ts WHERE ${whereStr}`;
-        const countResult = await pool.query(countQuery, params);
+        const statsQuery = `
+            SELECT
+                COUNT(DISTINCT ts.id) FILTER (WHERE ts.status = 'active') AS active_count,
+                COUNT(DISTINCT ts.id) FILTER (WHERE ts.status = 'archived') AS archived_count,
+                COUNT(tsc.id) AS total_cases
+            FROM test_suites ts
+            LEFT JOIN test_suite_cases tsc ON ts.id = tsc.suite_id AND tsc.snapshot_id IS NULL
+            WHERE ${whereStr}
+        `;
+
+        const [countResult, statsResult] = await Promise.all([
+            pool.query(countQuery, params),
+            pool.query(statsQuery, params),
+        ]);
         const total = parseInt(countResult.rows[0].total);
+        const sr = statsResult.rows[0] || {};
 
         const dataQuery = `
             SELECT ts.*,
@@ -115,6 +129,11 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
         res.json({
             data: result.rows,
             pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
+            stats: {
+                active: parseInt(sr.active_count) || 0,
+                archived: parseInt(sr.archived_count) || 0,
+                total_cases: parseInt(sr.total_cases) || 0,
+            },
         });
     } catch (error) { next(error); }
 });

@@ -74,8 +74,20 @@ router.get('/', requireAuth, requirePermission('qc.testcases.view'), async (req,
         }
 
         const countQuery = `SELECT COUNT(*) as total FROM (${query}) sub`;
-        const countResult = await pool.query(countQuery, params);
+        const statsQuery = `
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'Not Run') AS active_count,
+                COUNT(*) FILTER (WHERE priority = 'critical') AS critical_count,
+                COUNT(*) FILTER (WHERE automation_status = 'automated') AS automated_count
+            FROM (${query}) sub
+        `;
+
+        const [countResult, statsResult] = await Promise.all([
+            pool.query(countQuery, params),
+            pool.query(statsQuery, params),
+        ]);
         const total = parseInt(countResult.rows[0].total);
+        const sr = statsResult.rows[0] || {};
 
         query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
         query += ` LIMIT $${pn++} OFFSET $${pn++}`;
@@ -86,6 +98,11 @@ router.get('/', requireAuth, requirePermission('qc.testcases.view'), async (req,
         res.json({
             data: result.rows,
             pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
+            stats: {
+                active: parseInt(sr.active_count) || 0,
+                critical: parseInt(sr.critical_count) || 0,
+                automated: parseInt(sr.automated_count) || 0,
+            },
         });
     } catch (error) { next(error); }
 });
