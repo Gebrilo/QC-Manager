@@ -10,7 +10,7 @@ function applyValueMap(fieldName, value, valueMaps) {
 
 async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'update') {
   const values = [];
-  const requiredPermission = mode === 'create' ? 'submit' : 'update';
+  const requiredPermission = mode === 'create' ? 'create' : 'update';
   for (const [tuleapFieldName, fieldValue] of Object.entries(tuleapPayload)) {
     if (fieldValue === undefined || fieldValue === null) continue;
 
@@ -28,6 +28,7 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'upd
 
     let shape;
     if (['sb', 'rb', 'msb', 'cb'].includes(field.type)) {
+      if (fieldValue === '') continue;
       if (Array.isArray(fieldValue)) {
         const boundIds = await Promise.all(
           fieldValue.map(v => registry.resolveBindValue(trackerId, tuleapFieldName, v).then(b => b.id))

@@ -136,4 +136,77 @@ describe('user_story emitter — emitToTuleap', () => {
       emitToTuleap(unified, config, 'update', { client: defaultClient, registry: defaultRegistry })
     ).rejects.toThrow(/artifact_id/i);
   });
+
+  it('includes fields that have [read, update, create] permissions in create mode — regression for submit vs create bug', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'Story', status: 'Draft' },
+      fields: { requirement_version: '1' },
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'status') return { field_id: 200, name: 'status', type: 'sb', permissions: ['read', 'update', 'create'] };
+      if (fn === 'story_title') return { field_id: 201, name: 'story_title', type: 'string', permissions: ['read', 'update', 'create'] };
+      if (fn === 'requirement_version') return { field_id: 202, name: 'requirement_version', type: 'int', permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 700 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 5070 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values.length).toBeGreaterThan(0);
+    expect(payload.values.some(v => v.field_id === 201)).toBe(true);
+  });
+
+  it('skips read-only fields (no create permission) in create mode', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'Story', status: 'Draft' },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'story_title') return { field_id: 201, name: 'story_title', type: 'string', permissions: ['read'] };
+      if (fn === 'status') return { field_id: 200, name: 'status', type: 'sb', permissions: ['read'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read'] };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 700 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 5080 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values).toHaveLength(0);
+  });
+
+  it('skips empty string for sb/rb fields instead of throwing a bind value error', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'Story', status: 'Draft' },
+      fields: { ba_author: '' },
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'ba_author') return { field_id: 203, name: 'ba_author', type: 'sb', permissions: ['read', 'update', 'create'] };
+      if (fn === 'status') return { field_id: 200, name: 'status', type: 'sb', permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockImplementation(async (tid, fn, label) => {
+      if (label === '') throw new Error(`Bind value '' not found for field '${fn}'`);
+      return { id: 700 };
+    });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 5090 } });
+
+    await expect(
+      emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry })
+    ).resolves.toBeDefined();
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values.every(v => v.field_id !== 203)).toBe(true);
+  });
 });

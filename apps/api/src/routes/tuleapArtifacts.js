@@ -408,8 +408,11 @@ async function handleUserStoryCreate(req, res) {
 
   let unified;
   if (artifact_type && common) {
-    unified = { artifact_type: 'user_story', project_id: pid, common, fields: fields || {} };
+    const cleanedCommon = { ...common };
+    if (cleanedCommon.priority === 'None') delete cleanedCommon.priority;
+    unified = { artifact_type: 'user_story', project_id: pid, common: cleanedCommon, fields: fields || {} };
   } else {
+    const rawPriority = req.body.priority;
     unified = {
       artifact_type: 'user_story',
       project_id: pid,
@@ -417,7 +420,7 @@ async function handleUserStoryCreate(req, res) {
         title: req.body.summary || req.body.title,
         description: req.body.description || req.body.overviewDescription || '',
         status: req.body.status,
-        priority: req.body.priority,
+        priority: rawPriority === 'None' ? undefined : rawPriority,
       },
       fields: {
         acceptance_criteria: req.body.acceptanceCriteria || req.body.acceptance_criteria,
