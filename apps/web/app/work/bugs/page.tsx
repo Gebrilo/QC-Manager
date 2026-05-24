@@ -127,6 +127,7 @@ function BugsContent() {
         fromTests: number;
         critical: number;
     } | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(true);
     const PAGE_SIZE = 50;
 
     const updateUrlParams = useCallback(() => {
@@ -173,7 +174,11 @@ function BugsContent() {
                 fromTests: res.data.totals.bugs_from_testing,
                 critical:  res.data.by_severity.critical,
             });
-        }).catch(() => {});
+        }).catch((err) => {
+            console.error('Failed to load bug summary:', err);
+        }).finally(() => {
+            setSummaryLoading(false);
+        });
     }, []);
 
     useEffect(() => {
@@ -404,9 +409,13 @@ function BugsContent() {
                             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
                                 {s.label}
                             </div>
-                            <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">
-                                {s.value}
-                            </div>
+                            {summaryLoading ? (
+                                <div className="h-8 w-12 mt-0.5 rounded-md bg-slate-200 dark:bg-slate-700 animate-pulse" />
+                            ) : (
+                                <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">
+                                    {s.value}
+                                </div>
+                            )}
                         </div>
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
                     </div>
