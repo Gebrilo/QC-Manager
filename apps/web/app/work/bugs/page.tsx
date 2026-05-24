@@ -19,19 +19,23 @@ import {
 
 // ── Pill colour maps ────────────────────────────────────────────────────────
 const SEV_PILL: Record<string, string> = {
-    critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-    high:     'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    medium:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    low:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    'Critical Impact': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    'Major impact':    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    'Minor Impact':    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    'Cosmetic impact': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    'None':            'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500',
 };
 
 const STATUS_PILL: Record<string, string> = {
-    New:      'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
-    Open:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    Assigned: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-    Fixed:    'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-    Verified: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-    Closed:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    New:         'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+    'In Progress':'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    Assigned:    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+    Reopened:    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    Blocked:     'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    Fixed:       'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+    Verified:    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+    Duplicate:   'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    Closed:      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
 const SOURCE_PILL: Record<string, string> = {
@@ -261,7 +265,7 @@ function BugsContent() {
             header: 'Severity',
             cell: (info) => {
                 const v = info.getValue();
-                return <Pill tone={SEV_PILL[v] || SEV_PILL.low}>{v.charAt(0).toUpperCase() + v.slice(1)}</Pill>;
+                return <Pill tone={SEV_PILL[v] || SEV_PILL['None']}>{v || 'None'}</Pill>;
             },
         }),
         columnHelper.accessor('status', {
@@ -440,7 +444,7 @@ function BugsContent() {
                 {/* Status */}
                 <GlassSelect value={statusFilter} onChange={v => setStatusFilter(v)}>
                     <option value="">All Statuses</option>
-                    {['New', 'Open', 'Assigned', 'Fixed', 'Verified', 'Closed'].map(s => (
+                    {['New', 'In Progress', 'Assigned', 'Reopened', 'Blocked', 'Fixed', 'Verified', 'Duplicate', 'Closed'].map(s => (
                         <option key={s} value={s}>{s}</option>
                     ))}
                 </GlassSelect>
@@ -448,8 +452,8 @@ function BugsContent() {
                 {/* Severity */}
                 <GlassSelect value={severityFilter} onChange={v => setSeverityFilter(v)}>
                     <option value="">All Severities</option>
-                    {['critical', 'high', 'medium', 'low'].map(s => (
-                        <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    {['Critical Impact', 'Major impact', 'Minor Impact', 'Cosmetic impact', 'None'].map(s => (
+                        <option key={s} value={s}>{s}</option>
                     ))}
                 </GlassSelect>
 

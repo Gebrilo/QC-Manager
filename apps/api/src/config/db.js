@@ -557,14 +557,18 @@ const runMigrations = async () => {
                 b.project_id,
                 p.project_name,
                 COUNT(b.id) AS total_bugs,
-                COUNT(b.id) FILTER (WHERE b.status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
-                COUNT(b.id) FILTER (WHERE b.status IN ('Resolved', 'Closed')) AS closed_bugs,
-                COUNT(b.id) FILTER (WHERE b.severity = 'critical') AS critical_bugs,
-                COUNT(b.id) FILTER (WHERE b.severity = 'high') AS high_bugs,
-                COUNT(b.id) FILTER (WHERE b.severity = 'medium') AS medium_bugs,
-                COUNT(b.id) FILTER (WHERE b.severity = 'low') AS low_bugs,
-                COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(b.id) FILTER (WHERE b.source = 'EXPLORATORY') AS bugs_from_exploratory
+                COUNT(b.id) FILTER (WHERE b.status IN ('New', 'In Progress', 'Assigned', 'Reopened', 'Blocked')) AS open_bugs,
+                COUNT(b.id) FILTER (WHERE b.status IN ('Fixed', 'Verified', 'Duplicate', 'Closed'))              AS closed_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'Critical Impact')  AS critical_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'Major impact')     AS major_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'Minor Impact')     AS minor_bugs,
+                COUNT(b.id) FILTER (WHERE b.severity = 'Cosmetic impact')  AS cosmetic_bugs,
+                COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE')          AS bugs_from_test_cases,
+                COUNT(b.id) FILTER (WHERE b.source = 'EXPLORATORY')        AS bugs_from_exploratory,
+                COUNT(b.id) FILTER (WHERE array_length(b.linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
+                COUNT(b.id) FILTER (WHERE b.linked_test_execution_ids IS NULL
+                    OR array_length(b.linked_test_execution_ids, 1) = 0)   AS standalone_bugs,
+                MAX(b.reported_date) AS latest_bug_date
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             WHERE b.deleted_at IS NULL
@@ -1970,19 +1974,17 @@ const runMigrations = async () => {
             CREATE OR REPLACE VIEW v_bug_summary_global AS
             SELECT
                 COUNT(id) AS total_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Open', 'In Progress', 'Reopened')) AS open_bugs,
-                COUNT(id) FILTER (WHERE status IN ('Resolved', 'Closed')) AS closed_bugs,
-                COUNT(id) FILTER (WHERE severity = 'critical') AS critical_bugs,
-                COUNT(id) FILTER (WHERE severity = 'high') AS high_bugs,
-                COUNT(id) FILTER (WHERE severity = 'medium') AS medium_bugs,
-                COUNT(id) FILTER (WHERE severity = 'low') AS low_bugs,
-                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'TEST_CASE') AS bugs_from_test_cases,
-                COUNT(id) FILTER (WHERE COALESCE(source, 'EXPLORATORY') = 'EXPLORATORY') AS bugs_from_exploratory,
-                COUNT(id) FILTER (WHERE EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
-                                 OR EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)) AS bugs_from_testing,
-                COUNT(id) FILTER (WHERE NOT EXISTS (SELECT 1 FROM bug_test_executions bte WHERE bte.bug_id = bugs.id)
-                                      AND NOT EXISTS (SELECT 1 FROM bug_tasks bt WHERE bt.bug_id = bugs.id)
-                                      AND COALESCE(array_length(linked_test_case_ids, 1), 0) = 0) AS standalone_bugs
+                COUNT(id) FILTER (WHERE status IN ('New', 'In Progress', 'Assigned', 'Reopened', 'Blocked')) AS open_bugs,
+                COUNT(id) FILTER (WHERE status IN ('Fixed', 'Verified', 'Duplicate', 'Closed'))              AS closed_bugs,
+                COUNT(id) FILTER (WHERE severity = 'Critical Impact')  AS critical_bugs,
+                COUNT(id) FILTER (WHERE severity = 'Major impact')     AS major_bugs,
+                COUNT(id) FILTER (WHERE severity = 'Minor Impact')     AS minor_bugs,
+                COUNT(id) FILTER (WHERE severity = 'Cosmetic impact')  AS cosmetic_bugs,
+                COUNT(id) FILTER (WHERE source = 'TEST_CASE')          AS bugs_from_test_cases,
+                COUNT(id) FILTER (WHERE source = 'EXPLORATORY')        AS bugs_from_exploratory,
+                COUNT(id) FILTER (WHERE array_length(linked_test_execution_ids, 1) > 0) AS bugs_from_testing,
+                COUNT(id) FILTER (WHERE linked_test_execution_ids IS NULL
+                    OR array_length(linked_test_execution_ids, 1) = 0)    AS standalone_bugs
             FROM bugs
             WHERE deleted_at IS NULL
         `);
