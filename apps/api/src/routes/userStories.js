@@ -112,6 +112,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async 
                 });
             }
 
+            let tuleapAlreadyGone = false;
             try {
                 await emitToTuleap(
                     {
@@ -124,12 +125,27 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async 
                     { client: defaultClient, registry: defaultRegistry, query: pool.query.bind(pool) }
                 );
             } catch (emitErr) {
-                console.error(`[route:user-stories:delete] emit_failed id=${id} err="${emitErr.message}"`);
-                return res.status(emitErr.status || 502).json({
-                    success: false,
-                    error: 'Failed to delete in Tuleap',
-                    message: emitErr.message,
-                });
+                // If Tuleap no longer has the artifact (manually deleted, never created,
+                // or stale tuleap_artifact_id), the local delete should still succeed —
+                // convergent state, not a hard failure.
+                if (emitErr.status === 404) {
+                    tuleapAlreadyGone = true;
+                    console.warn(`[route:user-stories:delete] tuleap_404 id=${id} artifact_id=${original.tuleap_artifact_id} — soft-deleting locally`);
+                } else {
+                    console.error(`[route:user-stories:delete] emit_failed id=${id} err="${emitErr.message}"`);
+                    return res.status(emitErr.status || 502).json({
+                        success: false,
+                        error: 'Failed to delete in Tuleap',
+                        message: emitErr.message,
+                    });
+                }
+            }
+
+            if (tuleapAlreadyGone) {
+                await pool.query(
+                    'UPDATE user_stories SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1',
+                    [id]
+                );
             }
 
             const refreshed = await pool.query('SELECT * FROM user_stories WHERE id = $1', [id]);
@@ -137,8 +153,9 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async 
             await auditLog('user_stories', id, 'DELETE', deleted, original);
             return res.json({
                 success: true,
-                message: `User story '${deleted.title}' has been deleted`,
+                message: `User story '${deleted.title}' has been deleted${tuleapAlreadyGone ? ' (Tuleap artifact was already missing)' : ''}`,
                 data: deleted,
+                tuleap_already_gone: tuleapAlreadyGone || undefined,
             });
         }
 
