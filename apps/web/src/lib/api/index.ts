@@ -1804,12 +1804,15 @@ export const attachmentsApi = {
         return uploadFormData<Attachment>(`/attachments/${artifactType}/${artifactId}`, form);
     },
 
-    uploadStaged: (tempId: string, file: File): Promise<{ storagePath: string; originalName: string }> => {
+    uploadStaged: (tempId: string, file: File): Promise<{ storagePath: string; originalName: string; mimeType: string; sizeBytes: number }> => {
         const form = new FormData();
         form.append('file', file);
         form.append('temp_id', tempId);
-        return uploadFormData<{ storagePath: string; originalName: string }>('/attachments/staged', form);
+        return uploadFormData<{ storagePath: string; originalName: string; mimeType: string; sizeBytes: number }>('/attachments/staged', form);
     },
+
+    deleteStaged: (storagePath: string) =>
+        fetchApi<{ success: boolean }>('/attachments/staged', { method: 'DELETE', body: JSON.stringify({ storagePath }) }),
 
     getUrl: (attachmentId: string) =>
         fetchApi<{ url: string; originalName: string; mimeType: string; sizeBytes: number }>(`/attachments/file/${attachmentId}/url`),

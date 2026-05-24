@@ -28,6 +28,7 @@ function FileIcon({ mimeType }: { mimeType: string }) {
 
 export function AttachmentSection({ artifactType, artifactId, tempId, id }: Props) {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [stagedFiles, setStagedFiles] = useState<Array<{ storagePath: string; originalName: string; mimeType: string; sizeBytes: number }>>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [preview, setPreview] = useState<{ url: string; mimeType: string; name: string } | null>(null);
@@ -50,7 +51,8 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
                 const result = await attachmentsApi.upload(artifactType, artifactId, file);
                 setAttachments(prev => [...prev, result]);
             } else if (tempId) {
-                await attachmentsApi.uploadStaged(tempId, file);
+                const result = await attachmentsApi.uploadStaged(tempId, file);
+                setStagedFiles(prev => [...prev, result]);
             }
         } catch (err: any) {
             alert(err.message || 'Upload failed');
@@ -82,6 +84,16 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
         try {
             await attachmentsApi.delete(id);
             setAttachments(prev => prev.filter(a => a.id !== id));
+        } catch (err: any) {
+            alert(err.message || 'Delete failed');
+        }
+    }
+
+    async function handleDeleteStaged(storagePath: string) {
+        if (!confirm('Remove this attachment?')) return;
+        try {
+            await attachmentsApi.deleteStaged(storagePath);
+            setStagedFiles(prev => prev.filter(f => f.storagePath !== storagePath));
         } catch (err: any) {
             alert(err.message || 'Delete failed');
         }
@@ -186,6 +198,27 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
                                 ))}
                             </ul>
                         )
+                    )}
+
+                    {!artifactId && stagedFiles.length > 0 && (
+                        <ul className="space-y-2">
+                            {stagedFiles.map(f => (
+                                <li key={f.storagePath} className="flex items-center justify-between gap-3 py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-sm">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <FileIcon mimeType={f.mimeType} />
+                                        <span className="truncate text-slate-800 dark:text-slate-200 font-medium">{f.originalName}</span>
+                                        <span className="text-xs text-slate-400 flex-shrink-0">{formatSize(f.sizeBytes)}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteStaged(f.storagePath)}
+                                        className="text-xs text-rose-500 hover:text-rose-700 hover:underline flex-shrink-0"
+                                    >
+                                        Remove
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </div>
             </div>

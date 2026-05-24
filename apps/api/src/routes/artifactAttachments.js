@@ -53,6 +53,17 @@ router.post('/staged', requireAuth, upload.single('file'), async (req, res, next
     }
 });
 
+router.delete('/staged', requireAuth, async (req, res, next) => {
+    try {
+        const { storagePath } = req.body;
+        if (!storagePath || !storagePath.startsWith('tmp/')) {
+            return res.status(400).json({ error: 'Invalid staged file path' });
+        }
+        await storage.deleteArtifactFile(storagePath);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
 router.get('/file/:id/url', requireAuth, async (req, res, next) => {
     try {
         const result = await db.pool.query(
