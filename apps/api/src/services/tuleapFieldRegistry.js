@@ -37,6 +37,14 @@ class FieldRegistry {
       `Bind value '${label}' not found for field '${fieldName}' in tracker ${trackerId}. ` +
       `Available: ${valuesArr.map(v => v.label).join(', ')}`
     );
+    // Tuleap quirk: for ugroups-bound list fields the API exposes a values[].id
+    // (a tracker-local value record id) but REST writes require the
+    // ugroup_reference.id (the underlying user-group id).
+    const ugroupId = match.ugroup_reference && match.ugroup_reference.id;
+    if (f.bindings && f.bindings.type === 'ugroups' && ugroupId != null) {
+      const asInt = Number(ugroupId);
+      return { id: Number.isFinite(asInt) ? asInt : ugroupId };
+    }
     return { id: match.id };
   }
 }

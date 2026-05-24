@@ -36,6 +36,7 @@ const BASE_FIELD_MAPPINGS = {
     remaining_effort: 'remaining_effort',
     change_reason: 'change_reason',
     attachment: 'attachments',
+    user_stories: 'links',
   },
   test_case: {
     title: 'title',

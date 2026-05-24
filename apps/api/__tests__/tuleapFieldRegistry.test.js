@@ -48,4 +48,52 @@ describe('FieldRegistry', () => {
     await reg.getFieldId(5, 'summary');
     expect(defaultClient.get).toHaveBeenCalledTimes(1);
   });
+
+  it('returns ugroup_reference.id for ugroups-bound list fields, not values[].id', async () => {
+    // Regression for the "submitted value 112 is invalid" bug: when a list
+    // field is bound to ugroups, Tuleap REST writes expect the underlying
+    // ugroup id (e.g. 106), not the value record id (e.g. 112).
+    defaultClient.get.mockResolvedValueOnce({
+      data: {
+        fields: [
+          {
+            field_id: 541,
+            name: 'ba_author',
+            label: 'BA Author',
+            type: 'sb',
+            bindings: { type: 'ugroups', list: [] },
+            values: [
+              {
+                id: 112,
+                label: 'BA-Team',
+                ugroup_reference: { id: '106', label: 'BA-Team' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const reg = new FieldRegistry();
+    const val = await reg.resolveBindValue(19, 'ba_author', 'BA-Team');
+    expect(val).toEqual({ id: 106 });
+  });
+
+  it('still uses values[].id for static-bound list fields', async () => {
+    defaultClient.get.mockResolvedValueOnce({
+      data: {
+        fields: [
+          {
+            field_id: 525,
+            name: 'status',
+            type: 'sb',
+            bindings: { type: 'static', list: [] },
+            values: [{ id: 241, label: 'Draft' }],
+          },
+        ],
+      },
+    });
+    const reg = new FieldRegistry();
+    const val = await reg.resolveBindValue(19, 'status', 'Draft');
+    expect(val).toEqual({ id: 241 });
+  });
 });

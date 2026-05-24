@@ -209,4 +209,85 @@ describe('user_story emitter — emitToTuleap', () => {
     const payload = defaultClient.post.mock.calls[0][1];
     expect(payload.values.every(v => v.field_id !== 203)).toBe(true);
   });
+
+  it('sends Summary (story_title) with the QC title as the {value} for the string field', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'My Story Summary', status: 'Draft' },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'story_title') return { field_id: 526, name: 'story_title', type: 'string', permissions: ['read', 'update', 'create'] };
+      if (fn === 'status') return { field_id: 525, name: 'status', type: 'sb', permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 241 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 6010 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    const titleEntry = payload.values.find(v => v.field_id === 526);
+    expect(titleEntry).toEqual({ field_id: 526, value: 'My Story Summary' });
+  });
+
+  it('maps unified common.links to Tuleap user_stories art_link field', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: {
+        title: 'Story with link',
+        status: 'Draft',
+        links: [
+          { type: 'is_related', target_artifact_id: 444 },
+          { type: '_is_child', target_artifact_id: '555' },
+        ],
+      },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'user_stories') return { field_id: 542, name: 'user_stories', type: 'art_link', permissions: ['read', 'update', 'create'] };
+      if (fn === 'status') return { field_id: 525, name: 'status', type: 'sb', permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 241 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 6020 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    const linksEntry = payload.values.find(v => v.field_id === 542);
+    expect(linksEntry).toEqual({
+      field_id: 542,
+      links: [
+        { id: 444, type: 'is_related' },
+        { id: 555, type: '_is_child' },
+      ],
+    });
+  });
+
+  it('skips the art_link field entirely when there are no links to send', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'No links', status: 'Draft', links: [] },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'user_stories') return { field_id: 542, name: 'user_stories', type: 'art_link', permissions: ['read', 'update', 'create'] };
+      if (fn === 'status') return { field_id: 525, name: 'status', type: 'sb', permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 241 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 6030 } });
+
+    await emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values.find(v => v.field_id === 542)).toBeUndefined();
+  });
 });

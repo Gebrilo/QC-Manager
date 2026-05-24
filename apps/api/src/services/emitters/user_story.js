@@ -40,7 +40,17 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'upd
       }
     } else if (field.type === 'art_link') {
       const raw = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
-      const links = raw.map(id => Number(id)).filter(id => !isNaN(id)).map(id => ({ id }));
+      const links = raw
+        .map(item => {
+          if (item && typeof item === 'object') {
+            const id = Number(item.target_artifact_id ?? item.id);
+            if (!Number.isFinite(id)) return null;
+            return item.type ? { id, type: item.type } : { id };
+          }
+          const id = Number(item);
+          return Number.isFinite(id) ? { id } : null;
+        })
+        .filter(Boolean);
       if (links.length === 0) continue;
       shape = { links };
     } else {
