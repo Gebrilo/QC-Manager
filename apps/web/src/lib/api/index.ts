@@ -572,6 +572,9 @@ export const testCasesApi = {
     delete: (id: string) =>
         fetchApi<void>(`/test-cases/${id}`, { method: 'DELETE' }),
 
+    sync: (id: string) =>
+        fetchApi<{ success: boolean; data: TestCase }>(`/test-cases/${id}/sync`, { method: 'POST' }),
+
     bulkImport: (data: { test_cases: any[]; project_id: string }) =>
         fetchApi('/test-cases/bulk-import', {
             method: 'POST',

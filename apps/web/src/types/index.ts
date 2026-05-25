@@ -285,6 +285,8 @@ export interface TestCase {
     tuleap_artifact_id?: number;
     tuleap_url?: string;
     sync_status?: SyncStatus;
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
     last_tuleap_sync?: string;
     latest_execution_status?: string;
     latest_execution_date?: string;
