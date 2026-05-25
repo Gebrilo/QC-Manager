@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { forwardRef, useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -91,17 +91,16 @@ function FieldError({ message }: { message?: string }) {
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     prefix?: string;
-    fieldRef?: React.Ref<HTMLInputElement>;
 }
 
-function EFInput({ prefix, fieldRef, className, ...props }: InputProps) {
+const EFInput = forwardRef<HTMLInputElement, InputProps>(function EFInput({ prefix, className, ...props }, ref) {
     return (
         <div className="relative">
             {prefix && (
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono pointer-events-none">{prefix}</div>
             )}
             <input
-                ref={fieldRef}
+                ref={ref}
                 className={[
                     'w-full h-10 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border text-sm',
                     'text-slate-800 dark:text-slate-100 placeholder:text-slate-400',
@@ -117,12 +116,13 @@ function EFInput({ prefix, fieldRef, className, ...props }: InputProps) {
             />
         </div>
     );
-}
+});
 
-function EFSelect({ children, className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+const EFSelect = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function EFSelect({ children, className, ...props }, ref) {
     return (
         <div className="relative">
             <select
+                ref={ref}
                 className={[
                     'w-full h-10 pl-3.5 pr-9 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md',
                     'border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100',
@@ -140,11 +140,12 @@ function EFSelect({ children, className, ...props }: React.SelectHTMLAttributes<
             </svg>
         </div>
     );
-}
+});
 
-function EFTextarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+const EFTextarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function EFTextarea({ className, ...props }, ref) {
     return (
         <textarea
+            ref={ref}
             className={[
                 'w-full px-3.5 py-3 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md',
                 'border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100',
@@ -155,7 +156,7 @@ function EFTextarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTe
             {...props}
         />
     );
-}
+});
 
 // ── Section card ─────────────────────────────────────────────────────────────
 

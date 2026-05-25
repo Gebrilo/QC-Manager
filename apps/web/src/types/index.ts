@@ -253,7 +253,7 @@ export type TestCasePriority = 'critical' | 'high' | 'medium' | 'low';
 export type TestCaseSeverity = 'critical' | 'major' | 'normal' | 'minor' | 'trivial';
 export type TestCaseType = 'functional' | 'regression' | 'smoke' | 'integration' | 'performance' | 'security' | 'usability' | 'exploratory' | 'automated';
 export type AutomationStatus = 'manual' | 'automated' | 'partial' | 'to_automate';
-export type SyncStatus = 'synced' | 'pending' | 'conflict' | 'error' | 'not_synced';
+export type SyncStatus = 'synced' | 'pending' | 'failed' | 'standalone';
 
 export interface TestCase {
     id: string;
@@ -288,6 +288,8 @@ export interface TestCase {
     tuleap_artifact_id?: number;
     tuleap_url?: string;
     sync_status?: SyncStatus;
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
     last_tuleap_sync?: string;
     latest_execution_status?: string;
     latest_execution_date?: string;

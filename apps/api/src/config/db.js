@@ -2294,6 +2294,8 @@ const runMigrations = async () => {
                 tc.tuleap_artifact_id,
                 tc.tuleap_url,
                 tc.sync_status,
+                tc.last_sync_attempted_at,
+                tc.last_sync_error,
                 tc.last_tuleap_sync,
                 tc.service_name,
                 tc.is_regression,

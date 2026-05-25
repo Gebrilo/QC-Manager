@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { TestCase, TestCaseListResponse } from '@/types';
 import { testCasesApi, projectsApi, type Project } from '@/lib/api';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { SyncBadge } from '@/components/shared/SyncBadge';
 import { stripHtml } from '@/lib/stripHtml';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -215,14 +216,13 @@ export default function TestCasesPage() {
         columnHelper.accessor('sync_status', {
             id: 'sync_status',
             header: 'Sync',
-            cell: (info) => {
-                const v = info.getValue();
-                return v && v !== 'not_synced' ? (
-                    <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{v}</span>
-                ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                );
-            },
+            cell: (info) => (
+                <SyncBadge
+                    status={info.row.original.sync_status as any}
+                    lastAttemptedAt={info.row.original.last_sync_attempted_at}
+                    error={info.row.original.last_sync_error}
+                />
+            ),
         }),
         columnHelper.accessor('latest_execution_date', {
             id: 'latest_execution_date',

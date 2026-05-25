@@ -8,6 +8,7 @@ import { taskTestCaseLinksApi, testCasesApi, testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { SyncPanel } from '@/components/shared/SyncPanel';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
     LinkedArtifactsSection,
@@ -148,15 +149,15 @@ export default function TestCaseDetailPage() {
                     </div>
                 )}
 
-                {testCase.sync_status && testCase.sync_status !== 'not_synced' && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Sync Status</h3>
-                        <div className="flex items-center gap-2">
-                            <Badge variant={testCase.sync_status === 'synced' ? 'success' : testCase.sync_status === 'error' ? 'danger' : 'warning'}>{testCase.sync_status}</Badge>
-                            {testCase.last_tuleap_sync && <span className="text-xs text-gray-500">Last synced {formatDistanceToNow(new Date(testCase.last_tuleap_sync), { addSuffix: true })}</span>}
-                        </div>
-                    </div>
-                )}
+                <SyncPanel
+                    status={testCase.sync_status as any}
+                    lastAttemptedAt={testCase.last_sync_attempted_at}
+                    error={testCase.last_sync_error}
+                    tuleapUrl={testCase.tuleap_url}
+                    artifactType="test_case"
+                    artifactId={testCase.id}
+                    syncFn={(id) => testCasesApi.sync(id)}
+                />
 
                 {testCase.execution_history && testCase.execution_history.length > 0 && (
                     <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
