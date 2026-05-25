@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { bugsApi } from '@/lib/api';
 
 interface SyncPanelProps {
     status?: 'synced' | 'pending' | 'failed' | 'standalone';
@@ -10,7 +9,7 @@ interface SyncPanelProps {
     tuleapUrl?: string | null;
     artifactType?: string;
     artifactId?: string;
-    onRetry?: (artifactId: string) => Promise<unknown>;
+    syncFn?: (id: string) => Promise<unknown>;
 }
 
 function relativeTime(date: string | null | undefined): string {
@@ -26,7 +25,7 @@ function relativeTime(date: string | null | undefined): string {
     return `${days}d ago`;
 }
 
-export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactId, onRetry }: SyncPanelProps) {
+export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactId, syncFn }: SyncPanelProps) {
     const [retrying, setRetrying] = useState(false);
 
     if (!status || status === 'standalone') return null;
@@ -35,10 +34,8 @@ export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactI
         if (!artifactId || retrying) return;
         setRetrying(true);
         try {
-            if (onRetry) {
-                await onRetry(artifactId);
-            } else {
-                await bugsApi.sync(artifactId);
+            if (syncFn) {
+                await syncFn(artifactId);
             }
             window.location.reload();
         } catch {

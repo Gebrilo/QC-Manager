@@ -6,10 +6,60 @@ const { auditLog } = require('../middleware/audit');
 const { emitToTuleap } = require('../services/emitters/user_story');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+const { createUserStorySchema, updateUserStorySchema } = require('../schemas/userStory');
 
 function parseCsvParam(value) {
     if (!value) return [];
     return String(value).split(',').map(item => item.trim()).filter(Boolean);
+}
+
+async function resolveUserStorySyncConfig(projectId) {
+    const result = await pool.query(
+        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,
+        [projectId]
+    );
+    return result.rows[0] || null;
+}
+
+async function tryEmitAndWriteback(story, config, mode) {
+    const unified = {
+        artifact_type: 'user_story',
+        project_id: story.project_id,
+        common: {
+            title: story.title,
+            description: story.description,
+            status: story.status,
+            assigned_to: story.assigned_to,
+            priority: story.priority,
+        },
+        fields: {
+            acceptance_criteria: story.acceptance_criteria,
+            requirement_version: story.requirement_version,
+            change_reason: story.change_reason,
+            ba_author: story.ba_author,
+            initial_effort: story.initial_effort,
+            remaining_effort: story.remaining_effort,
+        },
+        ...(story.tuleap_artifact_id ? { tuleap: { artifact_id: story.tuleap_artifact_id } } : {}),
+    };
+
+    const emitDeps = { client: defaultClient, registry: defaultRegistry };
+
+    const emitResult = await emitToTuleap(unified, config, mode, emitDeps);
+
+    const updateRes = await pool.query(
+        `UPDATE user_stories SET
+            sync_status = 'synced',
+            tuleap_artifact_id = COALESCE($1, tuleap_artifact_id),
+            tuleap_url = COALESCE($2, tuleap_url),
+            last_sync_attempted_at = NOW(),
+            last_sync_error = NULL,
+            updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [emitResult.tuleap_artifact_id || null, emitResult.tuleap_url || null, story.id]
+    );
+    return updateRes.rows[0];
 }
 
 router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, res, next) => {
@@ -85,6 +135,214 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
     }
 });
 
+router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+    try {
+        const parsed = createUserStorySchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+        const data = parsed.data;
+
+        const result = await pool.query(`
+            INSERT INTO user_stories (
+                title, description, status, acceptance_criteria,
+                project_id, priority, assigned_to,
+                requirement_version, change_reason, ba_author,
+                initial_effort, remaining_effort,
+                sync_status
+            ) VALUES (
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending'
+            )
+            RETURNING *
+        `, [
+            data.title, data.description, data.status, data.acceptance_criteria,
+            data.project_id, data.priority, data.assigned_to,
+            data.requirement_version, data.change_reason, data.ba_author,
+            data.initial_effort, data.remaining_effort,
+        ]);
+        let story = result.rows[0];
+
+        const config = await resolveUserStorySyncConfig(data.project_id);
+
+        if (config) {
+            try {
+                story = await tryEmitAndWriteback(story, config, 'create');
+            } catch (err) {
+                console.error(`[route:user-stories:create] emit_failed id=${story.id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE user_stories SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), story.id]
+                );
+                story = failRes.rows[0];
+            }
+        } else {
+            const standaloneRes = await pool.query(
+                `UPDATE user_stories SET sync_status = 'standalone' WHERE id = $1 RETURNING *`,
+                [story.id]
+            );
+            story = standaloneRes.rows[0];
+        }
+
+        if (data.temp_id && story.id) {
+            try {
+                const { adoptStagedAttachments } = require('./artifactAttachments');
+                await adoptStagedAttachments('user_story', story.id, data.temp_id, req.user?.id);
+            } catch (err) {
+                console.error('[attachments:adopt] user-story-local', err.message);
+            }
+        }
+
+        await auditLog('user_stories', story.id, 'CREATE', story, null);
+
+        res.status(201).json({
+            success: true,
+            data: story
+        });
+    } catch (error) {
+        console.error('Error creating user story:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create user story',
+            message: error.message
+        });
+    }
+});
+
+router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const originalRes = await pool.query('SELECT * FROM user_stories WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (originalRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'User story not found' });
+        }
+        const original = originalRes.rows[0];
+
+        const parsed = updateUserStorySchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+        const data = parsed.data;
+
+        const allowedFields = [
+            'title', 'description', 'status', 'acceptance_criteria',
+            'priority', 'assigned_to', 'requirement_version',
+            'change_reason', 'ba_author',
+            'initial_effort', 'remaining_effort',
+        ];
+
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        for (const field of allowedFields) {
+            if (data[field] !== undefined) {
+                fields.push(`${field} = $${idx}`);
+                values.push(data[field]);
+                idx++;
+            }
+        }
+
+        if (fields.length === 0) {
+            return res.json({ success: true, data: original });
+        }
+
+        fields.push('updated_at = NOW()');
+        fields.push('sync_status = \'pending\'');
+        fields.push('last_sync_attempted_at = NULL');
+        fields.push('last_sync_error = NULL');
+        values.push(id);
+
+        const query = `UPDATE user_stories SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+        const result = await pool.query(query, values);
+        let updated = result.rows[0];
+
+        const config = await resolveUserStorySyncConfig(updated.project_id);
+        if (config) {
+            try {
+                const mode = updated.tuleap_artifact_id ? 'update' : 'create';
+                updated = await tryEmitAndWriteback(updated, config, mode);
+            } catch (err) {
+                console.error(`[route:user-stories:patch] emit_failed id=${id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE user_stories SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), id]
+                );
+                updated = failRes.rows[0];
+            }
+        }
+
+        await auditLog('user_stories', id, 'UPDATE', updated, original);
+
+        res.json({
+            success: true,
+            data: updated
+        });
+    } catch (error) {
+        console.error('Error updating user story:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update user story',
+            message: error.message
+        });
+    }
+});
+
+router.post('/:id/sync', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const storyRes = await pool.query('SELECT * FROM user_stories WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (storyRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'User story not found' });
+        }
+        let story = storyRes.rows[0];
+
+        const config = await resolveUserStorySyncConfig(story.project_id);
+        if (!config) {
+            const standaloneRes = await pool.query(
+                `UPDATE user_stories SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+                [id]
+            );
+            return res.json({ success: true, data: standaloneRes.rows[0] });
+        }
+
+        await pool.query(
+            `UPDATE user_stories SET sync_status = 'pending', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+
+        try {
+            const mode = story.tuleap_artifact_id ? 'update' : 'create';
+            story = await tryEmitAndWriteback(story, config, mode);
+        } catch (err) {
+            console.error(`[route:user-stories:sync] emit_failed id=${id} err="${err.message}"`);
+            const failRes = await pool.query(
+                `UPDATE user_stories SET sync_status = 'failed', last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                [String(err.message).slice(0, 1024), id]
+            );
+            story = failRes.rows[0];
+        }
+
+        res.json({ success: true, data: story });
+    } catch (error) {
+        console.error('Error syncing user story:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to sync user story',
+            message: error.message
+        });
+    }
+});
+
 router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -125,9 +383,6 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async 
                     { client: defaultClient, registry: defaultRegistry, query: pool.query.bind(pool) }
                 );
             } catch (emitErr) {
-                // If Tuleap no longer has the artifact (manually deleted, never created,
-                // or stale tuleap_artifact_id), the local delete should still succeed —
-                // convergent state, not a hard failure.
                 if (emitErr.status === 404) {
                     tuleapAlreadyGone = true;
                     console.warn(`[route:user-stories:delete] tuleap_404 id=${id} artifact_id=${original.tuleap_artifact_id} — soft-deleting locally`);

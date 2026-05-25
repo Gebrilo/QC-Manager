@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { tuleapApi, projectsApi, type Project } from '@/lib/api';
+import { tuleapApi, projectsApi, userStoriesApi, type Project } from '@/lib/api';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
@@ -194,6 +194,7 @@ function CreateUserStoryContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [syncWarning, setSyncWarning] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('story-general');
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
@@ -242,6 +243,7 @@ function CreateUserStoryContent() {
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         setSubmitError(null);
+        setSyncWarning(null);
         if (!selectedProjectId) {
             setSubmitError('Please select a project before creating a user story.');
             setIsSubmitting(false);
@@ -249,26 +251,27 @@ function CreateUserStoryContent() {
         }
         try {
             const payload = {
-                artifact_type: 'user_story' as const,
+                title: data.title,
                 project_id: selectedProjectId,
-                common: {
-                    title: data.title,
-                    description: data.description || undefined,
-                    status: data.status,
-                    assigned_to: data.assigned_to || null,
-                    priority: data.priority,
-                },
-                fields: {
-                    acceptance_criteria: data.acceptance_criteria || undefined,
-                    requirement_version: data.requirement_version || '1',
-                    change_reason: data.change_reason || undefined,
-                    ba_author: data.ba_author || undefined,
-                    initial_effort: data.initial_effort ?? null,
-                    remaining_effort: data.remaining_effort ?? null,
-                },
+                description: data.description || '',
+                acceptance_criteria: data.acceptance_criteria || '',
+                status: data.status,
+                priority: data.priority,
+                assigned_to: data.assigned_to || null,
+                requirement_version: data.requirement_version || '1',
+                change_reason: data.change_reason || '',
+                ba_author: data.ba_author || '',
+                initial_effort: data.initial_effort ?? null,
+                remaining_effort: data.remaining_effort ?? null,
+                temp_id: tempId,
             };
-            const result = await tuleapApi.createUnified({ ...payload, temp_id: tempId });
-            router.push(`/work/stories/${result.qc_id || result.tuleap_artifact_id}`);
+            const result = await userStoriesApi.create(payload);
+
+            if (result.data?.sync_status === 'failed') {
+                setSyncWarning(result.data.last_sync_error || 'Sync to Tuleap failed. Your story was saved locally.');
+            }
+
+            router.push(`/work/stories/${result.data.id}`);
             router.refresh();
         } catch (err: any) {
             setSubmitError(err.message || 'Failed to create user story');
@@ -342,6 +345,16 @@ function CreateUserStoryContent() {
                         <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
                     </svg>
                     {submitError}
+                </div>
+            )}
+
+            {/* Sync warning toast */}
+            {syncWarning && (
+                <div className="flex items-center gap-3 px-4 py-3 mb-5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-700 dark:text-amber-300">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="flex-shrink-0">
+                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    {syncWarning}
                 </div>
             )}
 

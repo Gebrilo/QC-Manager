@@ -307,6 +307,7 @@ export default function BugDetailPage() {
                 tuleapUrl={bug.tuleap_url}
                 artifactType="bug"
                 artifactId={bug.id}
+                syncFn={(id) => bugsApi.sync(id)}
             />
 
             <div className="space-y-4">

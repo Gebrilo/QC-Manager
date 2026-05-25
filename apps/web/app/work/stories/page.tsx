@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { projectsApi, userStoriesApi, type Project, type UserStory } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { ViewToggle } from '@/components/tasks/ViewToggle';
+import { SyncBadge } from '@/components/shared/SyncBadge';
 
 const STATUS_OPTIONS = ['Draft', 'Changes', 'Review', 'Approved'];
 const PRIORITY_OPTIONS = ['P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low', 'None'];
@@ -307,6 +308,7 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
                                         >
                                             {story.title || <span className="text-slate-400 italic">Untitled</span>}
                                         </Link>
+                                        <SyncBadge status={story.sync_status} lastAttemptedAt={story.last_sync_attempted_at} error={story.last_sync_error} />
                                     </td>
                                     <td className="px-3 py-3.5 whitespace-nowrap">
                                         <span className="text-slate-600 dark:text-slate-300 font-medium text-sm">{story.project_name ?? '—'}</span>
@@ -454,7 +456,10 @@ function StoriesBoardView({ stories, isLoading, onStoryClick }: { stories: UserS
                                     onClick={() => onStoryClick(story.id)}
                                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all"
                                 >
-                                    <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2 leading-snug mb-2">{story.title}</p>
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2 leading-snug mb-2">
+                                        {story.title}
+                                        <SyncBadge status={story.sync_status} lastAttemptedAt={story.last_sync_attempted_at} error={story.last_sync_error} />
+                                    </p>
                                     {story.project_name && (
                                         <p className="text-xs text-slate-400 mb-2 truncate">{story.project_name}</p>
                                     )}

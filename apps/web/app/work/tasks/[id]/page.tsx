@@ -264,7 +264,7 @@ export default function TaskDetailPage() {
                         tuleapUrl={task.tuleap_url}
                         artifactType="task"
                         artifactId={task.id}
-                        onRetry={(id) => tasksApi.sync(id)}
+                        syncFn={(id) => tasksApi.sync(id)}
                     />
 
                     {/* Resources */}

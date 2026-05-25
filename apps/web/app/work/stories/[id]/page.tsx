@@ -6,6 +6,7 @@ import { taskTestCaseLinksApi, tasksApi, tuleapApi, userStoriesApi, type UserSto
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { SyncPanel } from '@/components/shared/SyncPanel';
 import {
     LinkedArtifactsSection,
     type LinkedArtifactsSectionConfig,
@@ -137,6 +138,16 @@ export default function UserStoryDetailPage() {
             </div>
 
             <UserStoryLinkedArtifactsSections story={story} />
+
+            <SyncPanel
+                status={story.sync_status}
+                lastAttemptedAt={story.last_sync_attempted_at}
+                error={story.last_sync_error}
+                tuleapUrl={story.tuleap_url}
+                artifactType="user_story"
+                artifactId={story.id}
+                syncFn={(id) => userStoriesApi.sync(id)}
+            />
 
             <AttachmentSection
                 artifactType="user_story"
