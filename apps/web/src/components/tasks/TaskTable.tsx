@@ -14,6 +14,7 @@ import { Task } from '@/types';
 import { TaskStatusBadge } from './TaskStatusBadge';
 import Link from 'next/link';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { SyncBadge } from '@/components/shared/SyncBadge';
 
 export const HIDEABLE_TASK_COLUMNS: { id: string; header: string }[] = [
     { id: 'project_name',       header: 'Project' },
@@ -86,9 +87,16 @@ export function TaskTable({
                         <p className="font-medium text-slate-800 dark:text-slate-100 truncate">
                             {info.getValue()}
                         </p>
-                        {info.row.original.project_name && (
-                            <p className="text-xs text-slate-400 mt-0.5 truncate">{info.row.original.project_name}</p>
-                        )}
+                        <div className="flex items-center">
+                            {info.row.original.project_name && (
+                                <p className="text-xs text-slate-400 mt-0.5 truncate">{info.row.original.project_name}</p>
+                            )}
+                            <SyncBadge
+                                status={info.row.original.sync_status}
+                                lastAttemptedAt={info.row.original.last_sync_attempted_at}
+                                error={info.row.original.last_sync_error}
+                            />
+                        </div>
                     </div>
                 </SimpleTooltip>
             ),
