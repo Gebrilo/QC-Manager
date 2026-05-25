@@ -119,3 +119,90 @@ describe('POST /test-cases — sync_status writeback', () => {
     expect(standaloneUpdate[0]).toMatch(/last_sync_attempted_at/);
   });
 });
+
+describe('PATCH /test-cases/:id — sync_status writeback', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockClientQuery.mockReset();
+    mockClient.release.mockReset();
+  });
+
+  // Mock the PATCH transaction + view SELECT.
+  // PATCH client.query sequence: BEGIN, SELECT existing, UPDATE, history, audit_log, COMMIT
+  // Then pool.query: view SELECT (after COMMIT)
+  function mockPatch(overrides = {}) {
+    // existing.title must differ from payload ('Updated Title') to avoid the no-op guard that returns 400
+    const existing = { id: 'tc1', project_id: PID, sync_status: 'pending', tuleap_artifact_id: null, title: 'Old Title', status: 'Not Run', ...overrides };
+    const updated  = { ...existing, title: 'Updated Title', status: 'Not Run' };
+
+    pool.connect.mockResolvedValue(mockClient);
+
+    // client.query sequence inside transaction
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                   // BEGIN
+      .mockResolvedValueOnce({ rows: [existing] })        // SELECT existing
+      .mockResolvedValueOnce({ rows: [updated] })         // UPDATE
+      .mockResolvedValueOnce(undefined)                   // history (logTestCaseHistory)
+      .mockResolvedValueOnce(undefined)                   // audit_log
+      .mockResolvedValueOnce(undefined);                  // COMMIT
+
+    // pool.query: view SELECT after COMMIT
+    pool.query.mockResolvedValueOnce({ rows: [{ ...updated, project_id: PID }] });
+
+    return { existing, updated };
+  }
+
+  const patchPayload = { title: 'Updated Title' };
+
+  it('writes sync_status=synced when PATCH emit succeeds', async () => {
+    mockPatch();
+    // resolveTestCaseSyncConfig
+    pool.query.mockResolvedValueOnce({ rows: [{ tuleap_tracker_id: 7, tuleap_base_url: 'https://t.example.com' }] });
+    emitTestCase.mockResolvedValueOnce({ tuleap_artifact_id: 202 });
+    // UPDATE writeback — synced with artifact_id
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'synced', tuleap_artifact_id: 202 }] });
+
+    const res = await request(createApp()).patch('/test-cases/tc1').send(patchPayload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sync_status).toBe('synced');
+    const updateCall = pool.query.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes("sync_status = 'synced'"));
+    expect(updateCall).toBeDefined();
+    expect(updateCall[0]).toMatch(/last_sync_attempted_at/);
+    expect(updateCall[0]).toMatch(/last_sync_error/);
+  });
+
+  it('writes sync_status=failed when PATCH emit throws', async () => {
+    mockPatch();
+    // resolveTestCaseSyncConfig
+    pool.query.mockResolvedValueOnce({ rows: [{ tuleap_tracker_id: 7 }] });
+    emitTestCase.mockRejectedValueOnce(new Error('connection refused'));
+    // UPDATE writeback — failed
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'failed', last_sync_error: 'connection refused' }] });
+
+    const res = await request(createApp()).patch('/test-cases/tc1').send(patchPayload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sync_status).toBe('failed');
+    const failUpdate = pool.query.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes("sync_status = 'failed'"));
+    expect(failUpdate).toBeDefined();
+    expect(failUpdate[0]).toMatch(/last_sync_attempted_at/);
+    expect(failUpdate[1]).toContain('connection refused');
+  });
+
+  it('writes sync_status=standalone when no tuleap_sync_config', async () => {
+    mockPatch();
+    // resolveTestCaseSyncConfig returns empty
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    // UPDATE writeback — standalone
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'standalone' }] });
+
+    const res = await request(createApp()).patch('/test-cases/tc1').send(patchPayload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sync_status).toBe('standalone');
+    const standaloneUpdate = pool.query.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes("sync_status = 'standalone'"));
+    expect(standaloneUpdate).toBeDefined();
+    expect(standaloneUpdate[0]).toMatch(/last_sync_attempted_at/);
+  });
+});

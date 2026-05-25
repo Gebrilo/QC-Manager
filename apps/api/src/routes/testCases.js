@@ -8,6 +8,19 @@ const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 
+// Map QC test-case statuses to the Tuleap tracker's select-box labels
+const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
+
+async function resolveTestCaseSyncConfig(projectId) {
+    const r = await pool.query(
+        `SELECT * FROM tuleap_sync_config
+         WHERE qc_project_id = $1 AND tracker_type = 'test_case' AND is_active = true
+         LIMIT 1`,
+        [projectId]
+    );
+    return r.rows[0] || null;
+}
+
 const testCaseCreateSchema = z.object({
     title: z.string().min(3).max(500),
     description: z.string().max(5000).optional(),
@@ -179,17 +192,8 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
 
         const projectId = validatedData.project_id;
 
-        // Map QC test-case statuses to the Tuleap tracker's select-box labels
-        const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
-
         if (projectId) {
-            const configResult = await pool.query(
-                `SELECT * FROM tuleap_sync_config
-                 WHERE qc_project_id = $1 AND tracker_type = 'test_case' AND is_active = true
-                 LIMIT 1`,
-                [projectId]
-            );
-            const config = configResult.rows[0];
+            const config = await resolveTestCaseSyncConfig(projectId);
 
             if (config) {
                 try {
@@ -219,7 +223,8 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
                         const updated = await pool.query(
                             `UPDATE test_case
                              SET tuleap_artifact_id = $1, tuleap_url = $2,
-                                 sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL
+                                 sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL,
+                                 updated_at = NOW()
                              WHERE id = $3 RETURNING *`,
                             [emitResult.tuleap_artifact_id, `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}`, testCase.id]
                         );
@@ -227,7 +232,8 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
                     } else {
                         const updated = await pool.query(
                             `UPDATE test_case
-                             SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL
+                             SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL,
+                                 updated_at = NOW()
                              WHERE id = $1 RETURNING *`,
                             [testCase.id]
                         );
@@ -303,7 +309,74 @@ router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async 
 
         await client.query('COMMIT');
         const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
-        res.json(fullResult.rows[0]);
+        let updated = fullResult.rows[0];
+
+        const patchConfig = await resolveTestCaseSyncConfig(updated.project_id);
+
+        if (patchConfig) {
+            const unified = {
+                artifact_type: 'test_case',
+                project_id: updated.project_id,
+                common: {
+                    title: updated.title,
+                    status: STATUS_TO_TULEAP[updated.status] || 'Not Run',
+                },
+                fields: {
+                    note: updated.description || null,
+                    preconditions: updated.preconditions || null,
+                    test_steps: updated.test_steps || null,
+                    expected_result: updated.expected_result || null,
+                },
+                ...(updated.tuleap_artifact_id ? { tuleap: { artifact_id: updated.tuleap_artifact_id } } : {}),
+            };
+            const emitMode = updated.tuleap_artifact_id ? 'update' : 'create';
+
+            try {
+                const emitResult = await emitTestCase(unified, patchConfig, emitMode, {
+                    client: defaultClient,
+                    registry: defaultRegistry,
+                    skipPersist: true,
+                });
+                const baseUrl = patchConfig.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+                const syncedRow = emitResult?.tuleap_artifact_id
+                    ? await pool.query(
+                        `UPDATE test_case
+                         SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL,
+                             tuleap_artifact_id = $1, tuleap_url = $2,
+                             updated_at = NOW()
+                         WHERE id = $3 RETURNING *`,
+                        [emitResult.tuleap_artifact_id, `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}`, updated.id]
+                      )
+                    : await pool.query(
+                        `UPDATE test_case
+                         SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL,
+                             updated_at = NOW()
+                         WHERE id = $1 RETURNING *`,
+                        [updated.id]
+                      );
+                updated = syncedRow.rows[0];
+            } catch (patchErr) {
+                console.warn(`[testCases] patch tuleap_push_failed id=${updated.id} err="${patchErr.message}"`);
+                const failRow = await pool.query(
+                    `UPDATE test_case
+                     SET sync_status = 'failed', last_sync_attempted_at = NOW(),
+                         last_sync_error = $1, updated_at = NOW()
+                     WHERE id = $2 RETURNING *`,
+                    [String(patchErr.message).slice(0, 1024), updated.id]
+                );
+                updated = failRow.rows[0];
+            }
+        } else {
+            const standaloneRow = await pool.query(
+                `UPDATE test_case
+                 SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW()
+                 WHERE id = $1 RETURNING *`,
+                [updated.id]
+            );
+            updated = standaloneRow.rows[0];
+        }
+
+        res.json(updated);
     } catch (error) {
         await client.query('ROLLBACK');
         if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: error.errors });
