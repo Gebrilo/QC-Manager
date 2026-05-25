@@ -384,6 +384,87 @@ router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async 
     } finally { client.release(); }
 });
 
+router.post('/:id/sync', requireAuth, requirePermission('qc.testcases.edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const tcRes = await pool.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (tcRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Test case not found' });
+        let tc = tcRes.rows[0];
+
+        const config = await resolveTestCaseSyncConfig(tc.project_id);
+        if (!config) {
+            const standaloneRes = await pool.query(
+                `UPDATE test_case
+                 SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW()
+                 WHERE id = $1 RETURNING *`,
+                [id]
+            );
+            return res.json({ success: true, data: standaloneRes.rows[0] });
+        }
+
+        // Set to pending while we attempt sync
+        await pool.query(
+            `UPDATE test_case SET sync_status = 'pending', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+
+        const unified = {
+            artifact_type: 'test_case',
+            project_id: tc.project_id,
+            common: {
+                title: tc.title,
+                status: STATUS_TO_TULEAP[tc.status] || 'Not Run',
+            },
+            fields: {
+                note: tc.description || null,
+                preconditions: tc.preconditions || null,
+                test_steps: tc.test_steps || null,
+                expected_result: tc.expected_result || null,
+            },
+            ...(tc.tuleap_artifact_id ? { tuleap: { artifact_id: tc.tuleap_artifact_id } } : {}),
+        };
+        const emitMode = tc.tuleap_artifact_id ? 'update' : 'create';
+
+        try {
+            const emitResult = await emitTestCase(unified, config, emitMode, {
+                client: defaultClient,
+                registry: defaultRegistry,
+                skipPersist: true,
+            });
+            const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+            const syncedRes = emitResult?.tuleap_artifact_id
+                ? await pool.query(
+                    `UPDATE test_case
+                     SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL,
+                         tuleap_artifact_id = $1, tuleap_url = $2, updated_at = NOW()
+                     WHERE id = $3 RETURNING *`,
+                    [emitResult.tuleap_artifact_id, `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}`, id]
+                  )
+                : await pool.query(
+                    `UPDATE test_case
+                     SET sync_status = 'synced', last_sync_attempted_at = NOW(), last_sync_error = NULL, updated_at = NOW()
+                     WHERE id = $1 RETURNING *`,
+                    [id]
+                  );
+            tc = syncedRes.rows[0];
+        } catch (err) {
+            console.error(`[testCases] sync_retry_failed id=${id} err="${err.message}"`);
+            const failRes = await pool.query(
+                `UPDATE test_case
+                 SET sync_status = 'failed', last_sync_error = $1, last_sync_attempted_at = NOW(), updated_at = NOW()
+                 WHERE id = $2 RETURNING *`,
+                [String(err.message).slice(0, 1024), id]
+            );
+            tc = failRes.rows[0];
+        }
+
+        res.json({ success: true, data: tc });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), async (req, res, next) => {
     const client = await pool.connect();
     try {
