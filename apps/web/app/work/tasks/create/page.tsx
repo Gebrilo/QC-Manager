@@ -373,10 +373,13 @@ function CreateForm({
                 actual_effort: data.actual_effort ?? undefined,
                 parent_user_story_id: data.parent_user_story_id || undefined,
             };
-            await fetchApi('/tasks', {
+            const result = await fetchApi<any>('/tasks', {
                 method: 'POST',
                 body: JSON.stringify({ ...payload, temp_id: tempId }),
             });
+            if (result?.sync_status === 'failed') {
+                alert('Task saved locally, but Tuleap sync failed: ' + (result.last_sync_error || 'Unknown error'));
+            }
             router.push('/work/tasks');
             router.refresh();
         } catch (err: any) {
