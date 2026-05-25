@@ -1569,9 +1569,11 @@ const runMigrations = async () => {
             ALTER TABLE bugs
                 ADD COLUMN IF NOT EXISTS environment VARCHAR(20),
                 ADD COLUMN IF NOT EXISTS cc TEXT[],
+                ADD COLUMN IF NOT EXISTS steps_to_reproduce TEXT,
                 ADD COLUMN IF NOT EXISTS dev_fix_description TEXT,
                 ADD COLUMN IF NOT EXISTS qc_verification_notes TEXT,
                 ADD COLUMN IF NOT EXISTS service_name VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS close_date DATE,
                 ADD COLUMN IF NOT EXISTS initial_effort NUMERIC,
                 ADD COLUMN IF NOT EXISTS remaining_effort NUMERIC
         `);
@@ -1587,6 +1589,7 @@ const runMigrations = async () => {
 
         await client.query(`
             ALTER TABLE user_stories
+                ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255),
                 ADD COLUMN IF NOT EXISTS initial_effort NUMERIC,
                 ADD COLUMN IF NOT EXISTS remaining_effort NUMERIC,
                 ADD COLUMN IF NOT EXISTS change_reason TEXT

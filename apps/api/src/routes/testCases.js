@@ -31,6 +31,7 @@ async function tryEmitAndWriteback(testCase, config, mode) {
             preconditions: testCase.preconditions || null,
             test_steps: testCase.test_steps || null,
             expected_result: testCase.expected_result || null,
+            execution_count: testCase.execution_count ?? 0,
         },
         ...(testCase.tuleap_artifact_id ? { tuleap: { artifact_id: testCase.tuleap_artifact_id } } : {}),
     };
