@@ -13,6 +13,8 @@ import {
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { SyncPanel } from '@/components/shared/SyncPanel';
+import { tasksApi } from '@/lib/api';
 import Link from 'next/link';
 
 // ── Status pill config ──────────────────────────────────────────────────────
@@ -255,6 +257,15 @@ export default function TaskDetailPage() {
 
                 {/* Right column (1/3) */}
                 <div className="space-y-5">
+                    <SyncPanel
+                        status={task.sync_status}
+                        lastAttemptedAt={task.last_sync_attempted_at}
+                        error={task.last_sync_error}
+                        tuleapUrl={task.tuleap_url}
+                        artifactType="task"
+                        artifactId={task.id}
+                        onRetry={(id) => tasksApi.sync(id)}
+                    />
 
                     {/* Resources */}
                     <QCCard>
