@@ -2193,7 +2193,7 @@ const runMigrations = async () => {
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
-            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'not_synced'",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'pending'",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_error_message TEXT",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS service_name VARCHAR(100)",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS task_number VARCHAR(50)",
@@ -2222,7 +2222,7 @@ const runMigrations = async () => {
                 END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_sync_status_check') THEN
                     ALTER TABLE test_case ADD CONSTRAINT test_case_sync_status_check
-                        CHECK (sync_status IN ('synced','pending','conflict','error','not_synced'));
+                        CHECK (sync_status IN ('synced','pending','failed','standalone'));
                 END IF;
             END $$;
         `);
@@ -2437,6 +2437,152 @@ const runMigrations = async () => {
         await client.query(`
             ALTER TABLE tuleap_sync_config ADD CONSTRAINT tuleap_sync_config_tracker_type_check
             CHECK (tracker_type IN ('test_case', 'bug', 'task', 'user_story', 'user-story', 'test-case'))
+        `);
+
+        // Migration 035: sync-state columns and canonical bug constraints
+        await client.query(`
+            DO $$
+            DECLARE
+                artifact_table TEXT;
+                has_tuleap_artifact_id BOOLEAN;
+                timestamp_sources TEXT[];
+                timestamp_expr TEXT;
+            BEGIN
+                FOREACH artifact_table IN ARRAY ARRAY['tasks', 'bugs', 'user_stories', 'test_case', 'test_cases']
+                LOOP
+                    IF to_regclass(format('public.%I', artifact_table)) IS NULL THEN
+                        CONTINUE;
+                    END IF;
+
+                    EXECUTE format(
+                        'ALTER TABLE %I
+                            ADD COLUMN IF NOT EXISTS sync_status TEXT DEFAULT ''pending'',
+                            ADD COLUMN IF NOT EXISTS last_sync_attempted_at TIMESTAMPTZ,
+                            ADD COLUMN IF NOT EXISTS last_sync_error TEXT',
+                        artifact_table
+                    );
+
+                    EXECUTE format('ALTER TABLE %I ALTER COLUMN sync_status SET DEFAULT ''pending''', artifact_table);
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = artifact_table
+                          AND column_name = 'tuleap_artifact_id'
+                    ) INTO has_tuleap_artifact_id;
+
+                    IF has_tuleap_artifact_id THEN
+                        timestamp_sources := ARRAY['last_sync_attempted_at'];
+
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = artifact_table
+                              AND column_name = 'last_tuleap_sync'
+                        ) THEN
+                            timestamp_sources := array_append(timestamp_sources, 'last_tuleap_sync');
+                        END IF;
+
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = artifact_table
+                              AND column_name = 'last_sync_at'
+                        ) THEN
+                            timestamp_sources := array_append(timestamp_sources, 'last_sync_at');
+                        END IF;
+
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = artifact_table
+                              AND column_name = 'updated_at'
+                        ) THEN
+                            timestamp_sources := array_append(timestamp_sources, 'updated_at');
+                        END IF;
+
+                        timestamp_expr := array_to_string(timestamp_sources, ', ') || ', NOW()';
+
+                        EXECUTE format(
+                            'UPDATE %I
+                             SET sync_status = ''synced'',
+                                 last_sync_attempted_at = COALESCE(%s),
+                                 last_sync_error = NULL
+                             WHERE tuleap_artifact_id IS NOT NULL',
+                            artifact_table,
+                            timestamp_expr
+                        );
+                    END IF;
+
+                    EXECUTE format(
+                        'UPDATE %I
+                         SET sync_status = ''pending''
+                         WHERE sync_status IS NULL
+                            OR sync_status NOT IN (''synced'',''pending'',''failed'',''standalone'')',
+                        artifact_table
+                    );
+
+                    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', artifact_table, artifact_table || '_sync_status_check');
+                    EXECUTE format(
+                        'ALTER TABLE %I ADD CONSTRAINT %I
+                         CHECK (sync_status IN (''synced'',''pending'',''failed'',''standalone''))',
+                        artifact_table,
+                        artifact_table || '_sync_status_check'
+                    );
+                END LOOP;
+            END $$;
+        `);
+
+        await client.query(`
+            UPDATE bugs
+            SET status = CASE LOWER(TRIM(status))
+                WHEN 'open' THEN 'New'
+                WHEN 'new' THEN 'New'
+                WHEN 'backlog' THEN 'New'
+                WHEN 'in progress' THEN 'In Progress'
+                WHEN 'assigned' THEN 'Assigned'
+                WHEN 'reopened' THEN 'Reopened'
+                WHEN 'blocked' THEN 'Blocked'
+                WHEN 'resolved' THEN 'Fixed'
+                WHEN 'fixed' THEN 'Fixed'
+                WHEN 'verified' THEN 'Verified'
+                WHEN 'duplicate' THEN 'Duplicate'
+                WHEN 'closed' THEN 'Closed'
+                ELSE 'New'
+            END
+            WHERE status IS NULL
+               OR status NOT IN ('New','In Progress','Assigned','Reopened','Blocked','Fixed','Verified','Duplicate','Closed')
+        `);
+
+        await client.query(`
+            UPDATE bugs
+            SET severity = CASE LOWER(TRIM(severity))
+                WHEN 'critical' THEN 'Critical Impact'
+                WHEN 'critical impact' THEN 'Critical Impact'
+                WHEN 'high' THEN 'Major impact'
+                WHEN 'major impact' THEN 'Major impact'
+                WHEN 'medium' THEN 'Minor Impact'
+                WHEN 'minor impact' THEN 'Minor Impact'
+                WHEN 'low' THEN 'Cosmetic impact'
+                WHEN 'cosmetic impact' THEN 'Cosmetic impact'
+                WHEN 'none' THEN 'None'
+                ELSE 'None'
+            END
+            WHERE severity IS NULL
+               OR severity NOT IN ('Critical Impact','Major impact','Minor Impact','Cosmetic impact','None')
+        `);
+
+        await client.query(`ALTER TABLE bugs ALTER COLUMN status SET DEFAULT 'New'`);
+        await client.query(`ALTER TABLE bugs ALTER COLUMN severity SET DEFAULT 'None'`);
+        await client.query(`ALTER TABLE bugs DROP CONSTRAINT IF EXISTS bugs_status_canonical`);
+        await client.query(`
+            ALTER TABLE bugs ADD CONSTRAINT bugs_status_canonical
+            CHECK (status IN ('New','In Progress','Assigned','Reopened','Blocked','Fixed','Verified','Duplicate','Closed'))
+        `);
+        await client.query(`ALTER TABLE bugs DROP CONSTRAINT IF EXISTS bugs_severity_canonical`);
+        await client.query(`
+            ALTER TABLE bugs ADD CONSTRAINT bugs_severity_canonical
+            CHECK (severity IN ('Critical Impact','Major impact','Minor Impact','Cosmetic impact','None'))
         `);
 
         console.log('Database migrations completed successfully');

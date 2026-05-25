@@ -40,15 +40,18 @@ describe('task persister — dispatchAction', () => {
       .mockResolvedValueOnce({ rows: [] })                                    // SELECT deleted (none)
       .mockResolvedValueOnce({ rows: [{ task_id: 'TSK-042' }] })             // generateTaskId
       .mockResolvedValueOnce({ rows: [] })                                    // resolveResourceByName (no match)
-      .mockResolvedValueOnce({ rows: [{ id: 'new-task-uuid', task_id: 'TSK-042', task_name: 'Implement login' }] }); // INSERT
+      .mockResolvedValueOnce({ rows: [{ id: 'new-task-uuid', task_id: 'TSK-042', task_name: 'Implement login', sync_status: 'synced' }] }); // INSERT
 
     const result = await dispatchAction(unified, config, { query });
 
     expect(result.action).toBe('created');
     expect(result.id).toBe('new-task-uuid');
+    expect(result.data.sync_status).toBe('synced');
     const insertCall = query.mock.calls.find(c => /INSERT INTO tasks/i.test(c[0]));
     expect(insertCall).toBeDefined();
     expect(insertCall[0]).toContain('tuleap_artifact_id');
+    expect(insertCall[0]).toContain('sync_status');
+    expect(insertCall[0]).toContain('last_sync_error');
   });
 
   it('updates an existing task by tuleap_artifact_id', async () => {

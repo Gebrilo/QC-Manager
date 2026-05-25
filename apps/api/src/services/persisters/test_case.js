@@ -91,6 +91,9 @@ async function handleSync(unified, config, { query }) {
         priority = COALESCE($4, priority),
         tuleap_url = COALESCE($5, tuleap_url),
         last_tuleap_sync = NOW(),
+        sync_status = 'synced',
+        last_sync_attempted_at = NOW(),
+        last_sync_error = NULL,
         updated_at = NOW()
       WHERE id = $6
       RETURNING *
@@ -121,6 +124,9 @@ async function handleSync(unified, config, { query }) {
         tuleap_url = $5,
         deleted_at = NULL,
         last_tuleap_sync = NOW(),
+        sync_status = 'synced',
+        last_sync_attempted_at = NOW(),
+        last_sync_error = NULL,
         updated_at = NOW()
       WHERE id = $6
       RETURNING *
@@ -145,8 +151,9 @@ async function handleSync(unified, config, { query }) {
     INSERT INTO test_case (
       test_case_id, title, description, status, priority,
       project_id, tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
-      synced_from_tuleap, last_tuleap_sync, pending_links
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), $10)
+      synced_from_tuleap, last_tuleap_sync, pending_links,
+      sync_status, last_sync_attempted_at, last_sync_error
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), $10, 'synced', NOW(), NULL)
     RETURNING *
   `, [
     test_case_id,

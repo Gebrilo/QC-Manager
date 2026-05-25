@@ -56,6 +56,7 @@ describe('bug persister — dispatchAction', () => {
           id: 'new-bug-uuid',
           bug_id: 'TLP-67890',
           title: 'Login crash',
+          sync_status: 'synced',
         }],
       });
 
@@ -63,10 +64,13 @@ describe('bug persister — dispatchAction', () => {
 
     expect(result.action).toBe('created');
     expect(result.id).toBe('new-bug-uuid');
+    expect(result.data.sync_status).toBe('synced');
     expect(resolveLinks).toHaveBeenCalledTimes(1);
 
     const insertCall = query.mock.calls.find(c => /INSERT INTO bugs/i.test(c[0]));
     expect(insertCall).toBeDefined();
+    expect(insertCall[0]).toContain('sync_status');
+    expect(insertCall[0]).toContain("last_sync_error");
     expect(insertCall[1]).toContain('TLP-67890');
   });
 

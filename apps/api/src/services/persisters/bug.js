@@ -121,8 +121,9 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       linked_test_case_ids, assigned_to, reported_by,
       reported_date, last_sync_at, raw_tuleap_payload, source,
       owner_resource_id, pending_links, environment, service_name,
-      dev_fix_description, qc_verification_notes, initial_effort, remaining_effort, cc
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+      dev_fix_description, qc_verification_notes, initial_effort, remaining_effort, cc,
+      sync_status, last_sync_attempted_at, last_sync_error
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,'synced',NOW(),NULL)
     RETURNING *`,
     [
       tuleapArtifactId,
@@ -194,6 +195,9 @@ async function updateBug(bugId, unified, config, projectId, source, resolvedTest
       remaining_effort = COALESCE($16, remaining_effort),
       cc = COALESCE($17, cc),
       last_sync_at = NOW(),
+      sync_status = 'synced',
+      last_sync_attempted_at = NOW(),
+      last_sync_error = NULL,
       updated_at = NOW(),
       deleted_at = NULL,
       pending_links = '[]'::jsonb,

@@ -38,15 +38,18 @@ describe('test_case persister — dispatchAction', () => {
     query
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 'new-tc-uuid', test_case_id: 'TC-001', title: 'Login test' }] });
+      .mockResolvedValueOnce({ rows: [{ next_id: 'TC-001' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'new-tc-uuid', test_case_id: 'TC-001', title: 'Login test', sync_status: 'synced' }] });
 
     const result = await dispatchAction(unified, config, { query });
 
     expect(result.action).toBe('created');
     expect(result.id).toBe('new-tc-uuid');
+    expect(result.data.sync_status).toBe('synced');
     const insertCall = query.mock.calls.find(c => /INSERT INTO test_case/i.test(c[0]));
     expect(insertCall).toBeDefined();
+    expect(insertCall[0]).toContain('sync_status');
+    expect(insertCall[0]).toContain('last_sync_error');
   });
 
   it('updates an existing test case by tuleap_artifact_id', async () => {
@@ -158,7 +161,7 @@ describe('test_case persister — dispatchAction', () => {
     query
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ next_id: 'TC-001' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'new-tc', tuleap_artifact_id: 6060 }] });
 
     await dispatchAction(unified, config, { query });

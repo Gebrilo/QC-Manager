@@ -201,6 +201,9 @@ async function handleSync(unified, config, { query }) {
         parent_story_tuleap_artifact_id = CASE WHEN $6::integer IS NOT NULL THEN $6 ELSE parent_story_tuleap_artifact_id END,
         parent_user_story_id = CASE WHEN $7::uuid IS NOT NULL THEN $7 ELSE parent_user_story_id END,
         last_tuleap_sync = NOW(),
+        sync_status = 'synced',
+        last_sync_attempted_at = NOW(),
+        last_sync_error = NULL,
         updated_at = NOW()
       WHERE id = $8
       RETURNING *
@@ -240,6 +243,9 @@ async function handleSync(unified, config, { query }) {
         parent_story_tuleap_artifact_id = $6,
         parent_user_story_id = $7,
         last_tuleap_sync = NOW(),
+        sync_status = 'synced',
+        last_sync_attempted_at = NOW(),
+        last_sync_error = NULL,
         updated_at = NOW()
       WHERE id = $8
       RETURNING *
@@ -267,8 +273,9 @@ async function handleSync(unified, config, { query }) {
       task_id, task_name, notes, status,
       project_id, resource1_id,
       tuleap_artifact_id, tuleap_url, synced_from_tuleap, last_tuleap_sync,
-      parent_story_id, parent_story_tuleap_artifact_id, parent_user_story_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10)
+      parent_story_id, parent_story_tuleap_artifact_id, parent_user_story_id,
+      sync_status, last_sync_attempted_at, last_sync_error
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10, 'synced', NOW(), NULL)
     RETURNING *
   `, [
     task_id, common.title, common.description || '', normalizeTaskStatus(common.status),

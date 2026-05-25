@@ -51,15 +51,18 @@ describe('user_story persister — dispatchAction', () => {
     query
       .mockResolvedValueOnce({ rows: [] }) // SELECT live (none)
       .mockResolvedValueOnce({ rows: [] }) // SELECT deleted (none)
-      .mockResolvedValueOnce({ rows: [{ id: 'new-us-uuid', tuleap_artifact_id: 5001, title: 'New story' }] }); // INSERT
+      .mockResolvedValueOnce({ rows: [{ id: 'new-us-uuid', tuleap_artifact_id: 5001, title: 'New story', sync_status: 'synced' }] }); // INSERT
 
     const result = await dispatchAction(unified, config, { query });
 
     expect(result.action).toBe('created');
     expect(result.id).toBe('new-us-uuid');
+    expect(result.data.sync_status).toBe('synced');
     const insertCall = query.mock.calls.find(c => /INSERT INTO user_stories/i.test(c[0]));
     expect(insertCall).toBeDefined();
     expect(insertCall[0]).toContain('tuleap_artifact_id');
+    expect(insertCall[0]).toContain('sync_status');
+    expect(insertCall[0]).toContain('last_sync_error');
   });
 
   it('updates an existing user story by tuleap_artifact_id', async () => {

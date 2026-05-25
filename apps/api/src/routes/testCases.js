@@ -154,7 +154,7 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
                 priority, severity, test_type, category, component, automation_status, status,
                 estimated_duration_minutes, tags, project_id, assigned_to,
                 linked_requirement_id, linked_bug_ids, created_by, updated_by, sync_status)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'not_synced')
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending')
             RETURNING *`,
             [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
              validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
