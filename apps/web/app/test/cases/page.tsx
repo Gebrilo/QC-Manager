@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { TestCase, TestCaseListResponse } from '@/types';
 import { testCasesApi, projectsApi, type Project } from '@/lib/api';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { SyncBadge } from '@/components/shared/SyncBadge';
 import { stripHtml } from '@/lib/stripHtml';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -91,7 +92,7 @@ export default function TestCasesPage() {
     const [sortBy] = useState('created_at');
     const [sortOrder] = useState<'asc' | 'desc'>('desc');
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({ sync_status: false });
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
@@ -145,12 +146,19 @@ export default function TestCasesPage() {
             header: 'ID',
             enableHiding: false,
             cell: (info) => (
-                <Link
-                    href={`/test/cases/${info.row.original.id}`}
-                    className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
-                >
-                    {info.getValue()}
-                </Link>
+                <div className="flex items-center">
+                    <Link
+                        href={`/test/cases/${info.row.original.id}`}
+                        className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
+                    >
+                        {info.getValue()}
+                    </Link>
+                    <SyncBadge
+                        status={info.row.original.sync_status}
+                        lastAttemptedAt={info.row.original.last_sync_attempted_at}
+                        error={info.row.original.last_sync_error}
+                    />
+                </div>
             ),
         }),
         columnHelper.accessor('title', {
@@ -209,18 +217,6 @@ export default function TestCasesPage() {
                     <Pill tone={RESULT_PILL[v] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}>{v}</Pill>
                 ) : (
                     <span className="text-xs text-slate-400">Never run</span>
-                );
-            },
-        }),
-        columnHelper.accessor('sync_status', {
-            id: 'sync_status',
-            header: 'Sync',
-            cell: (info) => {
-                const v = info.getValue();
-                return v && v !== 'not_synced' ? (
-                    <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{v}</span>
-                ) : (
-                    <span className="text-xs text-slate-400">—</span>
                 );
             },
         }),
