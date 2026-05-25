@@ -7,6 +7,8 @@ const { requireAuth, requirePermission } = require('../middleware/authMiddleware
 const { emitToTuleap: emitBug } = require('../services/emitters/bug');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+const { createBugSchema, updateBugSchema } = require('../schemas/bug');
+const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
@@ -35,6 +37,61 @@ async function replaceBugLinks(bugId, { linked_test_execution_ids, linked_task_i
             );
         }
     }
+}
+
+async function resolveBugSyncConfig(projectId) {
+    const result = await pool.query(
+        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,
+        [projectId]
+    );
+    return result.rows[0] || null;
+}
+
+async function tryEmitAndWriteback(bug, data, config, mode) {
+    const unified = {
+        artifact_type: 'bug',
+        project_id: bug.project_id,
+        common: {
+            title: bug.title,
+            description: bug.description,
+            status: bug.status,
+            assigned_to: bug.assigned_to,
+            priority: bug.priority,
+        },
+        fields: {
+            severity: bug.severity,
+            environment: bug.environment,
+            service_name: bug.service_name,
+            steps_to_reproduce: bug.steps_to_reproduce,
+            dev_fix_description: bug.dev_fix_description,
+            qc_verification_notes: bug.qc_verification_notes,
+            close_date: bug.close_date,
+            cc: bug.cc,
+            linked_test_case_ids: bug.linked_test_case_ids,
+            initial_effort: bug.initial_effort,
+            remaining_effort: bug.remaining_effort,
+        },
+        ...(bug.tuleap_artifact_id ? { tuleap: { artifact_id: bug.tuleap_artifact_id } } : {}),
+    };
+
+    const emitDeps = { client: defaultClient, registry: defaultRegistry };
+
+    const emitResult = await emitBug(unified, config, mode, emitDeps);
+
+    const updateRes = await pool.query(
+        `UPDATE bugs SET
+            sync_status = 'synced',
+            tuleap_artifact_id = COALESCE($1, tuleap_artifact_id),
+            tuleap_url = COALESCE($2, tuleap_url),
+            tuleap_tracker_id = COALESCE($3, tuleap_tracker_id),
+            last_sync_attempted_at = NOW(),
+            last_sync_error = NULL,
+            updated_at = NOW()
+         WHERE id = $4
+         RETURNING *`,
+        [emitResult.tuleap_artifact_id || null, emitResult.tuleap_url || null, config.tuleap_tracker_id, bug.id]
+    );
+    return updateRes.rows[0];
 }
 
 router.get('/summary', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
@@ -298,66 +355,85 @@ router.get('/by-project/:projectId', requireAuth, requirePermission('qc.bugs.vie
 
 router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, res) => {
     try {
-        const {
-            tuleap_artifact_id,
-            tuleap_tracker_id,
-            tuleap_url,
-            bug_id,
-            title,
-            description,
-            status = 'New',
-            severity = 'None',
-            priority = 'medium',
-            bug_type,
-            component,
-            project_id,
-            linked_test_case_ids = [],
-            linked_test_execution_ids = [],
-            linked_task_ids = [],
-            reported_by,
-            assigned_to,
-            reported_date,
-            raw_tuleap_payload,
-            source,
-            triage_status
-        } = req.body;
+        const parsed = createBugSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+        const data = parsed.data;
 
-        const finalBugId = bug_id || (tuleap_artifact_id ? `TLP-${tuleap_artifact_id}` : `BUG-${Date.now().toString(36).toUpperCase()}`);
-        const computedSource = (linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0)
-            ? 'TEST_CASE'
-            : 'EXPLORATORY';
-        const finalSource = source || computedSource;
-        const finalTriageStatus = triage_status || (
-            linked_test_case_ids.length > 0 || linked_test_execution_ids.length > 0 || linked_task_ids.length > 0
-                ? 'triaged'
-                : 'untriaged'
+        const normalizedStatus = normalizeBugStatus(data.status);
+        const normalizedSeverity = normalizeBugSeverity(data.severity);
+
+        const bugId = `BUG-${Date.now().toString(36).toUpperCase()}`;
+        const computedSource = data.source || (
+            (data.linked_test_case_ids?.length > 0 || data.linked_test_execution_ids?.length > 0)
+                ? 'TEST_CASE' : 'EXPLORATORY'
+        );
+        const computedTriage = data.triage_status || (
+            (data.linked_test_case_ids?.length > 0 || data.linked_test_execution_ids?.length > 0 || data.linked_task_ids?.length > 0)
+                ? 'triaged' : 'untriaged'
         );
 
-        const query = `
+        const result = await pool.query(`
             INSERT INTO bugs (
-                tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
                 bug_id, title, description, status, severity, priority,
-                bug_type, component, project_id,
-                linked_test_case_ids, linked_test_execution_ids,
-                reported_by, assigned_to, reported_date, raw_tuleap_payload, source, triage_status
+                project_id, assigned_to, environment, service_name,
+                source, triage_status, bug_type, component,
+                steps_to_reproduce, dev_fix_description, qc_verification_notes,
+                close_date, cc, linked_test_case_ids, linked_test_execution_ids,
+                reported_by, reported_date,
+                sync_status
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+                $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+                $21,$22,'pending'
             )
             RETURNING *
-        `;
+        `, [
+            bugId, data.title, data.description, normalizedStatus, normalizedSeverity, data.priority,
+            data.project_id, data.assigned_to, data.environment, data.service_name,
+            computedSource, computedTriage, data.bug_type, data.component,
+            data.steps_to_reproduce, data.dev_fix_description, data.qc_verification_notes,
+            data.close_date, data.cc, data.linked_test_case_ids, data.linked_test_execution_ids,
+            data.reported_by, data.reported_date || new Date(),
+        ]);
+        let bug = result.rows[0];
 
-        const values = [
-            tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
-            finalBugId, title, description, status, severity, priority,
-            bug_type, component, project_id,
-            linked_test_case_ids, linked_test_execution_ids,
-            reported_by, assigned_to, reported_date || new Date(), raw_tuleap_payload, finalSource, finalTriageStatus
-        ];
+        await replaceBugLinks(bug.id, data);
 
-        const result = await pool.query(query, values);
-        const bug = result.rows[0];
-        await replaceBugLinks(bug.id, { linked_test_execution_ids, linked_task_ids });
+        const config = await resolveBugSyncConfig(data.project_id);
+
+        if (config) {
+            try {
+                bug = await tryEmitAndWriteback(bug, data, config, 'create');
+            } catch (err) {
+                console.error(`[route:bugs:create] emit_failed bug_id=${bug.id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE bugs SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), bug.id]
+                );
+                bug = failRes.rows[0];
+            }
+        } else {
+            const standaloneRes = await pool.query(
+                `UPDATE bugs SET sync_status = 'standalone' WHERE id = $1 RETURNING *`,
+                [bug.id]
+            );
+            bug = standaloneRes.rows[0];
+        }
+
+        if (data.temp_id && bug.id) {
+            try {
+                const { adoptStagedAttachments } = require('./artifactAttachments');
+                await adoptStagedAttachments('bug', bug.id, data.temp_id, req.user?.id);
+            } catch (err) {
+                console.error('[attachments:adopt] bug-local', err.message);
+            }
+        }
 
         await auditLog('bugs', bug.id, 'CREATE', bug, null);
 
@@ -397,6 +473,16 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
         }
         const original = originalRes.rows[0];
 
+        const parsed = updateBugSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+        const data = parsed.data;
+
         const allowedFields = [
             'title', 'description', 'status', 'severity', 'priority',
             'bug_type', 'component', 'assigned_to', 'updated_by',
@@ -412,32 +498,53 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
         let idx = 1;
 
         for (const field of allowedFields) {
-            if (req.body[field] !== undefined) {
+            if (data[field] !== undefined) {
+                let val = data[field];
+                if (field === 'status') val = normalizeBugStatus(val);
+                if (field === 'severity') val = normalizeBugSeverity(val);
                 fields.push(`${field} = $${idx}`);
-                values.push(req.body[field]);
+                values.push(val);
                 idx++;
             }
         }
 
         if (fields.length === 0) {
             await replaceBugLinks(id, {
-                linked_test_execution_ids: req.body.linked_test_execution_ids,
-                linked_task_ids: req.body.linked_task_ids,
+                linked_test_execution_ids: data.linked_test_execution_ids,
+                linked_task_ids: data.linked_task_ids,
             });
             return res.json({ success: true, data: original });
         }
 
         fields.push('updated_at = NOW()');
-        fields.push('last_sync_at = NOW()');
+        fields.push('sync_status = \'pending\'');
+        fields.push('last_sync_attempted_at = NULL');
+        fields.push('last_sync_error = NULL');
         values.push(id);
 
         const query = `UPDATE bugs SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         const result = await pool.query(query, values);
-        const updated = result.rows[0];
+        let updated = result.rows[0];
+
         await replaceBugLinks(id, {
-            linked_test_execution_ids: req.body.linked_test_execution_ids,
-            linked_task_ids: req.body.linked_task_ids,
+            linked_test_execution_ids: data.linked_test_execution_ids,
+            linked_task_ids: data.linked_task_ids,
         });
+
+        const config = await resolveBugSyncConfig(updated.project_id);
+        if (config) {
+            try {
+                const mode = updated.tuleap_artifact_id ? 'update' : 'create';
+                updated = await tryEmitAndWriteback(updated, data, config, mode);
+            } catch (err) {
+                console.error(`[route:bugs:patch] emit_failed bug_id=${id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE bugs SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), id]
+                );
+                updated = failRes.rows[0];
+            }
+        }
 
         await auditLog('bugs', id, 'UPDATE', updated, original);
 
@@ -450,6 +557,53 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
         res.status(500).json({
             success: false,
             error: 'Failed to update bug',
+            message: error.message
+        });
+    }
+});
+
+router.post('/:id/sync', requireAuth, requirePermission('qc.bugs.edit'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const bugRes = await pool.query('SELECT * FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (bugRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Bug not found' });
+        }
+        let bug = bugRes.rows[0];
+
+        const config = await resolveBugSyncConfig(bug.project_id);
+        if (!config) {
+            const standaloneRes = await pool.query(
+                `UPDATE bugs SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+                [id]
+            );
+            return res.json({ success: true, data: standaloneRes.rows[0] });
+        }
+
+        await pool.query(
+            `UPDATE bugs SET sync_status = 'pending', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+
+        try {
+            const mode = bug.tuleap_artifact_id ? 'update' : 'create';
+            bug = await tryEmitAndWriteback(bug, {}, config, mode);
+        } catch (err) {
+            console.error(`[route:bugs:sync] emit_failed bug_id=${id} err="${err.message}"`);
+            const failRes = await pool.query(
+                `UPDATE bugs SET sync_status = 'failed', last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                [String(err.message).slice(0, 1024), id]
+            );
+            bug = failRes.rows[0];
+        }
+
+        res.json({ success: true, data: bug });
+    } catch (error) {
+        console.error('Error syncing bug:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to sync bug',
             message: error.message
         });
     }

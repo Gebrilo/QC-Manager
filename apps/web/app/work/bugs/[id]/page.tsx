@@ -13,6 +13,7 @@ import {
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { stripHtml } from '@/lib/stripHtml';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { SyncPanel } from '@/components/shared/SyncPanel';
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
     New: 'info',
@@ -298,6 +299,15 @@ export default function BugDetailPage() {
                     </div>
                 )}
             </div>
+
+            <SyncPanel
+                status={bug.sync_status}
+                lastAttemptedAt={bug.last_sync_attempted_at}
+                error={bug.last_sync_error}
+                tuleapUrl={bug.tuleap_url}
+                artifactType="bug"
+                artifactId={bug.id}
+            />
 
             <div className="space-y-4">
                 {sections.map(section => (

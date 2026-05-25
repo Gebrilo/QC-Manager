@@ -7,6 +7,7 @@ import { bugsApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { SyncBadge } from '@/components/shared/SyncBadge';
 import {
     useReactTable,
     getCoreRowModel,
@@ -240,6 +241,11 @@ function BugsContent() {
                     {info.row.original.tuleap_artifact_id
                         ? `TLP-${info.row.original.tuleap_artifact_id}`
                         : info.getValue()}
+                    <SyncBadge
+                        status={info.row.original.sync_status}
+                        lastAttemptedAt={info.row.original.last_sync_attempted_at}
+                        error={info.row.original.last_sync_error}
+                    />
                 </Link>
             ),
         }),

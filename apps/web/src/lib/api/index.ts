@@ -347,6 +347,9 @@ export interface Bug {
     last_sync_at?: string;
     created_at?: string;
     updated_at?: string;
+    sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
 }
 
 export interface UserStory {
@@ -387,6 +390,15 @@ export const bugsApi = {
             by_project: any[];
             recent_bugs: Bug[];
         } }>(`/bugs/summary${project_id ? `?project_id=${project_id}` : ''}`),
+
+    create: (data: Record<string, unknown>) =>
+        fetchApi<{ success: boolean; data: Bug }>(`/bugs`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    sync: (id: string) =>
+        fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}/sync`, { method: 'POST' }),
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: Bug }>(`/bugs/${id}`, { method: 'DELETE' }),

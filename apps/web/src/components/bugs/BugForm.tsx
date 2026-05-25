@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { tuleapApi, projectsApi, type Project } from '@/lib/api';
+import { tuleapApi, bugsApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
@@ -403,6 +403,8 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
 
     const currentStatus = watch('status') || (initialData?.status as string) || 'New';
 
+    const [showSyncToast, setShowSyncToast] = useState<string | null>(null);
+
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         setError(null);
@@ -413,39 +415,48 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                 return;
             }
             const payload = {
-                artifact_type: 'bug' as const,
+                title: data.title,
+                description: data.description || undefined,
+                status: data.status,
+                severity: data.severity,
+                priority: data.severity,
+                assigned_to: data.assigned_to || null,
                 project_id: selectedProjectId,
-                common: {
-                    title: data.title,
-                    description: data.description || undefined,
-                    status: data.status,
-                    assigned_to: data.assigned_to || null,
-                    priority: data.severity,
-                },
-                fields: {
-                    severity: data.severity,
-                    environment: data.environment,
-                    service_name: data.service_name || undefined,
-                    steps_to_reproduce: data.steps_to_reproduce || undefined,
-                    dev_fix_description: data.dev_fix_description || undefined,
-                    qc_verification_notes: data.qc_verification_notes || undefined,
-                    close_date: data.close_date || null,
-                    cc: data.cc ? data.cc.split(',').map(s => s.trim()).filter(Boolean) : undefined,
-                    linked_test_case_ids: data.linked_test_case_ids
-                        ? data.linked_test_case_ids.split(',').map(s => s.trim()).filter(Boolean)
-                        : undefined,
-                    initial_effort: data.initial_effort ?? null,
-                    remaining_effort: data.remaining_effort ?? null,
-                },
+                environment: data.environment,
+                service_name: data.service_name || undefined,
+                steps_to_reproduce: data.steps_to_reproduce || undefined,
+                dev_fix_description: data.dev_fix_description || undefined,
+                qc_verification_notes: data.qc_verification_notes || undefined,
+                close_date: data.close_date || null,
+                cc: data.cc ? data.cc.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                linked_test_case_ids: data.linked_test_case_ids
+                    ? data.linked_test_case_ids.split(',').map(s => s.trim()).filter(Boolean)
+                    : [],
+                initial_effort: data.initial_effort ?? null,
+                remaining_effort: data.remaining_effort ?? null,
+                temp_id: tempId,
             };
 
             if (isEdit && artifactId) {
-                await tuleapApi.updateUnified(artifactId, payload);
+                await tuleapApi.updateUnified(artifactId, {
+                    artifact_type: 'bug' as const,
+                    project_id: selectedProjectId,
+                    common: { title: data.title, description: data.description, status: data.status, assigned_to: data.assigned_to || null, priority: data.severity },
+                    fields: { severity: data.severity, environment: data.environment, service_name: data.service_name, steps_to_reproduce: data.steps_to_reproduce, dev_fix_description: data.dev_fix_description, qc_verification_notes: data.qc_verification_notes, close_date: data.close_date || null, cc: data.cc ? data.cc.split(',').map(s => s.trim()).filter(Boolean) : undefined, linked_test_case_ids: data.linked_test_case_ids ? data.linked_test_case_ids.split(',').map(s => s.trim()).filter(Boolean) : undefined, initial_effort: data.initial_effort ?? null, remaining_effort: data.remaining_effort ?? null },
+                });
                 router.push(`/work/bugs/${bugUUID || artifactId}`);
             } else {
-                const result = await tuleapApi.createUnified({ ...payload, temp_id: tempId });
-                if (result.tuleap_warning) console.warn('Tuleap sync skipped:', result.tuleap_warning);
-                router.push(result.qc_id ? `/work/bugs/${result.qc_id}` : '/work/bugs');
+                const result = await bugsApi.create(payload);
+                const bugData = result.data;
+                if (bugData?.sync_status === 'failed') {
+                    setShowSyncToast(bugData.last_sync_error || 'Tuleap sync failed. You can retry from the artifact detail page.');
+                }
+                const targetId = bugData?.id;
+                if (showSyncToast) {
+                    setTimeout(() => router.push(targetId ? `/work/bugs/${targetId}` : '/work/bugs'), 3000);
+                } else {
+                    router.push(targetId ? `/work/bugs/${targetId}` : '/work/bugs');
+                }
             }
             router.refresh();
         } catch (err: any) {
@@ -489,6 +500,17 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="max-w-[1400px] mx-auto px-6 py-6">
+            {showSyncToast && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Saved locally. Tuleap sync failed.</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{showSyncToast}</p>
+                    </div>
+                </div>
+            )}
             {/* ── Header ──────────────────────────────────────────────────── */}
             <div className="flex items-start justify-between mb-6 gap-6">
                 <div className="flex items-start gap-3 min-w-0">
