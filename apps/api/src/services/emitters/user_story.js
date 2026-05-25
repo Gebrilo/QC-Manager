@@ -20,6 +20,7 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'upd
     } catch {
       continue;
     }
+    if (field.type === 'fieldset') continue;
 
     if (Array.isArray(field.permissions) && field.permissions.length > 0 && !field.permissions.includes(requiredPermission)) {
       console.log(`[emit:user_story] skip field '${tuleapFieldName}' — no '${requiredPermission}' permission`);
@@ -30,12 +31,27 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'upd
     if (['sb', 'rb', 'msb', 'cb'].includes(field.type)) {
       if (fieldValue === '') continue;
       if (Array.isArray(fieldValue)) {
-        const boundIds = await Promise.all(
-          fieldValue.map(v => registry.resolveBindValue(trackerId, tuleapFieldName, v).then(b => b.id))
-        );
+        const boundIds = [];
+        for (const value of fieldValue) {
+          try {
+            const bound = await registry.resolveBindValue(trackerId, tuleapFieldName, value);
+            boundIds.push(bound.id);
+          } catch (err) {
+            if (field.required) throw err;
+            console.log(`[emit:user_story] skip optional bind '${value}' for '${tuleapFieldName}' — ${err.message}`);
+          }
+        }
+        if (boundIds.length === 0) continue;
         shape = { bind_value_ids: boundIds };
       } else {
-        const bound = await registry.resolveBindValue(trackerId, tuleapFieldName, fieldValue);
+        let bound;
+        try {
+          bound = await registry.resolveBindValue(trackerId, tuleapFieldName, fieldValue);
+        } catch (err) {
+          if (field.required) throw err;
+          console.log(`[emit:user_story] skip optional bind '${fieldValue}' for '${tuleapFieldName}' — ${err.message}`);
+          continue;
+        }
         shape = { bind_value_ids: [bound.id] };
       }
     } else if (field.type === 'art_link') {

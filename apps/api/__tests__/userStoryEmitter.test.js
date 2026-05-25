@@ -210,6 +210,33 @@ describe('user_story emitter — emitToTuleap', () => {
     expect(payload.values.every(v => v.field_id !== 203)).toBe(true);
   });
 
+  it('skips invalid optional bind values instead of failing the create', async () => {
+    const unified = {
+      artifact_type: 'user_story',
+      project_id: 'proj-1',
+      common: { title: 'Story', status: 'Draft', priority: 'None' },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'priority') return { field_id: 298, name: 'priority', type: 'sb', required: false, permissions: ['read', 'update', 'create'] };
+      if (fn === 'status') return { field_id: 200, name: 'status', type: 'sb', required: true, permissions: ['read', 'update', 'create'] };
+      return { field_id: 999, name: fn, type: 'string', permissions: ['read', 'update', 'create'] };
+    });
+    defaultRegistry.resolveBindValue.mockImplementation(async (tid, fn, label) => {
+      if (fn === 'priority' && label === 'None') throw new Error("Bind value 'None' not found for field 'priority'");
+      return { id: 700 };
+    });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 5095 } });
+
+    await expect(
+      emitToTuleap(unified, config, 'create', { client: defaultClient, registry: defaultRegistry })
+    ).resolves.toBeDefined();
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values.every(v => v.field_id !== 298)).toBe(true);
+  });
+
   it('sends Summary (story_title) with the QC title as the {value} for the string field', async () => {
     const unified = {
       artifact_type: 'user_story',

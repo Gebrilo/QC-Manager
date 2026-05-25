@@ -19,6 +19,7 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
     } catch {
       continue;
     }
+    if (field.type === 'fieldset') continue;
 
     let shape;
     if (['sb', 'rb', 'msb', 'cb'].includes(field.type)) {

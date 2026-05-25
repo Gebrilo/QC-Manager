@@ -121,4 +121,31 @@ describe('task emitter — emitToTuleap', () => {
 
     expect(defaultRegistry.resolveBindValue).toHaveBeenCalledWith(5, 'status', 'Todo');
   });
+
+  it('skips Tuleap fieldsets instead of writing them as artifact values', async () => {
+    const configWithDescriptionMapping = {
+      ...config,
+      artifact_fields: { description: 'description' },
+    };
+
+    const unified = {
+      artifact_type: 'task',
+      project_id: 'proj-1',
+      common: { title: 'Task', description: 'Details', status: 'Backlog' },
+      fields: {},
+    };
+
+    defaultRegistry.getField.mockImplementation(async (tid, fn) => {
+      if (fn === 'description') return { field_id: 202, name: 'description', type: 'fieldset' };
+      if (fn === 'status') return { field_id: 104, name: 'status', type: 'sb' };
+      return { field_id: 100, name: fn, type: 'string' };
+    });
+    defaultRegistry.resolveBindValue.mockResolvedValue({ id: 600 });
+    defaultClient.post.mockResolvedValueOnce({ data: { id: 77778 } });
+
+    await emitToTuleap(unified, configWithDescriptionMapping, 'create', { client: defaultClient, registry: defaultRegistry });
+
+    const payload = defaultClient.post.mock.calls[0][1];
+    expect(payload.values.find(v => v.field_id === 202)).toBeUndefined();
+  });
 });
