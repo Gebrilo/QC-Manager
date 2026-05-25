@@ -527,6 +527,48 @@ router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req
     }
 });
 
+router.post('/:id/sync', requireAuth, requirePermission('qc.tasks.edit'), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const taskRes = await db.query('SELECT * FROM tasks WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (taskRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Task not found' });
+        }
+        let task = taskRes.rows[0];
+
+        const config = await resolveTaskSyncConfig(task.project_id);
+        if (!config) {
+            const standaloneRes = await db.query(
+                `UPDATE tasks SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+                [id]
+            );
+            return res.json({ success: true, data: standaloneRes.rows[0] });
+        }
+
+        await db.query(
+            `UPDATE tasks SET sync_status = 'pending', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+
+        try {
+            const mode = task.tuleap_artifact_id ? 'update' : 'create';
+            task = await tryEmitAndWriteback(task, config, mode);
+        } catch (err) {
+            console.error(`[route:tasks:sync] emit_failed task_id=${id} err="${err.message}"`);
+            const failRes = await db.query(
+                `UPDATE tasks SET sync_status = 'failed', last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                [String(err.message).slice(0, 1024), id]
+            );
+            task = failRes.rows[0];
+        }
+
+        res.json({ success: true, data: task });
+    } catch (error) {
+        console.error('Error syncing task:', error);
+        res.status(500).json({ success: false, error: 'Failed to sync task', message: error.message });
+    }
+});
+
 // DELETE soft delete task — enforce team scope
 router.delete('/:id', requireAuth, requirePermission('qc.tasks.delete'), async (req, res, next) => {
     try {
