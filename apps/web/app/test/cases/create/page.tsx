@@ -207,6 +207,7 @@ export default function CreateTestCasePage() {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [showSyncToast, setShowSyncToast] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
     const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
 
@@ -280,9 +281,20 @@ export default function CreateTestCasePage() {
                 assigned_to: data.assigned_to || undefined,
                 linked_requirement_id: data.linked_requirement_id || undefined,
             };
-            await testCasesApi.create(payload as any);
-            router.push('/test/cases');
-            router.refresh();
+            const created = await testCasesApi.create(payload as any);
+            const syncFailed = (created as any)?.sync_status === 'failed';
+            if (syncFailed) {
+                setShowSyncToast((created as any)?.last_sync_error || 'Tuleap sync failed. You can retry from the test case detail page.');
+                setTimeout(() => {
+                    const targetId = (created as any)?.id;
+                    router.push(targetId ? `/test/cases/${targetId}` : '/test/cases');
+                    router.refresh();
+                }, 3000);
+            } else {
+                const targetId = (created as any)?.id;
+                router.push(targetId ? `/test/cases/${targetId}` : '/test/cases');
+                router.refresh();
+            }
         } catch (err: any) {
             setSubmitError(err.message || 'Failed to create test case');
         } finally {
@@ -302,6 +314,18 @@ export default function CreateTestCasePage() {
 
     return (
         <form onSubmit={handleSubmit(onSubmit) as any} className="max-w-[1400px] mx-auto px-6 py-6">
+
+            {showSyncToast && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Saved locally. Tuleap sync failed.</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{showSyncToast}</p>
+                    </div>
+                </div>
+            )}
 
             {/* ── Header ──────────────────────────────────────────────── */}
             <div className="flex items-start justify-between mb-6 gap-6">
