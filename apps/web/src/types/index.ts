@@ -117,6 +117,9 @@ export interface Task {
     tags?: string[];
     notes?: string;
     tuleap_url?: string;
+    sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
 
     // Joined fields from API View
     project_name?: string;

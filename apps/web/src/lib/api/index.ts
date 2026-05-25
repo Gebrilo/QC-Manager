@@ -131,6 +131,9 @@ export interface Task {
     completed_date?: string;
     tags?: string[];
     notes?: string;
+    sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
     created_at?: string;
     updated_at?: string;
 }
@@ -257,6 +260,9 @@ export const tasksApi = {
         fetchApi<{ success: boolean; message: string }>(`/tasks/${id}`, {
             method: 'DELETE',
         }),
+
+    sync: (id: string) =>
+        fetchApi<{ success: boolean; data: Task }>(`/tasks/${id}/sync`, { method: 'POST' }),
 };
 
 // ============================================================================
@@ -366,6 +372,9 @@ export interface UserStory {
     tuleap_url?: string;
     created_at?: string;
     updated_at?: string;
+    sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    last_sync_attempted_at?: string | null;
+    last_sync_error?: string | null;
 }
 
 export const bugsApi = {
@@ -418,6 +427,21 @@ export const userStoriesApi = {
 
     get: (id: string) =>
         fetchApi<UserStory>(`/user-stories/${id}`),
+
+    create: (data: Record<string, unknown>) =>
+        fetchApi<{ success: boolean; data: UserStory }>(`/user-stories`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    update: (id: string, data: Record<string, unknown>) =>
+        fetchApi<{ success: boolean; data: UserStory }>(`/user-stories/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+    sync: (id: string) =>
+        fetchApi<{ success: boolean; data: UserStory }>(`/user-stories/${id}/sync`, { method: 'POST' }),
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: UserStory }>(`/user-stories/${id}`, { method: 'DELETE' }),
