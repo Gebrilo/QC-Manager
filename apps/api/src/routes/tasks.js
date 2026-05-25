@@ -23,6 +23,59 @@ async function getUserResourceId(userId) {
     return result.rows.length > 0 ? result.rows[0].id : null;
 }
 
+async function resolveTaskSyncConfig(projectId) {
+    const result = await db.query(
+        `SELECT * FROM tuleap_sync_config WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,
+        [projectId]
+    );
+    return result.rows[0] || null;
+}
+
+async function tryEmitAndWriteback(task, config, mode) {
+    const tuleapAssignedTo = await (async () => {
+        const resourceId = task.resource1_id || task.resource1_uuid;
+        if (!resourceId) return null;
+        const r = await db.query('SELECT tuleap_username FROM resources WHERE id = $1', [resourceId]);
+        return r.rows[0]?.tuleap_username || null;
+    })();
+
+    const unified = {
+        artifact_type: 'task',
+        project_id: task.project_id,
+        common: {
+            title: task.task_name,
+            description: task.notes || task.description || null,
+            status: task.status,
+            assigned_to: tuleapAssignedTo,
+        },
+        fields: {},
+        ...(task.tuleap_artifact_id ? { tuleap: { artifact_id: task.tuleap_artifact_id } } : {}),
+    };
+
+    const emitDeps = { client: defaultClient, registry: defaultRegistry, query: db.query.bind(db) };
+
+    const emitResult = await emitTask(unified, config, mode, { ...emitDeps, skipPersist: true });
+
+    const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
+    const updateRes = await db.query(
+        `UPDATE tasks SET
+            sync_status = 'synced',
+            tuleap_artifact_id = COALESCE($1, tuleap_artifact_id),
+            tuleap_url = COALESCE($2, tuleap_url),
+            last_sync_attempted_at = NOW(),
+            last_sync_error = NULL,
+            updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [
+            emitResult.tuleap_artifact_id || null,
+            emitResult.tuleap_artifact_id ? `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}` : null,
+            task.id,
+        ]
+    );
+    return updateRes.rows[0];
+}
+
 // Status transition validation
 const VALID_TRANSITIONS = {
     'Backlog': ['In Progress', 'Cancelled'],
