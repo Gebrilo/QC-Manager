@@ -2264,7 +2264,8 @@ const runMigrations = async () => {
             await client.query(sql);
         }
 
-        // Create or replace v_test_case_summary view
+        // Recreate v_test_case_summary so column-order changes remain idempotent.
+        await client.query(`DROP VIEW IF EXISTS v_test_case_summary CASCADE`);
         await client.query(`
             CREATE OR REPLACE VIEW v_test_case_summary AS
             SELECT
