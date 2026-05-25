@@ -533,6 +533,9 @@ const runMigrations = async () => {
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tuleap_url') THEN
                     ALTER TABLE tasks ADD COLUMN tuleap_url TEXT;
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='tuleap_tracker_id') THEN
+                    ALTER TABLE tasks ADD COLUMN tuleap_tracker_id INTEGER;
+                END IF;
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='synced_from_tuleap') THEN
                     ALTER TABLE tasks ADD COLUMN synced_from_tuleap BOOLEAN DEFAULT FALSE;
                 END IF;
@@ -1584,7 +1587,8 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS final_estimate NUMERIC,
                 ADD COLUMN IF NOT EXISTS actual_effort NUMERIC,
                 ADD COLUMN IF NOT EXISTS blocked_reason TEXT,
-                ADD COLUMN IF NOT EXISTS parent_story_id INTEGER
+                ADD COLUMN IF NOT EXISTS parent_story_id INTEGER,
+                ADD COLUMN IF NOT EXISTS tuleap_tracker_id INTEGER
         `);
 
         await client.query(`
