@@ -10,6 +10,7 @@ interface SyncPanelProps {
     tuleapUrl?: string | null;
     artifactType?: string;
     artifactId?: string;
+    onRetry?: (artifactId: string) => Promise<unknown>;
 }
 
 function relativeTime(date: string | null | undefined): string {
@@ -25,7 +26,7 @@ function relativeTime(date: string | null | undefined): string {
     return `${days}d ago`;
 }
 
-export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactId }: SyncPanelProps) {
+export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactId, onRetry }: SyncPanelProps) {
     const [retrying, setRetrying] = useState(false);
 
     if (!status || status === 'standalone') return null;
@@ -34,7 +35,11 @@ export function SyncPanel({ status, lastAttemptedAt, error, tuleapUrl, artifactI
         if (!artifactId || retrying) return;
         setRetrying(true);
         try {
-            await bugsApi.sync(artifactId);
+            if (onRetry) {
+                await onRetry(artifactId);
+            } else {
+                await bugsApi.sync(artifactId);
+            }
             window.location.reload();
         } catch {
             setRetrying(false);
