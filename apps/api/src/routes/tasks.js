@@ -56,20 +56,21 @@ async function tryEmitAndWriteback(task, config, mode) {
 
     const emitResult = await emitTask(unified, config, mode, { ...emitDeps, skipPersist: true });
 
-    const baseUrl = config.tuleap_base_url || process.env.TULEAP_BASE_URL || 'https://tuleap.windinfosys.com';
     const updateRes = await db.query(
         `UPDATE tasks SET
             sync_status = 'synced',
             tuleap_artifact_id = COALESCE($1, tuleap_artifact_id),
             tuleap_url = COALESCE($2, tuleap_url),
+            tuleap_tracker_id = COALESCE($3, tuleap_tracker_id),
             last_sync_attempted_at = NOW(),
             last_sync_error = NULL,
             updated_at = NOW()
-         WHERE id = $3
+         WHERE id = $4
          RETURNING *`,
         [
             emitResult.tuleap_artifact_id || null,
-            emitResult.tuleap_artifact_id ? `${baseUrl}/plugins/tracker/?aid=${emitResult.tuleap_artifact_id}` : null,
+            emitResult.tuleap_url || null,
+            config.tuleap_tracker_id,
             task.id,
         ]
     );
@@ -514,10 +515,16 @@ router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req
                 }
             }
         } else {
-            await db.query(
-                `UPDATE tasks SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-                [id]
-            );
+            try {
+                const emitTaskRow = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+                await tryEmitAndWriteback(emitTaskRow.rows[0], config, 'create');
+            } catch (emitErr) {
+                console.error(`[route:tasks:patch] emit_failed task_id=${id} err="${emitErr.message}"`);
+                await db.query(
+                    `UPDATE tasks SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2`,
+                    [String(emitErr.message).slice(0, 1024), id]
+                );
+            }
         }
 
         const viewResult = await db.query('SELECT * FROM v_tasks_with_metrics WHERE id = $1', [id]);
