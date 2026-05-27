@@ -2,6 +2,7 @@ const { toTuleap } = require('../tuleapTransformEngine');
 const { defaultRegistry } = require('../tuleapFieldRegistry');
 const { defaultClient } = require('../tuleapClient');
 const { dispatchAction } = require('../persisters/bug');
+const { normalizeBugSeverity } = require('../normalizers/bug');
 
 const SEVERITY_TO_TULEAP = {
   'None': '',
@@ -103,9 +104,13 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
         mappedPayload[key] = applyValueMap(key, val, valueMaps) || val;
       } else if (key === 'severity') {
         const hasSeverityMap = valueMaps && valueMaps[key] && valueMaps[key][val] != null;
-        mappedPayload[key] = hasSeverityMap
-          ? valueMaps[key][val]
-          : (SEVERITY_TO_TULEAP[val?.toLowerCase()] || val);
+        if (hasSeverityMap) {
+          mappedPayload[key] = valueMaps[key][val];
+        } else {
+          // Normalize raw input ('critical', 'high') to QC canonical, then map to Tuleap label.
+          const canonical = normalizeBugSeverity(val);
+          mappedPayload[key] = SEVERITY_TO_TULEAP[canonical] !== undefined ? SEVERITY_TO_TULEAP[canonical] : canonical;
+        }
       } else if (valueMaps[key]) {
         mappedPayload[key] = applyValueMap(key, val, valueMaps);
       }

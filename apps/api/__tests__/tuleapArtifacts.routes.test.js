@@ -402,23 +402,25 @@ describe('DELETE /tuleap/artifacts/:id', () => {
 // ── New: GET /:type — list ────────────────────────────────────────────────────
 describe('GET /tuleap/artifacts/:type', () => {
   it('returns 200 with data array on success', async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ tuleap_tracker_id: 10, qc_project_id: 'proj-1', tracker_type: 'user_story', is_active: true, artifact_fields: {}, value_maps: {} }] });
     defaultClient.get.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] });
-    const res = await request(app).get('/tuleap/artifacts/user-story');
+    const res = await request(app).get('/tuleap/artifacts/user-story?project_id=11111111-2222-3333-4444-555555555555');
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(2);
     expect(res.body.total).toBe(2);
     expect(defaultClient.get).toHaveBeenCalledWith(
-      '/artifacts',
-      expect.objectContaining({ params: expect.objectContaining({ tracker: 10 }) })
+      '/trackers/10/artifacts',
+      expect.objectContaining({ params: expect.objectContaining({ limit: 50, offset: 0 }) })
     );
   });
 
   it('passes limit and offset query params to Tuleap', async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ tuleap_tracker_id: 30, qc_project_id: 'proj-1', tracker_type: 'bug', is_active: true, artifact_fields: {}, value_maps: {} }] });
     defaultClient.get.mockResolvedValue({ data: [] });
-    await request(app).get('/tuleap/artifacts/bug?limit=10&offset=20');
+    await request(app).get('/tuleap/artifacts/bug?limit=10&offset=20&project_id=11111111-2222-3333-4444-555555555555');
     expect(defaultClient.get).toHaveBeenCalledWith(
-      '/artifacts',
-      expect.objectContaining({ params: expect.objectContaining({ limit: 10, offset: 20, tracker: 30 }) })
+      '/trackers/30/artifacts',
+      expect.objectContaining({ params: expect.objectContaining({ limit: 10, offset: 20 }) })
     );
   });
 

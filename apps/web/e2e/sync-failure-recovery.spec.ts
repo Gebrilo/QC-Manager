@@ -62,7 +62,7 @@ test.describe('Sync failure recovery', () => {
             project_name: 'Sync Test Project',
             sync_status: 'failed',
             last_sync_attempted_at: new Date().toISOString(),
-            last_sync_error: 'Tuleap connection refused',
+            last_sync_error: 'Tuleap connection refused' as string | null,
         };
 
         await page.route('http://localhost:3001/bugs', async route => {
@@ -100,7 +100,7 @@ test.describe('Sync failure recovery', () => {
             data: {
                 ...bugCreateResponse,
                 sync_status: 'synced',
-                last_sync_error: null,
+                last_sync_error: null as string | null,
                 tuleap_artifact_id: 99999,
                 tuleap_url: 'https://tuleap.windinfosys.com/plugins/tracker/?aid=99999',
             },

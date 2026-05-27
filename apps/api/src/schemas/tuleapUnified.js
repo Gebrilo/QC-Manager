@@ -113,7 +113,10 @@ const UnifiedPayloadSchema = z.discriminatedUnion('artifact_type', [
 ]);
 
 const PatchableCommonFields = CommonFields.partial();
-const PatchableBugFields = BugFields.partial();
+// Patch schema accepts raw/unnormalized severity strings from inbound Tuleap webhooks.
+const PatchableBugFields = BugFields.partial().extend({
+  severity: z.string().optional(),
+});
 const PatchableTaskFields = TaskFields.partial();
 const PatchableUserStoryFields = UserStoryFields.partial();
 const PatchableTestCaseFields = TestCaseFields.partial();
