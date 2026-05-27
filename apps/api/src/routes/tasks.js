@@ -32,13 +32,6 @@ async function resolveTaskSyncConfig(projectId) {
 }
 
 async function tryEmitAndWriteback(task, config, mode) {
-    const tuleapAssignedTo = await (async () => {
-        const resourceId = task.resource1_id || task.resource1_uuid;
-        if (!resourceId) return null;
-        const r = await db.query('SELECT tuleap_username FROM resources WHERE id = $1', [resourceId]);
-        return r.rows[0]?.tuleap_username || null;
-    })();
-
     const unified = {
         artifact_type: 'task',
         project_id: task.project_id,
@@ -46,7 +39,6 @@ async function tryEmitAndWriteback(task, config, mode) {
             title: task.task_name,
             description: task.notes || task.description || null,
             status: task.status,
-            assigned_to: tuleapAssignedTo,
         },
         fields: {},
         ...(task.tuleap_artifact_id ? { tuleap: { artifact_id: task.tuleap_artifact_id } } : {}),

@@ -26,7 +26,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Create API router for all routes (supports both / and /api prefixes)
 const apiRouter = express.Router();
@@ -67,6 +67,15 @@ apiRouter.use('/teams', require('./routes/teams'));
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+const openapiSpecPath = process.env.OPENAPI_SPEC_PATH || path.join(__dirname, '..', 'openapi.json');
+app.get(['/openapi.json', '/api/openapi.json'], (req, res, next) => {
+    res.sendFile(openapiSpecPath, (err) => {
+        if (err) {
+            next(err);
+        }
+    });
+});
 
 // Mount routes at both root and /api for compatibility
 app.use('/', apiRouter);
