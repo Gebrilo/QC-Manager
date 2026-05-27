@@ -79,10 +79,12 @@ async function tryEmitAndWriteback(task, config, mode) {
 
 // Status transition validation
 const VALID_TRANSITIONS = {
-    'Backlog': ['In Progress', 'Cancelled'],
-    'In Progress': ['Done', 'Cancelled'],
+    'Todo': ['In Progress', 'Canceled'],
+    'Backlog': ['In Progress', 'Canceled'],
+    'In Progress': ['Done', 'Canceled'],
+    'Blocked': ['In Progress', 'Canceled'],
     'Done': [],
-    'Cancelled': []
+    'Canceled': []
 };
 
 function validateStatusTransition(currentStatus, newStatus, data) {
@@ -651,7 +653,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.tasks.delete'), async (
         }
 
         const result = await db.query(
-            `UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW()
+            `UPDATE tasks SET deleted_at = NOW(), status = 'Canceled', updated_at = NOW()
              WHERE id = $1 RETURNING *`,
             [id]
         );

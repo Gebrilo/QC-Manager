@@ -58,8 +58,16 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
       const artifactId = unified.tuleap?.artifact_id;
       if (!artifactId) throw new Error('tuleap.artifact_id required for delete');
 
-      await client.delete(`/artifacts/${artifactId}`);
-      console.log(`[emit:task] tuleap_delete_ok artifact_id=${artifactId} project=${config.qc_project_id}`);
+      try {
+        await client.delete(`/artifacts/${artifactId}`);
+        console.log(`[emit:task] tuleap_delete_ok artifact_id=${artifactId} project=${config.qc_project_id}`);
+      } catch (deleteErr) {
+        if (deleteErr.status === 404) {
+          console.warn(`[emit:task] tuleap_delete_404 artifact_id=${artifactId} — artifact not found in Tuleap, proceeding with local delete`);
+        } else {
+          throw deleteErr;
+        }
+      }
 
       try {
         await dispatchAction(

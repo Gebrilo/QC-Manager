@@ -105,13 +105,13 @@ async function handleDelete(unified, config, { query }) {
       task.id, tuleapArtifactId, unified.tuleap?.url || null,
       task.task_name, task.notes, task.status, task.project_id,
       task.resource1_id, previousResourceName,
-      null, 'deleted_from_tuleap',
+      '', 'deleted_from_tuleap',
       `Artifact ${tuleapArtifactId} was deleted in Tuleap`,
       JSON.stringify(unified.raw_payload || unified),
     ]);
 
     await query(
-      "UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW() WHERE id = $1",
+      "UPDATE tasks SET deleted_at = NOW(), status = 'Canceled', updated_at = NOW() WHERE id = $1",
       [task.id]
     );
   }
@@ -154,7 +154,7 @@ async function handleArchive(unified, config, { query }) {
     ]);
 
     await query(
-      "UPDATE tasks SET deleted_at = NOW(), status = 'Cancelled', updated_at = NOW() WHERE id = $1",
+      "UPDATE tasks SET deleted_at = NOW(), status = 'Canceled', updated_at = NOW() WHERE id = $1",
       [task.id]
     );
 

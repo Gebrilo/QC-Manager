@@ -94,6 +94,37 @@ describe('task emitter — emitToTuleap', () => {
     expect(result.deleted).toBe(true);
   });
 
+  it('treats a 404 from Tuleap delete as already-deleted and still returns deleted:true', async () => {
+    const unified = {
+      artifact_type: 'task',
+      tuleap: { artifact_id: 99999 },
+    };
+
+    const notFound = new Error('HTTP 404');
+    notFound.status = 404;
+    defaultClient.delete.mockRejectedValueOnce(notFound);
+
+    const result = await emitToTuleap(unified, config, 'delete', { client: defaultClient, registry: defaultRegistry });
+
+    expect(defaultClient.delete).toHaveBeenCalledWith('/artifacts/99999');
+    expect(result.deleted).toBe(true);
+  });
+
+  it('re-throws non-404 errors from Tuleap delete', async () => {
+    const unified = {
+      artifact_type: 'task',
+      tuleap: { artifact_id: 11111 },
+    };
+
+    const serverErr = new Error('HTTP 500');
+    serverErr.status = 500;
+    defaultClient.delete.mockRejectedValueOnce(serverErr);
+
+    await expect(
+      emitToTuleap(unified, config, 'delete', { client: defaultClient, registry: defaultRegistry })
+    ).rejects.toMatchObject({ status: 500 });
+  });
+
   it('applies value_maps for outbound field translation', async () => {
     const configWithMaps = {
       ...config,

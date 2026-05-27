@@ -637,17 +637,17 @@ const runMigrations = async () => {
                 r.department,
                 r.role,
                 COALESCE(
-                    (SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Cancelled')),
+                    (SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')),
                     0
                 ) + COALESCE(
-                    (SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Cancelled')),
+                    (SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')),
                     0
                 ) AS current_allocation_hrs,
                 CASE 
                     WHEN r.weekly_capacity_hrs > 0 THEN
                         ROUND((
-                            (COALESCE((SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Cancelled')), 0) +
-                             COALESCE((SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Cancelled')), 0)
+                            (COALESCE((SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')), 0) +
+                             COALESCE((SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')), 0)
                             ) / r.weekly_capacity_hrs * 100
                         )::NUMERIC, 2)
                     ELSE 0
