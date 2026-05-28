@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -70,19 +70,21 @@ const readonlyCls =
 const textareaCls =
     'w-full px-3.5 py-3 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all resize-y leading-relaxed';
 
-function SelectField({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
-    return (
-        <div className="relative">
-            <select className={`${fieldCls} appearance-none pr-9`} {...props}>
-                {children}
-            </select>
-            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                <path d="M6 9l6 6 6-6" />
-            </svg>
-        </div>
-    );
-}
+const SelectField = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }>(
+    function SelectField({ children, ...props }, ref) {
+        return (
+            <div className="relative">
+                <select className={`${fieldCls} appearance-none pr-9`} ref={ref} {...props}>
+                    {children}
+                </select>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <path d="M6 9l6 6 6-6" />
+                </svg>
+            </div>
+        );
+    }
+);
 
 // ── Section card ────────────────────────────────────────────────────────────
 
@@ -484,7 +486,7 @@ function CreateForm({
                         icon={<TaskIcon />}
                         accent="violet"
                         title="General"
-                        description="Task identity, status, and priority."
+                        description="Task identity, project, status, and priority."
                     >
                         <div className="col-span-2">
                             <FieldLabel required>Task Name</FieldLabel>
@@ -494,6 +496,19 @@ function CreateForm({
                                 className={fieldCls}
                             />
                             <FieldError message={errors.task_name?.message} />
+                        </div>
+
+                        <div className="col-span-2">
+                            <FieldLabel required>Project</FieldLabel>
+                            <SelectField {...register('project_id')}>
+                                <option value="">— Select project —</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.project_id} — {p.project_name || 'Unnamed'}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            <FieldError message={errors.project_id?.message} />
                         </div>
 
                         <div>
@@ -579,21 +594,8 @@ function CreateForm({
                         icon={<AssignmentIcon />}
                         accent="blue"
                         title="Assignment"
-                        description="Project and resource allocation."
+                        description="Resource allocation."
                     >
-                        <div className="col-span-2">
-                            <FieldLabel required>Project</FieldLabel>
-                            <SelectField {...register('project_id')}>
-                                <option value="">— Select project —</option>
-                                {projects.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.project_id} — {p.project_name || 'Unnamed'}
-                                    </option>
-                                ))}
-                            </SelectField>
-                            <FieldError message={errors.project_id?.message} />
-                        </div>
-
                         <div>
                             <FieldLabel required>Primary Resource</FieldLabel>
                             <SelectField {...register('resource1_uuid')}>
