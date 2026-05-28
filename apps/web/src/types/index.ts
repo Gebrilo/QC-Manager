@@ -337,6 +337,8 @@ export interface TestCaseListResponse {
 
 // Test Suite Management Types
 export type SuiteStatus = 'draft' | 'active' | 'archived';
+export type SuiteType = 'smoke' | 'regression' | 'acceptance' | 'security' | 'performance' | 'other';
+export type ReadinessScope = 'required' | 'optional';
 
 export interface TestSuite {
     id: string;
@@ -344,6 +346,8 @@ export interface TestSuite {
     name: string;
     description?: string;
     status: SuiteStatus;
+    suite_type?: SuiteType;
+    readiness_scope?: ReadinessScope;
     project_id: string;
     project_name?: string;
     created_by?: string;

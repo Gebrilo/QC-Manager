@@ -696,7 +696,7 @@ export const testSuitesApi = {
             body: JSON.stringify(data),
         }),
 
-    update: (id: string, data: Partial<Pick<TestSuite, 'name' | 'description' | 'status'>>) =>
+    update: (id: string, data: Partial<Pick<TestSuite, 'name' | 'description' | 'status' | 'suite_type' | 'readiness_scope'>>) =>
         fetchApi<TestSuite>(`/test-suites/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
