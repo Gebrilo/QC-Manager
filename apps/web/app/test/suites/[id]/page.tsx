@@ -217,6 +217,24 @@ export default function TestSuiteDetailPage() {
                         <p className="text-gray-500 dark:text-gray-400 text-sm">No additional active test cases available to add.</p>
                     ) : (
                         <>
+                            <div className="mb-2">
+                                <label className="flex items-center gap-3 p-2 rounded-lg cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedCaseIds.size === availableCases.length}
+                                        ref={(el) => { if (el) el.indeterminate = selectedCaseIds.size > 0 && selectedCaseIds.size < availableCases.length; }}
+                                        onChange={() => {
+                                            if (selectedCaseIds.size === availableCases.length) {
+                                                setSelectedCaseIds(new Set());
+                                            } else {
+                                                setSelectedCaseIds(new Set(availableCases.map(tc => tc.id)));
+                                            }
+                                        }}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Select all ({availableCases.length})</span>
+                                </label>
+                            </div>
                             <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
                                 {availableCases.map((tc) => (
                                     <label key={tc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
