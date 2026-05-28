@@ -92,7 +92,7 @@ export default function TestSuiteDetailPage() {
         }
         setShowAddCases(true);
         try {
-            const res = await testSuitesApi.availableTestCases(id, { status: 'active', limit: 200 });
+            const res = await testSuitesApi.availableTestCases(id, { limit: 200 });
             setAvailableCases(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to load available cases', err);
