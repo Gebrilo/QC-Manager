@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { projectsApi } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
@@ -744,7 +745,11 @@ export default function TestExecutionsPage() {
                                     {filteredRuns.map(run => (
                                         <tr key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                             <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
-                                            <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-medium max-w-xs truncate">{run.name}</td>
+                                            <td className="px-4 py-4 text-sm font-medium max-w-xs truncate">
+                                                <Link href={`/test/runs/${run.id}`} className="text-slate-900 dark:text-white hover:text-violet-700 dark:hover:text-violet-300 transition-colors">
+                                                    {run.name}
+                                                </Link>
+                                            </td>
                                             <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">{run.project_name || '-'}</td>
                                             <td className="px-4 py-4 text-sm text-center font-semibold text-slate-700 dark:text-slate-300">{run.total_cases}</td>
                                             <td className="px-4 py-4 text-sm text-center font-semibold text-emerald-600">{run.passed}</td>

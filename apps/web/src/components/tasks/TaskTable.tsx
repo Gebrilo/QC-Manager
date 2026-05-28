@@ -84,9 +84,12 @@ export function TaskTable({
             cell: (info) => (
                 <SimpleTooltip content={buildTaskTooltip(info.row.original)} position="top">
                     <div style={{ minWidth: 280, maxWidth: 360 }}>
-                        <p className="font-medium text-slate-800 dark:text-slate-100 truncate">
+                        <Link
+                            href={`/work/tasks/${info.row.original.id}`}
+                            className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
+                        >
                             {info.getValue()}
-                        </p>
+                        </Link>
                         <div className="flex items-center">
                             {info.row.original.project_name && (
                                 <p className="text-xs text-slate-400 mt-0.5 truncate">{info.row.original.project_name}</p>

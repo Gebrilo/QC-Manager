@@ -256,9 +256,12 @@ function BugsContent() {
             cell: (info) => (
                 <SimpleTooltip content={`${info.getValue()}${info.row.original.component ? ` · ${info.row.original.component}` : ''}`} position="top">
                     <div style={{ minWidth: 280, maxWidth: 360 }}>
-                        <p className="font-medium text-slate-800 dark:text-slate-100 truncate">
+                        <Link
+                            href={`/work/bugs/${info.row.original.id}`}
+                            className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
+                        >
                             {info.getValue()}
-                        </p>
+                        </Link>
                         {info.row.original.component && (
                             <p className="text-xs text-slate-400 mt-0.5 truncate">{info.row.original.component}</p>
                         )}
