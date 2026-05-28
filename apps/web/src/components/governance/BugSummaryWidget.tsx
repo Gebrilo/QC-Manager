@@ -42,25 +42,23 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                    <div className="grid grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="h-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                        ))}
-                    </div>
+            <div className="animate-pulse space-y-4">
+                <div className="grid grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="h-40 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                    ))}
                 </div>
             </div>
         );
     }
 
     if (error) {
-        return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <p className="text-rose-500">Error loading bug data: {error}</p>
-            </div>
-        );
+        return <p className="text-rose-500 text-sm">Error loading bug data: {error}</p>;
     }
 
     const totals = data?.totals;
@@ -85,31 +83,9 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
     const hasBugs = totals && totals.total_bugs > 0;
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <BugIcon className="w-5 h-5 text-rose-500" />
-                            Bug Summary
-                        </h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Defects synced from Tuleap
-                        </p>
-                    </div>
-                    {totals && totals.open_bugs > 0 && (
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl font-bold text-rose-600">{totals.open_bugs}</span>
-                            <span className="text-sm text-slate-500">Open</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
+        <div>
             {/* Summary Cards */}
-            <div className="p-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     <StatCard
                         label="Total Bugs"
                         value={totals?.total_bugs || 0}
@@ -193,18 +169,17 @@ export function BugSummaryWidget({ projectId }: BugSummaryWidgetProps) {
                     </div>
                 </div>
 
-                {/* Severity Legend */}
-                {hasBugs && (
-                    <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                        <div className="flex flex-wrap gap-4 justify-center">
-                            <SeverityBadge severity="Critical Impact" count={severity?.critical || 0} />
-                            <SeverityBadge severity="Major impact" count={severity?.major || 0} />
-                            <SeverityBadge severity="Minor Impact" count={severity?.minor || 0} />
-                            <SeverityBadge severity="Cosmetic impact" count={severity?.cosmetic || 0} />
-                        </div>
+            {/* Severity Legend */}
+            {hasBugs && (
+                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-wrap gap-4 justify-center">
+                        <SeverityBadge severity="Critical Impact" count={severity?.critical || 0} />
+                        <SeverityBadge severity="Major impact" count={severity?.major || 0} />
+                        <SeverityBadge severity="Minor Impact" count={severity?.minor || 0} />
+                        <SeverityBadge severity="Cosmetic impact" count={severity?.cosmetic || 0} />
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

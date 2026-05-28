@@ -1,31 +1,20 @@
 'use client';
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import type { BlockedModuleAnalysis } from '@/types/governance';
 
 interface BlockedTestsWidgetProps {
     data: BlockedModuleAnalysis[];
+    pivotBadge?: boolean;
 }
 
-export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
+export function BlockedTestsWidget({ data, pivotBadge }: BlockedTestsWidgetProps) {
     const pivotModules = data.filter(d => d.pivot_required);
     const totalBlockedHrs = data.reduce((sum, d) => sum + parseFloat(d.blocked_hrs || '0'), 0);
     const totalRetestHrs  = data.reduce((sum, d) => sum + parseFloat(d.retest_hrs  || '0'), 0);
 
     return (
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center justify-between">
-                    Blocked Test Analysis
-                    {pivotModules.length > 0 && (
-                        <span className="text-xs font-normal px-2 py-1 bg-rose-100 text-rose-700 rounded-full">
-                            {pivotModules.length} pivot required
-                        </span>
-                    )}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="space-y-4">
                 {pivotModules.length > 0 && (
                     <div className="space-y-2">
                         {pivotModules.map(m => (
@@ -104,7 +93,6 @@ export function BlockedTestsWidget({ data }: BlockedTestsWidgetProps) {
                         <span>Double-work (retests): <strong className="text-rose-600">{totalRetestHrs.toFixed(1)}h</strong></span>
                     </div>
                 )}
-            </CardContent>
-        </Card>
+        </div>
     );
 }

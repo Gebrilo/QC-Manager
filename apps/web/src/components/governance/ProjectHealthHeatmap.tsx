@@ -80,26 +80,21 @@ export default function ProjectHealthHeatmap({
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-                <div className="animate-pulse">
-                    <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-6"></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} className="h-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                        ))}
-                    </div>
+            <div className="animate-pulse">
+                <div className="flex gap-2 mb-4">
+                    {[1,2,3,4].map(i => <div key={i} className="h-8 w-20 bg-slate-100 dark:bg-slate-800 rounded-lg" />)}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-32 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                    ))}
                 </div>
             </div>
         );
     }
 
     if (error) {
-        return (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Project Health Overview</h2>
-                <div className="text-rose-600 dark:text-rose-400">{error}</div>
-            </div>
-        );
+        return <div className="text-rose-600 dark:text-rose-400 text-sm">{error}</div>;
     }
 
     const statusCounts = {
@@ -109,13 +104,9 @@ export default function ProjectHealthHeatmap({
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow">
-            {/* Header with Filters */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-
-
-                {/* Filter Tabs */}
-                <div className="flex space-x-2">
+        <div>
+            {/* Filter Tabs */}
+            <div className="flex space-x-2 mb-4">
                     <button
                         onClick={() => setSelectedFilter(undefined)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!selectedFilter
@@ -153,10 +144,9 @@ export default function ProjectHealthHeatmap({
                         Healthy ({statusCounts.GREEN})
                     </button>
                 </div>
-            </div>
 
             {/* Heatmap Grid */}
-            <div className="p-6">
+            <div>
                 {projects.length === 0 ? (
                     <div className="text-center py-12">
                         <div className="text-slate-400 text-5xl mb-4">📊</div>

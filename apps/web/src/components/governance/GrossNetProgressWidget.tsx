@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import type { ExecutionProgress } from '@/types/governance';
 
 interface GrossNetProgressWidgetProps {
@@ -28,27 +27,13 @@ function ProgressBar({ value, color, label }: { value: number; color: string; la
 export function GrossNetProgressWidget({ data }: GrossNetProgressWidgetProps) {
     if (data.length === 0) {
         return (
-            <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Progress Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-slate-400 text-center py-4">No test execution data available.</p>
-                </CardContent>
-            </Card>
+            <p className="text-sm text-slate-400 text-center py-4">No test execution data available.</p>
         );
     }
 
     return (
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    Progress Overview
-                    <span className="text-xs font-normal text-slate-400">Gross vs. Net</span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-                <div className="flex gap-4 text-xs text-slate-500">
+        <div className="space-y-5">
+            <div className="flex gap-4 text-xs text-slate-500">
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-indigo-400 inline-block" />
                         Gross — includes blocked (masks risk)
@@ -84,8 +69,7 @@ export function GrossNetProgressWidget({ data }: GrossNetProgressWidgetProps) {
                             </div>
                         );
                     })}
-                </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

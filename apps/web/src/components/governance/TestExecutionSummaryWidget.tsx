@@ -57,25 +57,22 @@ export function TestExecutionSummaryWidget() {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                    <div className="grid grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="h-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                        ))}
-                    </div>
+            <div className="animate-pulse space-y-4">
+                <div className="grid grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="h-48 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                    <div className="h-48 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                 </div>
             </div>
         );
     }
 
     if (error) {
-        return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <p className="text-rose-500">Error loading test execution data: {error}</p>
-            </div>
-        );
+        return <p className="text-rose-500 text-sm">Error loading test execution data: {error}</p>;
     }
 
     const summary = data?.summary;
@@ -93,20 +90,9 @@ export function TestExecutionSummaryWidget() {
     const hasExecutions = summary && summary.total_executions > 0;
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Test Execution Overview</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {summary?.last_execution_date
-                        ? `Last execution: ${new Date(summary.last_execution_date).toLocaleDateString()}`
-                        : 'No test executions yet'}
-                </p>
-            </div>
-
+        <div>
             {/* Summary Cards */}
-            <div className="p-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     <StatCard
                         label="Total Runs"
                         value={summary?.total_test_runs || 0}
@@ -188,7 +174,6 @@ export function TestExecutionSummaryWidget() {
                             </div>
                         )}
                     </div>
-                </div>
             </div>
         </div>
     );

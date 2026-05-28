@@ -32,13 +32,13 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
     if (error) return <div className="text-rose-500 text-sm">{error}</div>;
 
     return (
-        <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 ${className}`}>
+        <div className={className}>
             <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Workload Balance</h3>
                 <InfoTooltip
                     content="Compares the number of tasks vs test cases to identify under-tested areas. Balanced projects typically have at least 0.5 tests per task."
                     position="top"
                 />
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Workload Balance</span>
             </div>
             <div className="space-y-4">
                 {data.map((item) => {
