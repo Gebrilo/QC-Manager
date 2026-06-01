@@ -61,7 +61,7 @@ describe('RBAC catalog resolver', () => {
 });
 
 describe('Access engine — expanded catalog (issue #80)', () => {
-    test('catalog declares scoped variants for tasks/bugs/test_cases/test_suites/test_executions/user_stories/reports', () => {
+    test('catalog declares scoped variants for tasks/bugs/testcases/testsuites/testexecutions/user_stories/reports', () => {
         const scopedExpect = [];
         for (const artifact of ['tasks', 'bugs', 'testcases', 'testsuites', 'testexecutions', 'user_stories']) {
             for (const verb of ['view', 'edit', 'delete']) {
@@ -109,11 +109,17 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         }
     });
 
-    test('BUILT_IN_ROLE_PERMISSION_DEFAULTS exposes a key array per built-in role', () => {
+    test('BUILT_IN_ROLE_PERMISSION_DEFAULTS exposes a key array per built-in role with resolved permissions', () => {
         for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer']) {
             expect(Array.isArray(BUILT_IN_ROLE_PERMISSION_DEFAULTS[role])).toBe(true);
         }
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.admin).toEqual(['*']);
+        // team_manager defaults must include the resolved permissions from its own role + inherited tester
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager).toContain('qc.bugs.triage');
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager).toContain('qc.testresults.upload'); // inherited from tester
+        // pm gets project-scope keys; viewer does not
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.pm).toContain('qc.reports.view_project');
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.viewer).not.toContain('qc.reports.view_project');
     });
 
     test('canUserPerform resolves manager → team_manager via aliasFor', () => {

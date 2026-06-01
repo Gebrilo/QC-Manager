@@ -231,6 +231,10 @@ const ROLE_DEFINITIONS = Object.freeze({
         ]),
         scopes: Object.freeze([SCOPES.TEAM.key, SCOPES.ACTIVE_ONLY.key]),
     }),
+    // `manager` is a legacy role identifier kept for backwards compatibility with
+    // existing app_user rows. Resolution happens via `inherits: ['team_manager']`;
+    // the `aliasFor` field is informational metadata for the admin UI and tooling
+    // (do NOT remove `inherits` thinking aliasFor is what resolves the role).
     manager: Object.freeze({
         inherits: Object.freeze(['team_manager']),
         permissions: Object.freeze([]),
