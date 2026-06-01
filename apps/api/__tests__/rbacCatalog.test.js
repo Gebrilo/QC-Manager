@@ -2,7 +2,10 @@
 
 const {
     PERMISSIONS,
+    ROLES,
     SCOPES,
+    ALL_PERMISSION_VALUES,
+    BUILT_IN_ROLE_PERMISSION_DEFAULTS,
     canUserPerform,
     canUserUseScope,
     resolvePermissionKey,
@@ -54,5 +57,66 @@ describe('RBAC catalog resolver', () => {
     test('team scope is declared in the catalog and granted to managers', () => {
         expect(canUserUseScope({ role: 'manager' }, SCOPES.TEAM.key)).toBe(true);
         expect(canUserUseScope({ role: 'tester' }, SCOPES.TEAM.key)).toBe(false);
+    });
+});
+
+describe('Access engine — expanded catalog (issue #80)', () => {
+    test('catalog declares scoped variants for tasks/bugs/test_cases/test_suites/test_executions/user_stories/reports', () => {
+        const scopedExpect = [];
+        for (const artifact of ['tasks', 'bugs', 'testcases', 'testsuites', 'testexecutions', 'user_stories']) {
+            for (const verb of ['view', 'edit', 'delete']) {
+                for (const scope of ['own', 'team', 'any']) {
+                    scopedExpect.push(`qc.${artifact}.${verb}_${scope}`);
+                }
+            }
+        }
+        for (const key of scopedExpect) {
+            expect(ALL_PERMISSION_VALUES).toContain(key);
+        }
+        for (const key of ['qc.reports.view_own', 'qc.reports.view_team', 'qc.reports.view_project', 'qc.reports.export']) {
+            expect(ALL_PERMISSION_VALUES).toContain(key);
+        }
+    });
+
+    test('artifact-specific actions are declared', () => {
+        const required = [
+            'qc.tasks.log_time', 'qc.tasks.take_over', 'qc.tasks.approve_completion', 'qc.tasks.change_priority',
+            'qc.bugs.triage', 'qc.bugs.change_severity', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
+            'qc.testcases.execute', 'qc.testcases.approve', 'qc.testcases.clone',
+            'qc.testcases.import', 'qc.testcases.export', 'qc.testcases.view_steps', 'qc.testcases.edit_steps',
+            'qc.admin.manage_users', 'qc.admin.manage_roles', 'qc.admin.manage_permissions',
+            'qc.admin.manage_teams', 'qc.admin.manage_integrations', 'qc.admin.manage_settings',
+            'qc.admin.view_audit_log',
+        ];
+        for (const key of required) {
+            expect(ALL_PERMISSION_VALUES).toContain(key);
+        }
+    });
+
+    test('new built-in roles exist: pm, team_manager, member, viewer; manager aliases team_manager', () => {
+        expect(ROLES.pm).toBeDefined();
+        expect(ROLES.team_manager).toBeDefined();
+        expect(ROLES.member).toBeDefined();
+        expect(ROLES.viewer).toBeDefined();
+        expect(ROLES.manager.aliasFor).toBe('team_manager');
+    });
+
+    test('member seeded with union of legacy tester permissions (PRD risk #1)', () => {
+        const legacyTester = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester;
+        const member = BUILT_IN_ROLE_PERMISSION_DEFAULTS.member;
+        for (const key of legacyTester) {
+            expect(member).toContain(key);
+        }
+    });
+
+    test('BUILT_IN_ROLE_PERMISSION_DEFAULTS exposes a key array per built-in role', () => {
+        for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer']) {
+            expect(Array.isArray(BUILT_IN_ROLE_PERMISSION_DEFAULTS[role])).toBe(true);
+        }
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.admin).toEqual(['*']);
+    });
+
+    test('canUserPerform resolves manager → team_manager via aliasFor', () => {
+        expect(canUserPerform({ role: 'manager' }, PERMISSIONS.TESTCASES_VIEW)).toBe(true);
     });
 });
