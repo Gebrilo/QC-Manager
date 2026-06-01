@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { REPORTS, cn } from '@/components/reports/reportTypes';
+import { useReportData } from '@/components/reports/useReportData';
 import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
 import { DocumentPreview } from '@/components/reports/DocumentPreview';
@@ -27,6 +28,7 @@ export default function ReportsPage() {
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
+    const { override: realData, loading: dataLoading } = useReportData(report.id);
 
     const notify = useCallback((msg: string) => {
         setToast(msg);
@@ -86,6 +88,8 @@ export default function ReportsPage() {
                             stamp={stamp}
                             range={range}
                             project={project}
+                            realData={realData}
+                            dataLoading={dataLoading}
                         />
                         <RecentScheduledPanel
                             notify={notify}

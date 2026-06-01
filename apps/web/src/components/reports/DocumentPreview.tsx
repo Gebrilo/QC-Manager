@@ -42,21 +42,33 @@ interface DocumentPreviewProps {
     stamp: string;
     range: string;
     project: string;
+    realData?: { kpis?: ReportDefinition['kpis']; chart?: ReportDefinition['chart']; rows?: ReportDefinition['rows']; summary?: string; summaryTone?: ReportDefinition['summaryTone']; gauge?: { value: number; label: string; caption: string } } | null;
+    dataLoading?: boolean;
 }
 
-export function DocumentPreview({ report, generating, stamp, range, project }: DocumentPreviewProps) {
-    const gauge = GAUGE_DATA[report.id] || { value: report.rows[0]?.rate || 0, label: 'Headline', caption: '' };
-    const sparkData = report.chart.bars.map(b => b.value);
+export function DocumentPreview({ report, generating, stamp, range, project, realData, dataLoading }: DocumentPreviewProps) {
+    const merged = realData
+        ? {
+            ...report,
+            kpis: realData.kpis?.length ? realData.kpis : report.kpis,
+            chart: realData.chart?.bars.length ? realData.chart : report.chart,
+            rows: realData.rows?.length ? realData.rows : report.rows,
+            summary: realData.summary || report.summary,
+            summaryTone: realData.summaryTone || report.summaryTone,
+        }
+        : report;
+    const gauge = realData?.gauge || GAUGE_DATA[report.id] || { value: 0, label: 'Headline', caption: '' };
+    const sparkData = merged.chart.bars.map(b => b.value);
 
     return (
         <div className="rounded-2xl p-3 sm:p-6 bg-slate-100 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
             <div className="relative mx-auto max-w-[820px] bg-white rounded-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-slate-200/80 overflow-hidden">
 
                 {/* Generating overlay */}
-                {generating && (
+                {(generating || dataLoading) && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-sm">
                         <span className="w-8 h-8 border-[3px] border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
-                        <p className="text-xs font-medium text-slate-500">Compiling {report.name}…</p>
+                        <p className="text-xs font-medium text-slate-500">{generating ? `Compiling ${report.name}…` : 'Loading live data…'}</p>
                     </div>
                 )}
 
@@ -96,16 +108,16 @@ export function DocumentPreview({ report, generating, stamp, range, project }: D
 
                 <div className="px-8 sm:px-10 pb-9 space-y-7">
                     {/* Executive summary */}
-                    <div className={cn('rounded-xl border p-4', SUMMARY_TONE[report.summaryTone] || SUMMARY_TONE.ontrack)}>
-                        <p className={cn('text-[10px] font-bold uppercase tracking-[0.14em] mb-1.5', SUMMARY_TEXT[report.summaryTone] || SUMMARY_TEXT.ontrack)}>
+                    <div className={cn('rounded-xl border p-4', SUMMARY_TONE[merged.summaryTone] || SUMMARY_TONE.ontrack)}>
+                        <p className={cn('text-[10px] font-bold uppercase tracking-[0.14em] mb-1.5', SUMMARY_TEXT[merged.summaryTone] || SUMMARY_TEXT.ontrack)}>
                             Executive summary
                         </p>
-                        <p className="text-sm leading-relaxed text-slate-700">{report.summary}</p>
+                        <p className="text-sm leading-relaxed text-slate-700">{merged.summary}</p>
                     </div>
 
                     {/* KPI tiles */}
                     <div className="grid grid-cols-3 gap-3">
-                        {report.kpis.map((k, i) => (
+                        {merged.kpis.map((k, i) => (
                             <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
                                 <p className="text-[10px] uppercase tracking-[0.1em] font-bold text-slate-400">{k.label}</p>
                                 <div className="flex items-end gap-1.5 mt-2">
@@ -127,7 +139,7 @@ export function DocumentPreview({ report, generating, stamp, range, project }: D
                             <Gauge {...gauge} />
                         </div>
                         <div className="sm:col-span-3 rounded-xl border border-slate-200 p-4">
-                            <ColumnChart data={report.chart} />
+                            <ColumnChart data={merged.chart} />
                         </div>
                     </div>
 
@@ -137,7 +149,7 @@ export function DocumentPreview({ report, generating, stamp, range, project }: D
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="border-b-2 border-slate-200">
-                                    {report.columns.map((h, i) => (
+                                    {merged.columns.map((h, i) => (
                                         <th key={h} className={cn(
                                             'text-[10px] uppercase tracking-[0.08em] font-bold text-slate-400 pb-2',
                                             i === 0 ? 'pr-4' : 'px-3'
@@ -146,7 +158,7 @@ export function DocumentPreview({ report, generating, stamp, range, project }: D
                                 </tr>
                             </thead>
                             <tbody>
-                                {report.rows.map((row, i) => (
+                                {merged.rows.map((row, i) => (
                                     <tr key={i} className="border-b border-slate-100">
                                         <td className="py-2.5 pr-4 text-sm font-semibold text-slate-800">{row.c[0]}</td>
                                         <td className="py-2.5 px-3"><StatusBadge status={row.status} paper /></td>
