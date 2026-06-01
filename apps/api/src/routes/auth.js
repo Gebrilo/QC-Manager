@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { notifyAdmins } = require('./notifications');
+const { resolve: resolveRole } = require('../access/RoleResolver');
 
 const DEFAULT_PERMISSIONS = {
     admin: [
@@ -324,7 +325,15 @@ router.get('/me', requireAuth, async (req, res, next) => {
             .filter(p => p.granted)
             .map(p => p.permission_key);
 
-        res.json({ user, permissions });
+        const resolved = await resolveRole(req.user, req);
+        const effective_permissions = Array.from(resolved.effectivePermissions);
+
+        res.json({
+            user,
+            permissions,
+            effective_permissions,
+            scope: resolved.scope,
+        });
     } catch (err) {
         next(err);
     }
