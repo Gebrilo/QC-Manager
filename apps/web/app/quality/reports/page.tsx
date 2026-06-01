@@ -30,6 +30,16 @@ const FORMAT_BY_LABEL: Record<string, BackendFormat> = {
     CSV: 'csv',
 };
 
+function startFileDownload(url: string) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_self';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 function stampNow() {
     return new Date().toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
@@ -85,7 +95,7 @@ export default function ReportsPage() {
                 setStamp(stampNow());
 
                 if (job.download_url) {
-                    window.open(job.download_url, '_blank', 'noopener,noreferrer');
+                    startFileDownload(job.download_url);
                     notify(`${reportName} generated. Download started.`);
                 } else {
                     notify(`${reportName} generated, but no download link was provided.`);
