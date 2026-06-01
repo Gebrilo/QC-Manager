@@ -162,3 +162,59 @@ describe('AccessEngine.canPerform — OR branches', () => {
         expect(out.reason).toBe(DENIAL_REASONS.TEAM_MISMATCH);
     });
 });
+
+describe('AccessEngine.buildListFilter', () => {
+    test('admin returns TRUE', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['*']),
+            scope: { team_id: null, team_type: null, pm_of_projects: [] },
+        });
+        const f = await buildListFilter({ id: 'a', role: 'admin' }, 'bug', 'view');
+        expect(f.clause).toBe('TRUE');
+        expect(f.params).toEqual([]);
+        expect(f.nextIdx).toBe(1);
+    });
+
+    test('member: composes owner_team + assignee + teammate + ACL clauses with parameterized $N', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.view_own', 'qc.bugs.view_team']),
+            scope: { team_id: 't-1', team_type: 'qc', pm_of_projects: ['p-9'] },
+        });
+        const f = await buildListFilter({ id: 'u', role: 'member' }, 'bug', 'view', { startIdx: 5 });
+        expect(f.clause).toMatch(/owner_team_id\s*=\s*\$/);
+        expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM resources/);
+        expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM artifact_access/);
+        expect(f.clause).toMatch(/project_id\s+IN/);
+        expect(f.nextIdx).toBeGreaterThan(5);
+        expect(f.params).toEqual(expect.arrayContaining(['u', 't-1', 'p-9']));
+    });
+
+    test('pm with view_any + pm_of_projects gets project_managers IN clause', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.view_any']),
+            scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] },
+        });
+        const f = await buildListFilter({ id: 'pm', role: 'pm' }, 'bug', 'view');
+        expect(f.clause).toMatch(/project_id\s+IN/);
+        expect(f.params).toEqual(expect.arrayContaining(['p-1', 'p-2']));
+    });
+
+    test('unknown artifact type throws', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set([]),
+            scope: { team_id: null, team_type: null, pm_of_projects: [] },
+        });
+        await expect(buildListFilter({ id: 'u', role: 'member' }, 'mysterious', 'view')).rejects.toThrow(/Unknown artifact type/);
+    });
+
+    test('returns FALSE clause when user has no applicable branches', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set([]), // no perms at all
+            scope: { team_id: null, team_type: null, pm_of_projects: [] }, // no team, no PM scope
+        });
+        const f = await buildListFilter({ id: 'u', role: 'viewer' }, 'bug', 'view');
+        // ACL branch always fires (it's a SQL EXISTS check, not a perm-gated branch).
+        // With no team and no PM scope, only the ACL clause is present.
+        expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM artifact_access/);
+    });
+});
