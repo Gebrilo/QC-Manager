@@ -76,13 +76,13 @@ describe('AccessEngine.canPerform — OR branches', () => {
             scope: { team_id: 't-qc', team_type: 'qc', pm_of_projects: [] },
         });
         mockQuery
-            .mockResolvedValueOnce(rows([])) // assignee empty
-            .mockResolvedValueOnce(rows([])) // teammate empty
+            .mockResolvedValueOnce(rows([])) // assignee: not me
+            .mockResolvedValueOnce(rows([])) // teammate: not my team
             .mockResolvedValueOnce(rows([{ ok: 1 }])); // ACL lookup hits
 
         const out = await canPerform(
             { id: 'u', role: 'member' },
-            { type: 'bug', id: 'b1', owner_team_id: 't-other', assignee_resource_id: null, project_id: 'p-1' },
+            { type: 'bug', id: 'b1', owner_team_id: 't-other', assignee_resource_id: 'r-other', project_id: 'p-1' },
             'view'
         );
         expect(out).toEqual({ allowed: true, branch: 'artifact_acl' });
@@ -107,14 +107,14 @@ describe('AccessEngine.canPerform — OR branches', () => {
             scope: { team_id: 't-dev', team_type: 'dev', pm_of_projects: [] },
         });
         mockQuery
-            .mockResolvedValueOnce(rows([])) // assignee empty
-            .mockResolvedValueOnce(rows([])) // teammate empty
+            .mockResolvedValueOnce(rows([])) // assignee: not me
+            .mockResolvedValueOnce(rows([])) // teammate: not my team
             .mockResolvedValueOnce(rows([])) // ACL empty
             .mockResolvedValueOnce(rows([{ ok: 1 }])); // project_teams hit
 
         const out = await canPerform(
             { id: 'u', role: 'member' },
-            { type: 'bug', id: 'b1', owner_team_id: 't-qc', assignee_resource_id: null, project_id: 'p-1', visibility_scope: 'project' },
+            { type: 'bug', id: 'b1', owner_team_id: 't-qc', assignee_resource_id: 'r-other', project_id: 'p-1', visibility_scope: 'project' },
             'view'
         );
         expect(out).toEqual({ allowed: true, branch: 'project_visibility' });
@@ -125,10 +125,9 @@ describe('AccessEngine.canPerform — OR branches', () => {
             effectivePermissions: new Set([]),
             scope: { team_id: 't-x', team_type: 'commercial', pm_of_projects: [] },
         });
-        mockQuery
-            .mockResolvedValueOnce(rows([])) // assignee
-            .mockResolvedValueOnce(rows([])) // teammate
-            .mockResolvedValueOnce(rows([])); // ACL
+        // assignee_resource_id is null → JS short-circuits skip assignee + teammate queries.
+        // Only the ACL query fires (returns empty).
+        mockQuery.mockResolvedValueOnce(rows([])); // ACL
 
         const out = await canPerform(
             { id: 'u', role: 'member' },
@@ -151,10 +150,8 @@ describe('AccessEngine.canPerform — OR branches', () => {
             effectivePermissions: new Set(['qc.bugs.view_team']),
             scope: { team_id: 't-dev', team_type: 'dev', pm_of_projects: [] },
         });
-        mockQuery
-            .mockResolvedValueOnce(rows([])) // assignee
-            .mockResolvedValueOnce(rows([])) // teammate
-            .mockResolvedValueOnce(rows([])); // ACL
+        // assignee_resource_id null → only ACL query fires.
+        mockQuery.mockResolvedValueOnce(rows([])); // ACL
 
         const out = await canPerform(
             { id: 'u', role: 'member' },

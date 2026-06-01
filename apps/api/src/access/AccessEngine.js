@@ -43,23 +43,21 @@ function hasAny(set, keys) {
 }
 
 async function isAssignee(userId, resourceId) {
+    if (!resourceId) return false;
     const r = await db.query(
-        `SELECT 1 FROM resources
-         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-           AND $1::text IS NOT NULL
-         LIMIT 1`,
+        'SELECT 1 FROM resources WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL LIMIT 1',
         [resourceId, userId]
     );
     return r.rows.length > 0;
 }
 
 async function isTeammateOfAssignee(userTeamId, resourceId) {
+    if (!userTeamId || !resourceId) return false;
     const r = await db.query(
         `SELECT 1
          FROM resources r
          JOIN app_user au ON au.id = r.user_id
          WHERE r.id = $1 AND au.team_id = $2 AND r.deleted_at IS NULL
-           AND $1::text IS NOT NULL AND $2::text IS NOT NULL
          LIMIT 1`,
         [resourceId, userTeamId]
     );
