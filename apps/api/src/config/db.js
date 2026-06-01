@@ -221,6 +221,8 @@ const runMigrations = async () => {
                 filters JSONB,
                 result_data JSONB,
                 download_url TEXT,
+                filename TEXT,
+                file_size BIGINT,
                 error_message TEXT,
                 user_email VARCHAR(255),
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -2661,7 +2663,10 @@ const runMigrations = async () => {
 
         await client.query(`
             DO $$
-            DECLARE artifact_table TEXT;
+            DECLARE
+                artifact_table TEXT;
+                has_deleted_at BOOLEAN;
+                where_clause TEXT;
             BEGIN
                 FOREACH artifact_table IN ARRAY ARRAY['bugs','tasks','test_cases','test_executions','test_suites','user_stories']
                 LOOP
@@ -2671,12 +2676,19 @@ const runMigrations = async () => {
                         ADD COLUMN IF NOT EXISTS visibility_scope VARCHAR(20),
                         ADD COLUMN IF NOT EXISTS created_by_user_id UUID REFERENCES app_user(id) ON DELETE SET NULL',
                         artifact_table);
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = artifact_table AND column_name = 'deleted_at'
+                    ) INTO has_deleted_at;
+                    where_clause := CASE WHEN has_deleted_at THEN ' WHERE deleted_at IS NULL' ELSE '' END;
+
                     EXECUTE format('DROP INDEX IF EXISTS idx_%s_owner_team_id', artifact_table);
-                    EXECUTE format('CREATE INDEX idx_%s_owner_team_id ON %I(owner_team_id) WHERE deleted_at IS NULL',
-                                   artifact_table, artifact_table);
+                    EXECUTE format('CREATE INDEX idx_%s_owner_team_id ON %I(owner_team_id)%s',
+                                   artifact_table, artifact_table, where_clause);
                     EXECUTE format('DROP INDEX IF EXISTS idx_%s_visibility_scope', artifact_table);
-                    EXECUTE format('CREATE INDEX idx_%s_visibility_scope ON %I(visibility_scope) WHERE deleted_at IS NULL',
-                                   artifact_table, artifact_table);
+                    EXECUTE format('CREATE INDEX idx_%s_visibility_scope ON %I(visibility_scope)%s',
+                                   artifact_table, artifact_table, where_clause);
                 END LOOP;
             END $$;
         `);
