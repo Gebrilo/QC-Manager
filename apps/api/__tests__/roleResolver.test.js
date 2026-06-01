@@ -84,6 +84,37 @@ describe('RoleResolver.resolve', () => {
         expect(out.scope.pm_of_projects).toEqual(['p-A', 'p-B']);
     });
 
+    test('canonicalises role BEFORE the role_permissions DB lookup', async () => {
+        mockQuery
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
+            .mockResolvedValueOnce(rows([]));
+
+        await resolve({ id: 'u', role: 'manager' });
+        expect(mockQuery).toHaveBeenNthCalledWith(
+            1,
+            'SELECT permission_key FROM role_permissions WHERE role_identifier = $1',
+            ['team_manager']
+        );
+    });
+
+    test('contributor (not in BUILT_IN_ROLE_PERMISSION_DEFAULTS) still resolves via catalog', async () => {
+        // Defense against silent lockout: a role that exists in ROLES but not in
+        // the pre-baked defaults map must still get its catalog permissions via
+        // collectRolePermissions, never an empty Set.
+        mockQuery
+            .mockResolvedValueOnce(rows([])) // role_permissions empty
+            .mockResolvedValueOnce(rows([])) // user_permissions empty
+            .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
+            .mockResolvedValueOnce(rows([]));
+
+        const out = await resolve({ id: 'u', role: 'contributor' });
+        expect(out.effectivePermissions.has('qc.tasks.view')).toBe(true);
+        expect(out.effectivePermissions.has('qc.tasks.edit')).toBe(true);
+        expect(out.effectivePermissions.has('qc.mywork.dashboard.view')).toBe(true);
+    });
+
     test('memoizes on req when supplied', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))

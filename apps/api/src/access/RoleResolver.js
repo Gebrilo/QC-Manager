@@ -4,6 +4,7 @@ const db = require('../config/db');
 const {
     BUILT_IN_ROLE_PERMISSION_DEFAULTS,
     ROLES,
+    collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
 
 function canonicalRole(role) {
@@ -20,9 +21,14 @@ async function loadRolePermissions(roleIdentifier) {
     if (result.rows.length > 0) {
         return new Set(result.rows.map(r => r.permission_key));
     }
-    // Fallback to catalog defaults — role_permissions table empty for this role
-    const defaults = BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier] || [];
-    return new Set(defaults);
+    // Fallback: role_permissions table empty for this role. Use the canonical
+    // catalog defaults if available (admin/pm/team_manager/member/viewer/tester),
+    // otherwise resolve via collectRolePermissions so any role defined in the
+    // catalog (e.g. legacy `contributor`) still gets its permissions.
+    if (BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]) {
+        return new Set(BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]);
+    }
+    return new Set(collectRolePermissions(roleIdentifier, new Set()));
 }
 
 async function loadUserPermissions(userId) {
@@ -59,9 +65,11 @@ async function resolve(user, req) {
     if (req && req._accessResolverCache) return req._accessResolverCache;
 
     const roleIdentifier = canonicalRole(user.role);
-    const rolePerms = await loadRolePermissions(roleIdentifier);
-    const userPerms = await loadUserPermissions(user.id);
-    const scope = await loadScope(user.id);
+    const [rolePerms, userPerms, scope] = await Promise.all([
+        loadRolePermissions(roleIdentifier),
+        loadUserPermissions(user.id),
+        loadScope(user.id),
+    ]);
 
     const effective = new Set(rolePerms);
     for (const row of userPerms) {
