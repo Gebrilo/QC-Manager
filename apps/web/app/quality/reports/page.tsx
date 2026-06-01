@@ -1,13 +1,34 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { REPORTS, cn } from '@/components/reports/reportTypes';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { REPORTS } from '@/components/reports/reportTypes';
 import { useReportData } from '@/components/reports/useReportData';
 import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
 import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
 import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
+import { reportsApi } from '@/lib/api';
+
+type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
+type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
+
+const REPORT_TYPE_BY_ID: Record<string, BackendReportType> = {
+    'proj-status': 'project_status',
+    'resource': 'resource_utilization',
+    'test-exec': 'test_results',
+    'readiness': 'dashboard',
+    'quality': 'dashboard',
+    'coverage': 'dashboard',
+    'bug-dist': 'dashboard',
+    'quality-trend': 'dashboard',
+};
+
+const FORMAT_BY_LABEL: Record<string, BackendFormat> = {
+    PDF: 'pdf',
+    Excel: 'xlsx',
+    CSV: 'csv',
+};
 
 function stampNow() {
     return new Date().toLocaleString('en-US', {
@@ -26,6 +47,7 @@ export default function ReportsPage() {
     const [modal, setModal] = useState<'share' | 'schedule' | null>(null);
     const [toast, setToast] = useState<string | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
     const { override: realData, loading: dataLoading } = useReportData(report.id);
@@ -36,13 +58,88 @@ export default function ReportsPage() {
         toastTimer.current = setTimeout(() => setToast(null), 2400);
     }, []);
 
-    function handleGenerate() {
+    const clearPolling = useCallback(() => {
+        if (pollTimer.current) {
+            clearTimeout(pollTimer.current);
+            pollTimer.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (toastTimer.current) clearTimeout(toastTimer.current);
+            clearPolling();
+        };
+    }, [clearPolling]);
+
+    const pollJobUntilDone = useCallback(async (jobId: string, reportName: string, attempt = 0) => {
+        const maxAttempts = 40;
+        const pollIntervalMs = 3000;
+
+        try {
+            const status = await reportsApi.getStatus(jobId);
+            const job = status.data;
+
+            if (job.status === 'completed') {
+                setGenerating(false);
+                setStamp(stampNow());
+
+                if (job.download_url) {
+                    window.open(job.download_url, '_blank', 'noopener,noreferrer');
+                    notify(`${reportName} generated. Download started.`);
+                } else {
+                    notify(`${reportName} generated, but no download link was provided.`);
+                }
+                return;
+            }
+
+            if (job.status === 'failed') {
+                setGenerating(false);
+                notify(job.error_message || `${reportName} generation failed.`);
+                return;
+            }
+
+            if (attempt >= maxAttempts) {
+                setGenerating(false);
+                notify('Report generation timed out. Please try again.');
+                return;
+            }
+
+            pollTimer.current = setTimeout(() => {
+                pollJobUntilDone(jobId, reportName, attempt + 1);
+            }, pollIntervalMs);
+        } catch {
+            if (attempt >= maxAttempts) {
+                setGenerating(false);
+                notify('Could not check report status. Please try again.');
+                return;
+            }
+
+            pollTimer.current = setTimeout(() => {
+                pollJobUntilDone(jobId, reportName, attempt + 1);
+            }, pollIntervalMs);
+        }
+    }, [notify]);
+
+    async function handleGenerate() {
+        clearPolling();
         setGenerating(true);
-        setTimeout(() => {
+
+        try {
+            const reportType = REPORT_TYPE_BY_ID[report.id] || 'dashboard';
+            const backendFormat = FORMAT_BY_LABEL[fmt] || 'pdf';
+
+            const response = await reportsApi.generate({
+                report_type: reportType,
+                format: backendFormat,
+            });
+
+            notify(`Generating ${report.name}...`);
+            await pollJobUntilDone(response.data.job_id, report.name);
+        } catch (err: any) {
             setGenerating(false);
-            setStamp(stampNow());
-            notify(`${report.name} generated`);
-        }, 1500);
+            notify(err?.message || `Failed to start ${report.name} generation.`);
+        }
     }
 
     return (
