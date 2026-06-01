@@ -77,7 +77,7 @@ export function DocumentPreview({ report, generating, stamp, range, project, rea
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{report.category} Report</p>
-                            <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1 leading-none">{report.name}</h3>
+                            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-900 tracking-tight mt-1 leading-none">{report.name}</h3>
                             <p className="text-xs text-slate-400 mt-2">Generated {stamp}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
