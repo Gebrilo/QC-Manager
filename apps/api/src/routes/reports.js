@@ -1,10 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const axios = require('axios');
 const { z } = require('zod');
 const { triggerWorkflow } = require('../utils/n8n');
 const { v4: uuidv4 } = require('uuid');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+
+const FORMAT_MIME = {
+    pdf: 'application/pdf',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    csv: 'text/csv',
+    json: 'application/json',
+};
 
 // Validation schema for report generation
 const generateReportSchema = z.object({
@@ -70,6 +78,54 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
     }
 });
 
+// GET /reports/:job_id/download - Proxy report file download through API (avoids browser CORS)
+router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
+    try {
+        const { job_id } = req.params;
+
+        const result = await db.query('SELECT * FROM report_jobs WHERE id = $1', [job_id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Report job not found' });
+        }
+
+        const job = result.rows[0];
+        if (job.status !== 'completed' || !job.download_url) {
+            return res.status(409).json({ error: 'Report is not ready for download' });
+        }
+
+        const upstream = await axios.get(job.download_url, {
+            responseType: 'stream',
+            timeout: 30000,
+        });
+
+        const filename = job.filename || `report-${job.id}.${job.format || 'dat'}`;
+        const contentType = upstream.headers['content-type'] || FORMAT_MIME[job.format] || 'application/octet-stream';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const contentLength = upstream.headers['content-length'];
+        if (contentLength) {
+            res.setHeader('Content-Length', contentLength);
+        }
+
+        upstream.data.on('error', (streamErr) => {
+            if (!res.headersSent) {
+                res.status(502).json({ error: 'Failed to stream report file' });
+                return;
+            }
+            res.destroy(streamErr);
+        });
+
+        upstream.data.pipe(res);
+    } catch (err) {
+        if (err.response) {
+            return res.status(502).json({ error: 'Failed to fetch report file from source' });
+        }
+        next(err);
+    }
+});
+
 // GET /reports/:job_id - Check report status
 router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
@@ -88,6 +144,9 @@ router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async 
         }
 
         const job = result.rows[0];
+        const proxiedDownloadUrl = job.download_url
+            ? `${req.protocol}://${req.get('host')}/reports/${job.id}/download`
+            : null;
 
         res.json({
             success: true,
@@ -96,7 +155,7 @@ router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async 
                 report_type: job.report_type,
                 format: job.format,
                 status: job.status,
-                download_url: job.download_url,
+                download_url: proxiedDownloadUrl,
                 filename: job.filename,
                 file_size: job.file_size,
                 error_message: job.error_message,
