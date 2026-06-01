@@ -6,6 +6,7 @@ const { z } = require('zod');
 const { triggerWorkflow } = require('../utils/n8n');
 const { v4: uuidv4 } = require('uuid');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const XLSX = require('xlsx');
 
 const FORMAT_MIME = {
     pdf: 'application/pdf',
@@ -13,6 +14,129 @@ const FORMAT_MIME = {
     csv: 'text/csv',
     json: 'application/json',
 };
+
+const REPORT_SQL_BY_TYPE = {
+    dashboard: 'SELECT * FROM v_dashboard_metrics',
+    project_status: 'SELECT * FROM v_projects_with_metrics ORDER BY created_at DESC',
+    resource_utilization: 'SELECT * FROM v_resources_with_utilization ORDER BY resource_name ASC',
+    task_export: 'SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC',
+    test_results: 'SELECT * FROM v_test_execution_trends ORDER BY execution_date DESC LIMIT 500',
+};
+
+function serializeCell(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
+
+function rowsToCsv(rows) {
+    if (!rows.length) {
+        return 'message\nNo data available\n';
+    }
+
+    const headers = Object.keys(rows[0]);
+    const escape = (raw) => {
+        const v = serializeCell(raw);
+        if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+            return `"${v.replace(/"/g, '""')}"`;
+        }
+        return v;
+    };
+
+    const lines = [headers.join(',')];
+    for (const row of rows) {
+        lines.push(headers.map((h) => escape(row[h])).join(','));
+    }
+    return `${lines.join('\n')}\n`;
+}
+
+function escapePdfText(value) {
+    return String(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function buildPdfBuffer(lines) {
+    const safeLines = lines.length ? lines : ['No data available'];
+    const maxLines = 38;
+    const visible = safeLines.slice(0, maxLines);
+
+    const textOps = [
+        'BT',
+        '/F1 12 Tf',
+        '50 800 Td',
+        ...visible.map((line, idx) => {
+            const op = `(${escapePdfText(line)}) Tj`;
+            return idx === 0 ? op : `T* ${op}`;
+        }),
+        'ET',
+    ].join('\n');
+
+    const objects = {
+        1: '<< /Type /Catalog /Pages 2 0 R >>',
+        2: '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        3: '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+        4: '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        5: `<< /Length ${Buffer.byteLength(textOps, 'utf8')} >>\nstream\n${textOps}\nendstream`,
+    };
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+
+    for (let i = 1; i <= 5; i++) {
+        offsets[i] = Buffer.byteLength(pdf, 'utf8');
+        pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
+    }
+
+    const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+    pdf += 'xref\n';
+    pdf += '0 6\n';
+    pdf += '0000000000 65535 f \n';
+    for (let i = 1; i <= 5; i++) {
+        pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+    }
+
+    pdf += 'trailer\n';
+    pdf += '<< /Size 6 /Root 1 0 R >>\n';
+    pdf += 'startxref\n';
+    pdf += `${xrefOffset}\n`;
+    pdf += '%%EOF';
+
+    return Buffer.from(pdf, 'utf8');
+}
+
+async function buildReportPayload(reportType, format) {
+    const sql = REPORT_SQL_BY_TYPE[reportType] || REPORT_SQL_BY_TYPE.dashboard;
+    const result = await db.query(sql);
+    const rows = result.rows || [];
+    const generatedAt = new Date().toISOString();
+
+    if (format === 'json') {
+        const content = Buffer.from(JSON.stringify({ generated_at: generatedAt, report_type: reportType, rows }, null, 2), 'utf8');
+        return { content, filename: `${reportType}-${Date.now()}.json` };
+    }
+
+    if (format === 'csv') {
+        const content = Buffer.from(rowsToCsv(rows), 'utf8');
+        return { content, filename: `${reportType}-${Date.now()}.csv` };
+    }
+
+    if (format === 'xlsx') {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ message: 'No data available' }]);
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        const content = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        return { content, filename: `${reportType}-${Date.now()}.xlsx` };
+    }
+
+    const lines = [
+        `QC Manager Report: ${reportType}`,
+        `Generated at: ${generatedAt}`,
+        `Rows: ${rows.length}`,
+        '',
+        ...rows.slice(0, 30).map((row, idx) => `${idx + 1}. ${JSON.stringify(row)}`),
+    ];
+    const content = buildPdfBuffer(lines);
+    return { content, filename: `${reportType}-${Date.now()}.pdf` };
+}
 
 // Validation schema for report generation
 const generateReportSchema = z.object({
@@ -51,14 +175,90 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
             ]
         );
 
+        if (REPORT_SQL_BY_TYPE[data.report_type]) {
+            try {
+                const payload = await buildReportPayload(data.report_type, data.format);
+                await db.query(
+                    `UPDATE report_jobs
+                     SET status = $1,
+                         result_data = $2,
+                         download_url = $3,
+                         error_message = NULL,
+                         completed_at = NOW(),
+                         updated_at = NOW()
+                     WHERE id = $4`,
+                    [
+                        'completed',
+                        JSON.stringify({
+                            inline_file_base64: payload.content.toString('base64'),
+                            mime_type: FORMAT_MIME[data.format] || 'application/octet-stream',
+                            filename: payload.filename,
+                            file_size: payload.content.length,
+                        }),
+                        'inline',
+                        jobId,
+                    ]
+                );
+            } catch (inlineErr) {
+                const message = String(inlineErr.message || 'Report generation failed').slice(0, 1024);
+                await db.query(
+                    `UPDATE report_jobs
+                     SET status = $1,
+                         error_message = $2,
+                         completed_at = NOW(),
+                         updated_at = NOW()
+                     WHERE id = $3`,
+                    ['failed', message, jobId]
+                );
+
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to generate report',
+                    message,
+                });
+            }
+
+            return res.status(202).json({
+                success: true,
+                message: 'Report generation started',
+                data: {
+                    job_id: jobId,
+                    status: 'processing',
+                    report_type: data.report_type,
+                    format: data.format,
+                    estimated_completion: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+                    status_url: `/reports/${jobId}`,
+                },
+            });
+        }
+
         // Trigger n8n workflow for report generation (async)
-        triggerWorkflow('generate-report', {
-            job_id: jobId,
-            report_type: data.report_type,
-            format: data.format,
-            filters: data.filters || {},
-            user_email: data.user_email
-        });
+        try {
+            await triggerWorkflow('generate-report', {
+                job_id: jobId,
+                report_type: data.report_type,
+                format: data.format,
+                filters: data.filters || {},
+                user_email: data.user_email
+            }, { strict: true });
+        } catch (triggerErr) {
+            const errorMessage = String(triggerErr.message || 'Unknown report trigger error').slice(0, 1024);
+            await db.query(
+                `UPDATE report_jobs
+                 SET status = $1,
+                     error_message = $2,
+                     completed_at = NOW(),
+                     updated_at = NOW()
+                 WHERE id = $3`,
+                ['failed', errorMessage, jobId]
+            );
+
+            return res.status(502).json({
+                success: false,
+                error: 'Failed to start report generation',
+                message: errorMessage
+            });
+        }
 
         // Return 202 Accepted with job_id
         res.status(202).json({
@@ -91,6 +291,18 @@ router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'
         const job = result.rows[0];
         if (job.status !== 'completed' || !job.download_url) {
             return res.status(409).json({ error: 'Report is not ready for download' });
+        }
+
+        if (job.result_data && job.result_data.inline_file_base64) {
+            const inlineData = job.result_data;
+            const contentBuffer = Buffer.from(inlineData.inline_file_base64, 'base64');
+            const contentType = inlineData.mime_type || FORMAT_MIME[job.format] || 'application/octet-stream';
+            const filename = inlineData.filename || job.filename || `report-${job.id}.${job.format || 'dat'}`;
+
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', contentBuffer.length);
+            return res.send(contentBuffer);
         }
 
         const upstream = await axios.get(job.download_url, {
@@ -144,7 +356,8 @@ router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async 
         }
 
         const job = result.rows[0];
-        const proxiedDownloadUrl = job.download_url
+        const hasInlineFile = Boolean(job.result_data && job.result_data.inline_file_base64);
+        const proxiedDownloadUrl = (job.download_url || hasInlineFile)
             ? `${req.protocol}://${req.get('host')}/reports/${job.id}/download`
             : null;
 
@@ -156,8 +369,8 @@ router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async 
                 format: job.format,
                 status: job.status,
                 download_url: proxiedDownloadUrl,
-                filename: job.filename,
-                file_size: job.file_size,
+                filename: job.filename || (job.result_data && job.result_data.filename) || null,
+                file_size: job.file_size || (job.result_data && job.result_data.file_size) || null,
                 error_message: job.error_message,
                 filters: job.filters,
                 created_at: job.created_at,

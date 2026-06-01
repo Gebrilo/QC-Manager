@@ -14,6 +14,11 @@ jest.mock('axios', () => ({
   get: (...args) => mockAxiosGet(...args),
 }));
 
+const mockTriggerWorkflow = jest.fn();
+jest.mock('../src/utils/n8n', () => ({
+  triggerWorkflow: (...args) => mockTriggerWorkflow(...args),
+}));
+
 function makeApp() {
   const app = express();
   app.use(express.json());
@@ -79,6 +84,33 @@ describe('GET /reports/:job_id/download', () => {
       responseType: 'stream',
     }));
   });
+
+  it('returns inline generated report content when stored in result_data', async () => {
+    const inlinePayload = Buffer.from('inline file bytes').toString('base64');
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 'job-inline',
+        status: 'completed',
+        download_url: 'inline',
+        format: 'pdf',
+        filename: null,
+        result_data: {
+          inline_file_base64: inlinePayload,
+          mime_type: 'application/pdf',
+          filename: 'dashboard-report.pdf',
+          file_size: 17,
+        },
+      }],
+    });
+
+    const res = await request(makeApp()).get('/reports/job-inline/download');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(res.headers['content-disposition']).toContain('dashboard-report.pdf');
+    expect(res.body.toString()).toBe('inline file bytes');
+    expect(mockAxiosGet).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /reports/:job_id', () => {
@@ -107,5 +139,63 @@ describe('GET /reports/:job_id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.download_url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/reports\/job-9\/download$/);
+  });
+});
+
+describe('POST /reports', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('generates dashboard report inline and does not call n8n', async () => {
+    mockQuery.mockImplementation((sql) => {
+      if (String(sql).includes('INSERT INTO report_jobs')) {
+        return Promise.resolve({ rows: [] });
+      }
+      if (String(sql).includes('SELECT * FROM v_dashboard_metrics')) {
+        return Promise.resolve({ rows: [{ total_tasks: 5, tasks_done: 3 }] });
+      }
+      if (String(sql).includes('UPDATE report_jobs')) {
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await request(makeApp())
+      .post('/reports')
+      .send({ report_type: 'dashboard', format: 'pdf' });
+
+    expect(res.status).toBe(202);
+    expect(res.body.success).toBe(true);
+    expect(mockTriggerWorkflow).not.toHaveBeenCalled();
+    const updateCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('UPDATE report_jobs'));
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1][0]).toBe('completed');
+  });
+
+  it('generates project_status report inline and does not call n8n', async () => {
+    mockQuery.mockImplementation((sql) => {
+      if (String(sql).includes('INSERT INTO report_jobs')) {
+        return Promise.resolve({ rows: [] });
+      }
+      if (String(sql).includes('SELECT * FROM v_projects_with_metrics')) {
+        return Promise.resolve({ rows: [{ project_name: 'Core', completion_pct: 91 }] });
+      }
+      if (String(sql).includes('UPDATE report_jobs')) {
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await request(makeApp())
+      .post('/reports')
+      .send({ report_type: 'project_status', format: 'xlsx' });
+
+    expect(res.status).toBe(202);
+    expect(res.body.success).toBe(true);
+    expect(mockTriggerWorkflow).not.toHaveBeenCalled();
+    const updateCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('UPDATE report_jobs'));
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1][0]).toBe('completed');
   });
 });
