@@ -1,382 +1,115 @@
 'use client';
 
-import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Rocket, TrendingUp, Scale, FileSpreadsheet, Printer } from 'lucide-react';
-import { ReportGenerator } from '@/components/reports/ReportGenerator';
-import {
-    ReleaseReadinessWidget,
-    TrendAnalysisWidget,
-    ProjectHealthHeatmap,
-    WorkloadBalanceWidget
-} from '@/components/governance';
-import {
-    getDashboardSummary,
-    getProjectHealth,
-    getExecutionTrend,
-    getWorkloadBalance
-} from '@/services/governanceApi';
-import type { ProjectHealth, TrendData, WorkloadBalance } from '@/types/governance';
+import React, { useState, useRef, useCallback } from 'react';
+import { REPORTS, cn } from '@/components/reports/reportTypes';
+import { LibraryRail } from '@/components/reports/LibraryRail';
+import { ActionBar } from '@/components/reports/ActionBar';
+import { DocumentPreview } from '@/components/reports/DocumentPreview';
+import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
+import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
 
-type ReportType = 'READINESS' | 'WEEKLY_HEALTH' | 'COVERAGE_GAP' | null;
-type TabType = 'custom' | 'governance';
-
-export default function ReportsPage() {
-    const [activeTab, setActiveTab] = useState<TabType>('custom');
-    const [selectedReport, setSelectedReport] = useState<ReportType>(null);
-    const [reportData, setReportData] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-
-    const handleSelectReport = async (type: ReportType) => {
-        setSelectedReport(type);
-        setLoading(true);
-        try {
-            // Fetch relevant data based on report type
-            if (type === 'READINESS') {
-                const data = await getProjectHealth();
-                setReportData(data);
-            } else if (type === 'WEEKLY_HEALTH') {
-                const [health, trend] = await Promise.all([
-                    getProjectHealth(),
-                    getExecutionTrend()
-                ]);
-                setReportData({ health, trend });
-            } else if (type === 'COVERAGE_GAP') {
-                const workload = await getWorkloadBalance();
-                setReportData(workload);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleExportExcel = () => {
-        if (!selectedReport || !reportData) return;
-
-        let dataToExport: any[] = [];
-        let fileName = 'Report.xlsx';
-
-        if (selectedReport === 'READINESS') {
-            fileName = 'Release_Readiness_Report.xlsx';
-            dataToExport = (reportData as ProjectHealth[]).map(p => ({
-                Project: p.project_name,
-                Status: p.overall_health_status,
-                'Pass Rate (%)': p.latest_pass_rate_pct,
-                'Defects': p.blocking_issue_count + p.latest_failed_count,
-                'Last Run': p.latest_execution_date ? new Date(p.latest_execution_date).toLocaleDateString() : 'N/A'
-            }));
-        } else if (selectedReport === 'WEEKLY_HEALTH') {
-            fileName = 'Weekly_Health_Report.xlsx';
-            // Export the full health list for detailed analysis
-            dataToExport = (reportData.health as ProjectHealth[]).map(p => ({
-                Project: p.project_name,
-                Status: p.overall_health_status,
-                'Pass Rate (%)': p.latest_pass_rate_pct,
-                'Trend (Change)': p.pass_rate_change,
-                'Risk Level': p.risk_level
-            }));
-        } else if (selectedReport === 'COVERAGE_GAP') {
-            fileName = 'Coverage_Workload_Report.xlsx';
-            dataToExport = (reportData as WorkloadBalance[]).map(w => ({
-                Project: w.project_name,
-                'Total Tasks': w.total_tasks,
-                'Total Tests': w.total_tests,
-                'Ratio': w.tests_per_task_ratio,
-                'Balance Status': w.balance_status
-            }));
-        }
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Report Data");
-        XLSX.writeFile(wb, fileName);
-    };
-
-    return (
-        <div className="space-y-6 print:space-y-0 py-6 px-4 max-w-7xl mx-auto">
-            {/* Page header */}
-            <div className="print:hidden">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Reports & Exports</h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Generate and export quality governance reports</p>
-                    </div>
-                </div>
-
-                {/* Tab Navigation */}
-                <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-                    <button
-                        onClick={() => setActiveTab('custom')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                            activeTab === 'custom'
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
-                    >
-                        Custom Reports
-                        {activeTab === 'custom' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
-                        )}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('governance')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                            activeTab === 'governance'
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
-                    >
-                        Governance Reports
-                        {activeTab === 'governance' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            <div className="space-y-8 print:p-0">
-
-                {/* Custom Reports Tab */}
-                {activeTab === 'custom' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <ReportGenerator />
-                    </div>
-                )}
-
-                {/* Governance Reports Tab */}
-                {activeTab === 'governance' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-8">
-
-                        {/* Report Selector - Hidden on Print */}
-                        <div className="print:hidden grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <ReportCard
-                        title="Release Readiness Report"
-                        description="Detailed status of all projects targeting the upcoming release window. Includes risk assessment and go/no-go status."
-                        icon={<Rocket className="w-7 h-7" strokeWidth={1.75} />}
-                        active={selectedReport === 'READINESS'}
-                        onClick={() => handleSelectReport('READINESS')}
-                    />
-                    <ReportCard
-                        title="Weekly Quality Health"
-                        description="High-level summary of pass rates, execution trends, and critical defects over the last 7 days."
-                        icon={<TrendingUp className="w-7 h-7" strokeWidth={1.75} />}
-                        active={selectedReport === 'WEEKLY_HEALTH'}
-                        onClick={() => handleSelectReport('WEEKLY_HEALTH')}
-                    />
-                            <ReportCard
-                                title="Test Coverage & Workload"
-                                description="Analysis of test coverage gaps vs total tasks, and tester workload distribution."
-                                icon={<Scale className="w-7 h-7" strokeWidth={1.75} />}
-                                active={selectedReport === 'COVERAGE_GAP'}
-                                onClick={() => handleSelectReport('COVERAGE_GAP')}
-                            />
-                        </div>
-
-                        {/* Report Preview / Print Area */}
-                        {selectedReport && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="flex justify-between items-center mb-6 print:hidden">
-                                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Report Preview</h2>
-                                    <div className="flex gap-2">
-                                        <Button onClick={handleExportExcel} variant="outline" className="flex items-center gap-2">
-                                            <FileSpreadsheet className="w-4 h-4" strokeWidth={1.75} />
-                                            Export Excel
-                                        </Button>
-                                        <Button onClick={handlePrint} variant="primary" className="flex items-center gap-2">
-                                            <Printer className="w-4 h-4" strokeWidth={1.75} />
-                                            Print / Save PDF
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* The Actual Report Content (A4-ish container) */}
-                                <div className="bg-white text-slate-900 p-8 sm:p-12 shadow-lg print:shadow-none print:p-0 min-h-[1000px] print:min-h-0 mx-auto max-w-[210mm] print:max-w-none print:w-full rounded-xl print:rounded-none border print:border-none">
-
-                                    {/* Report Header */}
-                                    <div className="border-b-2 border-slate-800 pb-6 mb-8 flex justify-between items-end">
-                                        <div>
-                                            <h1 className="text-3xl font-bold uppercase tracking-tight text-slate-900">
-                                                {selectedReport === 'READINESS' && 'Release Readiness Report'}
-                                                {selectedReport === 'WEEKLY_HEALTH' && 'Weekly Quality Health'}
-                                                {selectedReport === 'COVERAGE_GAP' && 'Coverage & Workload Analysis'}
-                                            </h1>
-                                            <p className="text-slate-500 mt-2">Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-xl font-bold text-indigo-700">QC Manager</div>
-                                            <div className="text-sm text-slate-500">Governance System</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Report Body */}
-                                    {loading ? (
-                                        <div className="py-20 text-center">
-                                            <div className="animate-spin h-8 w-8 border-2 border-indigo-400 border-t-transparent rounded-full mx-auto mb-4" />
-                                            <p className="text-slate-500">Loading report data...</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-8">
-
-                                            {selectedReport === 'READINESS' && (
-                                                <>
-                                                    <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-                                                        <h3 className="font-semibold text-lg mb-2">Executive Summary</h3>
-                                                        <p className="text-slate-700">
-                                                            This report outlines the current readiness status of all active projects.
-                                                            Projects marked as <span className="font-bold text-rose-600">RED</span> have critical blocking issues preventing release.
-                                                        </p>
-                                                    </div>
-
-                                                    <table className="w-full text-sm text-left border-collapse">
-                                                <thead>
-                                                    <tr className="border-b-2 border-slate-300">
-                                                                <th className="py-3 font-bold text-slate-700">Project</th>
-                                                                <th className="py-3 font-bold text-slate-700">Status</th>
-                                                                <th className="py-3 font-bold text-slate-700">Pass Rate</th>
-                                                                <th className="py-3 font-bold text-slate-700">Unresolved Defects</th>
-                                                                <th className="py-3 font-bold text-slate-700">Recommendation</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-200">
-                                                            {(reportData as ProjectHealth[] || []).map(p => (
-                                                                <tr key={p.project_id}>
-                                                                    <td className="py-3 font-medium">{p.project_name}</td>
-                                                                    <td className="py-3">
-                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${p.overall_health_status === 'GREEN' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            p.overall_health_status === 'AMBER' ? 'bg-amber-100 text-amber-700' :
-                                                                                'bg-rose-100 text-rose-700'
-                                                                            }`}>
-                                                                            {p.overall_health_status}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="py-3">{p.latest_pass_rate_pct}%</td>
-                                                                    <td className="py-3">{p.blocking_issue_count + p.latest_failed_count}</td>
-                                                                    <td className="py-3 text-slate-600 italic">
-                                                                        {p.overall_health_status === 'GREEN' ? 'Proceed with Release' :
-                                                                            p.overall_health_status === 'AMBER' ? 'Monitor Closely' : 'Block Release'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </>
-                                            )}
-
-                                            {selectedReport === 'WEEKLY_HEALTH' && reportData && (
-                                                <>
-                                                    <div className="h-[300px] mb-8 border border-slate-200 rounded-lg p-4">
-                                                        <h3 className="text-center font-bold mb-4">30-Day Execution Trend</h3>
-                                                        <TrendAnalysisWidget data={reportData.trend} title="" />
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 gap-8">
-                                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-lg border border-emerald-100 dark:border-emerald-900">
-                                                            <h3 className="text-emerald-800 dark:text-emerald-300 font-bold text-lg mb-2">Top Performers</h3>
-                                                            <ul className="space-y-2">
-                                                                {(reportData.health as ProjectHealth[])
-                                                                    .filter(p => p.overall_health_status === 'GREEN')
-                                                                    .slice(0, 3)
-                                                                    .map(p => (
-                                                                        <li key={p.project_id} className="flex justify-between">
-                                                                            <span>{p.project_name}</span>
-                                                                            <span className="font-bold">{p.latest_pass_rate_pct}%</span>
-                                                                        </li>
-                                                                    ))}
-                                                            </ul>
-                                                        </div>
-                                                        <div className="bg-rose-50 dark:bg-rose-900/20 p-6 rounded-lg border border-rose-100 dark:border-rose-900">
-                                                            <h3 className="text-rose-800 dark:text-rose-300 font-bold text-lg mb-2">Projects at Risk</h3>
-                                                            <ul className="space-y-2">
-                                                                {(reportData.health as ProjectHealth[])
-                                                                    .filter(p => p.overall_health_status === 'RED')
-                                                                    .slice(0, 3)
-                                                                    .map(p => (
-                                                                        <li key={p.project_id} className="flex justify-between">
-                                                                            <span>{p.project_name}</span>
-                                                                            <span className="font-bold">{p.latest_pass_rate_pct}%</span>
-                                                                        </li>
-                                                                    ))}
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {selectedReport === 'COVERAGE_GAP' && (
-                                                <>
-                                                    <p className="text-slate-700 mb-6">
-                                                        Analysis of test coverage relative to feature development tasks. Ratios below 1.0 indicate insufficient testing for developed features.
-                                                    </p>
-                                                    <table className="w-full text-sm text-left border-collapse">
-                                                <thead>
-                                                    <tr className="border-b-2 border-slate-300">
-                                                                <th className="py-3 font-bold text-slate-700">Project</th>
-                                                                <th className="py-3 font-bold text-slate-700">Total Tasks</th>
-                                                                <th className="py-3 font-bold text-slate-700">Total Tests</th>
-                                                                <th className="py-3 font-bold text-slate-700">Ratio (Tests/Task)</th>
-                                                                <th className="py-3 font-bold text-slate-700">Balance</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-200">
-                                                            {(reportData as WorkloadBalance[] || []).map((w, i) => (
-                                                                <tr key={i}>
-                                                                    <td className="py-3 font-medium">{w.project_name}</td>
-                                                                    <td className="py-3">{w.total_tasks}</td>
-                                                                    <td className="py-3">{w.total_tests}</td>
-                                                                    <td className="py-3 font-bold">{w.tests_per_task_ratio}</td>
-                                                                    <td className="py-3">
-                                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${w.balance_status === 'BALANCED' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            w.balance_status === 'UNDER_TESTED' ? 'bg-rose-100 text-rose-700' :
-                                                                                'bg-blue-100 text-blue-700'
-                                                                            }`}>
-                                                                            {w.balance_status}
-                                                                        </span>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </>
-                                            )}
-
-                                        </div>
-                                    )}
-
-                                    {/* Footer */}
-                                    <div className="mt-12 pt-6 border-t border-slate-200 text-center text-sm text-slate-400">
-                                        QC Management Tool • Confidential • Internal Use Only
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+function stampNow() {
+    return new Date().toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+    });
 }
 
-function ReportCard({ title, description, icon, onClick, active }: { title: string; description: string; icon: React.ReactNode; onClick: () => void; active: boolean }) {
+export default function ReportsPage() {
+    const [activeId, setActiveId] = useState('readiness');
+    const [generating, setGenerating] = useState(false);
+    const [fmt, setFmt] = useState('PDF');
+    const [range, setRange] = useState('Last 7 days');
+    const [project, setProject] = useState('All projects');
+    const [stamp, setStamp] = useState(stampNow);
+    const [modal, setModal] = useState<'share' | 'schedule' | null>(null);
+    const [toast, setToast] = useState<string | null>(null);
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
+
+    const notify = useCallback((msg: string) => {
+        setToast(msg);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 2400);
+    }, []);
+
+    function handleGenerate() {
+        setGenerating(true);
+        setTimeout(() => {
+            setGenerating(false);
+            setStamp(stampNow());
+            notify(`${report.name} generated`);
+        }, 1500);
+    }
+
     return (
-        <Card
-            className={`cursor-pointer transition-all hover:shadow-md border-2 ${active ? 'border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900' : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700'}`}
-            onClick={onClick}
-        >
-            <div className="p-6">
-                <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">
-                    {icon}
+        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+            <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-6">
+                {/* Page header */}
+                <div className="flex items-end justify-between gap-4 mb-5 flex-wrap">
+                    <div>
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Report Studio</h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Generate, preview and share quality governance reports.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {REPORTS.length} report types
+                        </span>
+                    </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{title}</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">{description}</p>
+
+                {/* Studio layout: rail + workspace */}
+                <div className="flex gap-5 items-start">
+                    <LibraryRail activeId={report.id} onSelect={setActiveId} />
+
+                    <div className="flex-1 min-w-0 space-y-5">
+                        <ActionBar
+                            report={report}
+                            generating={generating}
+                            onGenerate={handleGenerate}
+                            fmt={fmt}
+                            setFmt={setFmt}
+                            range={range}
+                            setRange={setRange}
+                            project={project}
+                            setProject={setProject}
+                            onShare={() => setModal('share')}
+                            onSchedule={() => setModal('schedule')}
+                            notify={notify}
+                        />
+                        <DocumentPreview
+                            report={report}
+                            generating={generating}
+                            stamp={stamp}
+                            range={range}
+                            project={project}
+                        />
+                        <RecentScheduledPanel
+                            notify={notify}
+                            onSchedule={() => setModal('schedule')}
+                        />
+                    </div>
+                </div>
             </div>
-        </Card>
+
+            {modal === 'share' && (
+                <ShareModal
+                    report={{ id: report.id, name: report.name, format: fmt }}
+                    onClose={() => setModal(null)}
+                    notify={notify}
+                />
+            )}
+            {modal === 'schedule' && (
+                <ScheduleModal
+                    report={{ name: report.name }}
+                    onClose={() => setModal(null)}
+                    notify={notify}
+                />
+            )}
+            <Toast toast={toast} />
+        </div>
     );
 }
