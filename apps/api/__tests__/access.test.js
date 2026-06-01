@@ -207,6 +207,16 @@ describe('AccessEngine.buildListFilter', () => {
         await expect(buildListFilter({ id: 'u', role: 'member' }, 'mysterious', 'view')).rejects.toThrow(/Unknown artifact type/);
     });
 
+    test('binds user.id once and reuses it across assignee + ACL branches', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.view_own']),
+            scope: { team_id: 't-1', team_type: 'qc', pm_of_projects: [] },
+        });
+        const f = await buildListFilter({ id: 'u-7', role: 'member' }, 'bug', 'view');
+        const occurrences = f.params.filter(p => p === 'u-7').length;
+        expect(occurrences).toBe(1);
+    });
+
     test('returns FALSE clause when user has no applicable branches', async () => {
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set([]), // no perms at all

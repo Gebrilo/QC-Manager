@@ -191,7 +191,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         branches.push(`${tableAlias}.owner_team_id = ${bind(scope.team_id)}`);
     }
 
-    // assignee (always bind user.id once, even if branch not added, since it's reused for ACL)
+    // assignee (bind user.id once; same placeholder is reused for ACL below)
     const userBind = bind(user.id);
     if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
         branches.push(
@@ -207,17 +207,16 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         );
     }
 
-    // artifact_access ACL
+    // artifact_access ACL (reuses userBind from the assignee branch)
     {
         const roleBind = bind(canonicalRole(user.role));
         const teamForAcl = scope.team_id ? bind(scope.team_id) : 'NULL';
-        const userForAcl = bind(user.id);
         const typeBind = bind(artifactType);
         const verbBind = bind(verb);
         branches.push(
             `EXISTS (SELECT 1 FROM artifact_access aa
                WHERE aa.artifact_type = ${typeBind} AND aa.artifact_id = ${tableAlias}.id AND aa.action = ${verbBind}
-                 AND ((aa.subject_type='user' AND aa.subject_id=${userForAcl})
+                 AND ((aa.subject_type='user' AND aa.subject_id=${userBind})
                    OR (aa.subject_type='team' AND aa.subject_id=${teamForAcl})
                    OR (aa.subject_type='role' AND aa.subject_id=${roleBind})))`
         );
