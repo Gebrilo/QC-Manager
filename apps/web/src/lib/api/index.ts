@@ -528,7 +528,13 @@ export const reportsApi = {
         }),
 
     getStatus: (jobId: string) =>
-        fetchApi<{ success: boolean; data: ReportJob }>(`/reports/${jobId}`),
+        fetchApi<{ success: boolean; data: ReportJob }>(`/reports/${jobId}?_ts=${Date.now()}`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                Pragma: 'no-cache',
+            },
+        }),
 
     list: (params?: { user_email?: string; status?: string; limit?: number; offset?: number }) => {
         const query = new URLSearchParams(params as any).toString();
