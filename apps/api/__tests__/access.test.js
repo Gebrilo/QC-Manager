@@ -228,3 +228,39 @@ describe('AccessEngine.buildListFilter', () => {
         expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM artifact_access/);
     });
 });
+
+describe('AccessEngine.filterFields', () => {
+    test('strips test_case steps + expected_results when user lacks view_steps', () => {
+        const out = filterFields(
+            { effectivePermissions: new Set([]) },
+            'test_case',
+            { id: 'tc1', title: 'x', steps: 'do thing', expected_results: 'pass' }
+        );
+        expect(out.steps).toBeUndefined();
+        expect(out.expected_results).toBeUndefined();
+        expect(out.title).toBe('x');
+    });
+
+    test('keeps test_case steps when user has view_steps', () => {
+        const out = filterFields(
+            { effectivePermissions: new Set(['qc.testcases.view_steps']) },
+            'test_case',
+            { id: 'tc1', title: 'x', steps: 'do thing', expected_results: 'pass' }
+        );
+        expect(out.steps).toBe('do thing');
+        expect(out.expected_results).toBe('pass');
+    });
+
+    test('non-test_case artifacts pass through unchanged', () => {
+        const row = { id: 'b1', title: 'bug', severity: 'Major impact' };
+        expect(filterFields({ effectivePermissions: new Set() }, 'bug', row)).toEqual(row);
+    });
+
+    test('returns a NEW object rather than mutating the input row', () => {
+        const row = { id: 'tc1', title: 'x', steps: 'secret', expected_results: 'p' };
+        const out = filterFields({ effectivePermissions: new Set() }, 'test_case', row);
+        expect(out).not.toBe(row);
+        expect(row.steps).toBe('secret'); // input unmutated
+        expect(out.steps).toBeUndefined();
+    });
+});

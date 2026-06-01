@@ -240,7 +240,16 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     return { clause, params, nextIdx: idx };
 }
 
-function filterFields(_user, _type, row) { return row; }
+function filterFields(resolvedUser, artifactType, row) {
+    if (artifactType !== 'test_case') return row;
+    if (resolvedUser && resolvedUser.effectivePermissions && resolvedUser.effectivePermissions.has('qc.testcases.view_steps')) {
+        return row;
+    }
+    const clone = { ...row };
+    delete clone.steps;
+    delete clone.expected_results;
+    return clone;
+}
 
 module.exports = {
     canPerform,
