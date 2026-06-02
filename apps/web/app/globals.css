@@ -119,3 +119,17 @@
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-slate-200 dark:bg-slate-700 rounded-full;
 }
+
+@media print {
+  html,
+  body {
+    overflow: visible;
+    height: auto;
+    background: white;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
