@@ -19,7 +19,7 @@ interface ReportGeneratorProps {
 
 export function ReportGenerator({ projects = [] }: ReportGeneratorProps) {
     const [reportType, setReportType] = useState<'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard'>('project_status');
-    const [format, setFormat] = useState<'xlsx' | 'csv' | 'json' | 'pdf'>('xlsx');
+    const [format, setFormat] = useState<'xlsx' | 'csv' | 'json'>('xlsx');
     const [filters, setFilters] = useState<ReportFilters>({});
     const [isGenerating, setIsGenerating] = useState(false);
     const [currentJob, setCurrentJob] = useState<ReportJob | null>(null);
@@ -147,8 +147,7 @@ export function ReportGenerator({ projects = [] }: ReportGeneratorProps) {
                             options={[
                                 { value: 'xlsx', label: 'Excel (.xlsx)' },
                                 { value: 'csv', label: 'CSV (.csv)' },
-                                { value: 'json', label: 'JSON (.json)' },
-                                { value: 'pdf', label: 'PDF (.pdf)' }
+                                { value: 'json', label: 'JSON (.json)' }
                             ]}
                             className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                         />

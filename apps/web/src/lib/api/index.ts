@@ -565,31 +565,12 @@ export const dashboardApi = {
 export const reportsApi = {
     generate: (data: {
         report_type: 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
-        format?: 'xlsx' | 'csv' | 'json' | 'pdf';
+        format?: 'xlsx' | 'csv' | 'json';
         filters?: {
             project_ids?: string[];
             status?: string[];
             date_from?: string;
             date_to?: string;
-        };
-        presentation?: {
-            report_id?: string;
-            name: string;
-            category?: string;
-            generated_label?: string;
-            range?: string;
-            project?: string;
-            summary?: string;
-            summary_tone?: string;
-            kpis?: Array<{ label: string; value: string; sub?: string; delta?: string; trend?: string }>;
-            chart?: {
-                title: string;
-                unit?: string;
-                bars: Array<{ label: string; value: number; status?: string }>;
-            };
-            columns?: string[];
-            rows?: Array<{ c: string[]; status?: string; rate?: number; defects?: number; rec?: string }>;
-            gauge?: { value: number; label: string; caption?: string };
         };
         user_email?: string;
     }) =>

@@ -24,6 +24,9 @@ function makeApp() {
   app.use(express.json());
   app.use('/reports', require('../src/routes/reports'));
   app.use((err, _req, res, _next) => {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation Error', details: err.errors });
+    }
     res.status(500).json({ error: err.message });
   });
   return app;
@@ -149,7 +152,7 @@ describe('POST /reports', () => {
     jest.clearAllMocks();
   });
 
-  it('generates dashboard report inline and does not call n8n', async () => {
+  it('generates dashboard JSON report inline and does not call n8n', async () => {
     mockQuery.mockImplementation((sql) => {
       if (String(sql).includes('INSERT INTO report_jobs')) {
         return Promise.resolve({ rows: [] });
@@ -165,7 +168,7 @@ describe('POST /reports', () => {
 
     const res = await request(makeApp())
       .post('/reports')
-      .send({ report_type: 'dashboard', format: 'pdf' });
+      .send({ report_type: 'dashboard', format: 'json' });
 
     expect(res.status).toBe(202);
     expect(res.body.success).toBe(true);
@@ -175,67 +178,26 @@ describe('POST /reports', () => {
     expect(updateCall[1][0]).toBe('completed');
   });
 
-  it('renders PDF from the provided Report Studio presentation model', async () => {
+  it('does not render PDF inline when PDF generation is requested through the API', async () => {
     mockQuery.mockImplementation((sql) => {
       if (String(sql).includes('INSERT INTO report_jobs')) {
         return Promise.resolve({ rows: [] });
       }
-      if (String(sql).includes('SELECT * FROM v_dashboard_metrics')) {
-        return Promise.resolve({ rows: [{ total_tasks: 5, tasks_done: 3 }] });
-      }
-      if (String(sql).includes('UPDATE report_jobs')) {
-        return Promise.resolve({ rows: [] });
-      }
       return Promise.resolve({ rows: [] });
     });
+    mockTriggerWorkflow.mockResolvedValueOnce({ success: true });
 
     const res = await request(makeApp())
       .post('/reports')
-      .send({
-        report_type: 'dashboard',
-        format: 'pdf',
-        presentation: {
-          report_id: 'readiness',
-          name: 'Release Readiness',
-          category: 'Governance',
-          generated_label: 'Jun 2, 2026, 07:15 AM',
-          range: 'Last 7 days',
-          project: 'All projects',
-          summary: 'Three projects carry critical blocking defects.',
-          summary_tone: 'atrisk',
-          kpis: [
-            { label: 'Projects assessed', value: '8', sub: '3 blocked' },
-            { label: 'Avg pass rate', value: '71%', sub: 'vs 85% gate' },
-            { label: 'Open blockers', value: '12', sub: 'across 3 projects' },
-          ],
-          chart: {
-            title: 'Pass rate by project',
-            unit: '%',
-            bars: [
-              { label: 'AUTH', value: '94', status: 'complete' },
-              { label: 'CST', value: '41', status: 'atrisk' },
-            ],
-          },
-          columns: ['Project', 'Status', 'Pass rate', 'Blockers', 'Recommendation'],
-          rows: [
-            { c: ['CST'], status: 'atrisk', rate: '41', defects: '5', rec: 'Block release' },
-            { c: ['AUTH'], status: 'complete', rate: '94', defects: '0', rec: 'Approve release' },
-          ],
-          gauge: { value: '71', label: 'Avg pass rate', caption: 'Below 85% gate' },
-        },
-      });
+      .send({ report_type: 'dashboard', format: 'pdf' });
 
     expect(res.status).toBe(202);
+    expect(mockTriggerWorkflow).toHaveBeenCalledWith('generate-report', expect.objectContaining({
+      report_type: 'dashboard',
+      format: 'pdf',
+    }), { strict: true });
     const updateCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('UPDATE report_jobs'));
-    const resultData = JSON.parse(updateCall[1][1]);
-    const pdfText = Buffer.from(resultData.inline_file_base64, 'base64').toString('utf8');
-
-    expect(resultData.filename).toMatch(/^release-readiness-\d+\.pdf$/);
-    expect(pdfText).toContain('Release Readiness');
-    expect(pdfText).toContain('EXECUTIVE SUMMARY');
-    expect(pdfText).toContain('DETAIL BREAKDOWN');
-    expect(pdfText).toContain('Three projects carry critical blocking defects.');
-    expect(pdfText).not.toContain('Rows: 1');
+    expect(updateCall).toBeUndefined();
   });
 
   it('generates project_status report inline and does not call n8n', async () => {

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { GAUGE_DATA, REPORTS, type ReportDefinition } from '@/components/reports/reportTypes';
+import { useSearchParams } from 'next/navigation';
+import { REPORTS } from '@/components/reports/reportTypes';
 import { useReportData } from '@/components/reports/useReportData';
 import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
@@ -9,24 +10,10 @@ import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
 import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
 import { reportsApi } from '@/lib/api';
+import { downloadElementAsPdf } from '@/lib/reportPdf';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
 type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
-type ReportPresentation = {
-    report_id: string;
-    name: string;
-    category: string;
-    generated_label: string;
-    range: string;
-    project: string;
-    summary: string;
-    summary_tone: string;
-    kpis: ReportDefinition['kpis'];
-    chart: ReportDefinition['chart'];
-    columns: ReportDefinition['columns'];
-    rows: ReportDefinition['rows'];
-    gauge: { value: number; label: string; caption: string };
-};
 
 const REPORT_TYPE_BY_ID: Record<string, BackendReportType> = {
     'proj-status': 'project_status',
@@ -63,43 +50,19 @@ function stampNow() {
     });
 }
 
-function buildReportPresentation(
-    report: ReportDefinition,
-    realData: Parameters<typeof DocumentPreview>[0]['realData'],
-    range: string,
-    project: string,
-    generatedLabel: string
-): ReportPresentation {
-    const merged = realData
-        ? {
-            ...report,
-            kpis: realData.kpis?.length ? realData.kpis : report.kpis,
-            chart: realData.chart?.bars.length ? realData.chart : report.chart,
-            rows: realData.rows?.length ? realData.rows : report.rows,
-            summary: realData.summary || report.summary,
-            summaryTone: realData.summaryTone || report.summaryTone,
-        }
-        : report;
-
-    return {
-        report_id: report.id,
-        name: merged.name,
-        category: merged.category,
-        generated_label: generatedLabel,
-        range,
-        project,
-        summary: merged.summary,
-        summary_tone: merged.summaryTone,
-        kpis: merged.kpis,
-        chart: merged.chart,
-        columns: merged.columns,
-        rows: merged.rows,
-        gauge: realData?.gauge || GAUGE_DATA[report.id] || { value: 0, label: 'Headline', caption: '' },
-    };
+function nextPaint() {
+    return new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
 }
 
 export default function ReportsPage() {
-    const [activeId, setActiveId] = useState('readiness');
+    const searchParams = useSearchParams();
+    const requestedReportId = searchParams.get('report');
+    const printMode = searchParams.get('print') === '1';
+    const initialReportId = REPORTS.some(r => r.id === requestedReportId) ? requestedReportId! : 'readiness';
+
+    const [activeId, setActiveId] = useState(initialReportId);
     const [generating, setGenerating] = useState(false);
     const [fmt, setFmt] = useState('PDF');
     const [range, setRange] = useState('Last 7 days');
@@ -109,6 +72,7 @@ export default function ReportsPage() {
     const [toast, setToast] = useState<string | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const previewRef = useRef<HTMLDivElement | null>(null);
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
     const { override: realData, loading: dataLoading } = useReportData(report.id);
@@ -132,6 +96,12 @@ export default function ReportsPage() {
             clearPolling();
         };
     }, [clearPolling]);
+
+    useEffect(() => {
+        if (printMode && requestedReportId && REPORTS.some(r => r.id === requestedReportId)) {
+            setActiveId(requestedReportId);
+        }
+    }, [printMode, requestedReportId]);
 
     const pollJobUntilDone = useCallback(async (jobId: string, reportName: string, generatedStamp: string, attempt = 0) => {
         const maxAttempts = 40;
@@ -196,12 +166,23 @@ export default function ReportsPage() {
             const backendFormat = FORMAT_BY_LABEL[fmt] || 'pdf';
             const generatedStamp = stampNow();
 
+            if (backendFormat === 'pdf') {
+                setStamp(generatedStamp);
+                await nextPaint();
+
+                if (!previewRef.current) {
+                    throw new Error('Report preview is not ready for PDF export.');
+                }
+
+                await downloadElementAsPdf(previewRef.current, report.name);
+                notify(`${report.name} PDF generated. Download started.`);
+                setGenerating(false);
+                return;
+            }
+
             const response = await reportsApi.generate({
                 report_type: reportType,
                 format: backendFormat,
-                presentation: backendFormat === 'pdf'
-                    ? buildReportPresentation(report, realData, range, project, generatedStamp)
-                    : undefined,
             });
 
             notify(`Generating ${report.name}...`);
@@ -210,6 +191,24 @@ export default function ReportsPage() {
             setGenerating(false);
             notify(err?.message || `Failed to start ${report.name} generation.`);
         }
+    }
+
+    if (printMode) {
+        return (
+            <div className="min-h-screen bg-slate-100 p-0 print:bg-white">
+                <div className="mx-auto w-full max-w-[960px] print:max-w-none">
+                    <DocumentPreview
+                        report={report}
+                        generating={false}
+                        stamp={stamp}
+                        range={range}
+                        project={project}
+                        realData={realData}
+                        dataLoading={false}
+                    />
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -249,15 +248,17 @@ export default function ReportsPage() {
                             onSchedule={() => setModal('schedule')}
                             notify={notify}
                         />
-                        <DocumentPreview
-                            report={report}
-                            generating={generating}
-                            stamp={stamp}
-                            range={range}
-                            project={project}
-                            realData={realData}
-                            dataLoading={dataLoading}
-                        />
+                        <div ref={previewRef}>
+                            <DocumentPreview
+                                report={report}
+                                generating={generating && fmt !== 'PDF'}
+                                stamp={stamp}
+                                range={range}
+                                project={project}
+                                realData={realData}
+                                dataLoading={dataLoading && fmt !== 'PDF'}
+                            />
+                        </div>
                         <RecentScheduledPanel
                             notify={notify}
                             onSchedule={() => setModal('schedule')}
