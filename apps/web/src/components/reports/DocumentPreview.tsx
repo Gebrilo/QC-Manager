@@ -44,9 +44,10 @@ interface DocumentPreviewProps {
     project: string;
     realData?: { kpis?: ReportDefinition['kpis']; chart?: ReportDefinition['chart']; rows?: ReportDefinition['rows']; summary?: string; summaryTone?: ReportDefinition['summaryTone']; gauge?: { value: number; label: string; caption: string } } | null;
     dataLoading?: boolean;
+    paperRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function DocumentPreview({ report, generating, stamp, range, project, realData, dataLoading }: DocumentPreviewProps) {
+export function DocumentPreview({ report, generating, stamp, range, project, realData, dataLoading, paperRef }: DocumentPreviewProps) {
     const merged = realData
         ? {
             ...report,
@@ -62,7 +63,7 @@ export function DocumentPreview({ report, generating, stamp, range, project, rea
 
     return (
         <div className="rounded-2xl p-3 sm:p-6 bg-slate-100 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
-            <div className="relative mx-auto max-w-[820px] bg-white rounded-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-slate-200/80 overflow-hidden">
+            <div ref={paperRef} className="relative mx-auto max-w-[820px] bg-white rounded-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.25)] ring-1 ring-slate-200/80 overflow-hidden">
 
                 {/* Generating overlay */}
                 {(generating || dataLoading) && (

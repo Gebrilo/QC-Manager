@@ -248,17 +248,16 @@ export default function ReportsPage() {
                             onSchedule={() => setModal('schedule')}
                             notify={notify}
                         />
-                        <div ref={previewRef}>
-                            <DocumentPreview
-                                report={report}
-                                generating={generating && fmt !== 'PDF'}
-                                stamp={stamp}
-                                range={range}
-                                project={project}
-                                realData={realData}
-                                dataLoading={dataLoading && fmt !== 'PDF'}
-                            />
-                        </div>
+                        <DocumentPreview
+                            report={report}
+                            generating={generating && fmt !== 'PDF'}
+                            stamp={stamp}
+                            range={range}
+                            project={project}
+                            realData={realData}
+                            dataLoading={dataLoading && fmt !== 'PDF'}
+                            paperRef={previewRef}
+                        />
                         <RecentScheduledPanel
                             notify={notify}
                             onSchedule={() => setModal('schedule')}

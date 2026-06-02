@@ -11,12 +11,17 @@ function safeFilename(value: string) {
 
 export async function downloadElementAsPdf(element: HTMLElement, reportName: string) {
     const canvas = await html2canvas(element, {
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#ffffff',
         logging: false,
-        scale: Math.min(window.devicePixelRatio || 1, 2),
+        scale: 2,
         useCORS: true,
-        windowWidth: element.scrollWidth,
+        allowTaint: true,
+        windowWidth: element.offsetWidth,
         windowHeight: element.scrollHeight,
+        width: element.offsetWidth,
+        height: element.scrollHeight,
+        x: 0,
+        y: 0,
     });
 
     const imageData = canvas.toDataURL('image/png');
