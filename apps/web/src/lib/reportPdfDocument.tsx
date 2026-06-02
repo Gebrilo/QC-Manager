@@ -220,12 +220,12 @@ function BarChartPdf({ chart }: { chart: ReportDefinition['chart'] }) {
                 })}
                 <Line x1={0} y1={H} x2={W} y2={H} stroke="#e2e8f0" strokeWidth={1} />
             </Svg>
-            {/* X-axis labels below */}
-            <View style={{ width: W, flexDirection: 'row' }}>
+            {/* X-axis labels below — offset by startX to match bar positions */}
+            <View style={{ flexDirection: 'row', paddingLeft: startX }}>
                 {bars.map((bar, i) => (
                     <Text
                         key={i}
-                        style={{ width: W / n, fontSize: 6.5, color: '#94a3b8', textAlign: 'center' }}
+                        style={{ width: barW + 6, fontSize: 6.5, color: '#94a3b8', textAlign: 'center' }}
                     >
                         {bar.label}
                     </Text>
@@ -253,7 +253,7 @@ function BadgePdf({ status }: { status: string }) {
     const color = STATUS_BADGE_TEXT[status] || STATUS_BADGE_TEXT.ontrack;
     const label = STATUS_LABELS[status] || 'STABLE';
     return (
-        <View style={[s.badge, { backgroundColor: bg }]}>
+        <View style={[s.badge, { backgroundColor: bg, alignSelf: 'flex-start' }]}>
             <Text style={[s.badgeText, { color }]}>{label}</Text>
         </View>
     );
