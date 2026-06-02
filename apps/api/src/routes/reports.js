@@ -333,11 +333,11 @@ function buildStyledPdfBuffer(presentation) {
     };
 
     rect(0, 0, W, H, '#f1f5f9');
-    roundedRect(24, 24, 564, 744, 18, '#e2e8f0');
-    roundedRect(20, 18, 564, 744, 18, '#ffffff', '#e2e8f0', 0.8);
-    rect(20, 18, 564, 96, '#f8fafc');
-    rect(20, 18, 8, 744, '#4f46e5');
-    rect(20, 18, 8, 248, '#7c3aed');
+    roundedRect(32, 32, 548, 728, 18, '#e2e8f0');
+    roundedRect(28, 28, 548, 728, 18, '#ffffff', '#e2e8f0', 0.8);
+    rect(28, 28, 548, 96, '#f8fafc');
+    rect(28, 28, 8, 728, '#4f46e5');
+    rect(28, 28, 8, 248, '#7c3aed');
 
     roundedRect(42, 46, 112, 19, 9.5, '#eef2ff', '#c7d2fe', 0.6);
     text(`${presentation.category} Report`.toUpperCase(), 52, 59, 7.5, '#4338ca', 'F2');
@@ -426,8 +426,8 @@ function buildStyledPdfBuffer(presentation) {
         text(truncateText(bar.label, 7), x - 2, chartBase + 13, 6.5, '#94a3b8', 'F1');
     });
 
-    const tableTop = 542;
-    card(42, tableTop, 528, 200, '#ffffff', '#e2e8f0', 12);
+    const tableTop = 530;
+    card(42, tableTop, 528, 222, '#ffffff', '#e2e8f0', 12);
     text('DETAIL BREAKDOWN', 58, tableTop + 24, 7.5, '#94a3b8', 'F2');
     line(58, tableTop + 36, 552, tableTop + 36, '#cbd5e1', 1.2);
 
@@ -436,15 +436,15 @@ function buildStyledPdfBuffer(presentation) {
         text(truncateText(header, idx === 0 ? 20 : 14).toUpperCase(), colX[idx], tableTop + 52, 7, '#94a3b8', 'F2');
     });
 
-    presentation.rows.slice(0, 7).forEach((row, idx) => {
-        const rowTop = tableTop + 62 + idx * 20;
-        if (idx % 2 === 0) roundedRect(54, rowTop - 5, 500, 18, 6, '#f8fafc');
-        line(58, rowTop + 7, 552, rowTop + 7, '#f1f5f9', 0.7);
-        text(truncateText(row.c?.[0] || `Row ${idx + 1}`, 24), colX[0], rowTop + 18, 8.5, '#1e293b', 'F2');
-        badge(row.status, colX[1], rowTop + 14);
-        progress(row.rate || 0, row.status, colX[2], rowTop + 10, 46);
-        text(String(row.defects ?? 0), colX[3], rowTop + 18, 8.5, '#475569', 'F1');
-        text(truncateText(row.rec || '', 28), colX[4], rowTop + 18, 8, '#64748b', 'F3');
+    presentation.rows.slice(0, 6).forEach((row, idx) => {
+        const rowTop = tableTop + 70 + idx * 26;
+        if (idx % 2 === 0) roundedRect(54, rowTop - 6, 500, 26, 6, '#f8fafc');
+        line(58, rowTop + 18, 552, rowTop + 18, '#f1f5f9', 0.7);
+        text(truncateText(row.c?.[0] || `Row ${idx + 1}`, 24), colX[0], rowTop + 20, 8.5, '#1e293b', 'F2');
+        badge(row.status, colX[1], rowTop + 16);
+        progress(row.rate || 0, row.status, colX[2], rowTop + 12, 46);
+        text(String(row.defects ?? 0), colX[3], rowTop + 20, 8.5, '#475569', 'F1');
+        text(truncateText(row.rec || '', 28), colX[4], rowTop + 20, 8, '#64748b', 'F3');
     });
 
     rect(42, 752, 528, 1, '#e2e8f0');
