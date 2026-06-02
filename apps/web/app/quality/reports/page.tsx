@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { REPORTS } from '@/components/reports/reportTypes';
+import { GAUGE_DATA, REPORTS, type ReportDefinition } from '@/components/reports/reportTypes';
 import { useReportData } from '@/components/reports/useReportData';
 import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
@@ -12,6 +12,21 @@ import { reportsApi } from '@/lib/api';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
 type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
+type ReportPresentation = {
+    report_id: string;
+    name: string;
+    category: string;
+    generated_label: string;
+    range: string;
+    project: string;
+    summary: string;
+    summary_tone: string;
+    kpis: ReportDefinition['kpis'];
+    chart: ReportDefinition['chart'];
+    columns: ReportDefinition['columns'];
+    rows: ReportDefinition['rows'];
+    gauge: { value: number; label: string; caption: string };
+};
 
 const REPORT_TYPE_BY_ID: Record<string, BackendReportType> = {
     'proj-status': 'project_status',
@@ -46,6 +61,41 @@ function stampNow() {
         month: 'short', day: 'numeric', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
+}
+
+function buildReportPresentation(
+    report: ReportDefinition,
+    realData: Parameters<typeof DocumentPreview>[0]['realData'],
+    range: string,
+    project: string,
+    generatedLabel: string
+): ReportPresentation {
+    const merged = realData
+        ? {
+            ...report,
+            kpis: realData.kpis?.length ? realData.kpis : report.kpis,
+            chart: realData.chart?.bars.length ? realData.chart : report.chart,
+            rows: realData.rows?.length ? realData.rows : report.rows,
+            summary: realData.summary || report.summary,
+            summaryTone: realData.summaryTone || report.summaryTone,
+        }
+        : report;
+
+    return {
+        report_id: report.id,
+        name: merged.name,
+        category: merged.category,
+        generated_label: generatedLabel,
+        range,
+        project,
+        summary: merged.summary,
+        summary_tone: merged.summaryTone,
+        kpis: merged.kpis,
+        chart: merged.chart,
+        columns: merged.columns,
+        rows: merged.rows,
+        gauge: realData?.gauge || GAUGE_DATA[report.id] || { value: 0, label: 'Headline', caption: '' },
+    };
 }
 
 export default function ReportsPage() {
@@ -83,7 +133,7 @@ export default function ReportsPage() {
         };
     }, [clearPolling]);
 
-    const pollJobUntilDone = useCallback(async (jobId: string, reportName: string, attempt = 0) => {
+    const pollJobUntilDone = useCallback(async (jobId: string, reportName: string, generatedStamp: string, attempt = 0) => {
         const maxAttempts = 40;
         const pollIntervalMs = 3000;
 
@@ -93,7 +143,7 @@ export default function ReportsPage() {
 
             if (job.status === 'completed') {
                 setGenerating(false);
-                setStamp(stampNow());
+                setStamp(generatedStamp);
 
                 if (job.download_url) {
                     try {
@@ -122,7 +172,7 @@ export default function ReportsPage() {
             }
 
             pollTimer.current = setTimeout(() => {
-                pollJobUntilDone(jobId, reportName, attempt + 1);
+                pollJobUntilDone(jobId, reportName, generatedStamp, attempt + 1);
             }, pollIntervalMs);
         } catch {
             if (attempt >= maxAttempts) {
@@ -132,7 +182,7 @@ export default function ReportsPage() {
             }
 
             pollTimer.current = setTimeout(() => {
-                pollJobUntilDone(jobId, reportName, attempt + 1);
+                pollJobUntilDone(jobId, reportName, generatedStamp, attempt + 1);
             }, pollIntervalMs);
         }
     }, [notify]);
@@ -144,14 +194,18 @@ export default function ReportsPage() {
         try {
             const reportType = REPORT_TYPE_BY_ID[report.id] || 'dashboard';
             const backendFormat = FORMAT_BY_LABEL[fmt] || 'pdf';
+            const generatedStamp = stampNow();
 
             const response = await reportsApi.generate({
                 report_type: reportType,
                 format: backendFormat,
+                presentation: backendFormat === 'pdf'
+                    ? buildReportPresentation(report, realData, range, project, generatedStamp)
+                    : undefined,
             });
 
             notify(`Generating ${report.name}...`);
-            await pollJobUntilDone(response.data.job_id, report.name);
+            await pollJobUntilDone(response.data.job_id, report.name, generatedStamp);
         } catch (err: any) {
             setGenerating(false);
             notify(err?.message || `Failed to start ${report.name} generation.`);
