@@ -132,9 +132,12 @@ jobs:
           TULEAP_ACCESS_KEY: ${{ secrets.TULEAP_ACCESS_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          timeout: 60s
+          command_timeout: 30m
           envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,SUPABASE_JWT_SECRET,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,TULEAP_BASE_URL,TULEAP_ACCESS_KEY
           script_stop: true
           script: |
@@ -222,13 +225,17 @@ jobs:
           CORS_ORIGIN: ${{ secrets.STAGING_CORS_ORIGIN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
         with:
           host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,DEPLOY_BRANCH
+          timeout: 60s
+          command_timeout: 30m
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH
           script_stop: true
           script: |
             set -euo pipefail
@@ -264,6 +271,7 @@ jobs:
               echo "POSTGRES_USER=qc_staging_admin"
               printf '%s\n' "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
               echo "POSTGRES_DB=qc_staging_app"
+              echo "DATABASE_SSL=false"
               printf '%s\n' "JWT_SECRET=${JWT_SECRET}"
               echo "CORS_ORIGIN=${CORS_ORIGIN}"
               printf '%s\n' "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
@@ -271,6 +279,7 @@ jobs:
               echo "BACKUP_RETENTION_DAYS=3"
               printf '%s\n' "SUPABASE_URL=${SUPABASE_URL}"
               printf '%s\n' "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}"
+              printf '%s\n' "SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}"
             } > .env.staging
 
             echo "=== Docker login ==="
