@@ -212,16 +212,16 @@ describe('POST /reports', () => {
             title: 'Pass rate by project',
             unit: '%',
             bars: [
-              { label: 'AUTH', value: 94, status: 'complete' },
-              { label: 'CST', value: 41, status: 'atrisk' },
+              { label: 'AUTH', value: '94', status: 'complete' },
+              { label: 'CST', value: '41', status: 'atrisk' },
             ],
           },
           columns: ['Project', 'Status', 'Pass rate', 'Blockers', 'Recommendation'],
           rows: [
-            { c: ['CST'], status: 'atrisk', rate: 41, defects: 5, rec: 'Block release' },
-            { c: ['AUTH'], status: 'complete', rate: 94, defects: 0, rec: 'Approve release' },
+            { c: ['CST'], status: 'atrisk', rate: '41', defects: '5', rec: 'Block release' },
+            { c: ['AUTH'], status: 'complete', rate: '94', defects: '0', rec: 'Approve release' },
           ],
-          gauge: { value: 71, label: 'Avg pass rate', caption: 'Below 85% gate' },
+          gauge: { value: '71', label: 'Avg pass rate', caption: 'Below 85% gate' },
         },
       });
 

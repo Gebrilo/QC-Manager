@@ -489,7 +489,7 @@ const generateReportSchema = z.object({
             unit: z.string().optional(),
             bars: z.array(z.object({
                 label: z.string(),
-                value: z.number(),
+                value: z.coerce.number(),
                 status: z.string().optional(),
             })),
         }).optional(),
@@ -497,12 +497,12 @@ const generateReportSchema = z.object({
         rows: z.array(z.object({
             c: z.array(z.string()),
             status: z.string().optional(),
-            rate: z.number().optional(),
-            defects: z.number().optional(),
+            rate: z.coerce.number().optional(),
+            defects: z.coerce.number().optional(),
             rec: z.string().optional(),
         })).optional(),
         gauge: z.object({
-            value: z.number(),
+            value: z.coerce.number(),
             label: z.string(),
             caption: z.string().optional(),
         }).optional(),
