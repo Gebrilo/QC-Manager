@@ -178,26 +178,26 @@ describe('POST /reports', () => {
     expect(updateCall[1][0]).toBe('completed');
   });
 
-  it('does not render PDF inline when PDF generation is requested through the API', async () => {
+  it('records PDF generation without server rendering', async () => {
     mockQuery.mockImplementation((sql) => {
       if (String(sql).includes('INSERT INTO report_jobs')) {
         return Promise.resolve({ rows: [] });
       }
+      if (String(sql).includes('UPDATE report_jobs')) {
+        return Promise.resolve({ rows: [] });
+      }
       return Promise.resolve({ rows: [] });
     });
-    mockTriggerWorkflow.mockResolvedValueOnce({ success: true });
 
     const res = await request(makeApp())
       .post('/reports')
       .send({ report_type: 'dashboard', format: 'pdf' });
 
     expect(res.status).toBe(202);
-    expect(mockTriggerWorkflow).toHaveBeenCalledWith('generate-report', expect.objectContaining({
-      report_type: 'dashboard',
-      format: 'pdf',
-    }), { strict: true });
+    expect(mockTriggerWorkflow).not.toHaveBeenCalled();
     const updateCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('UPDATE report_jobs'));
-    expect(updateCall).toBeUndefined();
+    expect(updateCall).toBeDefined();
+    expect(updateCall[1][0]).toBeDefined();
   });
 
   it('generates project_status report inline and does not call n8n', async () => {
@@ -224,5 +224,77 @@ describe('POST /reports', () => {
     const updateCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('UPDATE report_jobs'));
     expect(updateCall).toBeDefined();
     expect(updateCall[1][0]).toBe('completed');
+  });
+});
+
+describe('POST /reports/share', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('stores a PDF attachment, prepares a mailto draft, and triggers the share workflow', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(makeApp())
+      .post('/reports/share')
+      .send({
+        report_id: 'readiness',
+        report_name: 'Release Readiness',
+        report_type: 'dashboard',
+        format: 'pdf',
+        recipients: ['Lead@QC.IO'],
+        share_url: 'https://gerbil.qc/quality/reports?report=readiness',
+        attach_export: true,
+        attachment: {
+          filename: 'release-readiness.pdf',
+          mime_type: 'application/pdf',
+          content_base64: Buffer.from('PDF bytes').toString('base64'),
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.recipients).toEqual(['lead@qc.io']);
+    expect(res.body.data.attachment_download_url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/reports\/[-0-9a-f]+\/download$/);
+    expect(res.body.data.email_href).toContain('mailto:lead%40qc.io');
+    expect(res.body.data.email_body).toContain('View report: https://gerbil.qc/quality/reports?report=readiness');
+    expect(res.body.data.email_body).toContain('/download');
+
+    const insertCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('INSERT INTO report_jobs'));
+    expect(insertCall).toBeDefined();
+    expect(insertCall[1][1]).toBe('dashboard');
+    expect(insertCall[1][2]).toBe('pdf');
+    expect(insertCall[1][3]).toBe('completed');
+    expect(insertCall[1][6]).toBe('inline');
+    expect(insertCall[1][7]).toBe('release-readiness.pdf');
+    expect(insertCall[1][8]).toBe(9);
+
+    expect(mockTriggerWorkflow).toHaveBeenCalledWith('share-report', expect.objectContaining({
+      report_id: 'readiness',
+      recipients: ['lead@qc.io'],
+      attachment_download_url: res.body.data.attachment_download_url,
+      attachment: expect.objectContaining({
+        filename: 'release-readiness.pdf',
+        mime_type: 'application/pdf',
+      }),
+    }));
+  });
+
+  it('rejects share requests without recipients', async () => {
+    const res = await request(makeApp())
+      .post('/reports/share')
+      .send({
+        report_id: 'readiness',
+        report_name: 'Release Readiness',
+        report_type: 'dashboard',
+        format: 'pdf',
+        recipients: [],
+        share_url: 'https://gerbil.qc/quality/reports?report=readiness',
+        attach_export: false,
+      });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockTriggerWorkflow).not.toHaveBeenCalled();
   });
 });

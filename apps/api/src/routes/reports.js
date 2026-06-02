@@ -57,6 +57,21 @@ function downloadDisposition(filename) {
     return `attachment; filename="${safeFilename}"`;
 }
 
+function requestOrigin(req) {
+    const protocol = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    const host = (req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+    return host ? `${protocol}://${host}` : '';
+}
+
+function mailtoHref(recipients, subject, body) {
+    const to = recipients.map((recipient) => encodeURIComponent(recipient)).join(',');
+    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function uniqueLowerEmails(values) {
+    return Array.from(new Set(values.map((value) => value.trim().toLowerCase())));
+}
+
 async function buildReportPayload(reportType, format) {
     const sql = REPORT_SQL_BY_TYPE[reportType] || REPORT_SQL_BY_TYPE.dashboard;
     const result = await db.query(sql);
@@ -95,6 +110,28 @@ const generateReportSchema = z.object({
         date_to: z.string().optional()
     }).optional(),
     user_email: z.string().email().optional()
+});
+
+const shareReportSchema = z.object({
+    report_id: z.string().min(1),
+    report_name: z.string().min(1),
+    report_type: z.enum(['project_status', 'resource_utilization', 'task_export', 'test_results', 'dashboard']),
+    format: z.enum(['xlsx', 'csv', 'json', 'pdf']).default('pdf'),
+    recipients: z.array(z.string().email()).min(1).max(50).transform(uniqueLowerEmails),
+    share_url: z.string().url(),
+    attach_export: z.boolean().default(true),
+    filters: z.object({
+        project_ids: z.array(z.string().uuid()).optional(),
+        status: z.array(z.string()).optional(),
+        date_from: z.string().optional(),
+        date_to: z.string().optional()
+    }).optional(),
+    attachment: z.object({
+        filename: z.string().min(1).max(255),
+        mime_type: z.string().min(1).max(120),
+        content_base64: z.string().min(1).max(20 * 1024 * 1024),
+    }).optional(),
+    message: z.string().max(2000).optional(),
 });
 
 // POST /reports - Generate report (returns job_id)
@@ -238,6 +275,140 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
                 estimated_completion: new Date(Date.now() + 2 * 60 * 1000).toISOString(), // +2 minutes
                 status_url: `/reports/${jobId}`
             }
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /reports/share - Prepare and optionally attach a report share email
+router.post('/share', requireAuth, requirePermission('qc.reports.generate'), async (req, res, next) => {
+    try {
+        const data = shareReportSchema.parse(req.body);
+        const senderEmail = req.user?.email || data.recipients[0];
+        const subject = `${data.report_name} report`;
+        const jobId = data.attach_export ? uuidv4() : null;
+        let attachmentDownloadUrl = null;
+        let attachmentFilename = null;
+        let attachmentMimeType = null;
+        let attachmentSize = null;
+        let attachmentPayload = null;
+        let attachmentNote = null;
+
+        if (data.attach_export) {
+            if (data.format === 'pdf') {
+                if (data.attachment) {
+                    const normalizedBase64 = data.attachment.content_base64
+                        .replace(/^data:[^;]+;base64,/i, '')
+                        .replace(/\s/g, '');
+                    const content = Buffer.from(normalizedBase64, 'base64');
+
+                    attachmentPayload = {
+                        inline_file_base64: normalizedBase64,
+                        mime_type: data.attachment.mime_type,
+                        filename: data.attachment.filename,
+                        file_size: content.length,
+                        shared_with: data.recipients,
+                        share_url: data.share_url,
+                    };
+                    attachmentFilename = data.attachment.filename;
+                    attachmentMimeType = data.attachment.mime_type;
+                    attachmentSize = content.length;
+                } else {
+                    attachmentNote = 'PDF export was not uploaded; email includes the shareable report link only.';
+                }
+            } else {
+                const payload = await buildReportPayload(data.report_type, data.format);
+                attachmentPayload = {
+                    inline_file_base64: payload.content.toString('base64'),
+                    mime_type: FORMAT_MIME[data.format] || 'application/octet-stream',
+                    filename: payload.filename,
+                    file_size: payload.content.length,
+                    shared_with: data.recipients,
+                    share_url: data.share_url,
+                };
+                attachmentFilename = payload.filename;
+                attachmentMimeType = FORMAT_MIME[data.format] || 'application/octet-stream';
+                attachmentSize = payload.content.length;
+            }
+        }
+
+        if (jobId) {
+            await db.query(
+                `INSERT INTO report_jobs (
+                    id, report_type, format, status, filters, result_data, download_url, filename, file_size, user_email, completed_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+                [
+                    jobId,
+                    data.report_type,
+                    data.format,
+                    'completed',
+                    data.filters ? JSON.stringify(data.filters) : null,
+                    attachmentPayload ? JSON.stringify(attachmentPayload) : JSON.stringify({
+                        shared_with: data.recipients,
+                        share_url: data.share_url,
+                        attachment_note: attachmentNote,
+                    }),
+                    attachmentPayload ? 'inline' : null,
+                    attachmentFilename,
+                    attachmentSize,
+                    senderEmail,
+                ]
+            );
+
+            if (attachmentPayload) {
+                attachmentDownloadUrl = `${requestOrigin(req)}/reports/${jobId}/download`;
+            }
+        }
+
+        const lines = [
+            data.message || `A ${data.report_name} report has been shared with you.`,
+            '',
+            `View report: ${data.share_url}`,
+        ];
+
+        if (attachmentDownloadUrl) {
+            lines.push('', `Attachment: ${attachmentDownloadUrl}`);
+        } else if (attachmentNote) {
+            lines.push('', attachmentNote);
+        }
+
+        const emailBody = lines.join('\n');
+        const emailHref = mailtoHref(data.recipients, subject, emailBody);
+
+        triggerWorkflow('share-report', {
+            report_id: data.report_id,
+            report_name: data.report_name,
+            report_type: data.report_type,
+            format: data.format,
+            recipients: data.recipients,
+            sender_email: senderEmail,
+            subject,
+            body: emailBody,
+            share_url: data.share_url,
+            attachment_download_url: attachmentDownloadUrl,
+            attachment: attachmentPayload ? {
+                filename: attachmentFilename,
+                mime_type: attachmentMimeType,
+                size_bytes: attachmentSize,
+                content_base64: attachmentPayload.inline_file_base64,
+            } : null,
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Report share prepared',
+            data: {
+                recipients: data.recipients,
+                share_url: data.share_url,
+                job_id: jobId,
+                attachment_download_url: attachmentDownloadUrl,
+                attachment_filename: attachmentFilename,
+                attachment_note: attachmentNote,
+                email_subject: subject,
+                email_body: emailBody,
+                email_href: emailHref,
+            },
         });
     } catch (err) {
         next(err);

@@ -61,10 +61,10 @@ function GhostBtn({ children, onClick }: { children: React.ReactNode; onClick: (
     );
 }
 
-function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function PrimaryBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
     return (
-        <button onClick={onClick}
-            className="h-9 px-4 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 active:scale-95 transition shadow-lg shadow-indigo-500/30">
+        <button onClick={onClick} disabled={disabled}
+            className="h-9 px-4 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 active:scale-95 transition shadow-lg shadow-indigo-500/30 disabled:opacity-60 disabled:active:scale-100">
             {children}
         </button>
     );
@@ -73,19 +73,77 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
 // ── Share modal ───────────────────────────────────────────────────────────────
 interface ShareModalProps {
     report: { id: string; name: string; format?: string };
+    shareUrl: string;
     onClose: () => void;
     notify: (msg: string) => void;
+    onShare: (data: { recipients: string[]; attachExport: boolean; shareUrl: string }) => Promise<{ emailHref: string; attachmentDownloadUrl?: string | null; attachmentNote?: string | null }>;
 }
 
-export function ShareModal({ report, onClose, notify }: ShareModalProps) {
-    const [recipients, setRecipients] = useState(['leadership@qc.io']);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function ShareModal({ report, shareUrl, onClose, notify, onShare }: ShareModalProps) {
+    const [recipients, setRecipients] = useState<string[]>([]);
     const [input, setInput] = useState('');
-    const link = `https://qc.app/r/${report.id}-share`;
+    const [attachExport, setAttachExport] = useState(true);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     function add() {
-        const v = input.trim();
-        if (v && !recipients.includes(v)) setRecipients(r => [...r, v]);
+        const candidates = input
+            .split(/[,\s]+/)
+            .map(v => v.trim().toLowerCase())
+            .filter(Boolean);
+        const invalid = candidates.find(v => !emailPattern.test(v));
+        if (invalid) {
+            setError(`${invalid} is not a valid email address.`);
+            return;
+        }
+        if (candidates.length) {
+            setRecipients(r => Array.from(new Set([...r, ...candidates])));
+            setError(null);
+        }
         setInput('');
+    }
+
+    async function copyLink() {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            notify('Link copied to clipboard');
+        } catch {
+            notify('Could not copy link');
+        }
+    }
+
+    async function send() {
+        add();
+        const pending = input
+            .split(/[,\s]+/)
+            .map(v => v.trim().toLowerCase())
+            .filter(Boolean);
+        const nextRecipients = Array.from(new Set([...recipients, ...pending]));
+        if (nextRecipients.length === 0) {
+            setError('Add at least one recipient.');
+            return;
+        }
+        const invalid = nextRecipients.find(v => !emailPattern.test(v));
+        if (invalid) {
+            setError(`${invalid} is not a valid email address.`);
+            return;
+        }
+
+        setSending(true);
+        setError(null);
+        try {
+            const result = await onShare({ recipients: nextRecipients, attachExport, shareUrl });
+            const attached = result.attachmentDownloadUrl ? ' with attachment link' : '';
+            notify(`Email prepared for ${nextRecipients.length} recipient${nextRecipients.length > 1 ? 's' : ''}${attached}.`);
+            window.location.href = result.emailHref;
+            onClose();
+        } catch (err: any) {
+            setError(err?.message || 'Could not share this report.');
+        } finally {
+            setSending(false);
+        }
     }
 
     return (
@@ -93,10 +151,7 @@ export function ShareModal({ report, onClose, notify }: ShareModalProps) {
             footer={
                 <>
                     <GhostBtn onClick={onClose}>Cancel</GhostBtn>
-                    <PrimaryBtn onClick={() => {
-                        onClose();
-                        notify(`Shared with ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}`);
-                    }}>Send</PrimaryBtn>
+                    <PrimaryBtn onClick={send} disabled={sending}>{sending ? 'Preparing...' : 'Send'}</PrimaryBtn>
                 </>
             }
         >
@@ -104,15 +159,15 @@ export function ShareModal({ report, onClose, notify }: ShareModalProps) {
             <div className="flex items-center gap-2 mb-4">
                 <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 min-w-0">
                     <Ico k="link" size={13} cls="text-slate-400 flex-shrink-0" />
-                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{link}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{shareUrl}</span>
                 </div>
-                <button onClick={() => notify('Link copied to clipboard')}
+                <button onClick={copyLink}
                     className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition flex-shrink-0">
                     <Ico k="copy" size={13} /> Copy
                 </button>
             </div>
 
-            <FieldLabel>Recipients</FieldLabel>
+            <FieldLabel>Email recipients</FieldLabel>
             <div className="flex flex-wrap gap-1.5 mb-2">
                 {recipients.map(r => (
                     <span key={r} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
@@ -127,8 +182,13 @@ export function ShareModal({ report, onClose, notify }: ShareModalProps) {
                 <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <Ico k="mail" size={13} cls="text-slate-400" />
                     <input value={input} onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && add()}
-                        placeholder="name@company.com"
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                add();
+                            }
+                        }}
+                        placeholder="name@company.com, team@company.com"
                         className="flex-1 bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none" />
                 </div>
                 <button onClick={add}
@@ -136,8 +196,9 @@ export function ShareModal({ report, onClose, notify }: ShareModalProps) {
                     <Ico k="plus" size={15} />
                 </button>
             </div>
+            {error && <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-400">{error}</p>}
             <label className="flex items-center gap-2 mt-4 mb-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
-                <input type="checkbox" defaultChecked className="accent-indigo-600 w-4 h-4" />
+                <input type="checkbox" checked={attachExport} onChange={e => setAttachExport(e.target.checked)} className="accent-indigo-600 w-4 h-4" />
                 Attach the {report.format || 'PDF'} export
             </label>
         </Modal>

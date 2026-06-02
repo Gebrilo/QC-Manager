@@ -10,7 +10,7 @@ import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
 import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
 import { reportsApi, projectsApi, type Project } from '@/lib/api';
-import { downloadReportAsPdf } from '@/lib/reportPdf';
+import { createReportPdfBlob, downloadReportAsPdf } from '@/lib/reportPdf';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
 type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
@@ -55,6 +55,18 @@ function toIsoDate(d: Date): string {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const value = String(reader.result || '');
+            resolve(value.includes(',') ? value.split(',')[1] : value);
+        };
+        reader.onerror = () => reject(reader.error || new Error('Could not read report file'));
+        reader.readAsDataURL(blob);
+    });
 }
 
 // Translate a preset range label (or "Custom range") into concrete
@@ -257,6 +269,63 @@ export default function ReportsPage() {
         }
     }
 
+    async function handleShare({
+        recipients,
+        attachExport,
+        shareUrl,
+    }: {
+        recipients: string[];
+        attachExport: boolean;
+        shareUrl: string;
+    }) {
+        const reportType = REPORT_TYPE_BY_ID[report.id] || 'dashboard';
+        const backendFormat = FORMAT_BY_LABEL[fmt] || 'pdf';
+        const filters = {
+            ...(project ? { project_ids: [project] } : {}),
+            ...(effFrom ? { date_from: effFrom } : {}),
+            ...(effTo ? { date_to: effTo } : {}),
+        };
+        const sharePayload: Parameters<typeof reportsApi.share>[0] = {
+            report_id: report.id,
+            report_name: report.name,
+            report_type: reportType,
+            format: backendFormat,
+            recipients,
+            share_url: shareUrl,
+            attach_export: attachExport,
+            filters: Object.keys(filters).length ? filters : undefined,
+        };
+
+        if (attachExport && backendFormat === 'pdf') {
+            const generatedStamp = stampNow();
+            const merged = realData
+                ? {
+                    ...report,
+                    kpis: realData.kpis?.length ? realData.kpis : report.kpis,
+                    chart: realData.chart?.bars.length ? realData.chart : report.chart,
+                    rows: realData.rows?.length ? realData.rows : report.rows,
+                    summary: realData.summary || report.summary,
+                    summaryTone: realData.summaryTone || report.summaryTone,
+                }
+                : report;
+            const gauge = realData?.gauge ?? GAUGE_DATA[report.id] ?? { value: 0, label: 'Headline', caption: '' };
+            const file = await createReportPdfBlob({ report: merged, gauge, range, project: projectLabel, stamp: generatedStamp });
+            sharePayload.attachment = {
+                filename: file.fileName,
+                mime_type: 'application/pdf',
+                content_base64: await blobToBase64(file.blob),
+            };
+        }
+
+        const response = await reportsApi.share(sharePayload);
+        setRefreshKey(k => k + 1);
+        return {
+            emailHref: response.data.email_href,
+            attachmentDownloadUrl: response.data.attachment_download_url,
+            attachmentNote: response.data.attachment_note,
+        };
+    }
+
     if (printMode) {
         return (
             <div className="min-h-screen bg-slate-100 p-0 print:bg-white">
@@ -338,8 +407,10 @@ export default function ReportsPage() {
             {modal === 'share' && (
                 <ShareModal
                     report={{ id: report.id, name: report.name, format: fmt }}
+                    shareUrl={`${window.location.origin}/quality/reports?report=${encodeURIComponent(report.id)}`}
                     onClose={() => setModal(null)}
                     notify={notify}
+                    onShare={handleShare}
                 />
             )}
             {modal === 'schedule' && (

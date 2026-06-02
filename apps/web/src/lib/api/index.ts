@@ -609,6 +609,46 @@ export const reportsApi = {
             method: 'GET',
             cache: 'no-store',
         }),
+
+    share: (data: {
+        report_id: string;
+        report_name: string;
+        report_type: 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
+        format?: 'xlsx' | 'csv' | 'json' | 'pdf';
+        recipients: string[];
+        share_url: string;
+        attach_export?: boolean;
+        filters?: {
+            project_ids?: string[];
+            status?: string[];
+            date_from?: string;
+            date_to?: string;
+        };
+        attachment?: {
+            filename: string;
+            mime_type: string;
+            content_base64: string;
+        };
+        message?: string;
+    }) =>
+        fetchApi<{
+            success: boolean;
+            message: string;
+            data: {
+                recipients: string[];
+                share_url: string;
+                job_id: string | null;
+                attachment_download_url: string | null;
+                attachment_filename: string | null;
+                attachment_note: string | null;
+                email_subject: string;
+                email_body: string;
+                email_href: string;
+            };
+        }>('/reports/share', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
 };
 
 // ============================================================================
