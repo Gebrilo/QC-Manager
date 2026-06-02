@@ -61,6 +61,8 @@ export default function ReportsPage() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [fmt, setFmt] = useState('PDF');
     const [range, setRange] = useState('Last 7 days');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [project, setProject] = useState('All projects');
     const [stamp, setStamp] = useState(stampNow);
     const [modal, setModal] = useState<'share' | 'schedule' | null>(null);
@@ -245,6 +247,10 @@ export default function ReportsPage() {
                             setFmt={setFmt}
                             range={range}
                             setRange={setRange}
+                            dateFrom={dateFrom}
+                            setDateFrom={setDateFrom}
+                            dateTo={dateTo}
+                            setDateTo={setDateTo}
                             project={project}
                             setProject={setProject}
                             onShare={() => setModal('share')}

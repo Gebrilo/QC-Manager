@@ -68,6 +68,10 @@ interface ActionBarProps {
     setFmt: (f: string) => void;
     range: string;
     setRange: (r: string) => void;
+    dateFrom: string;
+    setDateFrom: (d: string) => void;
+    dateTo: string;
+    setDateTo: (d: string) => void;
     project: string;
     setProject: (p: string) => void;
     onShare: () => void;
@@ -77,7 +81,8 @@ interface ActionBarProps {
 
 export function ActionBar({
     report, generating, onGenerate, fmt, setFmt,
-    range, setRange, project, setProject,
+    range, setRange, dateFrom, setDateFrom, dateTo, setDateTo,
+    project, setProject,
     onShare, onSchedule, notify,
 }: ActionBarProps) {
     const [menu, setMenu] = useState(false);
@@ -148,6 +153,24 @@ export function ActionBar({
                 </span>
                 <Selectish icon="calendar" value={range} onChange={setRange}
                     options={['Last 7 days', 'Last 30 days', 'This quarter', 'Year to date', 'Custom range']} />
+                {range === 'Custom range' && (
+                    <>
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => setDateFrom(e.target.value)}
+                            className="h-7 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                        />
+                        <span className="text-xs text-slate-400">—</span>
+                        <input
+                            type="date"
+                            value={dateTo}
+                            onChange={e => setDateTo(e.target.value)}
+                            min={dateFrom || undefined}
+                            className="h-7 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                        />
+                    </>
+                )}
                 <Selectish icon="grid" value={project} onChange={setProject}
                     options={['All projects', 'CST', 'FRA', 'PPO', 'AUTH', 'CORE']} />
                 <div className="ml-auto flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
