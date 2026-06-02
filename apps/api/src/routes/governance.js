@@ -603,43 +603,59 @@ router.get('/approvals/:projectId', requireAuth, requirePermission('qc.governanc
 // =====================================================
 router.get('/execution-trend', requireAuth, requirePermission('qc.governance.view'), async (req, res) => {
     try {
-        const { project_id } = req.query;
+        const { project_id, date_from, date_to } = req.query;
+
+        const params = [];
+        let paramIdx = 1;
+
+        const startExpr = date_from
+            ? `$${paramIdx++}::DATE`
+            : `CURRENT_DATE - INTERVAL '29 days'`;
+        if (date_from) params.push(date_from);
+
+        const endExpr = date_to
+            ? `$${paramIdx++}::DATE`
+            : `CURRENT_DATE`;
+        if (date_to) params.push(date_to);
+
+        const projectFilterStats = project_id ? `AND tr.project_id = $${paramIdx++}` : ``;
+        if (project_id) params.push(project_id);
 
         let query = `
             WITH date_series AS (
                 SELECT generate_series(
-                    CURRENT_DATE - INTERVAL '29 days',
-                    CURRENT_DATE,
+                    ${startExpr},
+                    ${endExpr},
                     INTERVAL '1 day'
                 )::DATE AS date
             ),
             daily_stats AS (
-                SELECT 
+                SELECT
                     DATE(tr.started_at) AS execution_date,
-                    ${project_id ? 'tr.project_id,' : ''}
                     SUM(
                         COALESCE((
-                            SELECT COUNT(*) FROM test_execution te 
+                            SELECT COUNT(*) FROM test_execution te
                             WHERE te.test_run_id = tr.id AND te.status = 'pass'
                         ), 0)
                     ) AS passed_count,
                     SUM(
                         COALESCE((
-                            SELECT COUNT(*) FROM test_execution te 
+                            SELECT COUNT(*) FROM test_execution te
                             WHERE te.test_run_id = tr.id
                         ), 0)
                     ) AS total_tests
                 FROM test_run tr
                 WHERE tr.deleted_at IS NULL
-                    AND tr.started_at >= CURRENT_DATE - INTERVAL '30 days'
-                    ${project_id ? 'AND tr.project_id = $1' : ''}
-                GROUP BY DATE(tr.started_at)${project_id ? ', tr.project_id' : ''}
+                    AND tr.started_at >= ${startExpr}
+                    AND tr.started_at <= ${endExpr} + INTERVAL '1 day'
+                    ${projectFilterStats}
+                GROUP BY DATE(tr.started_at)
             )
-            SELECT 
+            SELECT
                 ds.date,
                 COALESCE(
-                    CASE 
-                        WHEN dst.total_tests > 0 
+                    CASE
+                        WHEN dst.total_tests > 0
                         THEN ROUND((dst.passed_count::NUMERIC / dst.total_tests) * 100, 2)
                         ELSE NULL
                     END,
@@ -652,7 +668,6 @@ router.get('/execution-trend', requireAuth, requirePermission('qc.governance.vie
             ORDER BY ds.date ASC
         `;
 
-        const params = project_id ? [project_id] : [];
         const result = await pool.query(query, params);
 
         // Transform for frontend compatibility

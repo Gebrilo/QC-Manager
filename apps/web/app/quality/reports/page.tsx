@@ -71,7 +71,11 @@ export default function ReportsPage() {
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
-    const { override: realData, loading: dataLoading } = useReportData(report.id);
+    const { override: realData, loading: dataLoading } = useReportData(
+        report.id,
+        range === 'Custom range' ? dateFrom || undefined : undefined,
+        range === 'Custom range' ? dateTo || undefined : undefined,
+    );
 
     const notify = useCallback((msg: string) => {
         setToast(msg);

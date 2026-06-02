@@ -76,8 +76,8 @@ async function fetchReadiness(): Promise<ReportOverride> {
 
 // ─── Weekly Quality Health ────────────────────────────────────────────────────
 
-async function fetchQualityHealth(): Promise<ReportOverride> {
-    const [trend, bugs] = await Promise.all([getExecutionTrend(), getBugSummary()]);
+async function fetchQualityHealth(dateFrom?: string, dateTo?: string): Promise<ReportOverride> {
+    const [trend, bugs] = await Promise.all([getExecutionTrend(undefined, dateFrom, dateTo), getBugSummary()]);
 
     const last7 = trend.slice(-7);
     const totalExecs = last7.reduce((s, d) => s + d.totalTests, 0);
@@ -358,8 +358,8 @@ async function fetchResourceUtilization(): Promise<ReportOverride> {
 
 // ─── Quality Trend Analysis ───────────────────────────────────────────────────
 
-async function fetchQualityTrend(): Promise<ReportOverride> {
-    const trend = await getExecutionTrend();
+async function fetchQualityTrend(dateFrom?: string, dateTo?: string): Promise<ReportOverride> {
+    const trend = await getExecutionTrend(undefined, dateFrom, dateTo);
 
     const now = new Date();
     const weeks: { label: string; tests: number; passed: number }[] = [
@@ -406,22 +406,27 @@ async function fetchQualityTrend(): Promise<ReportOverride> {
     };
 }
 
+interface DateParams {
+    dateFrom?: string;
+    dateTo?: string;
+}
+
 // ─── Fetcher registry ─────────────────────────────────────────────────────────
 
-const FETCHERS: Record<string, () => Promise<ReportOverride>> = {
-    readiness: fetchReadiness,
-    quality: fetchQualityHealth,
-    coverage: fetchCoverage,
-    'proj-status': fetchProjectStatus,
-    'bug-dist': fetchBugDistribution,
-    'test-exec': fetchTestExecution,
-    resource: fetchResourceUtilization,
-    'quality-trend': fetchQualityTrend,
+const FETCHERS: Record<string, (dates: DateParams) => Promise<ReportOverride>> = {
+    readiness: () => fetchReadiness(),
+    quality: ({ dateFrom, dateTo }) => fetchQualityHealth(dateFrom, dateTo),
+    coverage: () => fetchCoverage(),
+    'proj-status': () => fetchProjectStatus(),
+    'bug-dist': () => fetchBugDistribution(),
+    'test-exec': () => fetchTestExecution(),
+    resource: () => fetchResourceUtilization(),
+    'quality-trend': ({ dateFrom, dateTo }) => fetchQualityTrend(dateFrom, dateTo),
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useReportData(reportId: string) {
+export function useReportData(reportId: string, dateFrom?: string, dateTo?: string) {
     const [override, setOverride] = useState<ReportOverride | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -433,13 +438,13 @@ export function useReportData(reportId: string) {
         setOverride(null);
         setLoading(true);
 
-        fetcher()
+        fetcher({ dateFrom, dateTo })
             .then(data => { if (!cancelled) setOverride(data); })
             .catch(() => { if (!cancelled) setOverride(null); })
             .finally(() => { if (!cancelled) setLoading(false); });
 
         return () => { cancelled = true; };
-    }, [reportId]);
+    }, [reportId, dateFrom, dateTo]);
 
     return { override, loading };
 }

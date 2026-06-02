@@ -168,10 +168,12 @@ export async function getProjectHealthSummary(projectId: string): Promise<Projec
 // Trend Analysis
 // =====================================================
 
-export async function getExecutionTrend(projectId?: string): Promise<TrendData[]> {
+export async function getExecutionTrend(projectId?: string, dateFrom?: string, dateTo?: string): Promise<TrendData[]> {
     try {
         const params = new URLSearchParams();
         if (projectId) params.append('project_id', projectId);
+        if (dateFrom) params.append('date_from', dateFrom);
+        if (dateTo) params.append('date_to', dateTo);
         const qs = params.toString();
         const result = await fetchApi<GovernanceApiResponse<TrendData[]>>(
             `/governance/execution-trend${qs ? '?' + qs : ''}`
