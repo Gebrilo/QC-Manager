@@ -121,7 +121,27 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
             ]
         );
 
-        if (REPORT_SQL_BY_TYPE[data.report_type] && data.format !== 'pdf') {
+        if (data.format === 'pdf') {
+            // PDF is generated client-side; just record the job as completed for history
+            await db.query(
+                `UPDATE report_jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE id = $1`,
+                [jobId]
+            );
+            return res.status(202).json({
+                success: true,
+                message: 'Report job recorded',
+                data: {
+                    job_id: jobId,
+                    status: 'completed',
+                    report_type: data.report_type,
+                    format: data.format,
+                    estimated_completion: new Date().toISOString(),
+                    status_url: `/reports/${jobId}`,
+                },
+            });
+        }
+
+        if (REPORT_SQL_BY_TYPE[data.report_type]) {
             try {
                 const payload = await buildReportPayload(data.report_type, data.format);
                 await db.query(

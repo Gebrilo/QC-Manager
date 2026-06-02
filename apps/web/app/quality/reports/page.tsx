@@ -58,6 +58,7 @@ export default function ReportsPage() {
 
     const [activeId, setActiveId] = useState(initialReportId);
     const [generating, setGenerating] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [fmt, setFmt] = useState('PDF');
     const [range, setRange] = useState('Last 7 days');
     const [project, setProject] = useState('All projects');
@@ -107,6 +108,7 @@ export default function ReportsPage() {
             if (job.status === 'completed') {
                 setGenerating(false);
                 setStamp(generatedStamp);
+                setRefreshKey(k => k + 1);
 
                 if (job.download_url) {
                     try {
@@ -175,6 +177,9 @@ export default function ReportsPage() {
                 await downloadReportAsPdf({ report: merged, gauge, range, project, stamp: generatedStamp });
                 notify(`${report.name} PDF generated. Download started.`);
                 setGenerating(false);
+                // Record the PDF generation in the backend for history, then refresh the panel
+                reportsApi.generate({ report_type: reportType, format: 'pdf' }).catch(() => {});
+                setRefreshKey(k => k + 1);
                 return;
             }
 
@@ -258,6 +263,7 @@ export default function ReportsPage() {
                         <RecentScheduledPanel
                             notify={notify}
                             onSchedule={() => setModal('schedule')}
+                            refreshKey={refreshKey}
                         />
                     </div>
                 </div>

@@ -48,6 +48,7 @@ interface DisplayHistoryItem {
     format: string;
     when: string;
     by: string;
+    hasDownload: boolean;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -68,9 +69,10 @@ const fmtTint = (f: string) => f === 'Excel' ? 'text-emerald-600' : f === 'CSV' 
 interface RecentScheduledPanelProps {
     notify: (msg: string) => void;
     onSchedule: () => void;
+    refreshKey?: number;
 }
 
-export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPanelProps) {
+export function RecentScheduledPanel({ notify, onSchedule, refreshKey }: RecentScheduledPanelProps) {
     const [tab, setTab] = useState<'recent' | 'scheduled'>('recent');
     const [scheduled, setScheduled] = useState<ScheduledItem[]>(INITIAL_SCHEDULED);
     const [history, setHistory] = useState<DisplayHistoryItem[]>([]);
@@ -95,6 +97,7 @@ export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPane
                         format: FORMAT_LABELS[job.format] ?? job.format?.toUpperCase() ?? 'PDF',
                         when: formatWhen(job.completed_at ?? job.created_at),
                         by: job.user_email ?? 'system',
+                        hasDownload: !!(job.download_url),
                     };
                 }));
             })
@@ -102,7 +105,7 @@ export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPane
             .finally(() => { if (!cancelled) setHistoryLoading(false); });
 
         return () => { cancelled = true; };
-    }, []);
+    }, [refreshKey]);
 
     async function handleDownload(item: DisplayHistoryItem) {
         setDownloadingId(item.id);
@@ -175,15 +178,19 @@ export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPane
                                         <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{it.by}</td>
                                         <td className="px-4 py-3"><StatusBadge status="ready" /></td>
                                         <td className="pr-5 py-3 text-right">
-                                            {downloadingId === it.id ? (
-                                                <span className="inline-flex items-center gap-1.5 text-xs text-indigo-500">
-                                                    <span className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin inline-block" /> Downloading
-                                                </span>
+                                            {it.hasDownload ? (
+                                                downloadingId === it.id ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-xs text-indigo-500">
+                                                        <span className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin inline-block" /> Downloading
+                                                    </span>
+                                                ) : (
+                                                    <button onClick={() => handleDownload(it)}
+                                                        className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition whitespace-nowrap">
+                                                        <Ico k="download" size={13} /> Download
+                                                    </button>
+                                                )
                                             ) : (
-                                                <button onClick={() => handleDownload(it)}
-                                                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition whitespace-nowrap">
-                                                    <Ico k="download" size={13} /> Download
-                                                </button>
+                                                <span className="text-xs text-slate-400 whitespace-nowrap">Local file</span>
                                             )}
                                         </td>
                                     </tr>

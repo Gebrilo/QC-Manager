@@ -565,7 +565,7 @@ export const dashboardApi = {
 export const reportsApi = {
     generate: (data: {
         report_type: 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
-        format?: 'xlsx' | 'csv' | 'json';
+        format?: 'xlsx' | 'csv' | 'json' | 'pdf';
         filters?: {
             project_ids?: string[];
             status?: string[];
