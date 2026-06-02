@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { REPORTS } from '@/components/reports/reportTypes';
+import { REPORTS, GAUGE_DATA } from '@/components/reports/reportTypes';
 import { useReportData } from '@/components/reports/useReportData';
 import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
@@ -10,7 +10,7 @@ import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
 import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
 import { reportsApi } from '@/lib/api';
-import { downloadElementAsPdf } from '@/lib/reportPdf';
+import { downloadReportAsPdf } from '@/lib/reportPdf';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
 type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
@@ -50,12 +50,6 @@ function stampNow() {
     });
 }
 
-function nextPaint() {
-    return new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-    });
-}
-
 export default function ReportsPage() {
     const searchParams = useSearchParams();
     const requestedReportId = searchParams.get('report');
@@ -72,7 +66,6 @@ export default function ReportsPage() {
     const [toast, setToast] = useState<string | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const previewRef = useRef<HTMLDivElement | null>(null);
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
     const { override: realData, loading: dataLoading } = useReportData(report.id);
@@ -168,13 +161,18 @@ export default function ReportsPage() {
 
             if (backendFormat === 'pdf') {
                 setStamp(generatedStamp);
-                await nextPaint();
-
-                if (!previewRef.current) {
-                    throw new Error('Report preview is not ready for PDF export.');
-                }
-
-                await downloadElementAsPdf(previewRef.current, report.name);
+                const merged = realData
+                    ? {
+                        ...report,
+                        kpis: realData.kpis?.length ? realData.kpis : report.kpis,
+                        chart: realData.chart?.bars.length ? realData.chart : report.chart,
+                        rows: realData.rows?.length ? realData.rows : report.rows,
+                        summary: realData.summary || report.summary,
+                        summaryTone: realData.summaryTone || report.summaryTone,
+                    }
+                    : report;
+                const gauge = realData?.gauge ?? GAUGE_DATA[report.id] ?? { value: 0, label: 'Headline', caption: '' };
+                await downloadReportAsPdf({ report: merged, gauge, range, project, stamp: generatedStamp });
                 notify(`${report.name} PDF generated. Download started.`);
                 setGenerating(false);
                 return;
@@ -256,7 +254,6 @@ export default function ReportsPage() {
                             project={project}
                             realData={realData}
                             dataLoading={dataLoading && fmt !== 'PDF'}
-                            paperRef={previewRef}
                         />
                         <RecentScheduledPanel
                             notify={notify}
