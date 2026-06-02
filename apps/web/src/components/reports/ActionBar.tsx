@@ -41,14 +41,25 @@ function ExportMenu({ onPick, onClose }: ExportMenuProps) {
     );
 }
 
+interface SelectishOption {
+    value: string;
+    label: string;
+}
+
 function Selectish({ icon, value, onChange, options }: {
-    icon: string; value: string; onChange: (v: string) => void; options: string[];
+    icon: string;
+    value: string;
+    onChange: (v: string) => void;
+    options: Array<string | SelectishOption>;
 }) {
     return (
         <div className="relative">
             <select value={value} onChange={e => onChange(e.target.value)}
                 className="appearance-none h-7 pl-7 pr-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer">
-                {options.map(o => <option key={o}>{o}</option>)}
+                {options.map(o => {
+                    const opt = typeof o === 'string' ? { value: o, label: o } : o;
+                    return <option key={opt.value} value={opt.value}>{opt.label}</option>;
+                })}
             </select>
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 <Ico k={icon} size={12} />
@@ -74,6 +85,7 @@ interface ActionBarProps {
     setDateTo: (d: string) => void;
     project: string;
     setProject: (p: string) => void;
+    projects?: Array<{ id: string; name: string }>;
     onShare: () => void;
     onSchedule: () => void;
     notify: (msg: string) => void;
@@ -82,7 +94,7 @@ interface ActionBarProps {
 export function ActionBar({
     report, generating, onGenerate, fmt, setFmt,
     range, setRange, dateFrom, setDateFrom, dateTo, setDateTo,
-    project, setProject,
+    project, setProject, projects = [],
     onShare, onSchedule, notify,
 }: ActionBarProps) {
     const [menu, setMenu] = useState(false);
@@ -171,8 +183,15 @@ export function ActionBar({
                         />
                     </>
                 )}
-                <Selectish icon="grid" value={project} onChange={setProject}
-                    options={['All projects', 'CST', 'FRA', 'PPO', 'AUTH', 'CORE']} />
+                <Selectish
+                    icon="grid"
+                    value={project}
+                    onChange={setProject}
+                    options={[
+                        { value: '', label: 'All projects' },
+                        ...projects.map(p => ({ value: p.id, label: p.name })),
+                    ]}
+                />
                 <div className="ml-auto flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
                     {['PDF', 'Excel', 'CSV'].map(f => (
                         <button key={f} onClick={() => setFmt(f)}

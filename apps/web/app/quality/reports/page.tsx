@@ -9,7 +9,7 @@ import { ActionBar } from '@/components/reports/ActionBar';
 import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
 import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
-import { reportsApi } from '@/lib/api';
+import { reportsApi, projectsApi, type Project } from '@/lib/api';
 import { downloadReportAsPdf } from '@/lib/reportPdf';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
@@ -50,6 +50,46 @@ function stampNow() {
     });
 }
 
+function toIsoDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// Translate a preset range label (or "Custom range") into concrete
+// dateFrom/dateTo strings (YYYY-MM-DD) the backend can use.
+// Returns { from: undefined, to: undefined } only when the custom range is
+// chosen with no user-entered dates.
+function rangeToDates(range: string, customFrom: string, customTo: string): { from?: string; to?: string } {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (range === 'Custom range') {
+        return {
+            from: customFrom || undefined,
+            to: customTo || undefined,
+        };
+    }
+
+    const start = new Date(today);
+    if (range === 'Last 7 days') {
+        start.setDate(start.getDate() - 6);
+    } else if (range === 'Last 30 days') {
+        start.setDate(start.getDate() - 29);
+    } else if (range === 'This quarter') {
+        const q = Math.floor(today.getMonth() / 3);
+        start.setMonth(q * 3, 1);
+    } else if (range === 'Year to date') {
+        start.setMonth(0, 1);
+    } else {
+        return { from: undefined, to: undefined };
+    }
+
+    start.setHours(0, 0, 0, 0);
+    return { from: toIsoDate(start), to: toIsoDate(today) };
+}
+
 export default function ReportsPage() {
     const searchParams = useSearchParams();
     const requestedReportId = searchParams.get('report');
@@ -63,19 +103,34 @@ export default function ReportsPage() {
     const [range, setRange] = useState('Last 7 days');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [project, setProject] = useState('All projects');
+    // '' means 'All projects' (no server-side project filter). Otherwise holds a project id.
+    const [project, setProject] = useState('');
+    const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
     const [stamp, setStamp] = useState(stampNow);
     const [modal, setModal] = useState<'share' | 'schedule' | null>(null);
     const [toast, setToast] = useState<string | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    useEffect(() => {
+        projectsApi.list()
+            .then((rows: Project[]) => {
+                setProjects(rows.map(r => ({ id: r.id, name: r.project_name })));
+            })
+            .catch(() => setProjects([]));
+    }, []);
+
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
-    const { override: realData, loading: dataLoading } = useReportData(
-        report.id,
-        range === 'Custom range' ? dateFrom || undefined : undefined,
-        range === 'Custom range' ? dateTo || undefined : undefined,
-    );
+    const { from: effFrom, to: effTo } = rangeToDates(range, dateFrom, dateTo);
+    const { override: realData, loading: dataLoading } = useReportData(report.id, {
+        dateFrom: effFrom,
+        dateTo: effTo,
+        projectId: project || undefined,
+    });
+
+    const projectLabel = project
+        ? (projects.find(p => p.id === project)?.name ?? project)
+        : 'All projects';
 
     const notify = useCallback((msg: string) => {
         setToast(msg);
@@ -180,7 +235,7 @@ export default function ReportsPage() {
                     }
                     : report;
                 const gauge = realData?.gauge ?? GAUGE_DATA[report.id] ?? { value: 0, label: 'Headline', caption: '' };
-                await downloadReportAsPdf({ report: merged, gauge, range, project, stamp: generatedStamp });
+                await downloadReportAsPdf({ report: merged, gauge, range, project: projectLabel, stamp: generatedStamp });
                 notify(`${report.name} PDF generated. Download started.`);
                 setGenerating(false);
                 // Record the PDF generation in the backend for history, then refresh the panel
@@ -211,7 +266,7 @@ export default function ReportsPage() {
                         generating={false}
                         stamp={stamp}
                         range={range}
-                        project={project}
+                        project={projectLabel}
                         realData={realData}
                         dataLoading={false}
                     />
@@ -257,6 +312,7 @@ export default function ReportsPage() {
                             setDateTo={setDateTo}
                             project={project}
                             setProject={setProject}
+                            projects={projects}
                             onShare={() => setModal('share')}
                             onSchedule={() => setModal('schedule')}
                             notify={notify}
@@ -266,7 +322,7 @@ export default function ReportsPage() {
                             generating={generating && fmt !== 'PDF'}
                             stamp={stamp}
                             range={range}
-                            project={project}
+                            project={projectLabel}
                             realData={realData}
                             dataLoading={dataLoading && fmt !== 'PDF'}
                         />

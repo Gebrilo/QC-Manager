@@ -15,6 +15,12 @@ type ReportOverride = Pick<ReportDefinition, 'kpis' | 'chart' | 'rows' | 'summar
     gauge?: { value: number; label: string; caption: string };
 };
 
+interface FetcherParams {
+    dateFrom?: string;
+    dateTo?: string;
+    projectId?: string;
+}
+
 function toStatus(pct: number): ReportStatus {
     if (pct >= 85) return 'complete';
     if (pct >= 70) return 'ontrack';
@@ -34,10 +40,19 @@ function p(v: string | number | null | undefined): number {
     return isNaN(n) ? 0 : Math.round(n);
 }
 
+function inDateRange(iso: string | null | undefined, dateFrom?: string, dateTo?: string): boolean {
+    if (!iso) return !dateFrom && !dateTo;
+    const t = new Date(iso).getTime();
+    if (isNaN(t)) return !dateFrom && !dateTo;
+    if (dateFrom && t < new Date(dateFrom).getTime()) return false;
+    if (dateTo && t > new Date(dateTo + 'T23:59:59').getTime()) return false;
+    return true;
+}
+
 // ─── Release Readiness ────────────────────────────────────────────────────────
 
-async function fetchReadiness(): Promise<ReportOverride> {
-    const data = await getReleaseReadiness();
+async function fetchReadiness({ projectId }: FetcherParams): Promise<ReportOverride> {
+    const data = await getReleaseReadiness(projectId);
     if (!data.length) throw new Error('no data');
 
     const avgPass = Math.round(data.reduce((s, d) => s + p(d.latest_pass_rate_pct), 0) / data.length);
@@ -76,42 +91,46 @@ async function fetchReadiness(): Promise<ReportOverride> {
 
 // ─── Weekly Quality Health ────────────────────────────────────────────────────
 
-async function fetchQualityHealth(dateFrom?: string, dateTo?: string): Promise<ReportOverride> {
-    const [trend, bugs] = await Promise.all([getExecutionTrend(undefined, dateFrom, dateTo), getBugSummary()]);
+async function fetchQualityHealth({ dateFrom, dateTo, projectId }: FetcherParams): Promise<ReportOverride> {
+    const [trend, bugs] = await Promise.all([
+        getExecutionTrend(projectId, dateFrom, dateTo),
+        getBugSummary(projectId),
+    ]);
 
-    const last7 = trend.slice(-7);
-    const totalExecs = last7.reduce((s, d) => s + d.totalTests, 0);
-    const passedExecs = last7.reduce((s, d) => s + d.passedCount, 0);
+    const windowed = (dateFrom || dateTo) ? trend : trend.slice(-7);
+    const totalExecs = windowed.reduce((s, d) => s + d.totalTests, 0);
+    const passedExecs = windowed.reduce((s, d) => s + d.passedCount, 0);
     const passRate = totalExecs > 0 ? Math.round((passedExecs / totalExecs) * 100) : 0;
     const criticalDefects = bugs.by_severity.critical;
 
     const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const bars: ChartBar[] = last7.map(d => ({
+    const bars: ChartBar[] = windowed.slice(-7).map(d => ({
         label: dayLabels[new Date(d.date).getDay()],
         value: d.totalTests,
         status: d.totalTests >= 20 ? 'complete' : d.totalTests > 0 ? 'ontrack' : 'inprogress',
     }));
 
     const tone: ReportStatus = criticalDefects > 5 ? 'atrisk' : passRate >= 85 ? 'ontrack' : 'inprogress';
+    const windowLabel = (dateFrom || dateTo) ? 'in range' : 'rolling 7-day';
 
     return {
         kpis: [
-            { label: 'Test executions', value: String(totalExecs), sub: 'this week' },
-            { label: 'Pass rate', value: `${passRate}%`, sub: 'rolling 7-day' },
+            { label: 'Test executions', value: String(totalExecs), sub: windowLabel },
+            { label: 'Pass rate', value: `${passRate}%`, sub: windowLabel },
             { label: 'Critical defects', value: String(criticalDefects), sub: 'open & unresolved' },
         ],
         chart: { title: 'Executions per day', unit: '', bars },
         rows: [],
-        summary: `${totalExecs} test${totalExecs !== 1 ? 's' : ''} executed this week with a ${passRate}% pass rate. ${criticalDefects} critical defect${criticalDefects !== 1 ? 's' : ''} currently open.`,
+        summary: `${totalExecs} test${totalExecs !== 1 ? 's' : ''} executed ${windowLabel} with a ${passRate}% pass rate. ${criticalDefects} critical defect${criticalDefects !== 1 ? 's' : ''} currently open.`,
         summaryTone: tone,
-        gauge: { value: passRate, label: 'Pass rate', caption: 'rolling 7-day' },
+        gauge: { value: passRate, label: 'Pass rate', caption: windowLabel },
     };
 }
 
 // ─── Test Coverage & Workload ─────────────────────────────────────────────────
 
-async function fetchCoverage(): Promise<ReportOverride> {
-    const coverage = await getTestCoverage();
+async function fetchCoverage({ projectId }: FetcherParams): Promise<ReportOverride> {
+    const coverage = await getTestCoverage(projectId);
     const tasks = coverage.task_coverage;
     if (!tasks.length) throw new Error('no data');
 
@@ -155,8 +174,9 @@ async function fetchCoverage(): Promise<ReportOverride> {
 
 // ─── Project Status ───────────────────────────────────────────────────────────
 
-async function fetchProjectStatus(): Promise<ReportOverride> {
-    const data = await getProjectHealth();
+async function fetchProjectStatus({ projectId }: FetcherParams): Promise<ReportOverride> {
+    const all = await getProjectHealth();
+    const data = projectId ? all.filter(d => d.project_id === projectId) : all;
     if (!data.length) throw new Error('no data');
 
     const atRisk = data.filter(d => d.overall_health_status === 'RED').length;
@@ -201,8 +221,8 @@ async function fetchProjectStatus(): Promise<ReportOverride> {
 
 // ─── Bug Distribution ─────────────────────────────────────────────────────────
 
-async function fetchBugDistribution(): Promise<ReportOverride> {
-    const bugs = await getBugSummary();
+async function fetchBugDistribution({ projectId }: FetcherParams): Promise<ReportOverride> {
+    const bugs = await getBugSummary(projectId);
     const { totals, by_severity, by_project } = bugs;
 
     const criticalHigh = by_severity.critical + by_severity.major;
@@ -216,7 +236,8 @@ async function fetchBugDistribution(): Promise<ReportOverride> {
         { label: 'Cosmetic', value: by_severity.cosmetic, status: 'complete' },
     ];
 
-    const rows: ReportRow[] = by_project.slice(0, 8).map(p => ({
+    const projectRows = projectId ? by_project.filter(p => p.project_id === projectId) : by_project;
+    const rows: ReportRow[] = projectRows.slice(0, 8).map(p => ({
         c: [p.project_name],
         status: (p.critical_bugs > 0 ? 'atrisk' : p.open_bugs > 5 ? 'inprogress' : 'ontrack') as ReportStatus,
         rate: p.open_bugs,
@@ -228,7 +249,7 @@ async function fetchBugDistribution(): Promise<ReportOverride> {
 
     return {
         kpis: [
-            { label: 'Open defects', value: String(totals.open_bugs), sub: 'all projects' },
+            { label: 'Open defects', value: String(totals.open_bugs), sub: projectId ? 'this project' : 'all projects' },
             { label: 'Critical / Major', value: String(criticalHigh), sub: `${pctCritHigh}% of open` },
             { label: 'Total bugs', value: String(totals.total_bugs), sub: 'ever reported' },
         ],
@@ -256,21 +277,39 @@ interface RawTestExecSummary {
         pass_rate: string | number;
         total_cases: number;
         failed: number;
+        completed_at?: string | null;
+        started_at?: string | null;
     }>;
 }
 
-async function fetchTestExecution(): Promise<ReportOverride> {
-    const data = await fetchApi<RawTestExecSummary>('/test-executions/summary');
-    const { summary, recent_runs } = data;
+async function fetchTestExecution({ dateFrom, dateTo, projectId }: FetcherParams): Promise<ReportOverride> {
+    const params = new URLSearchParams();
+    if (projectId) params.append('project_id', projectId);
+    const qs = params.toString();
+    const data = await fetchApi<RawTestExecSummary>(`/test-executions/summary${qs ? '?' + qs : ''}`);
+    const recent = (dateFrom || dateTo)
+        ? data.recent_runs.filter(r => inDateRange(r.completed_at || r.started_at, dateFrom, dateTo))
+        : data.recent_runs;
 
-    const passRate = p(summary.overall_pass_rate);
+    // When dates filter the runs client-side, recompute aggregate from the surviving rows.
+    const useFiltered = (dateFrom || dateTo);
+    const totalRuns = useFiltered ? recent.length : data.summary.total_test_runs;
+    const totalCases = useFiltered
+        ? recent.reduce((s, r) => s + r.total_cases, 0)
+        : data.summary.total_executions;
+    const totalFailed = useFiltered
+        ? recent.reduce((s, r) => s + r.failed, 0)
+        : data.summary.total_failed;
+    const passRate = useFiltered
+        ? (totalCases > 0 ? Math.round(((totalCases - totalFailed) / totalCases) * 100) : 0)
+        : p(data.summary.overall_pass_rate);
 
-    const bars: ChartBar[] = recent_runs.slice(0, 6).map(r => {
+    const bars: ChartBar[] = recent.slice(0, 6).map(r => {
         const rate = p(r.pass_rate);
         return { label: r.name.substring(0, 8), value: rate, status: toStatus(rate) };
     });
 
-    const rows: ReportRow[] = recent_runs.slice(0, 8).map(r => {
+    const rows: ReportRow[] = recent.slice(0, 8).map(r => {
         const rate = p(r.pass_rate);
         return {
             c: [r.name],
@@ -285,15 +324,15 @@ async function fetchTestExecution(): Promise<ReportOverride> {
 
     return {
         kpis: [
-            { label: 'Runs executed', value: String(summary.total_test_runs), sub: 'total' },
-            { label: 'Cases run', value: String(summary.total_executions), sub: `${passRate}% passed` },
-            { label: 'Failed', value: String(summary.total_failed), sub: 'test cases' },
+            { label: 'Runs executed', value: String(totalRuns), sub: useFiltered ? 'in range' : 'total' },
+            { label: 'Cases run', value: String(totalCases), sub: `${passRate}% passed` },
+            { label: 'Failed', value: String(totalFailed), sub: 'test cases' },
         ],
         chart: { title: 'Pass rate by run', unit: '%', bars },
         rows,
-        summary: `${summary.total_test_runs} test run${summary.total_test_runs !== 1 ? 's' : ''} with ${summary.total_executions} total cases executed at ${passRate}% pass rate. ${summary.total_failed} case${summary.total_failed !== 1 ? 's' : ''} failed.`,
+        summary: `${totalRuns} test run${totalRuns !== 1 ? 's' : ''} with ${totalCases} total cases executed at ${passRate}% pass rate. ${totalFailed} case${totalFailed !== 1 ? 's' : ''} failed.`,
         summaryTone: tone,
-        gauge: { value: passRate, label: 'Pass rate', caption: `${summary.total_executions} cases run` },
+        gauge: { value: passRate, label: 'Pass rate', caption: `${totalCases} cases run` },
     };
 }
 
@@ -307,7 +346,10 @@ interface RawResource {
     weekly_capacity_hrs?: number | string | null;
 }
 
-async function fetchResourceUtilization(): Promise<ReportOverride> {
+async function fetchResourceUtilization(_: FetcherParams): Promise<ReportOverride> {
+    // Project / date filters do not apply: resource utilization is a current
+    // cross-project snapshot of each member's allocation. Filtering here would
+    // be misleading, so the report ignores those filters by design.
     const resources = await fetchApi<RawResource[]>('/resources');
     const active = resources.filter(r => r.is_active);
     if (!active.length) throw new Error('no data');
@@ -358,10 +400,13 @@ async function fetchResourceUtilization(): Promise<ReportOverride> {
 
 // ─── Quality Trend Analysis ───────────────────────────────────────────────────
 
-async function fetchQualityTrend(dateFrom?: string, dateTo?: string): Promise<ReportOverride> {
-    const trend = await getExecutionTrend(undefined, dateFrom, dateTo);
+async function fetchQualityTrend({ dateFrom, dateTo, projectId }: FetcherParams): Promise<ReportOverride> {
+    const trend = await getExecutionTrend(projectId, dateFrom, dateTo);
 
-    const now = new Date();
+    // Anchor the 5-bucket window to the end of the requested range (or "now" if
+    // no range was supplied). The hook is always called with concrete dateFrom/
+    // dateTo from page.tsx, but we stay safe if either is missing.
+    const anchor = dateTo ? new Date(dateTo + 'T23:59:59') : new Date();
     const weeks: { label: string; tests: number; passed: number }[] = [
         { label: 'W-4', tests: 0, passed: 0 },
         { label: 'W-3', tests: 0, passed: 0 },
@@ -373,7 +418,7 @@ async function fetchQualityTrend(dateFrom?: string, dateTo?: string): Promise<Re
     trend.forEach(d => {
         const dDate = new Date(d.date);
         const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-        const weeksAgo = Math.floor((now.getTime() - dDate.getTime()) / msPerWeek);
+        const weeksAgo = Math.floor((anchor.getTime() - dDate.getTime()) / msPerWeek);
         const idx = 4 - Math.min(4, weeksAgo);
         if (idx >= 0) {
             weeks[idx].tests += d.totalTests;
@@ -406,27 +451,23 @@ async function fetchQualityTrend(dateFrom?: string, dateTo?: string): Promise<Re
     };
 }
 
-interface DateParams {
-    dateFrom?: string;
-    dateTo?: string;
-}
-
 // ─── Fetcher registry ─────────────────────────────────────────────────────────
 
-const FETCHERS: Record<string, (dates: DateParams) => Promise<ReportOverride>> = {
-    readiness: () => fetchReadiness(),
-    quality: ({ dateFrom, dateTo }) => fetchQualityHealth(dateFrom, dateTo),
-    coverage: () => fetchCoverage(),
-    'proj-status': () => fetchProjectStatus(),
-    'bug-dist': () => fetchBugDistribution(),
-    'test-exec': () => fetchTestExecution(),
-    resource: () => fetchResourceUtilization(),
-    'quality-trend': ({ dateFrom, dateTo }) => fetchQualityTrend(dateFrom, dateTo),
+const FETCHERS: Record<string, (params: FetcherParams) => Promise<ReportOverride>> = {
+    readiness: fetchReadiness,
+    quality: fetchQualityHealth,
+    coverage: fetchCoverage,
+    'proj-status': fetchProjectStatus,
+    'bug-dist': fetchBugDistribution,
+    'test-exec': fetchTestExecution,
+    resource: fetchResourceUtilization,
+    'quality-trend': fetchQualityTrend,
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useReportData(reportId: string, dateFrom?: string, dateTo?: string) {
+export function useReportData(reportId: string, params: FetcherParams = {}) {
+    const { dateFrom, dateTo, projectId } = params;
     const [override, setOverride] = useState<ReportOverride | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -438,13 +479,13 @@ export function useReportData(reportId: string, dateFrom?: string, dateTo?: stri
         setOverride(null);
         setLoading(true);
 
-        fetcher({ dateFrom, dateTo })
+        fetcher({ dateFrom, dateTo, projectId })
             .then(data => { if (!cancelled) setOverride(data); })
             .catch(() => { if (!cancelled) setOverride(null); })
             .finally(() => { if (!cancelled) setLoading(false); });
 
         return () => { cancelled = true; };
-    }, [reportId, dateFrom, dateTo]);
+    }, [reportId, dateFrom, dateTo, projectId]);
 
     return { override, loading };
 }
