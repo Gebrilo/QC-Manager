@@ -236,6 +236,62 @@ function buildStyledPdfBuffer(presentation) {
         }
     };
 
+    const roundedRect = (x, top, w, h, r, fill, stroke = null, lineWidth = 1) => {
+        const bottom = H - top - h;
+        const x0 = x;
+        const x1 = x + w;
+        const y0 = bottom;
+        const y1 = bottom + h;
+        const radius = Math.min(r, w / 2, h / 2);
+        const k = radius * 0.5522847498;
+        const path = [
+            `${x0 + radius} ${y0} m`,
+            `${x1 - radius} ${y0} l`,
+            `${x1 - radius + k} ${y0} ${x1} ${y0 + radius - k} ${x1} ${y0 + radius} c`,
+            `${x1} ${y1 - radius} l`,
+            `${x1} ${y1 - radius + k} ${x1 - radius + k} ${y1} ${x1 - radius} ${y1} c`,
+            `${x0 + radius} ${y1} l`,
+            `${x0 + radius - k} ${y1} ${x0} ${y1 - radius + k} ${x0} ${y1 - radius} c`,
+            `${x0} ${y0 + radius} l`,
+            `${x0} ${y0 + radius - k} ${x0 + radius - k} ${y0} ${x0 + radius} ${y0} c`,
+            'h',
+        ].join(' ');
+
+        if (fill && stroke) {
+            ops.push(`q ${hexToRgb01(fill)} rg ${hexToRgb01(stroke)} RG ${lineWidth} w ${path} B Q`);
+        } else if (fill) {
+            ops.push(`q ${hexToRgb01(fill)} rg ${path} f Q`);
+        } else if (stroke) {
+            ops.push(`q ${hexToRgb01(stroke)} RG ${lineWidth} w ${path} S Q`);
+        }
+    };
+
+    const circle = (cx, topCenter, r, fill, stroke = null, lineWidth = 1) => {
+        const cy = y(topCenter);
+        const k = r * 0.5522847498;
+        const path = [
+            `${cx + r} ${cy} m`,
+            `${cx + r} ${cy + k} ${cx + k} ${cy + r} ${cx} ${cy + r} c`,
+            `${cx - k} ${cy + r} ${cx - r} ${cy + k} ${cx - r} ${cy} c`,
+            `${cx - r} ${cy - k} ${cx - k} ${cy - r} ${cx} ${cy - r} c`,
+            `${cx + k} ${cy - r} ${cx + r} ${cy - k} ${cx + r} ${cy} c`,
+            'h',
+        ].join(' ');
+
+        if (fill && stroke) {
+            ops.push(`q ${hexToRgb01(fill)} rg ${hexToRgb01(stroke)} RG ${lineWidth} w ${path} B Q`);
+        } else if (fill) {
+            ops.push(`q ${hexToRgb01(fill)} rg ${path} f Q`);
+        } else if (stroke) {
+            ops.push(`q ${hexToRgb01(stroke)} RG ${lineWidth} w ${path} S Q`);
+        }
+    };
+
+    const card = (x, top, w, h, fill = '#ffffff', stroke = '#e2e8f0', radius = 10) => {
+        roundedRect(x + 2, top + 3, w, h, radius, '#e2e8f0');
+        roundedRect(x, top, w, h, radius, fill, stroke, 0.8);
+    };
+
     const line = (x1, top1, x2, top2, color = '#e2e8f0', width = 1) => {
         ops.push(`q ${hexToRgb01(color)} RG ${width} w ${x1} ${y(top1)} m ${x2} ${y(top2)} l S Q`);
     };
@@ -254,14 +310,14 @@ function buildStyledPdfBuffer(presentation) {
 
     const badge = (status, x, top) => {
         const s = statusConfig(status);
-        rect(x, top - 9, 54, 16, s.fill, s.color, 0.5);
+        roundedRect(x, top - 9, 58, 16, 8, s.fill, s.color, 0.6);
         text(s.label.toUpperCase(), x + 6, top + 2, 7, s.text, 'F2');
     };
 
     const progress = (value, status, x, top, w = 58) => {
         const pct = clamp(value, 0, 100);
-        rect(x, top, w, 5, '#e2e8f0');
-        rect(x, top, (w * pct) / 100, 5, statusConfig(status).color);
+        roundedRect(x, top, w, 5, 2.5, '#e2e8f0');
+        roundedRect(x, top, (w * pct) / 100, 5, 2.5, statusConfig(status).color);
         text(`${Math.round(pct)}%`, x + w + 6, top + 5, 8, '#475569', 'F1');
     };
 
@@ -276,15 +332,26 @@ function buildStyledPdfBuffer(presentation) {
         ops.push(`q ${hexToRgb01(color)} RG ${width} w 1 J ${first[0].toFixed(2)} ${first[1].toFixed(2)} m ${rest.map((p) => `${p[0].toFixed(2)} ${p[1].toFixed(2)} l`).join(' ')} S Q`);
     };
 
-    rect(0, 0, W, H, '#ffffff');
+    rect(0, 0, W, H, '#f1f5f9');
+    roundedRect(24, 24, 564, 744, 18, '#e2e8f0');
+    roundedRect(20, 18, 564, 744, 18, '#ffffff', '#e2e8f0', 0.8);
+    rect(20, 18, 564, 96, '#f8fafc');
+    rect(20, 18, 8, 744, '#4f46e5');
+    rect(20, 18, 8, 248, '#7c3aed');
 
-    text(`${presentation.category} Report`, 42, 58, 8, '#94a3b8', 'F2');
-    text(truncateText(presentation.name, 34), 42, 80, 22, '#0f172a', 'F2');
-    text(`Generated ${presentation.generated_label}`, 42, 100, 9, '#94a3b8', 'F1');
-    text('QC Manager', 474, 62, 13, '#4f46e5', 'F2');
-    text('Governance System', 474, 78, 8, '#94a3b8', 'F1');
-    rect(42, 116, 528, 4, '#4f46e5');
-    rect(306, 116, 264, 4, '#7c3aed');
+    roundedRect(42, 46, 112, 19, 9.5, '#eef2ff', '#c7d2fe', 0.6);
+    text(`${presentation.category} Report`.toUpperCase(), 52, 59, 7.5, '#4338ca', 'F2');
+    text(truncateText(presentation.name, 34), 42, 88, 23, '#0f172a', 'F2');
+    text(`Generated ${presentation.generated_label}`, 42, 108, 9, '#64748b', 'F1');
+
+    circle(482, 58, 17, '#eef2ff', '#c7d2fe', 0.8);
+    text('QC', 472, 63, 10, '#4f46e5', 'F2');
+    text('QC Manager', 508, 56, 13, '#4f46e5', 'F2');
+    text('Governance System', 508, 72, 8, '#64748b', 'F1');
+    roundedRect(472, 88, 82, 16, 8, '#ecfeff', '#bae6fd', 0.5);
+    text('CONFIDENTIAL', 486, 99, 6.5, '#0369a1', 'F2');
+    rect(42, 126, 360, 4, '#4f46e5');
+    rect(402, 126, 168, 4, '#7c3aed');
 
     const meta = [
         ['Reporting period', presentation.range],
@@ -294,81 +361,94 @@ function buildStyledPdfBuffer(presentation) {
     ];
     meta.forEach(([label, value], idx) => {
         const x = 42 + idx * 132;
-        text(label, x, 139, 6.5, '#94a3b8', 'F2');
-        text(truncateText(value || '-', 18), x, 152, 8.5, '#334155', 'F2');
+        roundedRect(x, 146, 118, 32, 7, '#f8fafc', '#e2e8f0', 0.5);
+        text(label.toUpperCase(), x + 9, 159, 6.2, '#94a3b8', 'F2');
+        text(truncateText(value || '-', 18), x + 9, 172, 8.5, '#334155', 'F2');
     });
 
     const tone = PDF_SUMMARY_TONE[presentation.summary_tone] || PDF_SUMMARY_TONE.ontrack;
-    rect(42, 176, 528, 66, tone.fill, tone.stroke);
-    text('EXECUTIVE SUMMARY', 58, 195, 7, tone.label, 'F2');
-    wrappedText(presentation.summary, 58, 213, 92, 9.5, '#334155', 'F1', 12, 3);
+    roundedRect(42, 198, 528, 70, 12, tone.fill, tone.stroke, 0.8);
+    rect(42, 198, 5, 70, tone.label);
+    text('EXECUTIVE SUMMARY', 58, 218, 7.5, tone.label, 'F2');
+    wrappedText(presentation.summary, 58, 236, 92, 9.7, '#334155', 'F1', 12, 3);
 
-    const cardTop = 262;
+    const cardTop = 288;
     const cardW = 168;
     presentation.kpis.slice(0, 3).forEach((kpi, idx) => {
         const x = 42 + idx * (cardW + 12);
-        rect(x, cardTop, cardW, 70, '#f8fafc', '#e2e8f0');
+        card(x, cardTop, cardW, 72, '#f8fafc', '#e2e8f0', 12);
+        circle(x + 146, cardTop + 18, 5, idx === 0 ? '#4f46e5' : idx === 1 ? '#10b981' : '#f59e0b');
         text(truncateText(kpi.label, 24).toUpperCase(), x + 13, cardTop + 19, 7, '#94a3b8', 'F2');
-        text(truncateText(kpi.value, 12), x + 13, cardTop + 44, 21, '#0f172a', 'F2');
+        text(truncateText(kpi.value, 12), x + 13, cardTop + 45, 22, '#0f172a', 'F2');
         if (kpi.delta) {
             const deltaColor = kpi.trend === 'down' ? '#f43f5e' : '#10b981';
-            text(kpi.delta, x + 82, cardTop + 44, 8.5, deltaColor, 'F2');
+            roundedRect(x + 98, cardTop + 31, 50, 18, 9, kpi.trend === 'down' ? '#fff1f2' : '#ecfdf5');
+            text(kpi.delta, x + 110, cardTop + 43, 8, deltaColor, 'F2');
         }
-        text(truncateText(kpi.sub || '', 26), x + 13, cardTop + 59, 8, '#94a3b8', 'F1');
+        text(truncateText(kpi.sub || '', 26), x + 13, cardTop + 62, 8, '#64748b', 'F1');
     });
 
-    const panelTop = 352;
-    rect(42, panelTop, 204, 140, '#ffffff', '#e2e8f0');
-    rect(264, panelTop, 306, 140, '#ffffff', '#e2e8f0');
+    const panelTop = 382;
+    card(42, panelTop, 204, 136, '#ffffff', '#e2e8f0', 12);
+    card(264, panelTop, 306, 136, '#ffffff', '#e2e8f0', 12);
 
     const gauge = presentation.gauge || { value: 0, label: 'Headline', caption: '' };
     const gaugePct = clamp(gauge.value, 0, 100);
     const gaugeColor = gaugePct >= 85 ? '#10b981' : gaugePct >= 70 ? '#3b82f6' : gaugePct >= 50 ? '#f59e0b' : '#f43f5e';
     text(truncateText(gauge.label, 32).toUpperCase(), 58, panelTop + 21, 7, '#94a3b8', 'F2');
-    arc(144, panelTop + 76, 39, -90, 270, '#e2e8f0', 9);
-    arc(144, panelTop + 76, 39, -90, -90 + (gaugePct * 3.6), gaugeColor, 9);
-    text(`${Math.round(gaugePct)}%`, 123, panelTop + 81, 22, '#0f172a', 'F2');
-    text(truncateText(gauge.caption || '', 34), 76, panelTop + 122, 8, '#94a3b8', 'F1');
+    circle(144, panelTop + 75, 50, '#f8fafc');
+    arc(144, panelTop + 75, 39, -90, 270, '#e2e8f0', 9);
+    arc(144, panelTop + 75, 39, -90, -90 + (gaugePct * 3.6), gaugeColor, 9);
+    circle(144, panelTop + 75, 27, '#ffffff', '#e2e8f0', 0.6);
+    text(`${Math.round(gaugePct)}%`, 123, panelTop + 80, 22, '#0f172a', 'F2');
+    roundedRect(76, panelTop + 108, 128, 18, 9, '#f8fafc', '#e2e8f0', 0.5);
+    text(truncateText(gauge.caption || '', 30), 89, panelTop + 120, 7.5, '#64748b', 'F1');
 
     const chart = presentation.chart || { title: 'Chart', unit: '', bars: [] };
     text(truncateText(chart.title || 'Chart', 40).toUpperCase(), 280, panelTop + 21, 7, '#94a3b8', 'F2');
     const bars = chart.bars.slice(0, 8);
     const maxBar = Math.max(...bars.map((b) => Number(b.value) || 0), 1);
-    const chartBase = panelTop + 118;
-    const barAreaH = 78;
+    const chartBase = panelTop + 112;
+    const barAreaH = 72;
     const gap = 8;
     const barW = Math.min(28, (258 - gap * Math.max(0, bars.length - 1)) / Math.max(1, bars.length));
+    [0, 0.5, 1].forEach((ratio) => {
+        const gridTop = chartBase - barAreaH * ratio;
+        line(280, gridTop, 548, gridTop, '#eef2f7', 0.7);
+        if (ratio > 0) text(`${Math.round(maxBar * ratio)}${chart.unit || ''}`, 548, gridTop + 3, 6.2, '#cbd5e1', 'F1');
+    });
     bars.forEach((bar, idx) => {
         const x = 280 + idx * (barW + gap);
         const h = Math.max(5, ((Number(bar.value) || 0) / maxBar) * barAreaH);
         const top = chartBase - h;
         text(`${bar.value}${chart.unit || ''}`, x, top - 8, 7, '#64748b', 'F2');
-        rect(x, top, barW, h, statusConfig(bar.status).color);
+        roundedRect(x, top, barW, h, 4, statusConfig(bar.status).color);
         text(truncateText(bar.label, 7), x - 2, chartBase + 13, 6.5, '#94a3b8', 'F1');
     });
 
-    const tableTop = 520;
-    text('DETAIL BREAKDOWN', 42, tableTop, 7, '#94a3b8', 'F2');
-    line(42, tableTop + 13, 570, tableTop + 13, '#cbd5e1', 1.5);
+    const tableTop = 542;
+    card(42, tableTop, 528, 200, '#ffffff', '#e2e8f0', 12);
+    text('DETAIL BREAKDOWN', 58, tableTop + 24, 7.5, '#94a3b8', 'F2');
+    line(58, tableTop + 36, 552, tableTop + 36, '#cbd5e1', 1.2);
 
-    const colX = [42, 184, 274, 364, 430];
-    const colW = [132, 76, 80, 50, 132];
+    const colX = [58, 188, 282, 376, 430];
     presentation.columns.slice(0, 5).forEach((header, idx) => {
-        text(truncateText(header, idx === 0 ? 20 : 14).toUpperCase(), colX[idx], tableTop + 30, 7, '#94a3b8', 'F2');
+        text(truncateText(header, idx === 0 ? 20 : 14).toUpperCase(), colX[idx], tableTop + 52, 7, '#94a3b8', 'F2');
     });
 
-    presentation.rows.slice(0, 8).forEach((row, idx) => {
-        const rowTop = tableTop + 46 + idx * 24;
-        line(42, rowTop + 7, 570, rowTop + 7, '#f1f5f9', 0.8);
-        text(truncateText(row.c?.[0] || `Row ${idx + 1}`, 24), colX[0], rowTop + 21, 8.5, '#1e293b', 'F2');
-        badge(row.status, colX[1], rowTop + 17);
-        progress(row.rate || 0, row.status, colX[2], rowTop + 13, 46);
-        text(String(row.defects ?? 0), colX[3], rowTop + 21, 8.5, '#475569', 'F1');
-        text(truncateText(row.rec || '', 28), colX[4], rowTop + 21, 8, '#64748b', 'F3');
+    presentation.rows.slice(0, 7).forEach((row, idx) => {
+        const rowTop = tableTop + 62 + idx * 20;
+        if (idx % 2 === 0) roundedRect(54, rowTop - 5, 500, 18, 6, '#f8fafc');
+        line(58, rowTop + 7, 552, rowTop + 7, '#f1f5f9', 0.7);
+        text(truncateText(row.c?.[0] || `Row ${idx + 1}`, 24), colX[0], rowTop + 18, 8.5, '#1e293b', 'F2');
+        badge(row.status, colX[1], rowTop + 14);
+        progress(row.rate || 0, row.status, colX[2], rowTop + 10, 46);
+        text(String(row.defects ?? 0), colX[3], rowTop + 18, 8.5, '#475569', 'F1');
+        text(truncateText(row.rec || '', 28), colX[4], rowTop + 18, 8, '#64748b', 'F3');
     });
 
     rect(42, 752, 528, 1, '#e2e8f0');
-    text('QC Management Tool - Confidential - Internal Use Only', 186, 770, 7, '#94a3b8', 'F1');
+    text('QC Management Tool - Confidential - Internal Use Only', 176, 770, 7, '#94a3b8', 'F1');
 
     return drawPdfDocument(ops);
 }
