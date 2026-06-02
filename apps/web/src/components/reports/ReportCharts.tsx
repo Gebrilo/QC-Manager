@@ -66,9 +66,9 @@ export function ColumnChart({ data }: { data: { title: string; unit: string; bar
                     const color = (STATUS_CONFIG[b.status] || STATUS_CONFIG.ontrack).bar;
                     const h = Math.max(6, (b.value / max) * 100);
                     return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                        <div key={i} className="flex-1 self-stretch flex flex-col items-center gap-1.5 min-w-0">
                             <span className="text-[10px] font-semibold text-slate-500 tabular-nums">{b.value}{data.unit}</span>
-                            <div className="w-full flex items-end justify-center" style={{ height: '100%' }}>
+                            <div className="w-full flex-1 flex items-end justify-center">
                                 <div className="w-full max-w-[34px] rounded-t-md transition-all duration-700"
                                     style={{ height: `${h}%`, background: `linear-gradient(180deg, ${color}, ${color}cc)` }} />
                             </div>
