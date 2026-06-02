@@ -30,14 +30,15 @@ const FORMAT_BY_LABEL: Record<string, BackendFormat> = {
     CSV: 'csv',
 };
 
-function startFileDownload(url: string) {
+function saveBlobToDevice(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.target = '_self';
-    link.rel = 'noopener noreferrer';
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function stampNow() {
@@ -95,8 +96,13 @@ export default function ReportsPage() {
                 setStamp(stampNow());
 
                 if (job.download_url) {
-                    startFileDownload(job.download_url);
-                    notify(`${reportName} generated. Download started.`);
+                    try {
+                        const file = await reportsApi.download(jobId);
+                        saveBlobToDevice(file.blob, file.fileName);
+                        notify(`${reportName} generated. Download started.`);
+                    } catch (err: any) {
+                        notify(err?.message || `${reportName} generated, but download failed.`);
+                    }
                 } else {
                     notify(`${reportName} generated, but no download link was provided.`);
                 }

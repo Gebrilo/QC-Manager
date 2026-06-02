@@ -70,6 +70,7 @@ describe('GET /reports/:job_id/download', () => {
       data: upstreamStream,
       headers: {
         'content-type': 'application/pdf',
+        'content-length': '8',
       },
     });
 
@@ -77,8 +78,8 @@ describe('GET /reports/:job_id/download', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/pdf');
-    expect(res.headers['content-disposition']).toContain('attachment;');
-    expect(res.headers['content-disposition']).toContain('release-report.pdf');
+    expect(res.headers['content-disposition']).toBe('attachment; filename="release-report.pdf"');
+    expect(res.headers['content-length']).toBe('8');
     expect(res.body.toString()).toBe('PDF DATA');
     expect(mockAxiosGet).toHaveBeenCalledWith('https://files.example.com/r1.pdf', expect.objectContaining({
       responseType: 'stream',
@@ -107,7 +108,8 @@ describe('GET /reports/:job_id/download', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/pdf');
-    expect(res.headers['content-disposition']).toContain('dashboard-report.pdf');
+    expect(res.headers['content-disposition']).toBe('attachment; filename="dashboard-report.pdf"');
+    expect(res.headers['content-length']).toBe('17');
     expect(res.body.toString()).toBe('inline file bytes');
     expect(mockAxiosGet).not.toHaveBeenCalled();
   });

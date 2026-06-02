@@ -78,6 +78,69 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     return response.json();
 }
 
+function parseContentDispositionFileName(disposition: string | null): string | null {
+    if (!disposition) return null;
+
+    const encodedMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (encodedMatch?.[1]) {
+        try {
+            return decodeURIComponent(encodedMatch[1]);
+        } catch {
+            return encodedMatch[1];
+        }
+    }
+
+    const quotedMatch = disposition.match(/filename="([^"]+)"/i);
+    if (quotedMatch?.[1]) return quotedMatch[1];
+
+    const bareMatch = disposition.match(/filename=([^;]+)/i);
+    return bareMatch?.[1]?.trim() || null;
+}
+
+export async function fetchApiBlob(endpoint: string, options: RequestInit = {}) {
+    const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+    let authToken: string | null = null;
+    if (typeof window !== 'undefined') {
+        const { supabase } = await import('../supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        authToken = session?.access_token || null;
+    }
+
+    const headers: Record<string, string> = {
+        ...(options.headers as Record<string, string>),
+    };
+
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const response = await fetch(url, {
+        ...options,
+        headers,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+
+        if (response.status === 401 && typeof window !== 'undefined') {
+            const { supabase } = await import('../supabase');
+            supabase.auth.signOut();
+        }
+
+        const err = new Error(errorText || `API Error: ${response.statusText}`);
+        (err as any).status = response.status;
+        throw err;
+    }
+
+    const blob = await response.blob();
+    const contentType = response.headers.get('content-type') || blob.type || 'application/octet-stream';
+    const fileName = parseContentDispositionFileName(response.headers.get('content-disposition'))
+        || `report-${Date.now()}`;
+
+    return { blob, fileName, contentType };
+}
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -540,6 +603,12 @@ export const reportsApi = {
         const query = new URLSearchParams(params as any).toString();
         return fetchApi<{ success: boolean; data: ReportJob[] }>(`/reports${query ? `?${query}` : ''}`);
     },
+
+    download: (jobId: string) =>
+        fetchApiBlob(`/reports/${jobId}/download`, {
+            method: 'GET',
+            cache: 'no-store',
+        }),
 };
 
 // ============================================================================

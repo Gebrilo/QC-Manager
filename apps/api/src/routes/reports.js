@@ -103,6 +103,13 @@ function buildPdfBuffer(lines) {
     return Buffer.from(pdf, 'utf8');
 }
 
+function downloadDisposition(filename) {
+    const safeFilename = String(filename || 'report.dat')
+        .replace(/[\r\n]/g, '')
+        .replace(/"/g, "'");
+    return `attachment; filename="${safeFilename}"`;
+}
+
 async function buildReportPayload(reportType, format) {
     const sql = REPORT_SQL_BY_TYPE[reportType] || REPORT_SQL_BY_TYPE.dashboard;
     const result = await db.query(sql);
@@ -300,7 +307,7 @@ router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'
             const filename = inlineData.filename || job.filename || `report-${job.id}.${job.format || 'dat'}`;
 
             res.setHeader('Content-Type', contentType);
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Disposition', downloadDisposition(filename));
             res.setHeader('Content-Length', contentBuffer.length);
             return res.send(contentBuffer);
         }
@@ -314,7 +321,7 @@ router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'
         const contentType = upstream.headers['content-type'] || FORMAT_MIME[job.format] || 'application/octet-stream';
 
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Disposition', downloadDisposition(filename));
 
         const contentLength = upstream.headers['content-length'];
         if (contentLength) {
