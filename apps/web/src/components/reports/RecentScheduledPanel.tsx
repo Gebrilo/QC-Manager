@@ -1,8 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
-import { HISTORY, INITIAL_SCHEDULED, STATUS_CONFIG, cn, type ScheduledItem } from './reportTypes';
+import React, { useState, useEffect } from 'react';
+import { INITIAL_SCHEDULED, STATUS_CONFIG, cn, type ScheduledItem } from './reportTypes';
 import { Ico } from './ReportIcons';
+import { reportsApi } from '@/lib/api';
+
+// Map backend report_type to display name + category
+const REPORT_TYPE_LABELS: Record<string, { name: string; category: string }> = {
+    project_status:       { name: 'Project Status',        category: 'Operational' },
+    resource_utilization: { name: 'Resource Utilization',  category: 'Operational' },
+    task_export:          { name: 'Task Export',           category: 'Operational' },
+    test_results:         { name: 'Test Results',          category: 'Operational' },
+    dashboard:            { name: 'Dashboard Summary',     category: 'Governance'  },
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+    xlsx: 'Excel', csv: 'CSV', json: 'JSON', pdf: 'PDF',
+};
+
+function formatWhen(ts?: string): string {
+    if (!ts) return 'Unknown';
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 0) return `Today, ${time}`;
+    if (diffDays === 1) return `Yesterday, ${time}`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + `, ${time}`;
+}
+
+function saveBlobToDevice(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+interface DisplayHistoryItem {
+    id: string;
+    name: string;
+    category: string;
+    format: string;
+    when: string;
+    by: string;
+}
 
 function StatusBadge({ status }: { status: string }) {
     const s = STATUS_CONFIG[status] || STATUS_CONFIG.ontrack;
@@ -27,12 +73,55 @@ interface RecentScheduledPanelProps {
 export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPanelProps) {
     const [tab, setTab] = useState<'recent' | 'scheduled'>('recent');
     const [scheduled, setScheduled] = useState<ScheduledItem[]>(INITIAL_SCHEDULED);
+    const [history, setHistory] = useState<DisplayHistoryItem[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        setHistoryLoading(true);
+
+        reportsApi.list({ status: 'completed', limit: 10 })
+            .then(res => {
+                if (cancelled) return;
+                const rows = res.data ?? [];
+                setHistory(rows.map((job: any) => {
+                    const jobId: string = job.id ?? job.job_id ?? '';
+                    const label = REPORT_TYPE_LABELS[job.report_type] ?? { name: job.report_type, category: 'Operational' };
+                    return {
+                        id: jobId,
+                        name: label.name,
+                        category: label.category,
+                        format: FORMAT_LABELS[job.format] ?? job.format?.toUpperCase() ?? 'PDF',
+                        when: formatWhen(job.completed_at ?? job.created_at),
+                        by: job.user_email ?? 'system',
+                    };
+                }));
+            })
+            .catch(() => { if (!cancelled) setHistory([]); })
+            .finally(() => { if (!cancelled) setHistoryLoading(false); });
+
+        return () => { cancelled = true; };
+    }, []);
+
+    async function handleDownload(item: DisplayHistoryItem) {
+        setDownloadingId(item.id);
+        try {
+            const file = await reportsApi.download(item.id);
+            saveBlobToDevice(file.blob, file.fileName);
+            notify(`Downloading ${item.name}.${item.format.toLowerCase()}`);
+        } catch {
+            notify(`Download failed for ${item.name}`);
+        } finally {
+            setDownloadingId(null);
+        }
+    }
 
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
             <div className="flex items-center gap-1 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
                 {([
-                    ['recent', 'history', 'Recent', HISTORY.length],
+                    ['recent', 'history', 'Recent', history.length],
                     ['scheduled', 'calendar', 'Scheduled', scheduled.length],
                 ] as const).map(([id, ic, lbl, n]) => (
                     <button key={id} onClick={() => setTab(id)}
@@ -50,55 +139,58 @@ export function RecentScheduledPanel({ notify, onSchedule }: RecentScheduledPane
 
             {tab === 'recent' ? (
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px]">
-                        <thead>
-                            <tr className="bg-slate-50/70 dark:bg-slate-800/40">
-                                {['Report', 'Category', 'Format', 'Generated', 'By', 'Status', ''].map((h, i) => (
-                                    <th key={i} className={cn(
-                                        'text-[10px] uppercase tracking-[0.1em] font-bold text-slate-400 py-2.5 text-left',
-                                        i === 0 ? 'pl-5 pr-4' : 'px-4',
-                                        i === 6 && 'pr-5'
-                                    )}>{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {HISTORY.map((it, i) => (
-                                <tr key={it.id} className={cn(
-                                    'hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition',
-                                    i > 0 && 'border-t border-slate-50 dark:border-slate-800/60'
-                                )}>
-                                    <td className="pl-5 pr-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-200">{it.name}</td>
-                                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{it.category}</td>
-                                    <td className="px-4 py-3">
-                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                                            <Ico k={fmtIcon(it.format)} size={13} cls={fmtTint(it.format)} />{it.format}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{it.when}</td>
-                                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{it.by}</td>
-                                    <td className="px-4 py-3"><StatusBadge status={it.status} /></td>
-                                    <td className="pr-5 py-3 text-right">
-                                        {it.status === 'ready' ? (
-                                            <button onClick={() => notify(`Downloading ${it.name}.${it.format.toLowerCase()}`)}
-                                                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition whitespace-nowrap">
-                                                <Ico k="download" size={13} /> Download
-                                            </button>
-                                        ) : it.status === 'failed' ? (
-                                            <button onClick={() => notify('Retrying report generation…')}
-                                                className="inline-flex items-center gap-1 text-xs font-medium text-rose-500 hover:opacity-80 transition">
-                                                <Ico k="refresh" size={12} /> Retry
-                                            </button>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1.5 text-xs text-amber-500">
-                                                <span className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin inline-block" /> Working
-                                            </span>
-                                        )}
-                                    </td>
+                    {historyLoading ? (
+                        <div className="flex items-center justify-center py-10">
+                            <span className="w-5 h-5 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+                        </div>
+                    ) : history.length === 0 ? (
+                        <div className="py-10 text-center text-sm text-slate-400">No generated reports yet.</div>
+                    ) : (
+                        <table className="w-full min-w-[640px]">
+                            <thead>
+                                <tr className="bg-slate-50/70 dark:bg-slate-800/40">
+                                    {['Report', 'Category', 'Format', 'Generated', 'By', 'Status', ''].map((h, i) => (
+                                        <th key={i} className={cn(
+                                            'text-[10px] uppercase tracking-[0.1em] font-bold text-slate-400 py-2.5 text-left',
+                                            i === 0 ? 'pl-5 pr-4' : 'px-4',
+                                            i === 6 && 'pr-5'
+                                        )}>{h}</th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {history.map((it, i) => (
+                                    <tr key={it.id} className={cn(
+                                        'hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition',
+                                        i > 0 && 'border-t border-slate-50 dark:border-slate-800/60'
+                                    )}>
+                                        <td className="pl-5 pr-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-200">{it.name}</td>
+                                        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{it.category}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                <Ico k={fmtIcon(it.format)} size={13} cls={fmtTint(it.format)} />{it.format}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{it.when}</td>
+                                        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{it.by}</td>
+                                        <td className="px-4 py-3"><StatusBadge status="ready" /></td>
+                                        <td className="pr-5 py-3 text-right">
+                                            {downloadingId === it.id ? (
+                                                <span className="inline-flex items-center gap-1.5 text-xs text-indigo-500">
+                                                    <span className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin inline-block" /> Downloading
+                                                </span>
+                                            ) : (
+                                                <button onClick={() => handleDownload(it)}
+                                                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition whitespace-nowrap">
+                                                    <Ico k="download" size={13} /> Download
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             ) : (
                 <div className="p-3 space-y-2">

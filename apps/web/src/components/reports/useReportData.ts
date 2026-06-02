@@ -302,9 +302,9 @@ async function fetchTestExecution(): Promise<ReportOverride> {
 interface RawResource {
     resource_name: string;
     is_active: boolean;
-    utilization_pct?: number;
-    current_allocation_hrs?: number;
-    weekly_capacity_hrs?: number;
+    utilization_pct?: number | string | null;
+    current_allocation_hrs?: number | string | null;
+    weekly_capacity_hrs?: number | string | null;
 }
 
 async function fetchResourceUtilization(): Promise<ReportOverride> {
@@ -312,30 +312,31 @@ async function fetchResourceUtilization(): Promise<ReportOverride> {
     const active = resources.filter(r => r.is_active);
     if (!active.length) throw new Error('no data');
 
-    const avgUtil = Math.round(active.reduce((s, r) => s + (r.utilization_pct || 0), 0) / active.length);
-    const overCapacity = active.filter(r => (r.utilization_pct || 0) > 100).length;
+    // PostgreSQL NUMERIC columns come back as strings from pg — use p() to coerce safely
+    const avgUtil = Math.round(active.reduce((s, r) => s + p(r.utilization_pct), 0) / active.length);
+    const overCapacity = active.filter(r => p(r.utilization_pct) > 100).length;
     const spareHrs = Math.round(active.reduce((s, r) => {
-        const spare = (r.weekly_capacity_hrs || 0) - (r.current_allocation_hrs || 0);
+        const spare = p(r.weekly_capacity_hrs) - p(r.current_allocation_hrs);
         return s + (spare > 0 ? spare : 0);
     }, 0));
 
     const bars: ChartBar[] = active.slice(0, 8).map(r => {
-        const u = Math.round(r.utilization_pct || 0);
+        const u = Math.min(p(r.utilization_pct), 150);
         return {
             label: (r.resource_name || '').split(' ')[0],
-            value: Math.min(u, 150),
+            value: u,
             status: u > 100 ? 'atrisk' : u > 85 ? 'ontrack' : u > 50 ? 'inprogress' : 'complete',
         };
     });
 
     const rows: ReportRow[] = active.slice(0, 8).map(r => {
-        const u = Math.round(r.utilization_pct || 0);
+        const u = Math.min(p(r.utilization_pct), 100);
         return {
             c: [r.resource_name],
             status: (u > 100 ? 'atrisk' : u > 85 ? 'ontrack' : u > 50 ? 'inprogress' : 'complete') as ReportStatus,
-            rate: Math.min(u, 100),
-            defects: Math.round(r.current_allocation_hrs || 0),
-            rec: `${r.weekly_capacity_hrs || 0}h capacity`,
+            rate: u,
+            defects: p(r.current_allocation_hrs),
+            rec: `${p(r.weekly_capacity_hrs)}h capacity`,
         };
     });
 
