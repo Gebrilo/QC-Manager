@@ -72,6 +72,17 @@ function uniqueLowerEmails(values) {
     return Array.from(new Set(values.map((value) => value.trim().toLowerCase())));
 }
 
+function systemReportSenderEmail() {
+    if (process.env.REPORT_EMAIL_FROM) return process.env.REPORT_EMAIL_FROM;
+    if (process.env.SYSTEM_EMAIL_FROM) return process.env.SYSTEM_EMAIL_FROM;
+    if (process.env.SUPABASE_EMAIL_FROM) return process.env.SUPABASE_EMAIL_FROM;
+
+    const domain = String(process.env.WEB_DOMAIN || process.env.API_DOMAIN || 'gerbil.qc')
+        .replace(/^https?:\/\//i, '')
+        .split('/')[0];
+    return `no-reply@${domain}`;
+}
+
 async function buildReportPayload(reportType, format) {
     const sql = REPORT_SQL_BY_TYPE[reportType] || REPORT_SQL_BY_TYPE.dashboard;
     const result = await db.query(sql);
@@ -285,7 +296,7 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
 router.post('/share', requireAuth, requirePermission('qc.reports.generate'), async (req, res, next) => {
     try {
         const data = shareReportSchema.parse(req.body);
-        const senderEmail = req.user?.email || data.recipients[0];
+        const fromEmail = systemReportSenderEmail();
         const subject = `${data.report_name} report`;
         const jobId = data.attach_export ? uuidv4() : null;
         let attachmentDownloadUrl = null;
@@ -352,7 +363,7 @@ router.post('/share', requireAuth, requirePermission('qc.reports.generate'), asy
                     attachmentPayload ? 'inline' : null,
                     attachmentFilename,
                     attachmentSize,
-                    senderEmail,
+                    fromEmail,
                 ]
             );
 
@@ -376,28 +387,44 @@ router.post('/share', requireAuth, requirePermission('qc.reports.generate'), asy
         const emailBody = lines.join('\n');
         const emailHref = mailtoHref(data.recipients, subject, emailBody);
 
-        triggerWorkflow('share-report', {
-            report_id: data.report_id,
-            report_name: data.report_name,
-            report_type: data.report_type,
-            format: data.format,
-            recipients: data.recipients,
-            sender_email: senderEmail,
-            subject,
-            body: emailBody,
-            share_url: data.share_url,
-            attachment_download_url: attachmentDownloadUrl,
-            attachment: attachmentPayload ? {
-                filename: attachmentFilename,
-                mime_type: attachmentMimeType,
-                size_bytes: attachmentSize,
-                content_base64: attachmentPayload.inline_file_base64,
-            } : null,
-        });
+        try {
+            await triggerWorkflow('share-report', {
+                report_id: data.report_id,
+                report_name: data.report_name,
+                report_type: data.report_type,
+                format: data.format,
+                recipients: data.recipients,
+                from_email: fromEmail,
+                delivery_channel: 'system_email',
+                subject,
+                body: emailBody,
+                share_url: data.share_url,
+                attachment_download_url: attachmentDownloadUrl,
+                attachment: attachmentPayload ? {
+                    filename: attachmentFilename,
+                    mime_type: attachmentMimeType,
+                    size_bytes: attachmentSize,
+                    content_base64: attachmentPayload.inline_file_base64,
+                } : null,
+            }, { strict: true });
+        } catch (workflowErr) {
+            return res.status(502).json({
+                success: false,
+                error: 'Failed to send report email',
+                message: workflowErr.message || 'The report email workflow is not available.',
+                data: {
+                    recipients: data.recipients,
+                    share_url: data.share_url,
+                    job_id: jobId,
+                    attachment_download_url: attachmentDownloadUrl,
+                    attachment_filename: attachmentFilename,
+                },
+            });
+        }
 
         return res.status(201).json({
             success: true,
-            message: 'Report share prepared',
+            message: 'Report share email sent',
             data: {
                 recipients: data.recipients,
                 share_url: data.share_url,

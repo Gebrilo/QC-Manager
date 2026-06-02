@@ -232,7 +232,7 @@ describe('POST /reports/share', () => {
     jest.clearAllMocks();
   });
 
-  it('stores a PDF attachment, prepares a mailto draft, and triggers the share workflow', async () => {
+  it('stores a PDF attachment and sends through the system email workflow', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(makeApp())
@@ -268,16 +268,19 @@ describe('POST /reports/share', () => {
     expect(insertCall[1][6]).toBe('inline');
     expect(insertCall[1][7]).toBe('release-readiness.pdf');
     expect(insertCall[1][8]).toBe(9);
+    expect(insertCall[1][9]).toBe('no-reply@gerbil.qc');
 
     expect(mockTriggerWorkflow).toHaveBeenCalledWith('share-report', expect.objectContaining({
       report_id: 'readiness',
       recipients: ['lead@qc.io'],
+      from_email: 'no-reply@gerbil.qc',
+      delivery_channel: 'system_email',
       attachment_download_url: res.body.data.attachment_download_url,
       attachment: expect.objectContaining({
         filename: 'release-readiness.pdf',
         mime_type: 'application/pdf',
       }),
-    }));
+    }), { strict: true });
   });
 
   it('rejects share requests without recipients', async () => {

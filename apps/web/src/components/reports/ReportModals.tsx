@@ -134,10 +134,8 @@ export function ShareModal({ report, shareUrl, onClose, notify, onShare }: Share
         setSending(true);
         setError(null);
         try {
-            const result = await onShare({ recipients: nextRecipients, attachExport, shareUrl });
-            const attached = result.attachmentDownloadUrl ? ' with attachment link' : '';
-            notify(`Email prepared for ${nextRecipients.length} recipient${nextRecipients.length > 1 ? 's' : ''}${attached}.`);
-            window.location.href = result.emailHref;
+            await onShare({ recipients: nextRecipients, attachExport, shareUrl });
+            notify(`Report email sent to ${nextRecipients.length} recipient${nextRecipients.length > 1 ? 's' : ''}.`);
             onClose();
         } catch (err: any) {
             setError(err?.message || 'Could not share this report.');
