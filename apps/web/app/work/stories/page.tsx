@@ -125,6 +125,7 @@ export default function UserStoriesPage() {
     }), [stories]);
 
     const hasAnyFilter = !!(searchTerm || selectedProject || selectedStatus || selectedPriority);
+    const canCreateStory = hasPermission('qc.user_stories.create') || hasPermission('qc.projects.view');
 
     return (
         <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
@@ -140,7 +141,7 @@ export default function UserStoriesPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
-                    {hasPermission('qc.projects.view') && (
+                    {canCreateStory && (
                         <Link
                             href="/work/stories/create"
                             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
@@ -294,7 +295,10 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
                                 <tr>
                                     <td colSpan={7} className="px-5 py-12 text-center text-slate-400">No user stories found.</td>
                                 </tr>
-                            ) : stories.map(story => (
+                            ) : stories.map(story => {
+                                const canEdit = story._can?.edit !== false;
+                                const canDelete = story._can?.delete !== false;
+                                return (
                                 <tr key={story.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
                                     <td className="pl-5 pr-3 py-3.5 sticky left-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm group-hover:bg-violet-50/95 dark:group-hover:bg-violet-900/20">
                                         <span className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300">
@@ -334,17 +338,26 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
                                     </td>
                                     <td className="pl-3 pr-5 py-3.5 whitespace-nowrap text-right">
                                         <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Link
-                                                href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
-                                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
-                                            >
-                                                Edit
-                                            </Link>
+                                            {canEdit ? (
+                                                <Link
+                                                    href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
+                                                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
+                                                >
+                                                    Edit
+                                                </Link>
+                                            ) : (
+                                                <span
+                                                    className="text-xs text-slate-300 dark:text-slate-600 font-medium cursor-not-allowed"
+                                                    title="You do not have permission to edit this story"
+                                                >
+                                                    Edit
+                                                </span>
+                                            )}
                                             <button
-                                                onClick={() => setPendingDelete(story)}
-                                                disabled={deletingId === story.id}
+                                                onClick={() => canDelete && setPendingDelete(story)}
+                                                disabled={deletingId === story.id || !canDelete}
                                                 className="p-1.5 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-40"
-                                                title="Delete story"
+                                                title={canDelete ? 'Delete story' : 'You do not have permission to delete this story'}
                                             >
                                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                     <path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
@@ -353,7 +366,8 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

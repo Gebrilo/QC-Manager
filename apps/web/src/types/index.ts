@@ -361,6 +361,12 @@ export interface TestSuite {
     last_run_date?: string;
     last_run_pass_rate?: number;
     test_cases?: SuiteTestCase[];
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 export interface SuiteTestCase {
@@ -408,6 +414,12 @@ export interface TestRun {
     version_tag?: string;
     started_at: string;
     completed_at?: string;
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
     created_by?: string;
     created_by_email?: string;
     created_at: string;
