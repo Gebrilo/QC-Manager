@@ -1,4 +1,9 @@
 const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
+const {
+  resolveEmailCreator,
+  buildAccessDefaults,
+  materializeAclGrants,
+} = require('../accessDefaults');
 
 const VALID_TEST_CASE_ACTIONS = new Set(['sync', 'delete']);
 
@@ -147,13 +152,25 @@ async function handleSync(unified, config, { query }) {
 
   const test_case_id = await generateTestCaseId(query);
 
+  const createdByUserId = await resolveEmailCreator({
+    email: unified.created_by || null,
+    query,
+  });
+
+  const accessDefaults = await buildAccessDefaults({
+    tuleapConfig: config,
+    artifactType: 'test_case',
+    query,
+  });
+
   const result = await query(`
     INSERT INTO test_case (
       test_case_id, title, description, status, priority,
       project_id, tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
       synced_from_tuleap, last_tuleap_sync, pending_links,
-      sync_status, last_sync_attempted_at, last_sync_error
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), $10, 'synced', NOW(), NULL)
+      sync_status, last_sync_attempted_at, last_sync_error,
+      owner_team_id, visibility_scope, created_by_user_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), $10, 'synced', NOW(), NULL, $11, $12, $13)
     RETURNING *
   `, [
     test_case_id,
@@ -166,7 +183,18 @@ async function handleSync(unified, config, { query }) {
     config.tuleap_tracker_id || null,
     tuleapUrl,
     JSON.stringify(pending),
+    accessDefaults.owner_team_id,
+    accessDefaults.visibility_scope,
+    createdByUserId,
   ]);
+
+  await materializeAclGrants({
+    artifactType: 'test_case',
+    artifactId: result.rows[0].id,
+    grants: accessDefaults.default_acl_grants,
+    grantedBy: createdByUserId,
+    query,
+  });
 
   if (resolved.length > 0) {
     await drainPending({

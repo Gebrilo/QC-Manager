@@ -7,6 +7,7 @@ const { emitToTuleap } = require('../services/emitters/user_story');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createUserStorySchema, updateUserStorySchema } = require('../schemas/userStory');
+const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 
 function parseCsvParam(value) {
     if (!value) return [];
@@ -147,15 +148,22 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
         }
         const data = parsed.data;
 
+        const accessDefaults = await buildAccessDefaults({
+            creator: req.user ? { id: req.user.id } : null,
+            artifactType: 'user_story',
+            query: pool.query.bind(pool),
+        });
+
         const result = await pool.query(`
             INSERT INTO user_stories (
                 title, description, status, acceptance_criteria,
                 project_id, priority, assigned_to,
                 requirement_version, change_reason, ba_author,
                 initial_effort, remaining_effort,
-                sync_status
+                sync_status,
+                owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending'
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,$15
             )
             RETURNING *
         `, [
@@ -163,8 +171,17 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
             data.project_id, data.priority, data.assigned_to,
             data.requirement_version, data.change_reason, data.ba_author,
             data.initial_effort, data.remaining_effort,
+            accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ]);
         let story = result.rows[0];
+
+        await materializeAclGrants({
+            artifactType: 'user_story',
+            artifactId: story.id,
+            grants: accessDefaults.default_acl_grants,
+            grantedBy: req.user?.id || null,
+            query: pool.query.bind(pool),
+        });
 
         const config = await resolveUserStorySyncConfig(data.project_id);
 

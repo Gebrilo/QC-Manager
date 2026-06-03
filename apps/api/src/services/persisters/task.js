@@ -1,4 +1,9 @@
 const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
+const {
+  resolveEmailCreator,
+  buildAccessDefaults,
+  materializeAclGrants,
+} = require('../accessDefaults');
 
 const VALID_TASK_ACTIONS = new Set(['sync', 'delete', 'reject', 'archive']);
 
@@ -268,20 +273,43 @@ async function handleSync(unified, config, { query }) {
   const resourceId = common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null;
   const task_id = await generateTaskId(query);
 
+  const createdByUserId = await resolveEmailCreator({
+    email: unified.created_by || null,
+    query,
+  });
+
+  const accessDefaults = await buildAccessDefaults({
+    tuleapConfig: config,
+    artifactType: 'task',
+    query,
+  });
+
   const result = await query(`
     INSERT INTO tasks (
       task_id, task_name, notes, status,
       project_id, resource1_id,
       tuleap_artifact_id, tuleap_url, synced_from_tuleap, last_tuleap_sync,
       parent_story_id, parent_story_tuleap_artifact_id, parent_user_story_id,
-      sync_status, last_sync_attempted_at, last_sync_error
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10, 'synced', NOW(), NULL)
+      sync_status, last_sync_attempted_at, last_sync_error,
+      owner_team_id, visibility_scope, created_by_user_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10, 'synced', NOW(), NULL, $11, $12, $13)
     RETURNING *
   `, [
     task_id, common.title, common.description || '', normalizeTaskStatus(common.status),
     projectId, resourceId,
     tuleapArtifactId, tuleapUrl, parentStoryTuleapArtifactId, parentUserStoryId,
+    accessDefaults.owner_team_id,
+    accessDefaults.visibility_scope,
+    createdByUserId,
   ]);
+
+  await materializeAclGrants({
+    artifactType: 'task',
+    artifactId: result.rows[0].id,
+    grants: accessDefaults.default_acl_grants,
+    grantedBy: createdByUserId,
+    query,
+  });
 
   if (resolved.length > 0) {
     await drainPending({
