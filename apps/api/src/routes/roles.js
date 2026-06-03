@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const { PERMISSIONS, ALL_PERMISSION_VALUES } = require('../../../shared/rbac/catalog.ts');
+const { syncRolePermissions } = require('../services/rolePermissions');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 
@@ -95,6 +96,9 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
             'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
             [normalizedName, validPerms, req.user?.email || 'system']
         );
+        if (validPerms.length > 0) {
+            await syncRolePermissions(db, normalizedName, validPerms, req.user?.email || 'system');
+        }
 
         res.status(201).json({
             name: normalizedName,
@@ -128,54 +132,24 @@ router.patch('/:roleName', requireAuth, requireRole('admin'), async (req, res, n
         // Check if it's a built-in role or custom role
         const isBuiltIn = BUILT_IN_ROLES.includes(roleName);
 
-        if (isBuiltIn) {
-            // For built-in roles, persist the override in custom_roles table
-            // so setDefaultPermissions() can pick it up for new users
-            const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
-            if (existing.rows.length > 0) {
-                await db.query(
-                    'UPDATE custom_roles SET permissions = $1 WHERE name = $2',
-                    [validPerms, roleName]
-                );
-            } else {
-                await db.query(
-                    'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
-                    [roleName, validPerms, req.user?.email || 'system']
-                );
-            }
-        } else {
-            // For custom roles, update the custom_roles table
+        if (!isBuiltIn) {
             const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
             if (existing.rows.length === 0) {
                 return res.status(404).json({ error: `Role '${roleName}' not found` });
             }
-            await db.query(
-                'UPDATE custom_roles SET permissions = $1 WHERE name = $2',
-                [validPerms, roleName]
-            );
         }
 
-        // Apply changes immediately to all users with this role
-        const usersResult = await db.query('SELECT id FROM app_user WHERE role = $1', [roleName]);
-        for (const user of usersResult.rows) {
-            // Delete existing permissions
-            await db.query('DELETE FROM user_permissions WHERE user_id = $1', [user.id]);
-            // Set new permissions
-            for (const perm of validPerms) {
-                await db.query(
-                    `INSERT INTO user_permissions (user_id, permission_key, granted) 
-                     VALUES ($1, $2, true)
-                     ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
-                    [user.id, perm]
-                );
-            }
-        }
+        const syncResult = await syncRolePermissions(db, roleName, validPerms, req.user?.email || 'system');
+        const usersResult = await db.query(
+            'SELECT COUNT(*) AS count FROM app_user WHERE role = ANY($1::text[])',
+            [syncResult.affectedRoleNames]
+        );
 
         res.json({
             name: roleName,
             permissions: validPerms,
             is_builtin: isBuiltIn,
-            affected_users: usersResult.rows.length,
+            affected_users: Number(usersResult.rows[0]?.count || 0),
         });
     } catch (err) {
         next(err);
@@ -200,6 +174,7 @@ router.delete('/:roleName', requireAuth, requireRole('admin'), async (req, res, 
             });
         }
 
+        await db.query('DELETE FROM role_permissions WHERE role_identifier = $1', [roleName]);
         const result = await db.query('DELETE FROM custom_roles WHERE name = $1 RETURNING *', [roleName]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: `Role '${roleName}' not found` });

@@ -2837,6 +2837,12 @@ const runMigrations = async () => {
             ON CONFLICT (role_identifier, permission_key) DO NOTHING
         `);
 
+        await client.query(`ALTER TABLE app_user DROP CONSTRAINT IF EXISTS valid_role`);
+        await client.query(`
+            ALTER TABLE app_user ADD CONSTRAINT valid_role
+            CHECK (role ~ '^[a-z0-9_]+$')
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
