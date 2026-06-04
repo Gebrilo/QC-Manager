@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { testCasesApi } from '@/lib/api';
+import { projectsApi, testCasesApi, type Project } from '@/lib/api';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { TestCase } from '@/types';
 import { stripHtml } from '@/lib/stripHtml';
@@ -30,6 +30,7 @@ const schema = z.object({
     status: z.enum(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']).default('Not Run'),
     estimated_duration_minutes: z.coerce.number().int().min(0).max(480).optional().nullable(),
     tags: z.string().optional().default(''),
+    project_id: z.string().uuid('Valid project is required'),
     assigned_to: z.string().optional().default(''),
     linked_requirement_id: z.string().max(100).optional().default(''),
 });
@@ -303,7 +304,15 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [projectsError, setProjectsError] = useState<string | null>(null);
     const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+
+    useEffect(() => {
+        projectsApi.list()
+            .then((data) => setProjects(data as Project[]))
+            .catch((err) => setProjectsError(err.message || 'Failed to load projects'));
+    }, []);
 
     const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
@@ -322,6 +331,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
             status: (testCase.status || 'Not Run') as FormData['status'],
             estimated_duration_minutes: testCase.estimated_duration_minutes != null ? Number(testCase.estimated_duration_minutes) : null,
             tags: Array.isArray(testCase.tags) ? (testCase.tags as string[]).join(', ') : ((testCase.tags as unknown) as string) || '',
+            project_id: testCase.project_id || '',
             assigned_to: testCase.assigned_to || '',
             linked_requirement_id: testCase.linked_requirement_id || '',
         },
@@ -363,6 +373,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
                 status: data.status,
                 estimated_duration_minutes: data.estimated_duration_minutes || undefined,
                 tags: data.tags ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+                project_id: data.project_id,
                 assigned_to: data.assigned_to || undefined,
                 linked_requirement_id: data.linked_requirement_id || undefined,
             };
@@ -471,6 +482,21 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
                                 className={inputCls}
                             />
                             <FError message={errors.title?.message} />
+                        </FieldWrap>
+
+                        <FieldWrap full>
+                            <FLabel required>Project</FLabel>
+                            <SelectWrapper>
+                                <select {...register('project_id')} className={selectCls}>
+                                    <option value="">Select project</option>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.id}>
+                                            {project.project_name} ({project.project_id})
+                                        </option>
+                                    ))}
+                                </select>
+                            </SelectWrapper>
+                            <FError message={errors.project_id?.message || projectsError || undefined} />
                         </FieldWrap>
 
                         <div>

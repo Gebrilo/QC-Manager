@@ -420,7 +420,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                 description: data.description || undefined,
                 status: data.status,
                 severity: data.severity,
-                priority: data.severity,
+                priority: (initialData?.priority as string) || (bug?.priority as string) || 'medium',
                 assigned_to: data.assigned_to || null,
                 project_id: selectedProjectId,
                 environment: data.environment,

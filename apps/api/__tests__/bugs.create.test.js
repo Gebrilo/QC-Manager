@@ -171,6 +171,64 @@ describe('POST /bugs — create with Zod + normalizer + sync', () => {
   });
 });
 
+describe('PATCH /bugs/:id — update persistence', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('persists project, reproduction steps, and close date edits', async () => {
+    const bugId = '11111111-1111-4111-8111-111111111111';
+    const nextProjectId = '22222222-2222-4222-8222-222222222222';
+    const original = {
+      id: bugId,
+      project_id: PID,
+      title: 'Before',
+      status: 'New',
+      severity: 'None',
+      priority: 'medium',
+      sync_status: 'standalone',
+    };
+    const updated = {
+      ...original,
+      project_id: nextProjectId,
+      title: 'After',
+      steps_to_reproduce: '1. Open edit\n2. Save',
+      close_date: '2026-06-04',
+    };
+    const updateCall = jest.fn().mockResolvedValue({ rows: [updated] });
+
+    pool.query
+      .mockResolvedValueOnce({ rows: [original] })
+      .mockImplementationOnce(updateCall)
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(createApp())
+      .patch(`/bugs/${bugId}`)
+      .send({
+        project_id: nextProjectId,
+        title: 'After',
+        steps_to_reproduce: '1. Open edit\n2. Save',
+        close_date: '2026-06-04',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      project_id: nextProjectId,
+      title: 'After',
+      steps_to_reproduce: '1. Open edit\n2. Save',
+      close_date: '2026-06-04',
+    });
+    expect(updateCall.mock.calls[0][0]).toContain('project_id =');
+    expect(updateCall.mock.calls[0][0]).toContain('steps_to_reproduce =');
+    expect(updateCall.mock.calls[0][0]).toContain('close_date =');
+    expect(updateCall.mock.calls[0][1]).toEqual(expect.arrayContaining([
+      nextProjectId,
+      'After',
+      '1. Open edit\n2. Save',
+      '2026-06-04',
+      bugId,
+    ]));
+  });
+});
+
 describe('Zod schemas', () => {
   it('createBugSchema rejects invalid environment', () => {
     const result = createBugSchema.safeParse({
