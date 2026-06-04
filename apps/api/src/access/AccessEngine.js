@@ -16,8 +16,8 @@ const DENIAL_REASONS = Object.freeze({
 const ARTIFACT_TABLE_BY_TYPE = Object.freeze({
     bug: 'bugs',
     task: 'tasks',
-    test_case: 'test_cases',
-    test_execution: 'test_executions',
+    test_case: 'test_case',
+    test_execution: 'test_execution',
     test_suite: 'test_suites',
     user_story: 'user_stories',
 });
@@ -29,6 +29,19 @@ const ARTIFACT_PERMISSION_NAMESPACE = Object.freeze({
     test_execution: 'testexecutions',
     test_suite: 'testsuites',
     user_story: 'user_stories',
+});
+
+const SENSITIVE_FIELDS_BY_ARTIFACT = Object.freeze({
+    test_case: Object.freeze([
+        'description',
+        'preconditions',
+        'steps',
+        'test_steps',
+        'expected_result',
+        'expected_results',
+        'actual_result',
+        'note',
+    ]),
 });
 
 function permKey(artifactType, scope, verb) {
@@ -106,7 +119,7 @@ async function canPerform(user, artifact, verb, req) {
 
     // Branch 2: project-scope role (PM of this project)
     if (artifact.project_id && scope.pm_of_projects.includes(artifact.project_id)) {
-        if (effectivePermissions.has(keyAny) || effectivePermissions.has('qc.reports.view_project')) {
+        if (effectivePermissions.has(keyAny) || (verb === 'view' && effectivePermissions.has('qc.reports.view_project'))) {
             return { allowed: true, branch: 'project_scope' };
         }
     }
@@ -119,6 +132,18 @@ async function canPerform(user, artifact, verb, req) {
     }
 
     // Branch 4: assignee (resource bridge) with view_own / edit_own
+    if (artifact.owner_user_id && artifact.owner_user_id === user.id) {
+        if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+            return { allowed: true, branch: 'owner_user' };
+        }
+    }
+
+    if (artifact.assignee_user_id && artifact.assignee_user_id === user.id) {
+        if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+            return { allowed: true, branch: 'assignee_user' };
+        }
+    }
+
     if (await isAssignee(user.id, artifact.assignee_resource_id)) {
         if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
             return { allowed: true, branch: 'assignee' };
@@ -171,8 +196,18 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     const startIdx = opts.startIdx || 1;
     const tableAlias = opts.tableAlias || ARTIFACT_TABLE_BY_TYPE[artifactType];
     if (!tableAlias) throw new Error(`Unknown artifact type: ${artifactType}`);
+    const projectExpr = opts.projectExpr || `${tableAlias}.project_id`;
+    const ownerTeamExpr = opts.ownerTeamExpr === undefined ? `${tableAlias}.owner_team_id` : opts.ownerTeamExpr;
+    const visibilityExpr = opts.visibilityExpr === undefined ? `${tableAlias}.visibility_scope` : opts.visibilityExpr;
+    const assigneeResourceExprs = opts.assigneeResourceExprs || [
+        `${tableAlias}.resource1_id`,
+        `${tableAlias}.resource2_id`,
+        `${tableAlias}.owner_resource_id`,
+        `${tableAlias}.submitted_by_resource_id`,
+    ];
+    const userExprs = opts.userExprs || [`${tableAlias}.created_by_user_id`];
 
-    const { effectivePermissions, scope } = await resolveRole(user);
+    const { effectivePermissions, scope } = await resolveRole(user, opts.req);
 
     if (effectivePermissions.has('*')) {
         return { clause: 'TRUE', params: [], nextIdx: startIdx };
@@ -187,23 +222,28 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     const bind = (val) => { params.push(val); return `$${idx++}`; };
 
     // owner_team
-    if (scope.team_id && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
-        branches.push(`${tableAlias}.owner_team_id = ${bind(scope.team_id)}`);
+    if (ownerTeamExpr && scope.team_id && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
+        branches.push(`${ownerTeamExpr} = ${bind(scope.team_id)}`);
     }
 
-    // assignee (bind user.id once; same placeholder is reused for ACL below)
+    // owner/assignee user columns (created_by_user_id, assigned_to, executed_by...)
     const userBind = bind(user.id);
     if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
-        branches.push(
-            `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind} AND r.deleted_at IS NULL AND (r.id = ${tableAlias}.resource1_id OR r.id = ${tableAlias}.resource2_id OR r.id = ${tableAlias}.owner_resource_id OR r.id = ${tableAlias}.submitted_by_resource_id))`
-        );
+        if (userExprs.length > 0) {
+            branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}`).join(' OR ')})`);
+        }
+        if (assigneeResourceExprs.length > 0) {
+            branches.push(
+                `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind} AND r.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r.id = ${expr}`).join(' OR ')}))`
+            );
+        }
     }
 
     // teammate of assignee
-    if (scope.team_id && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
+    if (scope.team_id && assigneeResourceExprs.length > 0 && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
         const teamBind = bind(scope.team_id);
         branches.push(
-            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind} AND r2.deleted_at IS NULL AND (r2.id = ${tableAlias}.resource1_id OR r2.id = ${tableAlias}.resource2_id OR r2.id = ${tableAlias}.owner_resource_id OR r2.id = ${tableAlias}.submitted_by_resource_id))`
+            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind} AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
         );
     }
 
@@ -225,14 +265,14 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     // project_managers (PM of project)
     if (scope.pm_of_projects.length > 0) {
         const placeholders = scope.pm_of_projects.map(p => bind(p)).join(', ');
-        branches.push(`${tableAlias}.project_id IN (${placeholders})`);
+        branches.push(`${projectExpr} IN (${placeholders})`);
     }
 
     // visibility_scope = project + project_teams membership (view only)
-    if (verb === 'view' && scope.team_id) {
+    if (verb === 'view' && visibilityExpr && scope.team_id) {
         const tb = bind(scope.team_id);
         branches.push(
-            `(${tableAlias}.visibility_scope = 'project' AND EXISTS (SELECT 1 FROM project_teams pt WHERE pt.project_id = ${tableAlias}.project_id AND pt.team_id = ${tb}))`
+            `(${visibilityExpr} = 'project' AND EXISTS (SELECT 1 FROM project_teams pt WHERE pt.project_id = ${projectExpr} AND pt.team_id = ${tb}))`
         );
     }
 
@@ -246,8 +286,9 @@ function filterFields(resolvedUser, artifactType, row) {
         return row;
     }
     const clone = { ...row };
-    delete clone.steps;
-    delete clone.expected_results;
+    for (const field of SENSITIVE_FIELDS_BY_ARTIFACT.test_case) {
+        delete clone[field];
+    }
     return clone;
 }
 
@@ -258,4 +299,5 @@ module.exports = {
     DENIAL_REASONS,
     ARTIFACT_TABLE_BY_TYPE,
     ARTIFACT_PERMISSION_NAMESPACE,
+    SENSITIVE_FIELDS_BY_ARTIFACT,
 };
