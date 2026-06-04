@@ -438,6 +438,12 @@ export interface UserStory {
     sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
     last_sync_attempted_at?: string | null;
     last_sync_error?: string | null;
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 export const bugsApi = {

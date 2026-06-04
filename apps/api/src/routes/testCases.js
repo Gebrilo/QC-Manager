@@ -7,6 +7,7 @@ const { requireAuth, requirePermission } = require('../middleware/authMiddleware
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
+const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 
 const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
 
@@ -203,12 +204,19 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
         const idResult = await client.query("SELECT 'TC-' || LPAD(nextval('test_case_id_seq')::text, 5, '0') AS next_id");
         const testCaseId = idResult.rows[0].next_id;
 
+        const accessDefaults = await buildAccessDefaults({
+            creator: req.user ? { id: req.user.id } : null,
+            artifactType: 'test_case',
+            query: client.query.bind(client),
+        });
+
         const result = await client.query(
             `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
                 priority, severity, test_type, category, component, automation_status, status,
                 estimated_duration_minutes, tags, project_id, assigned_to,
-                linked_requirement_id, linked_bug_ids, created_by, updated_by, sync_status)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending')
+                linked_requirement_id, linked_bug_ids, created_by, updated_by, sync_status,
+                owner_team_id, visibility_scope, created_by_user_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending',$22,$23,$24)
             RETURNING *`,
             [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
              validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
@@ -216,7 +224,16 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
              validatedData.component || null, validatedData.automation_status, validatedData.status,
              validatedData.estimated_duration_minutes || null, validatedData.tags, validatedData.project_id,
              assignedToUserId, validatedData.linked_requirement_id || null,
-             validatedData.linked_bug_ids, req.user?.id || null, req.user?.id || null]);
+             validatedData.linked_bug_ids, req.user?.id || null, req.user?.id || null,
+             accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null]);
+
+        await materializeAclGrants({
+            artifactType: 'test_case',
+            artifactId: result.rows[0].id,
+            grants: accessDefaults.default_acl_grants,
+            grantedBy: req.user?.id || null,
+            query: client.query.bind(client),
+        });
 
         await logTestCaseHistory(client, {
             test_case_id: result.rows[0].id, action: 'created', after_state: result.rows[0],

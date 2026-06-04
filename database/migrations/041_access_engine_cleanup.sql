@@ -1,4 +1,4 @@
--- Migration 039: Access Engine cleanup.
+-- Migration 041: Access Engine cleanup.
 -- Engine enforcement is the only artifact route path after issue #91.
 
 DELETE FROM feature_flags

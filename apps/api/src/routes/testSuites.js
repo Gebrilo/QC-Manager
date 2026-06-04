@@ -4,6 +4,12 @@ const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const {
+    appendListFilter,
+    decorateRows,
+    enforceArtifact,
+    shadowList,
+} = require('../services/access/enforcement');
 
 const suiteCreateSchema = z.object({
     name: z.string().min(3).max(255),
@@ -86,6 +92,14 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
             params.push(`%${search}%`); pn++;
         }
 
+        const access = await appendListFilter(req, 'test_suite', whereClauses, params, {
+            startIdx: pn,
+            tableAlias: 'ts',
+            assigneeResourceExprs: [],
+            userExprs: ['ts.created_by_user_id', 'ts.created_by'],
+        });
+        pn = access.nextIdx;
+
         const whereStr = whereClauses.join(' AND ');
 
         const countQuery = `
@@ -125,9 +139,11 @@ router.get('/', requireAuth, requirePermission('qc.testsuites.view'), async (req
         const dataParams = [...params, limitNum, offset];
 
         const result = await pool.query(dataQuery, dataParams);
+        await shadowList(req, 'test_suite', result.rows, { route: 'GET /test-suites' });
+        const data = await decorateRows(req, 'test_suite', result.rows);
 
         res.json({
-            data: result.rows,
+            data,
             pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
             stats: {
                 active: parseInt(sr.active_count) || 0,
@@ -155,6 +171,8 @@ router.get('/:id', requireAuth, requirePermission('qc.testsuites.view'), async (
             [id]);
 
         if (suiteResult.rows.length === 0) return res.status(404).json({ error: 'Test suite not found' });
+        const access = await enforceArtifact(req, res, 'test_suite', suiteResult.rows[0], 'view', { route: 'GET /test-suites/:id' });
+        if (!access.allowed) return;
 
         const casesResult = await pool.query(
             `SELECT tsc.id AS junction_id, tsc.sort_order, tsc.created_at AS added_at,
@@ -166,7 +184,8 @@ router.get('/:id', requireAuth, requirePermission('qc.testsuites.view'), async (
             ORDER BY tsc.sort_order`,
             [id]);
 
-        res.json({ ...suiteResult.rows[0], test_cases: casesResult.rows });
+        const [suite] = await decorateRows(req, 'test_suite', suiteResult.rows);
+        res.json({ ...suite, test_cases: casesResult.rows });
     } catch (error) { next(error); }
 });
 
@@ -245,6 +264,8 @@ router.patch('/:id', requireAuth, requirePermission('qc.testsuites.edit'), async
         const existingResult = await client.query('SELECT * FROM test_suites WHERE id = $1 AND deleted_at IS NULL', [id]);
         if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test suite not found' }); }
         const existing = existingResult.rows[0];
+        const access = await enforceArtifact(req, res, 'test_suite', existing, 'edit', { route: 'PATCH /test-suites/:id' });
+        if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
         const updatableFields = ['name', 'description', 'status', 'readiness_scope', 'suite_type'];
         const updates = [];
@@ -309,6 +330,8 @@ router.delete('/:id', requireAuth, requirePermission('qc.testsuites.delete'), as
         const existingResult = await client.query('SELECT * FROM test_suites WHERE id = $1 AND deleted_at IS NULL', [id]);
         if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test suite not found' }); }
         const existing = existingResult.rows[0];
+        const access = await enforceArtifact(req, res, 'test_suite', existing, 'delete', { route: 'DELETE /test-suites/:id' });
+        if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
         await client.query(
             `UPDATE test_suites SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1 WHERE id = $2 AND deleted_at IS NULL`,

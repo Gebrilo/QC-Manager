@@ -95,6 +95,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/journeys', label: 'Manage Journeys', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.5, icon: Map },
     { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
+    { path: '/admin/permissions/matrix', label: 'Permissions Matrix', permission: PERMISSIONS.ADMIN_MANAGE_PERMISSIONS, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.2, icon: ShieldCheck },
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
     { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/team/journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
@@ -178,6 +179,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
             { path: '/admin/teams', label: 'Teams', icon: Users2 },
             { path: '/admin/journeys', label: 'Journey Templates', icon: Map },
             { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
+            { path: '/admin/permissions/matrix', label: 'Permissions Matrix', icon: ShieldCheck },
             {
                 label: 'Integrations',
                 icon: Settings2,

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { projectsApi } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface Project {
     id: string;
@@ -28,6 +29,12 @@ interface TestRun {
     blocked: number;
     skipped: number;
     pass_rate: number;
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 interface UploadResult {
@@ -66,6 +73,7 @@ const SAMPLE_TEMPLATE = [
 
 export default function TestExecutionsPage() {
     const router = useRouter();
+    const { hasPermission } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [testRuns, setTestRuns] = useState<TestRun[]>([]);
@@ -316,6 +324,7 @@ export default function TestExecutionsPage() {
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
         return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     };
+    const canCreateRun = hasPermission('qc.testexecutions.create') || hasPermission('qc.testresults.upload');
 
     return (
         <div className="space-y-8">
@@ -348,6 +357,7 @@ export default function TestExecutionsPage() {
             </div>
 
                 {/* Upload Section */}
+                {canCreateRun && (
                 <section className="glass-card p-6">
                     <div className="mb-6">
                         <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -609,6 +619,7 @@ export default function TestExecutionsPage() {
                         </div>
                     </div>
                 </section>
+                )}
 
                 {/* Upload Result */}
                 {uploadResult && (
@@ -742,7 +753,9 @@ export default function TestExecutionsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                    {filteredRuns.map(run => (
+                                    {filteredRuns.map(run => {
+                                        const canDelete = run._can?.delete !== false;
+                                        return (
                                         <tr key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                             <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
                                             <td className="px-4 py-4 text-sm font-medium max-w-xs truncate">
@@ -785,9 +798,10 @@ export default function TestExecutionsPage() {
                                                     </div>
                                                 ) : (
                                                     <button
-                                                        onClick={() => setDeleteConfirm(run.id)}
-                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                        title="Delete test run"
+                                                        onClick={() => canDelete && setDeleteConfirm(run.id)}
+                                                        disabled={!canDelete}
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title={canDelete ? 'Delete test run' : 'You do not have permission to delete this test run'}
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -796,7 +810,8 @@ export default function TestExecutionsPage() {
                                                 )}
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

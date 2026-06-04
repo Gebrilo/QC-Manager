@@ -8,7 +8,7 @@ This note summarizes the access-control rollout completed by PRD #79 and issue #
 - Artifact visibility is derived from owner team, owner or assignee user, PM project scope, and explicit `artifact_access` grants.
 - Role permissions are canonical in `role_permissions`.
 - `custom_roles` stores role metadata only; the legacy `custom_roles.permissions` array is removed by migration 039 after backfill.
-- The generic `feature_flags` table remains available, but retired `access_engine.*` rows are deleted by migration 039.
+- The generic `feature_flags` table remains available, but retired `access_engine.*` rows are deleted by migration 041.
 
 ## Admin Gates
 

@@ -1,4 +1,4 @@
--- Migration 037: Seed qc.dashboard.pm.view permission for pm + admin roles.
+-- Migration 039: Seed qc.dashboard.pm.view permission for pm + admin roles.
 -- Strictly additive; idempotent.
 
 BEGIN;

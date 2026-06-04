@@ -60,6 +60,7 @@ apiRouter.use('/tuleap/artifacts', require('./routes/tuleapArtifacts'));
 apiRouter.use('/my-tasks', require('./routes/personalTasks'));
 apiRouter.use('/me', require('./routes/me'));
 apiRouter.use('/roles', require('./routes/roles'));
+apiRouter.use('/admin/access', require('./routes/adminAccess'));
 apiRouter.use('/journeys', require('./routes/journeys'));
 apiRouter.use('/my-journeys', require('./routes/myJourneys'));
 apiRouter.use('/manager', require('./routes/managerView'));

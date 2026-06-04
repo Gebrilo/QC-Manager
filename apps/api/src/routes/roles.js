@@ -8,6 +8,7 @@ const {
     ROLES,
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
+const { syncRolePermissions } = require('../services/rolePermissions');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 
@@ -33,19 +34,6 @@ async function loadRolePermissionMap() {
         map.get(row.role_identifier).push(row.permission_key);
     }
     return map;
-}
-
-async function replaceRolePermissions(roleName, permissions, grantedBy) {
-    await db.query('DELETE FROM role_permissions WHERE role_identifier = $1', [roleName]);
-    for (const permission of permissions) {
-        await db.query(
-            `INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (role_identifier, permission_key)
-             DO UPDATE SET granted_by = EXCLUDED.granted_by`,
-            [roleName, permission, grantedBy]
-        );
-    }
 }
 
 // GET all roles with their permissions
@@ -135,7 +123,7 @@ router.post('/', requireAuth, requirePermission('qc.admin.manage_roles'), async 
             'INSERT INTO custom_roles (name, created_by) VALUES ($1, $2)',
             [normalizedName, grantedBy]
         );
-        await replaceRolePermissions(normalizedName, validPerms, grantedBy);
+        await syncRolePermissions(db, normalizedName, validPerms, grantedBy);
 
         res.status(201).json({
             name: normalizedName,
@@ -176,29 +164,17 @@ router.patch('/:roleName', requireAuth, requirePermission('qc.admin.manage_roles
             }
         }
 
-        await replaceRolePermissions(roleName, validPerms, grantedBy);
-
-        // Apply changes immediately to all users with this role
-        const usersResult = await db.query('SELECT id FROM app_user WHERE role = $1', [roleName]);
-        for (const user of usersResult.rows) {
-            // Delete existing permissions
-            await db.query('DELETE FROM user_permissions WHERE user_id = $1', [user.id]);
-            // Set new permissions
-            for (const perm of validPerms) {
-                await db.query(
-                    `INSERT INTO user_permissions (user_id, permission_key, granted) 
-                     VALUES ($1, $2, true)
-                     ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
-                    [user.id, perm]
-                );
-            }
-        }
+        const syncResult = await syncRolePermissions(db, roleName, validPerms, grantedBy);
+        const usersResult = await db.query(
+            'SELECT COUNT(*) AS count FROM app_user WHERE role = ANY($1::text[])',
+            [syncResult.affectedRoleNames]
+        );
 
         res.json({
             name: roleName,
             permissions: validPerms,
             is_builtin: isBuiltIn,
-            affected_users: usersResult.rows.length,
+            affected_users: Number(usersResult.rows[0]?.count || 0),
         });
     } catch (err) {
         next(err);

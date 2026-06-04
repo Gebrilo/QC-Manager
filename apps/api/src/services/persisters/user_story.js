@@ -1,4 +1,9 @@
 const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
+const {
+  resolveEmailCreator,
+  buildAccessDefaults,
+  materializeAclGrants,
+} = require('../accessDefaults');
 
 const VALID_USER_STORY_ACTIONS = new Set(['sync', 'delete']);
 
@@ -120,14 +125,26 @@ async function handleSync(unified, config, { query }) {
     return { action: 'revived', id: result.rows[0].id, data: result.rows[0] };
   }
 
+  const createdByUserId = await resolveEmailCreator({
+    email: unified.created_by || null,
+    query,
+  });
+
+  const accessDefaults = await buildAccessDefaults({
+    tuleapConfig: config,
+    artifactType: 'user_story',
+    query,
+  });
+
   const insertResult = await query(
     `INSERT INTO user_stories (
        tuleap_artifact_id, tuleap_tracker_id, tuleap_url,
        title, description, acceptance_criteria, status,
        requirement_version, priority, ba_author,
        project_id, raw_tuleap_payload, last_sync_at, pending_links,
-       sync_status, last_sync_attempted_at, last_sync_error
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, 'synced', NOW(), NULL)
+       sync_status, last_sync_attempted_at, last_sync_error,
+       owner_team_id, visibility_scope, created_by_user_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, 'synced', NOW(), NULL, $14, $15, $16)
      RETURNING *`,
     [
       tuleapArtifactId,
@@ -143,8 +160,19 @@ async function handleSync(unified, config, { query }) {
       projectId,
       unified.raw_payload ? JSON.stringify(unified.raw_payload) : JSON.stringify(unified),
       JSON.stringify(pending),
+      accessDefaults.owner_team_id,
+      accessDefaults.visibility_scope,
+      createdByUserId,
     ]
   );
+
+  await materializeAclGrants({
+    artifactType: 'user_story',
+    artifactId: insertResult.rows[0].id,
+    grants: accessDefaults.default_acl_grants,
+    grantedBy: createdByUserId,
+    query,
+  });
 
   if (resolved.length > 0) {
     await drainPending({

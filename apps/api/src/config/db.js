@@ -2858,6 +2858,21 @@ const runMigrations = async () => {
                 ON CONFLICT (role_identifier, permission_key) DO NOTHING
             `);
         }
+
+        // ============================================================
+        // Migration 039: Seed PM dashboard permission
+        // ============================================================
+        await client.query(`
+            INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+            VALUES
+                ('pm',    'qc.dashboard.pm.view', NULL),
+                ('admin', 'qc.dashboard.pm.view', NULL)
+            ON CONFLICT (role_identifier, permission_key) DO NOTHING
+        `);
+
+        // ============================================================
+        // Migration 040: Seed team-manager and member dashboard permissions
+        // ============================================================
         await client.query(`
             INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
             VALUES
@@ -2871,8 +2886,14 @@ const runMigrations = async () => {
             ON CONFLICT (role_identifier, permission_key) DO NOTHING
         `);
 
+        await client.query(`ALTER TABLE app_user DROP CONSTRAINT IF EXISTS valid_role`);
+        await client.query(`
+            ALTER TABLE app_user ADD CONSTRAINT valid_role
+            CHECK (role ~ '^[a-z0-9_]+$')
+        `);
+
         // ============================================================
-        // Migration 039: Access Engine cleanup (issue #91)
+        // Migration 041: Access Engine cleanup (issue #91)
         // ============================================================
         await client.query(`
             DELETE FROM feature_flags

@@ -1,4 +1,4 @@
--- Migration 038: Seed team-manager and member dashboard permissions.
+-- Migration 040: Seed team-manager and member dashboard permissions.
 -- Strictly additive; idempotent.
 
 BEGIN;

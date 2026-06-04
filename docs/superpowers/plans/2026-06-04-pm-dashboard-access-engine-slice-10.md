@@ -22,7 +22,7 @@
 
 | Path | Status | Responsibility |
 |------|--------|----------------|
-| `database/migrations/037_pm_dashboard_permission.sql` | new | Seeds `qc.dashboard.pm.view` into `role_permissions` for `pm` and `admin` |
+| `database/migrations/039_pm_dashboard_permission.sql` | new | Seeds `qc.dashboard.pm.view` into `role_permissions` for `pm` and `admin` |
 | `apps/shared/rbac/catalog.ts` | modify | Adds `DASHBOARD_PM_VIEW` permission constant + grants to `pm` role default |
 | `apps/api/src/services/dashboards/pmDashboard.js` | new | Pure aggregation functions; each takes `(db, projectId, user)` and returns the metric value |
 | `apps/api/src/routes/dashboards.js` | new | Express router: `GET /pm` handler |
@@ -46,7 +46,7 @@
 
 **Files:**
 - Modify: `apps/shared/rbac/catalog.ts`
-- Create: `database/migrations/037_pm_dashboard_permission.sql`
+- Create: `database/migrations/039_pm_dashboard_permission.sql`
 
 - [ ] **Step 1: Extend the PERMISSIONS table**
 
@@ -69,10 +69,10 @@ Admin gets it implicitly via `permissions: ['*']`. Do not add it to `team_manage
 
 - [ ] **Step 3: Write the seed migration**
 
-Create `database/migrations/037_pm_dashboard_permission.sql`:
+Create `database/migrations/039_pm_dashboard_permission.sql`:
 
 ```sql
--- Migration 037: Seed qc.dashboard.pm.view permission for pm + admin roles.
+-- Migration 039: Seed qc.dashboard.pm.view permission for pm + admin roles.
 -- Strictly additive; idempotent.
 
 BEGIN;
@@ -89,7 +89,7 @@ COMMIT;
 - [ ] **Step 4: Commit**
 
 ```bash
-git add apps/shared/rbac/catalog.ts database/migrations/037_pm_dashboard_permission.sql
+git add apps/shared/rbac/catalog.ts database/migrations/039_pm_dashboard_permission.sql
 git commit -m "feat(access): add qc.dashboard.pm.view permission (slice 10, refs #89)"
 ```
 

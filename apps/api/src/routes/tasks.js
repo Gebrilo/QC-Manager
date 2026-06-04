@@ -12,6 +12,7 @@ const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { resolve: resolveRole } = require('../access/RoleResolver');
 const { canEditTask, canTakeOverTask } = require('../services/dashboards/teamMemberDashboards');
+const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 
 /**
  * Helper: Get the resource ID linked to the current user.
@@ -297,6 +298,12 @@ router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, 
 
         const notes = data.notes || data.description || null;
 
+        const accessDefaults = await buildAccessDefaults({
+            creator: req.user ? { id: req.user.id } : null,
+            artifactType: 'task',
+            query: db.query.bind(db),
+        });
+
         const query = `
             INSERT INTO tasks (
                 task_id, project_id, task_name, status,
@@ -305,9 +312,11 @@ router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, 
                 r1_estimate_hrs, r1_actual_hrs,
                 r2_estimate_hrs, r2_actual_hrs,
                 deadline, tags, notes, completed_date,
-                expected_start_date, actual_start_date
+                expected_start_date, actual_start_date,
+                owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                $18, $19, $20
             ) RETURNING *
         `;
 
@@ -318,11 +327,20 @@ router.post('/', requireAuth, requirePermission('qc.tasks.create'), async (req, 
             data.r1_estimate_hrs, data.r1_actual_hrs,
             data.r2_estimate_hrs, data.r2_actual_hrs,
             data.deadline, data.tags, notes, data.completed_date,
-            data.expected_start_date || null, data.actual_start_date || null
+            data.expected_start_date || null, data.actual_start_date || null,
+            accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ];
 
         const result = await db.query(query, values);
         const task = result.rows[0];
+
+        await materializeAclGrants({
+            artifactType: 'task',
+            artifactId: task.id,
+            grants: accessDefaults.default_acl_grants,
+            grantedBy: req.user?.id || null,
+            query: db.query.bind(db),
+        });
 
         await auditLog('tasks', task.id, 'CREATE', task, null);
         triggerWorkflow('task-created', task);

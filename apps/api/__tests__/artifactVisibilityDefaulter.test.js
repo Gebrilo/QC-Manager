@@ -42,16 +42,20 @@ describe('ArtifactVisibilityDefaulter.defaultsFor', () => {
         expect(out.visibility_scope).toBe('team');
     });
 
-    test('tuleap-creator with default_visibility_scope override skips default_artifact_visibility lookup', async () => {
-        mockQuery.mockResolvedValueOnce({ rows: [{ team_id: 'team-qc', team_type_id: 'tt-qc', team_type: 'qc' }] });
+    test('tuleap-creator with default_visibility_scope override still loads team-type ACL grants', async () => {
+        // The tracker config overrides visibility_scope, but role-based ACL
+        // grants (e.g. pm view) still come from the team-type defaults so they
+        // remain consistent across artifacts of the same team type.
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ team_id: 'team-qc', team_type_id: 'tt-qc', team_type: 'qc' }] })
+            .mockResolvedValueOnce({ rows: [{ default_scope: 'team', default_acl_grants: [{ role: 'pm', action: 'view' }] }] });
 
         const out = await defaultsFor({
             tuleapDefaults: { default_owner_team_id: 'team-qc', default_visibility_scope: 'project' },
             artifactType: 'bug',
         });
         expect(out.visibility_scope).toBe('project');
-        // Only one query — visibility_scope override skipped the second lookup
-        expect(mockQuery).toHaveBeenCalledTimes(1);
+        expect(out.default_acl_grants).toEqual([{ role: 'pm', action: 'view' }]);
     });
 
     test('human creator with no team: scope defaults to team, owner_team_id null', async () => {
