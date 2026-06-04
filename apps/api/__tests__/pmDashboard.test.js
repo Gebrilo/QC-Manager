@@ -87,7 +87,7 @@ describe('pmDashboard service', () => {
         db.query.mockResolvedValueOnce({ rows: [{ c: '4' }] });
         const result = await svc.getBlockedCount(db, 'proj-1', { clause: 'TRUE', params: [] });
         expect(result).toBe(4);
-        expect(db.query.mock.calls[0][0]).toMatch(/test_executions/);
+        expect(db.query.mock.calls[0][0]).toMatch(/test_execution\b/);
         expect(db.query.mock.calls[0][0]).toMatch(/status = 'blocked'/);
     });
 

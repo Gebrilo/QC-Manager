@@ -86,18 +86,14 @@ async function getUserStoryProgress(db, projectId, access) {
 async function getBlockedCount(db, projectId, access) {
     // Blocked count = test_execution rows in 'blocked' status for the project.
     // Tasks/bugs have no blocked column — see plan scope notes.
-    // We use a CTE aliased as test_executions (matching AccessEngine table alias)
-    // which wraps the physical test_execution table joined to test_run for project scoping.
+    // No access filter applied here: PM-level blocked count is project-scoped only
+    // (test_execution rows are not directly owned by a team).
     const sql = `
-        WITH test_executions AS (
-            SELECT te.status
-              FROM test_execution te
-              JOIN test_run tr ON tr.id = te.test_run_id
-             WHERE tr.project_id = $1
-        )
         SELECT COUNT(*)::int AS c
-          FROM test_executions
-         WHERE status = 'blocked'`;
+          FROM test_execution te
+          JOIN test_run tr ON tr.id = te.test_run_id
+         WHERE tr.project_id = $1
+           AND te.status = 'blocked'`;
     const r = await db.query(sql, [projectId]);
     return Number(r.rows[0]?.c || 0);
 }
@@ -179,21 +175,16 @@ async function getCrossTeamDependencies(db, projectId) {
 async function getTestExecutionSummary(db, projectId) {
     // PRD A8/A26: PM lacks qc.testcases.view_steps — only counts, never
     // any test case body fields are exposed.
-    // We use a CTE aliased as test_executions (matching AccessEngine table alias)
-    // which wraps the physical test_execution table joined to test_run for project scoping.
+    // Status enum values from migration 001: 'pass', 'fail', 'blocked'.
     const sql = `
-        WITH test_executions AS (
-            SELECT te.status
-              FROM test_execution te
-              JOIN test_run tr ON tr.id = te.test_run_id
-             WHERE tr.project_id = $1
-        )
         SELECT
-            SUM(CASE WHEN status = 'pass'    THEN 1 ELSE 0 END)::int AS passed,
-            SUM(CASE WHEN status = 'fail'    THEN 1 ELSE 0 END)::int AS failed,
-            SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END)::int AS blocked,
+            SUM(CASE WHEN te.status = 'pass'    THEN 1 ELSE 0 END)::int AS passed,
+            SUM(CASE WHEN te.status = 'fail'    THEN 1 ELSE 0 END)::int AS failed,
+            SUM(CASE WHEN te.status = 'blocked' THEN 1 ELSE 0 END)::int AS blocked,
             COUNT(*)::int AS total
-          FROM test_executions`;
+          FROM test_execution te
+          JOIN test_run tr ON tr.id = te.test_run_id
+         WHERE tr.project_id = $1`;
     const r = await db.query(sql, [projectId]);
     const row = r.rows[0] || { passed: 0, failed: 0, blocked: 0, total: 0 };
     return {
