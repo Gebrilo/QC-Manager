@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { tuleapApi, projectsApi, type TuleapArtifact, type Project } from '@/lib/api';
+import { projectsApi, userStoriesApi, type UserStory, type Project } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
@@ -16,6 +16,7 @@ import Link from 'next/link';
 
 const schema = z.object({
     title: z.string().min(1, 'Summary is required'),
+    project_id: z.string().uuid('Valid project is required'),
     description: z.string().optional().default(''),
     acceptance_criteria: z.string().optional().default(''),
     change_reason: z.string().optional().default(''),
@@ -238,7 +239,7 @@ export default function EditUserStoryPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
-    const [artifact, setArtifact] = useState<TuleapArtifact | null>(null);
+    const [artifact, setArtifact] = useState<UserStory | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -247,7 +248,7 @@ export default function EditUserStoryPage() {
         async function load() {
             try {
                 const [data, projs] = await Promise.all([
-                    tuleapApi.get('user-story', id),
+                    userStoriesApi.get(id),
                     projectsApi.list(),
                 ]);
                 setArtifact(data);
@@ -298,7 +299,7 @@ function EditForm({
     artifactId,
     router,
 }: {
-    artifact: TuleapArtifact;
+    artifact: UserStory;
     projects: Project[];
     artifactId: string;
     router: ReturnType<typeof useRouter>;
@@ -322,6 +323,7 @@ function EditForm({
                 (artifact as any).story_title ||
                 (artifact as any).summary || ''
             ),
+            project_id: artifact.project_id || '',
             description: stripHtml((artifact as any).description || (artifact as any).overview_description || ''),
             acceptance_criteria: stripHtml((artifact as any).acceptance_criteria || ''),
             change_reason: stripHtml((artifact as any).change_reason || ''),
@@ -360,25 +362,20 @@ function EditForm({
         setSubmitError(null);
         try {
             const payload = {
-                artifact_type: 'user_story' as const,
-                project_id: (artifact as any).project_id || '',
-                common: {
-                    title: data.title,
-                    description: data.description || undefined,
-                    status: data.status,
-                    assigned_to: data.assigned_to || null,
-                    priority: data.priority === 'None' ? undefined : data.priority,
-                },
-                fields: {
-                    acceptance_criteria: data.acceptance_criteria || undefined,
-                    requirement_version: data.requirement_version || '1',
-                    change_reason: data.change_reason || undefined,
-                    ba_author: data.ba_author || undefined,
-                    initial_effort: data.initial_effort ?? null,
-                    remaining_effort: data.remaining_effort ?? null,
-                },
+                title: data.title,
+                project_id: data.project_id,
+                description: data.description || undefined,
+                status: data.status,
+                assigned_to: data.assigned_to || null,
+                priority: data.priority === 'None' ? undefined : data.priority,
+                acceptance_criteria: data.acceptance_criteria || undefined,
+                requirement_version: data.requirement_version || '1',
+                change_reason: data.change_reason || undefined,
+                ba_author: data.ba_author || undefined,
+                initial_effort: data.initial_effort ?? null,
+                remaining_effort: data.remaining_effort ?? null,
             };
-            await tuleapApi.updateUnified(artifactId, payload);
+            await userStoriesApi.update(artifactId, payload);
             router.push(`/work/stories/${artifactId}`);
             router.refresh();
         } catch (err: any) {
@@ -510,6 +507,19 @@ function EditForm({
                                 className={fieldCls}
                             />
                             <FieldError message={errors.title?.message} />
+                        </div>
+
+                        <div className="col-span-2">
+                            <FieldLabel required>Project</FieldLabel>
+                            <SelectField {...register('project_id')}>
+                                <option value="">Select a project...</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.project_name} ({p.project_id})
+                                    </option>
+                                ))}
+                            </SelectField>
+                            <FieldError message={errors.project_id?.message} />
                         </div>
 
                         <div>

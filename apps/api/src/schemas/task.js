@@ -33,7 +33,7 @@ const createTaskSchema = baseTaskSchema.refine(data => {
     return true;
 }, { message: "completed_date is required when status is Done", path: ["completed_date"] });
 
-const updateTaskSchema = baseTaskSchema.partial().omit({ task_id: true, project_id: true }).extend({
+const updateTaskSchema = baseTaskSchema.partial().omit({ task_id: true }).extend({
     parent_user_story_id: z.string().uuid().optional(),
 });
 

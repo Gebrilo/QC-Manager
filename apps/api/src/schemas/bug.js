@@ -29,7 +29,7 @@ const createBugSchema = z.object({
     temp_id: z.string().optional(),
 });
 
-const updateBugSchema = createBugSchema.partial().omit({ project_id: true });
+const updateBugSchema = createBugSchema.partial();
 
 module.exports = {
     createBugSchema,

@@ -15,7 +15,7 @@ import Link from 'next/link';
 // ── Schema ─────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-    task_id: z.string().regex(/^TSK-[0-9]{3}$/, 'Format: TSK-XXX'),
+    task_id: z.string().optional().default(''),
     project_id: z.string().uuid(),
     task_name: z.string().min(1, 'Required'),
     status: z.enum(['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled']),
@@ -48,6 +48,12 @@ function normalizePriority(priority?: string): 'High' | 'Medium' | 'Low' {
     if (lower === 'high') return 'High';
     if (lower === 'low') return 'Low';
     return 'Medium';
+}
+
+function getTaskDisplayId(task: Task): string {
+    if (task.task_id && !task.task_id.includes('NaN')) return task.task_id;
+    if ((task as any).tuleap_artifact_id) return `TSK-${(task as any).tuleap_artifact_id}`;
+    return `TSK-${task.id.slice(0, 8)}`;
 }
 
 // ── Design primitives ──────────────────────────────────────────────────────
@@ -447,6 +453,7 @@ function EditForm({
 
     const projectName = projects.find(p => p.id === task.project_id)?.project_name;
     const r1Name = activeResources.find(r => r.id === (task.resource1_uuid || task.resource1_id))?.resource_name;
+    const taskDisplayId = getTaskDisplayId(task);
     const deadlineDisplay = task.deadline ? new Date(task.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
     const createdAt = (task as any).created_at ? new Date((task as any).created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
     const updatedAt = (task as any).updated_at ? new Date((task as any).updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
@@ -487,7 +494,7 @@ function EditForm({
                         <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
                             <Link href="/work/tasks" className="hover:text-violet-600 transition-colors">Tasks</Link>
                             <span className="text-slate-300 dark:text-slate-600">/</span>
-                            <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">{task.task_id}</span>
+                            <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">{taskDisplayId}</span>
                             <span className="text-slate-300 dark:text-slate-600">/</span>
                             <span className="text-slate-500 dark:text-slate-300 font-medium">Edit</span>
                         </div>
@@ -557,7 +564,7 @@ function EditForm({
 
                         <div>
                             <FieldLabel>Task ID</FieldLabel>
-                            <input {...register('task_id')} disabled className={readonlyCls} />
+                            <input value={taskDisplayId} readOnly disabled className={readonlyCls} />
                             <FieldHint>Read-only identifier.</FieldHint>
                         </div>
 
@@ -786,7 +793,7 @@ function EditForm({
                 <aside className="col-span-12 lg:col-span-3">
                     <div className="lg:sticky lg:top-4 space-y-5">
                         <MetaCard title="At a glance">
-                            <MetaRow label="Task ID" value={task.task_id} mono />
+                            <MetaRow label="Task ID" value={taskDisplayId} mono />
                             <MetaRow label="Project" value={projectName} />
                             <MetaRow label="Primary Resource" value={r1Name} />
                             <MetaRow label="Deadline" value={deadlineDisplay} />

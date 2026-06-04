@@ -141,9 +141,9 @@ describe('Zod schemas', () => {
         expect(result.success).toBe(true);
     });
 
-    it('updateUserStorySchema omits project_id', () => {
+    it('updateUserStorySchema preserves project_id', () => {
         const result = updateUserStorySchema.safeParse({ project_id: PID, title: 'X' });
         expect(result.success).toBe(true);
-        expect(result.data).not.toHaveProperty('project_id');
+        expect(result.data).toHaveProperty('project_id', PID);
     });
 });

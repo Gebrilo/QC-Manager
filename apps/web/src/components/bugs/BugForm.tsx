@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { tuleapApi, bugsApi, projectsApi, type Project } from '@/lib/api';
+import { bugsApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
@@ -438,14 +438,9 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                 temp_id: tempId,
             };
 
-            if (isEdit && artifactId) {
-                await tuleapApi.updateUnified(artifactId, {
-                    artifact_type: 'bug' as const,
-                    project_id: selectedProjectId,
-                    common: { title: data.title, description: data.description, status: data.status, assigned_to: data.assigned_to || null, priority: data.severity },
-                    fields: { severity: data.severity, environment: data.environment, service_name: data.service_name, steps_to_reproduce: data.steps_to_reproduce, dev_fix_description: data.dev_fix_description, qc_verification_notes: data.qc_verification_notes, close_date: data.close_date || null, cc: data.cc ? data.cc.split(',').map(s => s.trim()).filter(Boolean) : undefined, linked_test_case_ids: data.linked_test_case_ids ? data.linked_test_case_ids.split(',').map(s => s.trim()).filter(Boolean) : undefined, initial_effort: data.initial_effort ?? null, remaining_effort: data.remaining_effort ?? null },
-                });
-                router.push(`/work/bugs/${bugUUID || artifactId}`);
+            if (isEdit && bugUUID) {
+                await bugsApi.update(bugUUID, payload);
+                router.push(`/work/bugs/${bugUUID}`);
             } else {
                 const result = await bugsApi.create(payload);
                 const bugData = result.data;
@@ -582,7 +577,6 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                             <EFSelect
                                 value={selectedProjectId}
                                 onChange={e => setSelectedProjectId(e.target.value)}
-                                disabled={isEdit}
                             >
                                 <option value="">Select a project…</option>
                                 {projects.map(p => (

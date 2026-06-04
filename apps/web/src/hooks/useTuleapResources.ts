@@ -4,6 +4,7 @@ import { resourcesApi, type Resource } from '@/lib/api';
 
 export interface TuleapResource {
     id: string;
+    user_id?: string;
     resource_name: string;
     tuleap_username: string;
 }
@@ -25,6 +26,7 @@ export function useTuleapResources(): UseTuleapResourcesResult {
                         .filter(r => r.is_active && r.tuleap_username)
                         .map(r => ({
                             id: r.id,
+                            user_id: r.user_id,
                             resource_name: r.resource_name,
                             tuleap_username: r.tuleap_username!,
                         }))

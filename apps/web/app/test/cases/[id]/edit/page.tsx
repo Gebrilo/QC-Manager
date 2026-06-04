@@ -570,7 +570,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
                                 <select {...register('assigned_to')} className={selectCls}>
                                     <option value="">— Unassigned —</option>
                                     {tuleapResources.map(r => (
-                                        <option key={r.id} value={r.id}>
+                                        <option key={r.id} value={r.user_id || r.id}>
                                             {r.resource_name} ({r.tuleap_username})
                                         </option>
                                     ))}

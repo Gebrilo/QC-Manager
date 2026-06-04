@@ -480,6 +480,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req
         let idx = 1;
 
         const keyMap = {
+            project_id: 'project_id',
             task_name: 'task_name',
             status: 'status',
             resource1_uuid: 'resource1_id',
@@ -520,7 +521,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req
         await auditLog('tasks', id, 'UPDATE', updated, original);
         triggerWorkflow('task-updated', updated);
 
-        const config = await resolveTaskSyncConfig(original.project_id);
+        const config = await resolveTaskSyncConfig(updated.project_id);
         if (!config) {
             await db.query(
                 `UPDATE tasks SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,

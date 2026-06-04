@@ -475,6 +475,12 @@ export const bugsApi = {
             body: JSON.stringify(data),
         }),
 
+    update: (id: string, data: Record<string, unknown>) =>
+        fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
     sync: (id: string) =>
         fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}/sync`, { method: 'POST' }),
 

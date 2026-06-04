@@ -84,7 +84,20 @@ const testCaseCreateSchema = z.object({
     linked_bug_ids: z.array(z.string().uuid()).default([]),
 });
 
-const testCaseUpdateSchema = testCaseCreateSchema.partial().omit({ project_id: true });
+const testCaseUpdateSchema = testCaseCreateSchema.partial();
+
+async function resolveAssignedToUserId(client, assignedTo) {
+    if (!assignedTo) return null;
+    const resRow = await client.query(
+        `SELECT user_id
+           FROM resources
+          WHERE (id = $1 OR user_id = $1)
+            AND deleted_at IS NULL
+          LIMIT 1`,
+        [assignedTo]
+    );
+    return resRow.rows[0]?.user_id || null;
+}
 
 async function logTestCaseHistory(client, { test_case_id, action, changed_fields, before_state, after_state, change_summary, user_id, user_email }) {
     await client.query(
@@ -190,14 +203,7 @@ router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (r
         const validatedData = testCaseCreateSchema.parse(req.body);
 
         // assigned_to is a resource UUID from the form; resolve to app_user.id for the FK
-        let assignedToUserId = null;
-        if (validatedData.assigned_to) {
-            const resRow = await pool.query(
-                'SELECT user_id FROM resources WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
-                [validatedData.assigned_to]
-            );
-            assignedToUserId = resRow.rows[0]?.user_id || null;
-        }
+        const assignedToUserId = await resolveAssignedToUserId(pool, validatedData.assigned_to);
 
         await client.query('BEGIN');
 
@@ -299,9 +305,13 @@ router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async 
         if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test case not found' }); }
         const existing = existingResult.rows[0];
 
+        if (validatedData.assigned_to !== undefined) {
+            validatedData.assigned_to = await resolveAssignedToUserId(client, validatedData.assigned_to);
+        }
+
         const updatableFields = ['title','description','preconditions','test_steps','expected_result',
             'priority','severity','test_type','category','component','automation_status','status',
-            'estimated_duration_minutes','tags','assigned_to','linked_requirement_id','linked_bug_ids'];
+            'estimated_duration_minutes','tags','project_id','assigned_to','linked_requirement_id','linked_bug_ids'];
         const updates = []; const params = []; let pn = 1; const changedFields = [];
 
         for (const field of updatableFields) {
@@ -332,7 +342,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async 
         const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
         const testCase = { ...fullResult.rows[0] };
 
-        const config = await resolveTestCaseSyncConfig(existing.project_id);
+        const config = await resolveTestCaseSyncConfig(testCase.project_id);
         if (!config) {
             await pool.query(
                 `UPDATE test_case SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,

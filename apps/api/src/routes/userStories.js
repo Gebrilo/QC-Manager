@@ -272,7 +272,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
 
         const allowedFields = [
             'title', 'description', 'status', 'acceptance_criteria',
-            'priority', 'assigned_to', 'requirement_version',
+            'project_id', 'priority', 'assigned_to', 'requirement_version',
             'change_reason', 'ba_author',
             'initial_effort', 'remaining_effort',
         ];

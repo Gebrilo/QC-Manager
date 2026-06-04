@@ -16,7 +16,7 @@ const createUserStorySchema = z.object({
     temp_id: z.string().optional(),
 });
 
-const updateUserStorySchema = createUserStorySchema.partial().omit({ project_id: true });
+const updateUserStorySchema = createUserStorySchema.partial();
 
 module.exports = {
     createUserStorySchema,

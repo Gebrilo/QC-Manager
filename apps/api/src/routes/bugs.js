@@ -502,7 +502,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
         const data = parsed.data;
 
         const allowedFields = [
-            'title', 'description', 'status', 'severity', 'priority',
+            'title', 'description', 'status', 'severity', 'priority', 'project_id',
             'bug_type', 'component', 'assigned_to', 'updated_by',
             'resolved_date', 'environment', 'service_name',
             'dev_fix_description', 'qc_verification_notes',
