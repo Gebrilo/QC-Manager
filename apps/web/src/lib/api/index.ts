@@ -559,6 +559,50 @@ export const dashboardApi = {
 };
 
 // ============================================================================
+// Types - PM Dashboard
+// ============================================================================
+
+export type PmProjectResource = {
+    resource_id: string;
+    name: string;
+    capacity_hrs: number;
+    allocated_hrs: number;
+    utilization_pct: number;
+};
+
+export type PmCrossTeamDependency = {
+    from_team: string;
+    to_team: string;
+    artifact_count: number;
+};
+
+export type PmProjectDashboard = {
+    project_id: string;
+    project_name: string;
+    total_workload: number;
+    tasks_by_status: Record<string, number>;
+    tasks_by_team: Record<string, number>;
+    bugs_by_status: Record<string, number>;
+    bugs_by_severity: Record<string, number>;
+    user_stories: { total: number; in_progress: number; done: number };
+    blocked_count: number;
+    overdue_count: number;
+    resources: PmProjectResource[];
+    cross_team_dependencies: PmCrossTeamDependency[];
+    test_execution_summary: { passed: number; failed: number; blocked: number; total: number };
+};
+
+export type PmDashboardResponse = { projects: PmProjectDashboard[] };
+
+// ============================================================================
+// API Client - PM Dashboard
+// ============================================================================
+
+export const pmDashboardApi = {
+    get: () => fetchApi<PmDashboardResponse>('/api/dashboards/pm'),
+};
+
+// ============================================================================
 // API Client - Reports
 // ============================================================================
 
