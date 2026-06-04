@@ -52,6 +52,8 @@ const ROUTES: RouteConfig[] = [
     { path: '/me/idp/history/[planId]', label: 'Archived Plan', permission: PERMISSIONS.MY_TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/me/dashboard', label: 'My Dashboard', permission: PERMISSIONS.MY_DASHBOARD_VIEW, showInNavbar: true, navOrder: 1.8, icon: LayoutGrid },
     { path: '/dashboards/pm', label: 'PM Dashboard', permission: PERMISSIONS.DASHBOARD_PM_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 1.9, icon: LayoutGrid },
+    { path: '/dashboards/member', label: 'Member Dashboard', permission: PERMISSIONS.DASHBOARDS_MEMBER_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 1.85, icon: LayoutGrid },
+    { path: '/dashboards/team-manager', label: 'Team Dashboard', permission: PERMISSIONS.DASHBOARDS_TEAM_MANAGER_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 1.95, icon: LayoutGrid },
     { path: '/work/stories', label: 'Stories', permission: PERMISSIONS.PROJECTS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 2.9, icon: BookOpen },
     { path: '/work/tasks', label: 'Tasks', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 3, icon: ListTodo },
     { path: '/work/tasks/create', label: 'Create Task', permission: PERMISSIONS.TASKS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
@@ -110,6 +112,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         icon: CheckSquare,
         children: [
             { path: '/me/dashboard', label: 'My Dashboard', icon: LayoutGrid },
+            { path: '/dashboards/member', label: 'Member Dashboard', icon: LayoutGrid },
             { path: '/me/tasks', label: 'My Tasks', icon: CheckSquare },
             { path: '/me/journeys', label: 'My Journeys', icon: Map },
             { path: '/me/idp', label: 'My Development Plan', icon: GraduationCap },
@@ -156,8 +159,9 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'manage',
         label: 'Manage',
         icon: Users,
-        roles: ['manager', 'admin'],
+        roles: ['manager', 'team_manager', 'admin'],
         children: [
+            { path: '/dashboards/team-manager', label: 'Team Dashboard', icon: LayoutGrid },
             { path: '/team/resources', label: 'Resources', icon: Users },
             { path: '/team/idp', label: 'Development Plans', icon: GraduationCap },
             { path: '/team/journeys', label: 'Team Journeys', icon: Users2 },

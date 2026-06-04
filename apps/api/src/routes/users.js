@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const { createNotification } = require('./notifications');
 const { rollbackUser } = require('../services/userLifecycle');
+const { ROLES } = require('../../../shared/rbac/catalog.ts');
 
-router.use(requireAuth, requireRole('admin'));
+const BUILT_IN_ROLES = Object.freeze(Object.keys(ROLES));
 
-router.get('/', async (req, res, next) => {
+router.use(requireAuth);
+
+router.get('/', requirePermission('qc.admin.users.view'), async (req, res, next) => {
     try {
         const result = await db.query(`
             SELECT u.id, u.name, u.email, u.phone, u.role, u.active,
@@ -28,7 +31,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', requirePermission('qc.admin.manage_users'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { role, active, status, manager_id } = req.body;
@@ -42,12 +45,11 @@ router.patch('/:id', async (req, res, next) => {
         let idx = 1;
 
         if (role !== undefined) {
-            const builtInRoles = ['admin', 'manager', 'user', 'viewer', 'contributor'];
-            if (!builtInRoles.includes(role)) {
+            if (!BUILT_IN_ROLES.includes(role)) {
                 // Check if it's a valid custom role
                 const customRoleCheck = await db.query('SELECT name FROM custom_roles WHERE name = $1', [role]);
                 if (customRoleCheck.rows.length === 0) {
-                    return res.status(400).json({ error: `Invalid role '${role}'. Must be a built-in role (${builtInRoles.join(', ')}) or a valid custom role.` });
+                    return res.status(400).json({ error: `Invalid role '${role}'. Must be a built-in role (${BUILT_IN_ROLES.join(', ')}) or a valid custom role.` });
                 }
             }
             fields.push(`role = $${idx++}`);
@@ -148,7 +150,7 @@ router.patch('/:id', async (req, res, next) => {
     }
 });
 
-router.get('/:id/permissions', async (req, res, next) => {
+router.get('/:id/permissions', requirePermission('qc.admin.users.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -163,7 +165,7 @@ router.get('/:id/permissions', async (req, res, next) => {
     }
 });
 
-router.put('/:id/permissions', async (req, res, next) => {
+router.put('/:id/permissions', requirePermission('qc.admin.manage_permissions'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { permissions } = req.body;
@@ -213,7 +215,7 @@ router.put('/:id/permissions', async (req, res, next) => {
     }
 });
 
-router.post('/:id/convert-to-resource', async (req, res, next) => {
+router.post('/:id/convert-to-resource', requirePermission('qc.admin.manage_users'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { weekly_capacity_hrs, department, role } = req.body;
@@ -276,7 +278,7 @@ router.post('/:id/convert-to-resource', async (req, res, next) => {
     }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requirePermission('qc.admin.manage_users'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -305,7 +307,7 @@ router.delete('/:id', async (req, res, next) => {
 });
 
 // POST /users/:id/rollback — Admin-only: revert ACTIVE user to PREPARATION
-router.post('/:id/rollback', async (req, res, next) => {
+router.post('/:id/rollback', requirePermission('qc.admin.manage_users'), async (req, res, next) => {
     try {
         const { id } = req.params;
         if (id === req.user.id) {

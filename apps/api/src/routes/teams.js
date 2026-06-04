@@ -19,7 +19,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { getManagerTeam } = require('../middleware/teamAccess');
 
 // ──────────────────────────────────────────────
@@ -27,7 +27,7 @@ const { getManagerTeam } = require('../middleware/teamAccess');
 // ──────────────────────────────────────────────
 
 // GET /teams — list all teams
-router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const result = await db.query(`
             SELECT
@@ -54,7 +54,7 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
 });
 
 // POST /teams — create a team
-router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { name, description, manager_id } = req.body;
         if (!name || !name.trim()) {
@@ -132,7 +132,7 @@ router.get('/mine', requireAuth, async (req, res, next) => {
 });
 
 // GET /teams/:id — get one team with members and projects
-router.get('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -172,7 +172,7 @@ router.get('/:id', requireAuth, requireRole('admin'), async (req, res, next) => 
 });
 
 // PATCH /teams/:id — update name, description, or manager
-router.patch('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { name, description, manager_id } = req.body;
@@ -221,7 +221,7 @@ router.patch('/:id', requireAuth, requireRole('admin'), async (req, res, next) =
 });
 
 // DELETE /teams/:id — soft delete
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -246,7 +246,7 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) 
 // ──────────────────────────────────────────────
 
 // POST /teams/:id/members — add user to team
-router.post('/:id/members', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/:id/members', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { user_id } = req.body;
@@ -271,7 +271,7 @@ router.post('/:id/members', requireAuth, requireRole('admin'), async (req, res, 
 });
 
 // DELETE /teams/:id/members/:userId — remove user from team
-router.delete('/:id/members/:userId', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/:id/members/:userId', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id, userId } = req.params;
 
@@ -293,7 +293,7 @@ router.delete('/:id/members/:userId', requireAuth, requireRole('admin'), async (
 // ──────────────────────────────────────────────
 
 // POST /teams/:id/projects — assign project to team
-router.post('/:id/projects', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/:id/projects', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { project_id } = req.body;
@@ -320,7 +320,7 @@ router.post('/:id/projects', requireAuth, requireRole('admin'), async (req, res,
 });
 
 // DELETE /teams/:id/projects/:projectId — unassign project from team
-router.delete('/:id/projects/:projectId', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/:id/projects/:projectId', requireAuth, requirePermission('qc.admin.manage_teams'), async (req, res, next) => {
     try {
         const { id, projectId } = req.params;
 

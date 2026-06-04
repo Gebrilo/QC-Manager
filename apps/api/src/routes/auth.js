@@ -3,7 +3,11 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { notifyAdmins } = require('./notifications');
-const { resolve: resolveRole } = require('../access/RoleResolver');
+const { canonicalRole, resolve: resolveRole } = require('../access/RoleResolver');
+const {
+    BUILT_IN_ROLE_PERMISSION_DEFAULTS,
+    collectRolePermissions,
+} = require('../../../shared/rbac/catalog.ts');
 
 const DEFAULT_PERMISSIONS = {
     admin: [
@@ -81,12 +85,17 @@ const INACTIVE_PERMISSIONS = [
 async function setDefaultPermissions(userId, role) {
     let permissions;
 
-    // Always check custom_roles table first — it stores both custom role definitions
-    // AND admin-customized overrides for built-in roles (saved when admin edits role permissions)
+    const roleIdentifier = canonicalRole(role);
+
+    // role_permissions is the canonical role-permission store. Catalog defaults
+    // are only a bootstrap fallback for built-ins with no persisted rows yet.
     try {
-        const result = await db.query('SELECT permissions FROM custom_roles WHERE name = $1', [role]);
-        if (result.rows.length > 0 && Array.isArray(result.rows[0].permissions) && result.rows[0].permissions.length > 0) {
-            permissions = result.rows[0].permissions;
+        const result = await db.query(
+            'SELECT permission_key FROM role_permissions WHERE role_identifier = $1 ORDER BY permission_key',
+            [roleIdentifier]
+        );
+        if (result.rows.length > 0) {
+            permissions = result.rows.map(row => row.permission_key);
         }
     } catch {
         // DB error — fall through to defaults
@@ -94,7 +103,9 @@ async function setDefaultPermissions(userId, role) {
 
     // Fall back to hardcoded defaults if no DB override found
     if (!permissions) {
-        permissions = DEFAULT_PERMISSIONS[role];
+        permissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]
+            || collectRolePermissions(roleIdentifier, new Set())
+            || DEFAULT_PERMISSIONS[role];
     }
 
     // Final fallback for unknown roles with no DB entry

@@ -595,11 +595,110 @@ export type PmProjectDashboard = {
 export type PmDashboardResponse = { projects: PmProjectDashboard[] };
 
 // ============================================================================
-// API Client - PM Dashboard
+// Types - Team Manager / Member Dashboards
+// ============================================================================
+
+export type DashboardTask = {
+    id: string;
+    task_id?: string | null;
+    task_name: string;
+    status: string;
+    priority?: string | null;
+    project_id?: string | null;
+    project_name?: string | null;
+    owner_team_id?: string | null;
+    resource1_id?: string | null;
+    resource1_name?: string | null;
+    resource2_id?: string | null;
+    resource2_name?: string | null;
+    parent_user_story_id?: string | null;
+    deadline?: string | null;
+    total_est_hrs: number;
+    total_actual_hrs: number;
+    _can?: {
+        view?: boolean;
+        edit?: boolean;
+        take_over?: boolean;
+    };
+};
+
+export type DashboardBug = {
+    id: string;
+    bug_id?: string | null;
+    tuleap_artifact_id?: number | null;
+    title: string;
+    status: string;
+    severity?: string | null;
+    priority?: string | null;
+    project_id?: string | null;
+    project_name?: string | null;
+    owner_team_id?: string | null;
+};
+
+export type DashboardUserStory = {
+    id: string;
+    tuleap_artifact_id?: number | null;
+    title: string;
+    status: string;
+    priority?: string | null;
+    project_id?: string | null;
+    project_name?: string | null;
+};
+
+export type TeamManagerDashboard = {
+    team_id: string;
+    team_name: string | null;
+    team_type: string | null;
+    team_tasks: {
+        total: number;
+        by_status: Record<string, number>;
+        items: DashboardTask[];
+    };
+    tasks_by_member: Array<{ user_id: string; resource_id?: string | null; name: string; total: number }>;
+    members: Array<{
+        user_id: string;
+        resource_id?: string | null;
+        name: string;
+        workload_hrs: number;
+        capacity_hrs: number;
+        logged_hrs: number;
+    }>;
+    blocked_items: DashboardTask[];
+    overdue_items: DashboardTask[];
+    team_bugs: { total: number; by_status: Record<string, number> } | null;
+    reports_link: string;
+};
+
+export type MemberDashboard = {
+    my_tasks: DashboardTask[];
+    my_bugs: DashboardBug[];
+    related_user_stories: DashboardUserStory[];
+    due_this_week: DashboardTask[];
+    logged_time_this_week: number;
+    shared_with_me: Array<{
+        artifact_type: string;
+        artifact_id: string;
+        display_id?: string | null;
+        title: string;
+        status?: string | null;
+        action: string;
+    }>;
+};
+
+// ============================================================================
+// API Client - Dashboards
 // ============================================================================
 
 export const pmDashboardApi = {
     get: () => fetchApi<PmDashboardResponse>('/api/dashboards/pm'),
+};
+
+export const teamManagerDashboardApi = {
+    get: () => fetchApi<TeamManagerDashboard>('/api/dashboards/team-manager'),
+};
+
+export const memberDashboardApi = {
+    get: () => fetchApi<MemberDashboard>('/api/dashboards/member'),
 };
 
 // ============================================================================

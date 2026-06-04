@@ -1,20 +1,60 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth, requireRole } = require('../middleware/authMiddleware');
-const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
-const { PERMISSIONS, ALL_PERMISSION_VALUES } = require('../../../shared/rbac/catalog.ts');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const {
+    ALL_PERMISSION_VALUES,
+    BUILT_IN_ROLE_PERMISSION_DEFAULTS,
+    ROLES,
+    collectRolePermissions,
+} = require('../../../shared/rbac/catalog.ts');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 
 // Protected built-in roles that cannot be deleted
-const BUILT_IN_ROLES = ['admin', 'manager', 'user', 'viewer', 'contributor'];
+const BUILT_IN_ROLES = Object.freeze(Object.keys(ROLES));
+const PROTECTED_BUILT_IN_ROLES = Object.freeze(new Set(BUILT_IN_ROLES));
+
+function catalogPermissionsFor(roleName) {
+    return BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleName]
+        || collectRolePermissions(roleName, new Set())
+        || [];
+}
+
+async function loadRolePermissionMap() {
+    const result = await db.query(`
+        SELECT role_identifier, permission_key
+        FROM role_permissions
+        ORDER BY role_identifier, permission_key
+    `);
+    const map = new Map();
+    for (const row of result.rows) {
+        if (!map.has(row.role_identifier)) map.set(row.role_identifier, []);
+        map.get(row.role_identifier).push(row.permission_key);
+    }
+    return map;
+}
+
+async function replaceRolePermissions(roleName, permissions, grantedBy) {
+    await db.query('DELETE FROM role_permissions WHERE role_identifier = $1', [roleName]);
+    for (const permission of permissions) {
+        await db.query(
+            `INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (role_identifier, permission_key)
+             DO UPDATE SET granted_by = EXCLUDED.granted_by`,
+            [roleName, permission, grantedBy]
+        );
+    }
+}
 
 // GET all roles with their permissions
-router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res, next) => {
     try {
-        // Get all roles from custom_roles table (includes both custom roles AND built-in overrides)
-        const customResult = await db.query('SELECT * FROM custom_roles ORDER BY created_at ASC');
+        const [customResult, rolePermissionMap] = await Promise.all([
+            db.query('SELECT name, created_at, created_by FROM custom_roles ORDER BY created_at ASC'),
+            loadRolePermissionMap(),
+        ]);
         const customRolesMap = new Map();
         for (const cr of customResult.rows) {
             customRolesMap.set(cr.name, cr);
@@ -23,14 +63,13 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
         // Merge built-in and custom roles
         const roles = [];
 
-        // Built-in roles — use DB override if admin has customized, otherwise hardcoded defaults
-        for (const [roleName, defaultPerms] of Object.entries(DEFAULT_PERMISSIONS)) {
+        // Built-in roles use role_permissions when present, otherwise catalog defaults.
+        for (const roleName of BUILT_IN_ROLES) {
             const dbOverride = customRolesMap.get(roleName);
+            const dbPermissions = rolePermissionMap.get(roleName) || [];
             roles.push({
                 name: roleName,
-                permissions: dbOverride && Array.isArray(dbOverride.permissions) && dbOverride.permissions.length > 0
-                    ? dbOverride.permissions
-                    : defaultPerms,
+                permissions: dbPermissions.length > 0 ? dbPermissions : catalogPermissionsFor(roleName),
                 is_builtin: true,
                 is_protected: roleName === 'admin',
                 is_customized: !!dbOverride,
@@ -43,7 +82,7 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
         for (const [, cr] of customRolesMap) {
             roles.push({
                 name: cr.name,
-                permissions: cr.permissions || [],
+                permissions: rolePermissionMap.get(cr.name) || [],
                 is_builtin: false,
                 is_protected: false,
                 created_at: cr.created_at,
@@ -58,12 +97,12 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res, next) => {
 });
 
 // GET all available permission keys
-router.get('/permissions', requireAuth, requireRole('admin'), async (req, res) => {
+router.get('/permissions', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res) => {
     res.json(ALL_PERMISSIONS);
 });
 
 // POST create a custom role
-router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const { name, permissions = [] } = req.body;
 
@@ -91,10 +130,12 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
         // Validate permission keys
         const validPerms = permissions.filter(p => ALL_PERMISSIONS.includes(p));
 
+        const grantedBy = req.user?.email || 'system';
         await db.query(
-            'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
-            [normalizedName, validPerms, req.user?.email || 'system']
+            'INSERT INTO custom_roles (name, created_by) VALUES ($1, $2)',
+            [normalizedName, grantedBy]
         );
+        await replaceRolePermissions(normalizedName, validPerms, grantedBy);
 
         res.status(201).json({
             name: normalizedName,
@@ -108,7 +149,7 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res, next) => {
 });
 
 // PATCH update permissions for a role (applies immediately to all users with that role)
-router.patch('/:roleName', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.patch('/:roleName', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const { roleName } = req.params;
         const { permissions } = req.body;
@@ -125,35 +166,17 @@ router.patch('/:roleName', requireAuth, requireRole('admin'), async (req, res, n
         // Validate permission keys
         const validPerms = permissions.filter(p => ALL_PERMISSIONS.includes(p));
 
-        // Check if it's a built-in role or custom role
+        const grantedBy = req.user?.email || 'system';
         const isBuiltIn = BUILT_IN_ROLES.includes(roleName);
 
-        if (isBuiltIn) {
-            // For built-in roles, persist the override in custom_roles table
-            // so setDefaultPermissions() can pick it up for new users
-            const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
-            if (existing.rows.length > 0) {
-                await db.query(
-                    'UPDATE custom_roles SET permissions = $1 WHERE name = $2',
-                    [validPerms, roleName]
-                );
-            } else {
-                await db.query(
-                    'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
-                    [roleName, validPerms, req.user?.email || 'system']
-                );
-            }
-        } else {
-            // For custom roles, update the custom_roles table
+        if (!isBuiltIn) {
             const existing = await db.query('SELECT name FROM custom_roles WHERE name = $1', [roleName]);
             if (existing.rows.length === 0) {
                 return res.status(404).json({ error: `Role '${roleName}' not found` });
             }
-            await db.query(
-                'UPDATE custom_roles SET permissions = $1 WHERE name = $2',
-                [validPerms, roleName]
-            );
         }
+
+        await replaceRolePermissions(roleName, validPerms, grantedBy);
 
         // Apply changes immediately to all users with this role
         const usersResult = await db.query('SELECT id FROM app_user WHERE role = $1', [roleName]);
@@ -183,12 +206,12 @@ router.patch('/:roleName', requireAuth, requireRole('admin'), async (req, res, n
 });
 
 // DELETE a custom role
-router.delete('/:roleName', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/:roleName', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const { roleName } = req.params;
 
         // Prevent deletion of built-in roles
-        if (BUILT_IN_ROLES.includes(roleName)) {
+        if (PROTECTED_BUILT_IN_ROLES.has(roleName)) {
             return res.status(403).json({ error: `Built-in role '${roleName}' cannot be deleted` });
         }
 
@@ -200,6 +223,7 @@ router.delete('/:roleName', requireAuth, requireRole('admin'), async (req, res, 
             });
         }
 
+        await db.query('DELETE FROM role_permissions WHERE role_identifier = $1', [roleName]);
         const result = await db.query('DELETE FROM custom_roles WHERE name = $1 RETURNING *', [roleName]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: `Role '${roleName}' not found` });

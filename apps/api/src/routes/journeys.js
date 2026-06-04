@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+const { requireAuth, requireRole, requirePermission } = require('../middleware/authMiddleware');
 const {
     createJourneySchema, updateJourneySchema,
     createChapterSchema, updateChapterSchema,
@@ -113,7 +113,7 @@ router.patch('/:id', requireAuth, requireRole('admin', 'manager'), async (req, r
 });
 
 // DELETE /journeys/:id — Soft delete
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.admin.manage_settings'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(
@@ -161,7 +161,7 @@ router.patch('/chapters/:id', requireAuth, requireRole('admin', 'manager'), asyn
     } catch (err) { next(err); }
 });
 
-router.delete('/chapters/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/chapters/:id', requireAuth, requirePermission('qc.admin.manage_settings'), async (req, res, next) => {
     try {
         const result = await db.query(`DELETE FROM journey_chapters WHERE id = $1 RETURNING *`, [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Chapter not found' });
@@ -205,7 +205,7 @@ router.patch('/quests/:id', requireAuth, requireRole('admin', 'manager'), async 
     } catch (err) { next(err); }
 });
 
-router.delete('/quests/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/quests/:id', requireAuth, requirePermission('qc.admin.manage_settings'), async (req, res, next) => {
     try {
         const result = await db.query(`DELETE FROM journey_quests WHERE id = $1 RETURNING *`, [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Quest not found' });
@@ -257,7 +257,7 @@ router.patch('/tasks/:id', requireAuth, requireRole('admin', 'manager'), async (
     } catch (err) { next(err); }
 });
 
-router.delete('/tasks/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/tasks/:id', requireAuth, requirePermission('qc.admin.manage_settings'), async (req, res, next) => {
     try {
         const result = await db.query(`DELETE FROM journey_tasks WHERE id = $1 RETURNING *`, [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found' });

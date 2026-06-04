@@ -15,7 +15,7 @@ interface User {
     display_name?: string | null;
     email: string;
     phone?: string;
-    role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
+    role: 'admin' | 'manager' | 'team_manager' | 'pm' | 'member' | 'user' | 'viewer' | 'tester' | 'contributor';
     status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     team_membership_active: boolean;
     onboarding_completed?: boolean;
@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, permissions]);
 
     const isAdmin = user?.role === 'admin';
-    const isManager = user?.role === 'manager';
+    const isManager = user?.role === 'manager' || user?.role === 'team_manager';
     const userStatus = user?.status ?? null;
 
     return (

@@ -6,6 +6,7 @@ const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const access = require('../access/AccessEngine');
 const svc = require('../services/dashboards/pmDashboard');
+const teamMemberDashboards = require('../services/dashboards/teamMemberDashboards');
 
 // Column overrides per artifact type — passed to buildListFilter so we never
 // reference a column that doesn't exist on a given table.
@@ -108,6 +109,35 @@ router.get(
             }
 
             res.json({ projects: out });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+router.get(
+    '/team-manager',
+    requireAuth,
+    requirePermission('qc.dashboards.team_manager.view'),
+    async (req, res, next) => {
+        try {
+            res.json(await teamMemberDashboards.getTeamDashboard(db, req.user, req));
+        } catch (err) {
+            if (err.status) {
+                return res.status(err.status).json({ error: err.message });
+            }
+            next(err);
+        }
+    }
+);
+
+router.get(
+    '/member',
+    requireAuth,
+    requirePermission('qc.dashboards.member.view'),
+    async (req, res, next) => {
+        try {
+            res.json(await teamMemberDashboards.getMemberDashboard(db, req.user, req));
         } catch (err) {
             next(err);
         }
