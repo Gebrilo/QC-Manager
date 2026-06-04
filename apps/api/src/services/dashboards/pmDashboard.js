@@ -1,8 +1,7 @@
 'use strict';
 
 // Helper: append an access-engine clause to a WHERE.
-// projectIdx must be the 1-based position of project_id in the params array.
-function withAccess(baseSql, access, projectIdx) {
+function withAccess(baseSql, access) {
     if (!access || access.clause === 'TRUE') return baseSql;
     if (access.clause === 'FALSE') return `${baseSql} AND FALSE`;
     return `${baseSql} AND ${access.clause}`;
@@ -17,7 +16,7 @@ async function getWorkloadCounts(db, projectId, access) {
 
     let total = 0;
     for (const q of queries) {
-        const sql = withAccess(q.sql, q.access, 1);
+        const sql = withAccess(q.sql, q.access);
         const params = [projectId, ...(q.access ? q.access.params : [])];
         const r = await db.query(sql, params);
         total += Number(r.rows[0]?.c || 0);
@@ -27,7 +26,7 @@ async function getWorkloadCounts(db, projectId, access) {
 
 async function getTasksByStatus(db, projectId, access) {
     const base = 'SELECT status, COUNT(*)::int AS c FROM tasks WHERE project_id = $1';
-    const sql = `${withAccess(base, access, 1)} GROUP BY status`;
+    const sql = `${withAccess(base, access)} GROUP BY status`;
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     const out = {};
@@ -37,7 +36,7 @@ async function getTasksByStatus(db, projectId, access) {
 
 async function getTasksByTeam(db, projectId, access) {
     const base = 'SELECT owner_team_id, COUNT(*)::int AS c FROM tasks WHERE project_id = $1';
-    const sql = `${withAccess(base, access, 1)} GROUP BY owner_team_id`;
+    const sql = `${withAccess(base, access)} GROUP BY owner_team_id`;
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     const out = {};
@@ -50,7 +49,7 @@ async function getTasksByTeam(db, projectId, access) {
 
 async function getBugsByStatus(db, projectId, access) {
     const base = 'SELECT status, COUNT(*)::int AS c FROM bugs WHERE project_id = $1';
-    const sql = `${withAccess(base, access, 1)} GROUP BY status`;
+    const sql = `${withAccess(base, access)} GROUP BY status`;
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     const out = {};
@@ -60,7 +59,7 @@ async function getBugsByStatus(db, projectId, access) {
 
 async function getBugsBySeverity(db, projectId, access) {
     const base = 'SELECT severity, COUNT(*)::int AS c FROM bugs WHERE project_id = $1';
-    const sql = `${withAccess(base, access, 1)} GROUP BY severity`;
+    const sql = `${withAccess(base, access)} GROUP BY severity`;
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     const out = {};
@@ -76,7 +75,7 @@ async function getUserStoryProgress(db, projectId, access) {
             SUM(CASE WHEN status IN ('Done','Closed','Released') THEN 1 ELSE 0 END)::int AS done
         FROM user_stories
         WHERE project_id = $1`;
-    const sql = withAccess(base, access, 1);
+    const sql = withAccess(base, access);
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     const row = r.rows[0] || { total: 0, in_progress: 0, done: 0 };
@@ -106,7 +105,7 @@ async function getOverdueCount(db, projectId, access) {
           AND deadline IS NOT NULL
           AND deadline < CURRENT_DATE
           AND status NOT IN ('Done','Cancelled')`;
-    const sql = withAccess(base, access, 1);
+    const sql = withAccess(base, access);
     const params = [projectId, ...(access ? access.params : [])];
     const r = await db.query(sql, params);
     return Number(r.rows[0]?.c || 0);
@@ -130,7 +129,7 @@ async function getResourceUtilization(db, projectId, access) {
              WHERE t.project_id = $1
                AND t.status NOT IN ('Done','Cancelled')
                AND r.deleted_at IS NULL`;
-    const sql = `${withAccess(base, access, 1)}
+    const sql = `${withAccess(base, access)}
             GROUP BY r.id, r.resource_name, r.weekly_capacity_hrs
         )
         SELECT * FROM resource_load
@@ -176,6 +175,8 @@ async function getTestExecutionSummary(db, projectId) {
     // PRD A8/A26: PM lacks qc.testcases.view_steps — only counts, never
     // any test case body fields are exposed.
     // Status enum values from migration 001: 'pass', 'fail', 'blocked'.
+    // Returns only passed/failed/blocked/total per the dashboard API contract;
+    // not_run and skipped executions count toward `total` but have no named bucket.
     const sql = `
         SELECT
             SUM(CASE WHEN te.status = 'pass'    THEN 1 ELSE 0 END)::int AS passed,
