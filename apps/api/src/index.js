@@ -38,6 +38,7 @@ apiRouter.use('/test-cases', require('./routes/testCases'));
 apiRouter.use('/test-suites', require('./routes/testSuites'));
 apiRouter.use('/test-executions', require('./routes/testExecutions'));
 apiRouter.use('/dashboard', require('./routes/dashboard'));
+apiRouter.use('/dashboards', require('./routes/dashboards'));
 apiRouter.use('/reports', require('./routes/reports'));
 apiRouter.use('/', require('./routes/testResults'));
 apiRouter.use('/testsprite', require('./routes/testspriteWebhook'));
