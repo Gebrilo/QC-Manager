@@ -166,6 +166,9 @@ const PERMISSIONS = Object.freeze({
     ADMIN_MANAGE_INTEGRATIONS: 'qc.admin.manage_integrations',
     ADMIN_MANAGE_SETTINGS: 'qc.admin.manage_settings',
     ADMIN_VIEW_AUDIT_LOG: 'qc.admin.view_audit_log',
+
+    // --- Dashboards ---
+    DASHBOARDS_PM_VIEW: 'qc.dashboards.pm.view',
 });
 
 const SCOPES = Object.freeze({
@@ -262,6 +265,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TESTEXECUTIONS_VIEW_ANY,
             PERMISSIONS.GOVERNANCE_VIEW,
             PERMISSIONS.QUALITY_TRACEABILITY_VIEW,
+            PERMISSIONS.DASHBOARDS_PM_VIEW,
             PERMISSIONS.TEAM_VIEW,
         ]),
         scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
