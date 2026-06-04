@@ -13,6 +13,7 @@ import {
     createColumnHelper,
     SortingState,
 } from '@tanstack/react-table';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 // ── Pill colour maps ────────────────────────────────────────────────────────
 const STATUS_PILL: Record<string, string> = {
@@ -49,6 +50,7 @@ function GlassSelect({ value, onChange, children }: { value: string; onChange: (
 const columnHelper = createColumnHelper<TestSuite>();
 
 export default function TestSuitesPage() {
+    const { hasPermission } = useAuth();
     const [suites, setSuites] = useState<TestSuite[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -103,6 +105,19 @@ export default function TestSuitesPage() {
     }), [pagination.total, listStats]);
 
     const hasAnyFilter = !!(search || projectFilter || status);
+    const canCreateSuite = hasPermission('qc.testsuites.create') || hasPermission('qc.testsuites.view');
+
+    const handleDeleteSuite = useCallback(async (suite: TestSuite) => {
+        if (suite._can?.delete === false) return;
+        if (!window.confirm(`Delete test suite "${suite.name}"?`)) return;
+        try {
+            await testSuitesApi.delete(suite.id);
+            setSuites(prev => prev.filter(item => item.id !== suite.id));
+            setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+        } catch (error) {
+            console.error('Failed to delete test suite:', error);
+        }
+    }, []);
 
     const columns = useMemo(() => [
         columnHelper.accessor('suite_id', {
@@ -182,14 +197,32 @@ export default function TestSuitesPage() {
             id: 'actions',
             header: '',
             enableHiding: false,
-            cell: (info) => (
+            cell: (info) => {
+                const suite = info.row.original;
+                const canEdit = suite._can?.edit !== false;
+                const canDelete = suite._can?.delete !== false;
+                return (
                 <div className="flex justify-end gap-3 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Link href={`/test/suites/${info.row.original.id}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
-                    <Link href={`/test/suites/${info.row.original.id}`} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
+                    {canEdit ? (
+                        <Link href={`/test/suites/${suite.id}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
+                    ) : (
+                        <span className="text-slate-300 dark:text-slate-600 font-medium cursor-not-allowed" title="You do not have permission to edit this suite">Edit</span>
+                    )}
+                    <Link href={`/test/suites/${suite.id}`} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
+                    <button
+                        type="button"
+                        onClick={() => handleDeleteSuite(suite)}
+                        disabled={!canDelete}
+                        className="text-rose-500 hover:text-rose-700 disabled:text-slate-300 disabled:cursor-not-allowed"
+                        title={canDelete ? 'Delete suite' : 'You do not have permission to delete this suite'}
+                    >
+                        Delete
+                    </button>
                 </div>
-            ),
+                );
+            },
         }),
-    ], []);
+    ], [handleDeleteSuite]);
 
     const table = useReactTable({
         data: suites,
@@ -212,15 +245,17 @@ export default function TestSuitesPage() {
                         <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span>
                     </p>
                 </div>
-                <Link
-                    href="/test/suites/create"
-                    className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
-                >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    New Suite
-                </Link>
+                {canCreateSuite && (
+                    <Link
+                        href="/test/suites/create"
+                        className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                    >
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        New Suite
+                    </Link>
+                )}
             </div>
 
             {/* ── Stat strip ─────────────────────────────────────────── */}

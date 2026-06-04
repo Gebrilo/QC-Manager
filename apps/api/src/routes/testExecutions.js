@@ -5,6 +5,12 @@ const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const {
+  appendListFilter,
+  decorateRows,
+  enforceArtifact,
+  shadowList,
+} = require('../services/access/enforcement');
 
 // Configure multer for file upload (memory storage)
 const upload = multer({
@@ -189,6 +195,19 @@ router.get('/test-runs', requireAuth, requirePermission('qc.testexecutions.view'
       paramCount++;
     }
 
+    const whereClauses = [];
+    const access = await appendListFilter(req, 'test_execution', whereClauses, params, {
+      startIdx: paramCount,
+      tableAlias: 'tr',
+      projectExpr: 'tr.project_id',
+      ownerTeamExpr: null,
+      visibilityExpr: null,
+      assigneeResourceExprs: [],
+      userExprs: ['tr.created_by'],
+    });
+    paramCount = access.nextIdx;
+    if (whereClauses.length > 0) query += ` AND ${whereClauses.join(' AND ')}`;
+
     query += `
       GROUP BY tr.id, p.project_name, u.name
       ORDER BY tr.started_at DESC
@@ -198,9 +217,11 @@ router.get('/test-runs', requireAuth, requirePermission('qc.testexecutions.view'
     params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
+    await shadowList(req, 'test_execution', result.rows, { route: 'GET /test-executions/test-runs' });
+    const data = await decorateRows(req, 'test_execution', result.rows);
 
     res.json({
-      data: result.rows,
+      data,
       pagination: {
         limit: parseInt(limit),
         offset: parseInt(offset)
@@ -232,6 +253,8 @@ router.get('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.v
     if (runResult.rows.length === 0) {
       return res.status(404).json({ error: 'Test run not found' });
     }
+    const access = await enforceArtifact(req, res, 'test_execution', runResult.rows[0], 'view', { route: 'GET /test-executions/test-runs/:id' });
+    if (!access.allowed) return;
 
     // Get executions
     const executionsResult = await pool.query(
@@ -267,8 +290,9 @@ router.get('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.v
     const blocked = executions.filter(e => e.status === 'blocked').length;
     const skipped = executions.filter(e => e.status === 'skipped').length;
 
+    const [run] = await decorateRows(req, 'test_execution', runResult.rows);
     res.json({
-      ...runResult.rows[0],
+      ...run,
       metrics: {
         total_executions: total,
         pass_count: pass,
@@ -368,6 +392,8 @@ router.patch('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Test run not found' });
     }
+    const access = await enforceArtifact(req, res, 'test_execution', existingResult.rows[0], 'edit', { route: 'PATCH /test-executions/test-runs/:id' });
+    if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
     // Build update query
     const updates = [];
@@ -461,6 +487,8 @@ router.delete('/test-runs/:id', requireAuth, requirePermission('qc.testexecution
     }
 
     const run = existingResult.rows[0];
+    const access = await enforceArtifact(req, res, 'test_execution', run, 'delete', { route: 'DELETE /test-executions/test-runs/:id' });
+    if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
     // Soft delete
     await client.query(
@@ -552,6 +580,19 @@ router.get('/executions', requireAuth, requirePermission('qc.testexecutions.view
       paramCount++;
     }
 
+    const accessWhere = [];
+    const access = await appendListFilter(req, 'test_execution', accessWhere, params, {
+      startIdx: paramCount,
+      tableAlias: 'te',
+      projectExpr: 'tr.project_id',
+      ownerTeamExpr: null,
+      visibilityExpr: null,
+      assigneeResourceExprs: [],
+      userExprs: ['te.assigned_to', 'te.executed_by', 'tr.created_by'],
+    });
+    paramCount = access.nextIdx;
+    if (accessWhere.length > 0) query += ` AND ${accessWhere.join(' AND ')}`;
+
     query += ` ORDER BY
       CASE WHEN COALESCE(te.sort_order, 0) > 0 THEN 0 ELSE 1 END,
       te.sort_order ASC,
@@ -560,9 +601,11 @@ router.get('/executions', requireAuth, requirePermission('qc.testexecutions.view
     params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
+    await shadowList(req, 'test_execution', result.rows, { route: 'GET /test-executions/executions' });
+    const data = await decorateRows(req, 'test_execution', result.rows);
 
     res.json({
-      data: result.rows,
+      data,
       pagination: {
         limit: parseInt(limit),
         offset: parseInt(offset)
@@ -659,7 +702,10 @@ router.patch('/executions/:id', requireAuth, requirePermission('qc.testexecution
 
     // Check if exists
     const existingResult = await client.query(
-      'SELECT * FROM test_execution WHERE id = $1',
+      `SELECT te.*, tr.project_id, tr.created_by
+       FROM test_execution te
+       LEFT JOIN test_run tr ON te.test_run_id = tr.id
+       WHERE te.id = $1`,
       [id]
     );
 
@@ -674,6 +720,8 @@ router.patch('/executions/:id', requireAuth, requirePermission('qc.testexecution
     let paramCount = 1;
 
     const existing = existingResult.rows[0];
+    const access = await enforceArtifact(req, res, 'test_execution', existing, 'edit', { route: 'PATCH /test-executions/executions/:id' });
+    if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
     if (validatedData.status !== undefined) {
       updates.push(`status = $${paramCount}`);
@@ -1091,6 +1139,19 @@ router.post('/upload-excel', requireAuth, requirePermission('qc.testexecutions.c
 // GET /recent-uploads - Get recent test run uploads
 router.get('/recent-uploads', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
+    const whereClauses = ['tr.deleted_at IS NULL'];
+    const params = [];
+    let pn = 1;
+    const access = await appendListFilter(req, 'test_execution', whereClauses, params, {
+      startIdx: pn,
+      tableAlias: 'tr',
+      projectExpr: 'tr.project_id',
+      ownerTeamExpr: null,
+      visibilityExpr: null,
+      assigneeResourceExprs: [],
+      userExprs: ['tr.created_by'],
+    });
+    pn = access.nextIdx;
     const result = await pool.query(`
       SELECT 
         tr.id,
@@ -1115,13 +1176,15 @@ router.get('/recent-uploads', requireAuth, requirePermission('qc.testexecutions.
       FROM test_run tr
       LEFT JOIN projects p ON tr.project_id = p.id
       LEFT JOIN test_execution te ON tr.id = te.test_run_id
-      WHERE tr.deleted_at IS NULL
+      WHERE ${whereClauses.join(' AND ')}
       GROUP BY tr.id, tr.run_id, tr.name, tr.description, tr.status, tr.started_at, p.project_name, p.id
       ORDER BY tr.started_at DESC
       LIMIT 20
-    `);
+    `, params);
 
-    res.json(result.rows);
+    await shadowList(req, 'test_execution', result.rows, { route: 'GET /test-executions/recent-uploads' });
+    const data = await decorateRows(req, 'test_execution', result.rows);
+    res.json(data);
   } catch (error) {
     next(error);
   }
