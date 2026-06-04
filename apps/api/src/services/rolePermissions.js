@@ -80,13 +80,11 @@ async function getRolePermissionSet(client, roleName) {
         return new Set(defaultsForRole(roleName));
     }
 
-    const legacyResult = await client.query('SELECT permissions FROM custom_roles WHERE name = $1', [roleName]);
-    const legacy = legacyResult.rows[0]?.permissions;
-    return new Set(validatePermissionList(Array.isArray(legacy) ? legacy : []));
+    return new Set();
 }
 
 async function listRoles(client) {
-    const customResult = await client.query('SELECT name, permissions, created_at, created_by FROM custom_roles ORDER BY created_at ASC');
+    const customResult = await client.query('SELECT name, created_at, created_by FROM custom_roles ORDER BY created_at ASC');
     const customRoles = new Map(customResult.rows.map(row => [row.name, row]));
     const roles = [];
 
@@ -139,10 +137,10 @@ async function syncRolePermissions(client, roleName, permissions, actorEmail = '
 
     for (const storageName of storageNames) {
         await client.query(
-            `INSERT INTO custom_roles (name, permissions, created_by)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (name) DO UPDATE SET permissions = EXCLUDED.permissions`,
-            [storageName, normalizedPermissions, actorEmail]
+            `INSERT INTO custom_roles (name, created_by)
+             VALUES ($1, $2)
+             ON CONFLICT (name) DO NOTHING`,
+            [storageName, actorEmail]
         );
     }
 

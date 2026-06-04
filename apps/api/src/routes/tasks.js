@@ -10,6 +10,8 @@ const { emitToTuleap: emitTask } = require('../services/emitters/task');
 const { adoptStagedAttachments } = require('./artifactAttachments');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+const { resolve: resolveRole } = require('../access/RoleResolver');
+const { canEditTask, canTakeOverTask } = require('../services/dashboards/teamMemberDashboards');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 
 /**
@@ -68,6 +70,20 @@ async function tryEmitAndWriteback(task, config, mode) {
         ]
     );
     return updateRes.rows[0];
+}
+
+async function ensureResourceInTeam(resourceId, teamId, label) {
+    if (!resourceId || !teamId) return null;
+    const result = await db.query(
+        `SELECT r.id
+           FROM resources r
+           JOIN app_user u ON r.user_id = u.id
+          WHERE r.id = $1
+            AND u.team_id = $2
+            AND r.deleted_at IS NULL`,
+        [resourceId, teamId]
+    );
+    return result.rows.length === 0 ? `${label} does not belong to your team` : null;
 }
 
 // Status transition validation
@@ -379,6 +395,35 @@ router.patch('/:id', requireAuth, requirePermission('qc.tasks.edit'), async (req
         const originalRes = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
         if (originalRes.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
         const original = originalRes.rows[0];
+
+        const assignmentChanged =
+            (Object.prototype.hasOwnProperty.call(data, 'resource1_uuid') && data.resource1_uuid !== original.resource1_id)
+            || (Object.prototype.hasOwnProperty.call(data, 'resource2_uuid') && data.resource2_uuid !== original.resource2_id);
+
+        if (assignmentChanged) {
+            const resolved = await resolveRole(req.user, req);
+            if (!canTakeOverTask(resolved, original)) {
+                return res.status(403).json({ error: 'You do not have permission to take over this task' });
+            }
+            if (!resolved.effectivePermissions.has('*')) {
+                const resourceErrors = [
+                    Object.prototype.hasOwnProperty.call(data, 'resource1_uuid')
+                        ? await ensureResourceInTeam(data.resource1_uuid, resolved.scope.team_id, 'Resource 1')
+                        : null,
+                    Object.prototype.hasOwnProperty.call(data, 'resource2_uuid')
+                        ? await ensureResourceInTeam(data.resource2_uuid, resolved.scope.team_id, 'Resource 2')
+                        : null,
+                ].filter(Boolean);
+                if (resourceErrors.length > 0) {
+                    return res.status(403).json({ error: resourceErrors[0] });
+                }
+            }
+        } else {
+            const canEdit = await canEditTask(req.user, original, req);
+            if (!canEdit) {
+                return res.status(403).json({ error: 'You do not have permission to edit this task' });
+            }
+        }
 
         // Enforce team scope for managers
         if (req.user.role === 'manager') {

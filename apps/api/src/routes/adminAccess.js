@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const {
     ALL_PERMISSIONS,
     getRolePermissionSet,
@@ -57,7 +57,7 @@ function permissionsForArtifact(artifactType) {
         }));
 }
 
-router.get('/matrix', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.get('/matrix', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res, next) => {
     try {
         const artifactType = req.query.artifact_type || 'task';
         const permissions = permissionsForArtifact(artifactType);
@@ -90,7 +90,7 @@ router.get('/matrix', requireAuth, requireRole('admin'), async (req, res, next) 
     }
 });
 
-router.patch('/matrix', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.patch('/matrix', requireAuth, requirePermission('qc.admin.manage_permissions'), async (req, res, next) => {
     try {
         const roleName = normalizeRoleName(req.body.role_identifier);
         const permissionKey = req.body.permission_key;
@@ -140,7 +140,7 @@ router.patch('/matrix', requireAuth, requireRole('admin'), async (req, res, next
     }
 });
 
-router.get('/roles', requireAuth, requireRole('admin'), async (_req, res, next) => {
+router.get('/roles', requireAuth, requirePermission('qc.admin.roles.view'), async (_req, res, next) => {
     try {
         res.json(await listRoles(db));
     } catch (err) {
@@ -148,7 +148,7 @@ router.get('/roles', requireAuth, requireRole('admin'), async (_req, res, next) 
     }
 });
 
-router.post('/roles', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/roles', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const validation = validateRoleName(req.body.name);
         if (!validation.ok) return res.status(400).json({ error: validation.error });
@@ -162,8 +162,8 @@ router.post('/roles', requireAuth, requireRole('admin'), async (req, res, next) 
         }
 
         await db.query(
-            'INSERT INTO custom_roles (name, permissions, created_by) VALUES ($1, $2, $3)',
-            [roleName, [], req.user?.email || 'system']
+            'INSERT INTO custom_roles (name, created_by) VALUES ($1, $2)',
+            [roleName, req.user?.email || 'system']
         );
 
         res.status(201).json({
@@ -178,7 +178,7 @@ router.post('/roles', requireAuth, requireRole('admin'), async (req, res, next) 
     }
 });
 
-router.patch('/roles/:name', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.patch('/roles/:name', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const oldName = normalizeRoleName(req.params.name);
         const validation = validateRoleName(req.body.name);
@@ -218,7 +218,7 @@ router.patch('/roles/:name', requireAuth, requireRole('admin'), async (req, res,
     }
 });
 
-router.delete('/roles/:name', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.delete('/roles/:name', requireAuth, requirePermission('qc.admin.manage_roles'), async (req, res, next) => {
     try {
         const roleName = normalizeRoleName(req.params.name);
         if (isBuiltInRole(roleName)) {
@@ -236,7 +236,7 @@ router.delete('/roles/:name', requireAuth, requireRole('admin'), async (req, res
             });
         }
 
-        const beforeState = (await db.query('SELECT name, permissions FROM custom_roles WHERE name = $1', [roleName])).rows[0] || { name: roleName };
+        const beforeState = (await db.query('SELECT name, created_at, created_by FROM custom_roles WHERE name = $1', [roleName])).rows[0] || { name: roleName };
         await db.query('DELETE FROM role_permissions WHERE role_identifier = $1', [roleName]);
         await db.query('DELETE FROM custom_roles WHERE name = $1', [roleName]);
         await db.query(

@@ -35,7 +35,7 @@ describe('RoleResolver.resolve', () => {
         expect(out.scope.team_type).toBe('qc');
     });
 
-    test('role_permissions table overrides catalog defaults when populated', async () => {
+    test('role_permissions table is canonical when populated', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([{ permission_key: 'qc.bugs.triage' }]))
             .mockResolvedValueOnce(rows([]))

@@ -18,17 +18,17 @@ async function loadRolePermissions(roleIdentifier) {
         'SELECT permission_key FROM role_permissions WHERE role_identifier = $1',
         [roleIdentifier]
     );
+
     if (result.rows.length > 0) {
         return new Set(result.rows.map(r => r.permission_key));
     }
-    // Fallback: role_permissions table empty for this role. Use the canonical
-    // catalog defaults if available (admin/pm/team_manager/member/viewer/tester),
-    // otherwise resolve via collectRolePermissions so any role defined in the
-    // catalog (e.g. legacy `contributor`) still gets its permissions.
-    if (BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]) {
-        return new Set(BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]);
-    }
-    return new Set(collectRolePermissions(roleIdentifier, new Set()));
+
+    // Bootstrap fallback: role_permissions table empty for this role. Use the
+    // canonical catalog defaults if available, otherwise resolve via
+    // collectRolePermissions so catalog-defined roles still get permissions.
+    const catalogPermissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]
+        || collectRolePermissions(roleIdentifier, new Set());
+    return new Set(catalogPermissions);
 }
 
 async function loadUserPermissions(userId) {

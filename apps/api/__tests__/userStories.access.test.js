@@ -2,8 +2,8 @@
 
 // Per-route access integration tests for issue #82 (slice 3).
 // Exercises the real AccessEngine + enforcement.js wiring against the
-// userStories router; only the role/permission resolver and feature flag
-// reader are stubbed, plus the underlying pg pool.
+// userStories router; only the role/permission resolver and underlying pg pool
+// are stubbed.
 
 const queries = [];
 let queryHandler = async () => ({ rows: [] });
@@ -29,17 +29,11 @@ jest.mock('../src/services/tuleapClient', () => ({ defaultClient: {} }));
 jest.mock('../src/services/tuleapFieldRegistry', () => ({ defaultRegistry: {} }));
 jest.mock('../src/services/emitters/user_story', () => ({ emitToTuleap: jest.fn() }));
 
-jest.mock('../src/access/FeatureFlagReader', () => ({
-    isEnabled: jest.fn(),
-    clearCache: jest.fn(),
-}));
-
 jest.mock('../src/access/RoleResolver', () => ({
     resolve: jest.fn(),
     canonicalRole: (role) => (role === 'manager' ? 'team_manager' : role),
 }));
 
-const featureFlag = require('../src/access/FeatureFlagReader');
 const roleResolver = require('../src/access/RoleResolver');
 
 const express = require('express');
@@ -111,14 +105,13 @@ function findDataQuery() {
 beforeEach(() => {
     jest.clearAllMocks();
     queries.length = 0;
-    featureFlag.isEnabled.mockResolvedValue(true);
     queryHandler = async (sql) => {
         if (/SELECT COUNT/i.test(sql)) return { rows: [{ total: '0' }] };
         return { rows: [] };
     };
 });
 
-describe('GET /user-stories — per-role list visibility (flag ON)', () => {
+describe('GET /user-stories — per-role list visibility', () => {
     test('admin: filter clause is TRUE (sees all rows)', async () => {
         setRole('admin');
         const res = await request(makeApp()).get('/user-stories');
@@ -221,10 +214,9 @@ describe('DELETE /user-stories/:id — manipulation guard', () => {
     });
 });
 
-describe('shadow mode (flag OFF) — disagreement logging', () => {
-    test('member viewing a foreign story passes (legacy 200) but logs ACCESS_ENGINE_SHADOW_DISAGREEMENT', async () => {
+describe('GET /user-stories/:id — enforced denial', () => {
+    test('member viewing a foreign story gets 403', async () => {
         setRole('member');
-        featureFlag.isEnabled.mockResolvedValue(false);
         queryHandler = async (sql) => {
             if (/FROM user_stories us\s+LEFT JOIN projects/i.test(sql)) {
                 return { rows: [{
@@ -236,10 +228,7 @@ describe('shadow mode (flag OFF) — disagreement logging', () => {
             return { rows: [] };
         };
         const res = await request(makeApp()).get('/user-stories/story-1');
-        expect(res.status).toBe(200);
-        const disagreementLog = queries.find(q =>
-            /INSERT INTO audit_log/i.test(q.sql) && q.params.includes('shadow_disagreement')
-        );
-        expect(disagreementLog).toBeDefined();
+        expect(res.status).toBe(403);
+        expect(res.body.reason).toBeDefined();
     });
 });

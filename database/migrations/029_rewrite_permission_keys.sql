@@ -1,6 +1,7 @@
 -- Migration 029: Rewrite user_permissions.permission_key from legacy to canonical keys
 -- Maps old keys (page:*, action:*) to namespaced qc.* keys.
--- Also rewrites custom_roles.permissions arrays.
+-- Older databases may still have custom_roles.permissions arrays; API startup
+-- guards that legacy rewrite before migration 039 drops the column.
 
 -- Legacy-to-canonical mapping (each row migrated programmatically):
 -- page:dashboard       -> qc.dashboard.view

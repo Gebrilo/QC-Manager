@@ -119,7 +119,7 @@ CREATE INDEX IF NOT EXISTS idx_artifact_access_artifact ON artifact_access(artif
 CREATE INDEX IF NOT EXISTS idx_artifact_access_subject ON artifact_access(subject_type, subject_id);
 
 -- =====================================================================
--- 7. role_permissions (normalized form of custom_roles.permissions)
+-- 7. role_permissions
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS role_permissions (
     role_identifier VARCHAR(64) NOT NULL,
@@ -251,25 +251,27 @@ CREATE TABLE IF NOT EXISTS feature_flags (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO feature_flags (key, value, description) VALUES
-    ('access_engine.bugs', 'false'::jsonb, 'Enable Access Engine enforcement on bug routes'),
-    ('access_engine.tasks', 'false'::jsonb, 'Enable Access Engine enforcement on task routes'),
-    ('access_engine.test_cases', 'false'::jsonb, 'Enable Access Engine enforcement on test_case routes'),
-    ('access_engine.test_executions', 'false'::jsonb, 'Enable Access Engine enforcement on test_execution routes'),
-    ('access_engine.test_suites', 'false'::jsonb, 'Enable Access Engine enforcement on test_suite routes'),
-    ('access_engine.user_stories', 'false'::jsonb, 'Enable Access Engine enforcement on user_story routes')
-ON CONFLICT (key) DO NOTHING;
-
 -- =====================================================================
 -- 15. role_permissions backfill from custom_roles + catalog defaults
 --     Catalog defaults are loaded by the API bootstrap; here we mirror
---     custom_roles.permissions array into the normalized table.
+--     legacy custom_roles.permissions array into the normalized table when
+--     upgrading an older database.
 -- =====================================================================
-INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
-SELECT cr.name, perm, cr.created_by
-FROM custom_roles cr, UNNEST(cr.permissions) AS perm
-WHERE perm IS NOT NULL
-ON CONFLICT (role_identifier, permission_key) DO NOTHING;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'custom_roles'
+          AND column_name = 'permissions'
+    ) THEN
+        INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+        SELECT cr.name, perm, cr.created_by
+        FROM custom_roles cr, UNNEST(cr.permissions) AS perm
+        WHERE perm IS NOT NULL
+        ON CONFLICT (role_identifier, permission_key) DO NOTHING;
+    END IF;
+END $$;
 
 -- =====================================================================
 -- 16. POST-MIGRATION ASSERTIONS

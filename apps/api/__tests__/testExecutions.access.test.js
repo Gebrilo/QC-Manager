@@ -28,17 +28,11 @@ jest.mock('../src/middleware/authMiddleware', () => ({
     requirePermission: () => (_req, _res, next) => next(),
 }));
 
-jest.mock('../src/access/FeatureFlagReader', () => ({
-    isEnabled: jest.fn(),
-    clearCache: jest.fn(),
-}));
-
 jest.mock('../src/access/RoleResolver', () => ({
     resolve: jest.fn(),
     canonicalRole: (role) => (role === 'manager' ? 'team_manager' : role),
 }));
 
-const featureFlag = require('../src/access/FeatureFlagReader');
 const roleResolver = require('../src/access/RoleResolver');
 
 const express = require('express');
@@ -110,14 +104,13 @@ function findTestRunsDataQuery() {
 beforeEach(() => {
     jest.clearAllMocks();
     queries.length = 0;
-    featureFlag.isEnabled.mockResolvedValue(true);
     queryHandler = async (sql) => {
         if (/SELECT COUNT/i.test(sql)) return { rows: [{ total: '0' }] };
         return { rows: [] };
     };
 });
 
-describe('GET /test-executions/test-runs — per-role list visibility (flag ON)', () => {
+describe('GET /test-executions/test-runs — per-role list visibility', () => {
     test('admin: filter clause is TRUE (sees all runs)', async () => {
         setRole('admin');
         const res = await request(makeApp()).get('/test-executions/test-runs');
@@ -242,10 +235,9 @@ describe('GET /test-executions/recent-uploads — shape and access wiring', () =
     });
 });
 
-describe('shadow mode (flag OFF) — disagreement logging', () => {
-    test('member viewing a foreign test run gets legacy 200 but logs ACCESS_ENGINE_SHADOW_DISAGREEMENT', async () => {
+describe('GET /test-executions/test-runs/:id — enforced denial', () => {
+    test('member viewing a foreign test run gets 403', async () => {
         setRole('member');
-        featureFlag.isEnabled.mockResolvedValue(false);
         queryHandler = async (sql) => {
             if (/FROM test_run tr\s+LEFT JOIN projects/i.test(sql) && /WHERE tr\.id = \$1/i.test(sql)) {
                 return { rows: [{
@@ -256,10 +248,7 @@ describe('shadow mode (flag OFF) — disagreement logging', () => {
             return { rows: [] };
         };
         const res = await request(makeApp()).get('/test-executions/test-runs/run-1');
-        expect(res.status).toBe(200);
-        const disagreementLog = queries.find(q =>
-            /INSERT INTO audit_log/i.test(q.sql) && q.params.includes('shadow_disagreement')
-        );
-        expect(disagreementLog).toBeDefined();
+        expect(res.status).toBe(403);
+        expect(res.body.reason).toBeDefined();
     });
 });

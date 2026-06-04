@@ -912,7 +912,6 @@ const runMigrations = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS custom_roles (
                 name VARCHAR(50) PRIMARY KEY,
-                permissions TEXT[] NOT NULL DEFAULT '{}',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(255)
             )
@@ -2346,7 +2345,7 @@ const runMigrations = async () => {
             )
         `);
 
-        const { ALL_PERMISSION_VALUES } = require('../../../shared/rbac/catalog.ts');
+        const { ALL_PERMISSION_VALUES, BUILT_IN_ROLE_PERMISSION_DEFAULTS } = require('../../../shared/rbac/catalog.ts');
         for (const permKey of ALL_PERMISSION_VALUES) {
             const domain = permKey.split('.').slice(0, -1).join('.');
             await client.query(`
@@ -2411,6 +2410,15 @@ const runMigrations = async () => {
             'action:governance:manage_gates': 'qc.governance.manage_gates',
             'action:governance:approve_release': 'qc.governance.approve_release',
         };
+        const customRolesPermissionsColumn = await client.query(`
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'custom_roles'
+                  AND column_name = 'permissions'
+            ) AS exists
+        `);
+        const hasCustomRolesPermissionsColumn = customRolesPermissionsColumn.rows[0]?.exists === true;
         for (const [legacyKey, canonicalKey] of Object.entries(LEGACY_TO_CANONICAL)) {
             // Delete legacy rows where the canonical key already exists for the same user (avoid duplicate conflict)
             await client.query(`
@@ -2429,11 +2437,13 @@ const runMigrations = async () => {
                 WHERE permission_key = $2
             `, [canonicalKey, legacyKey]);
 
-            await client.query(`
-                UPDATE custom_roles
-                SET permissions = array_replace(permissions, $2, $1)
-                WHERE $2 = ANY(permissions)
-            `, [canonicalKey, legacyKey]);
+            if (hasCustomRolesPermissionsColumn) {
+                await client.query(`
+                    UPDATE custom_roles
+                    SET permissions = array_replace(permissions, $2, $1)
+                    WHERE $2 = ANY(permissions)
+                `, [canonicalKey, legacyKey]);
+            }
         }
 
         // Fix tuleap_sync_config tracker_type constraint to include user_story (underscore form)
@@ -2719,6 +2729,26 @@ const runMigrations = async () => {
             )
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_identifier)`);
+        let rolesWithLegacyCustomPermissions = new Set();
+        if (hasCustomRolesPermissionsColumn) {
+            const customizedRolesResult = await client.query(`
+                SELECT name
+                FROM custom_roles
+                WHERE permissions IS NOT NULL
+                  AND array_length(permissions, 1) > 0
+            `);
+            rolesWithLegacyCustomPermissions = new Set(customizedRolesResult.rows.map(row => row.name));
+        }
+        for (const [roleIdentifier, permissions] of Object.entries(BUILT_IN_ROLE_PERMISSION_DEFAULTS)) {
+            if (rolesWithLegacyCustomPermissions.has(roleIdentifier)) continue;
+            for (const permissionKey of permissions) {
+                await client.query(`
+                    INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                    VALUES ($1, $2, NULL)
+                    ON CONFLICT (role_identifier, permission_key) DO NOTHING
+                `, [roleIdentifier, permissionKey]);
+            }
+        }
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS default_artifact_visibility (
@@ -2818,22 +2848,41 @@ const runMigrations = async () => {
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        await client.query(`
-            INSERT INTO feature_flags (key, value, description) VALUES
-                ('access_engine.bugs', 'false'::jsonb, 'Enable Access Engine enforcement on bug routes'),
-                ('access_engine.tasks', 'false'::jsonb, 'Enable Access Engine enforcement on task routes'),
-                ('access_engine.test_cases', 'false'::jsonb, 'Enable Access Engine enforcement on test_case routes'),
-                ('access_engine.test_executions', 'false'::jsonb, 'Enable Access Engine enforcement on test_execution routes'),
-                ('access_engine.test_suites', 'false'::jsonb, 'Enable Access Engine enforcement on test_suite routes'),
-                ('access_engine.user_stories', 'false'::jsonb, 'Enable Access Engine enforcement on user_story routes')
-            ON CONFLICT (key) DO NOTHING
-        `);
 
+        if (hasCustomRolesPermissionsColumn) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                SELECT cr.name, perm, cr.created_by
+                FROM custom_roles cr, UNNEST(cr.permissions) AS perm
+                WHERE perm IS NOT NULL
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+        }
+
+        // ============================================================
+        // Migration 039: Seed PM dashboard permission
+        // ============================================================
         await client.query(`
             INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
-            SELECT cr.name, perm, cr.created_by
-            FROM custom_roles cr, UNNEST(cr.permissions) AS perm
-            WHERE perm IS NOT NULL
+            VALUES
+                ('pm',    'qc.dashboard.pm.view', NULL),
+                ('admin', 'qc.dashboard.pm.view', NULL)
+            ON CONFLICT (role_identifier, permission_key) DO NOTHING
+        `);
+
+        // ============================================================
+        // Migration 040: Seed team-manager and member dashboard permissions
+        // ============================================================
+        await client.query(`
+            INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+            VALUES
+                ('team_manager', 'qc.dashboards.team_manager.view', NULL),
+                ('team_manager', 'qc.tasks.take_over', NULL),
+                ('manager',      'qc.dashboards.team_manager.view', NULL),
+                ('manager',      'qc.tasks.take_over', NULL),
+                ('member',       'qc.dashboards.member.view', NULL),
+                ('admin',        'qc.dashboards.team_manager.view', NULL),
+                ('admin',        'qc.dashboards.member.view', NULL)
             ON CONFLICT (role_identifier, permission_key) DO NOTHING
         `);
 
@@ -2842,6 +2891,37 @@ const runMigrations = async () => {
             ALTER TABLE app_user ADD CONSTRAINT valid_role
             CHECK (role ~ '^[a-z0-9_]+$')
         `);
+
+        // ============================================================
+        // Migration 041: Access Engine cleanup (issue #91)
+        // ============================================================
+        await client.query(`
+            DELETE FROM feature_flags
+            WHERE key LIKE 'access_engine.%'
+        `);
+        await client.query(`
+            INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+            SELECT 'team_manager', permission_key, granted_by
+            FROM role_permissions
+            WHERE role_identifier = 'manager'
+            ON CONFLICT (role_identifier, permission_key) DO NOTHING
+        `);
+        await client.query(`
+            DELETE FROM role_permissions
+            WHERE role_identifier = 'manager'
+        `);
+        if (hasCustomRolesPermissionsColumn) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                SELECT cr.name, perm, cr.created_by
+                FROM custom_roles cr, UNNEST(cr.permissions) AS perm
+                WHERE perm IS NOT NULL
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                ALTER TABLE custom_roles DROP COLUMN IF EXISTS permissions
+            `);
+        }
 
         console.log('Database migrations completed successfully');
     } catch (err) {

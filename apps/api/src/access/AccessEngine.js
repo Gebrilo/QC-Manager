@@ -16,7 +16,7 @@ const DENIAL_REASONS = Object.freeze({
 const ARTIFACT_TABLE_BY_TYPE = Object.freeze({
     bug: 'bugs',
     task: 'tasks',
-    test_case: 'test_cases',
+    test_case: 'test_case',
     test_execution: 'test_execution',
     test_suite: 'test_suites',
     user_story: 'user_stories',
@@ -29,6 +29,19 @@ const ARTIFACT_PERMISSION_NAMESPACE = Object.freeze({
     test_execution: 'testexecutions',
     test_suite: 'testsuites',
     user_story: 'user_stories',
+});
+
+const SENSITIVE_FIELDS_BY_ARTIFACT = Object.freeze({
+    test_case: Object.freeze([
+        'description',
+        'preconditions',
+        'steps',
+        'test_steps',
+        'expected_result',
+        'expected_results',
+        'actual_result',
+        'note',
+    ]),
 });
 
 function permKey(artifactType, scope, verb) {
@@ -106,7 +119,7 @@ async function canPerform(user, artifact, verb, req) {
 
     // Branch 2: project-scope role (PM of this project)
     if (artifact.project_id && scope.pm_of_projects.includes(artifact.project_id)) {
-        if (effectivePermissions.has(keyAny) || effectivePermissions.has('qc.reports.view_project')) {
+        if (effectivePermissions.has(keyAny) || (verb === 'view' && effectivePermissions.has('qc.reports.view_project'))) {
             return { allowed: true, branch: 'project_scope' };
         }
     }
@@ -273,8 +286,9 @@ function filterFields(resolvedUser, artifactType, row) {
         return row;
     }
     const clone = { ...row };
-    delete clone.steps;
-    delete clone.expected_results;
+    for (const field of SENSITIVE_FIELDS_BY_ARTIFACT.test_case) {
+        delete clone[field];
+    }
     return clone;
 }
 
@@ -285,4 +299,5 @@ module.exports = {
     DENIAL_REASONS,
     ARTIFACT_TABLE_BY_TYPE,
     ARTIFACT_PERMISSION_NAMESPACE,
+    SENSITIVE_FIELDS_BY_ARTIFACT,
 };

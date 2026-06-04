@@ -8,7 +8,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
         req.user = { id: 'admin-1', email: 'admin@example.com', role: 'admin', active: true, status: 'ACTIVE' };
         next();
     },
-    requireRole: () => (_req, _res, next) => next(),
+    requirePermission: () => (_req, _res, next) => next(),
 }));
 
 const express = require('express');

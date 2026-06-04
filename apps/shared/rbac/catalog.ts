@@ -166,6 +166,11 @@ const PERMISSIONS = Object.freeze({
     ADMIN_MANAGE_INTEGRATIONS: 'qc.admin.manage_integrations',
     ADMIN_MANAGE_SETTINGS: 'qc.admin.manage_settings',
     ADMIN_VIEW_AUDIT_LOG: 'qc.admin.view_audit_log',
+
+    // --- Dashboards ---
+    DASHBOARD_PM_VIEW: 'qc.dashboard.pm.view',
+    DASHBOARDS_TEAM_MANAGER_VIEW: 'qc.dashboards.team_manager.view',
+    DASHBOARDS_MEMBER_VIEW: 'qc.dashboards.member.view',
 });
 
 const SCOPES = Object.freeze({
@@ -202,9 +207,11 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TEAM_VIEW,
             PERMISSIONS.GOVERNANCE_VIEW,
             PERMISSIONS.GOVERNANCE_APPROVE_RELEASE,
+            PERMISSIONS.DASHBOARDS_TEAM_MANAGER_VIEW,
             PERMISSIONS.TASKS_VIEW_TEAM,
             PERMISSIONS.TASKS_EDIT_TEAM,
             PERMISSIONS.TASKS_DELETE_TEAM,
+            PERMISSIONS.TASKS_TAKE_OVER,
             PERMISSIONS.TASKS_APPROVE_COMPLETION,
             PERMISSIONS.TASKS_CHANGE_PRIORITY,
             PERMISSIONS.BUGS_VIEW_TEAM,
@@ -231,10 +238,11 @@ const ROLE_DEFINITIONS = Object.freeze({
         ]),
         scopes: Object.freeze([SCOPES.TEAM.key, SCOPES.ACTIVE_ONLY.key]),
     }),
-    // `manager` is a legacy role identifier kept for backwards compatibility with
-    // existing app_user rows. Resolution happens via `inherits: ['team_manager']`;
-    // the `aliasFor` field is informational metadata for the admin UI and tooling
-    // (do NOT remove `inherits` thinking aliasFor is what resolves the role).
+    // `manager` is a legacy role identifier kept for backwards compatibility.
+    // Issue #91 did not remove this alias because non-engine IDP/team/resource
+    // paths still branch on role === 'manager'. Resolution happens via
+    // `inherits: ['team_manager']`; `aliasFor` is informational metadata for
+    // admin UI and tooling.
     manager: Object.freeze({
         inherits: Object.freeze(['team_manager']),
         permissions: Object.freeze([]),
@@ -262,6 +270,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TESTEXECUTIONS_VIEW_ANY,
             PERMISSIONS.GOVERNANCE_VIEW,
             PERMISSIONS.QUALITY_TRACEABILITY_VIEW,
+            PERMISSIONS.DASHBOARD_PM_VIEW,
             PERMISSIONS.TEAM_VIEW,
         ]),
         scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
@@ -289,6 +298,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TESTSUITES_VIEW_TEAM,
             PERMISSIONS.USER_STORIES_VIEW_OWN,
             PERMISSIONS.USER_STORIES_VIEW_TEAM,
+            PERMISSIONS.DASHBOARDS_MEMBER_VIEW,
             PERMISSIONS.REPORTS_VIEW_OWN,
             PERMISSIONS.REPORTS_VIEW_TEAM,
         ]),

@@ -2,8 +2,7 @@
 
 // Per-route access integration tests for issue #82 (slice 3) — test_suites.
 // Exercises the real AccessEngine + enforcement.js wiring against the testSuites
-// router; only the role/permission resolver, feature flag reader, and pg pool
-// are stubbed.
+// router; only the role/permission resolver and pg pool are stubbed.
 
 const queries = [];
 let queryHandler = async () => ({ rows: [] });
@@ -29,17 +28,11 @@ jest.mock('../src/middleware/authMiddleware', () => ({
     requirePermission: () => (_req, _res, next) => next(),
 }));
 
-jest.mock('../src/access/FeatureFlagReader', () => ({
-    isEnabled: jest.fn(),
-    clearCache: jest.fn(),
-}));
-
 jest.mock('../src/access/RoleResolver', () => ({
     resolve: jest.fn(),
     canonicalRole: (role) => (role === 'manager' ? 'team_manager' : role),
 }));
 
-const featureFlag = require('../src/access/FeatureFlagReader');
 const roleResolver = require('../src/access/RoleResolver');
 
 const express = require('express');
@@ -108,7 +101,6 @@ function findDataQuery() {
 beforeEach(() => {
     jest.clearAllMocks();
     queries.length = 0;
-    featureFlag.isEnabled.mockResolvedValue(true);
     queryHandler = async (sql) => {
         if (/SELECT COUNT/i.test(sql)) return { rows: [{ total: '0' }] };
         if (/active_count/i.test(sql)) return { rows: [{ active_count: '0', archived_count: '0', total_cases: '0' }] };
@@ -116,7 +108,7 @@ beforeEach(() => {
     };
 });
 
-describe('GET /test-suites — per-role list visibility (flag ON)', () => {
+describe('GET /test-suites — per-role list visibility', () => {
     test('admin: filter clause is TRUE (sees all suites)', async () => {
         setRole('admin');
         const res = await request(makeApp()).get('/test-suites');
@@ -224,10 +216,9 @@ describe('DELETE /test-suites/:id — manipulation guard', () => {
     });
 });
 
-describe('shadow mode (flag OFF) — disagreement logging', () => {
-    test('member viewing a foreign suite gets legacy 200 but logs ACCESS_ENGINE_SHADOW_DISAGREEMENT', async () => {
+describe('GET /test-suites/:id — enforced denial', () => {
+    test('member viewing a foreign suite gets 403', async () => {
         setRole('member');
-        featureFlag.isEnabled.mockResolvedValue(false);
         queryHandler = async (sql) => {
             if (/FROM test_suites ts\s+LEFT JOIN projects/i.test(sql) && /WHERE ts\.id = \$1/i.test(sql)) {
                 return { rows: [{
@@ -240,10 +231,7 @@ describe('shadow mode (flag OFF) — disagreement logging', () => {
             return { rows: [] };
         };
         const res = await request(makeApp()).get('/test-suites/suite-1');
-        expect(res.status).toBe(200);
-        const disagreementLog = queries.find(q =>
-            /INSERT INTO audit_log/i.test(q.sql) && q.params.includes('shadow_disagreement')
-        );
-        expect(disagreementLog).toBeDefined();
+        expect(res.status).toBe(403);
+        expect(res.body.reason).toBeDefined();
     });
 });

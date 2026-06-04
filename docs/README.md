@@ -71,6 +71,7 @@ docs/
 | [development-guide.md](./03-guides/development-guide.md) | Local development setup, coding conventions, Git workflow |
 | [deployment-guide.md](./03-guides/deployment-guide.md) | Production deployment - Docker, Railway, Vercel |
 | [api-usage-guide.md](./03-guides/api-usage-guide.md) | API examples with curl, JavaScript, Postman |
+| [access-control-rollout.md](./03-guides/access-control-rollout.md) | Access Engine rollout summary and cleanup notes |
 
 ### 04-integrations/
 **External system integrations**
