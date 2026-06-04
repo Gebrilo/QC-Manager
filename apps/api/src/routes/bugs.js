@@ -9,6 +9,7 @@ const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createBugSchema, updateBugSchema } = require('../schemas/bug');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
+const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
@@ -378,6 +379,12 @@ router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, r
                 ? 'triaged' : 'untriaged'
         );
 
+        const accessDefaults = await buildAccessDefaults({
+            creator: req.user ? { id: req.user.id } : null,
+            artifactType: 'bug',
+            query: pool.query.bind(pool),
+        });
+
         const result = await pool.query(`
             INSERT INTO bugs (
                 bug_id, title, description, status, severity, priority,
@@ -386,11 +393,13 @@ router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, r
                 steps_to_reproduce, dev_fix_description, qc_verification_notes,
                 close_date, cc, linked_test_case_ids, linked_test_execution_ids,
                 reported_by, reported_date,
-                sync_status
+                sync_status,
+                owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
                 $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
                 $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-                $21,$22,$23,'pending'
+                $21,$22,$23,'pending',
+                $24,$25,$26
             )
             RETURNING *
         `, [
@@ -400,8 +409,17 @@ router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, r
             data.steps_to_reproduce, data.dev_fix_description, data.qc_verification_notes,
             data.close_date, data.cc, data.linked_test_case_ids, data.linked_test_execution_ids,
             data.reported_by, data.reported_date || new Date(),
+            accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ]);
         let bug = result.rows[0];
+
+        await materializeAclGrants({
+            artifactType: 'bug',
+            artifactId: bug.id,
+            grants: accessDefaults.default_acl_grants,
+            grantedBy: req.user?.id || null,
+            query: pool.query.bind(pool),
+        });
 
         await replaceBugLinks(bug.id, data);
 

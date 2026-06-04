@@ -1,6 +1,11 @@
 const { resolveLinks, drainPending } = require('../tuleapLinkResolver');
 const { UnifiedPayloadSchema } = require('../../schemas/tuleapUnified');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../normalizers/bug');
+const {
+  resolveTuleapCreator,
+  buildAccessDefaults,
+  materializeAclGrants,
+} = require('../accessDefaults');
 
 const VALID_BUG_ACTIONS = new Set(['sync', 'delete']);
 
@@ -111,6 +116,17 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
     }
   }
 
+  const createdByUserId = await resolveTuleapCreator({
+    tuleapUsername: unified.reported_by || null,
+    query,
+  });
+
+  const accessDefaults = await buildAccessDefaults({
+    tuleapConfig: config,
+    artifactType: 'bug',
+    query,
+  });
+
   const bugId = `TLP-${tuleapArtifactId}`;
   const linkedTestCaseIds = resolvedTestCases.map(l => l.qc_id);
 
@@ -122,8 +138,9 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       reported_date, last_sync_at, raw_tuleap_payload, source,
       owner_resource_id, pending_links, environment, service_name,
       dev_fix_description, qc_verification_notes, initial_effort, remaining_effort, cc,
-      sync_status, last_sync_attempted_at, last_sync_error
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,'synced',NOW(),NULL)
+      sync_status, last_sync_attempted_at, last_sync_error,
+      owner_team_id, visibility_scope, created_by_user_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,'synced',NOW(),NULL,$28,$29,$30)
     RETURNING *`,
     [
       tuleapArtifactId,
@@ -153,8 +170,19 @@ async function createBug(unified, config, projectId, source, resolvedTestCases, 
       fields.initial_effort != null ? fields.initial_effort : null,
       fields.remaining_effort != null ? fields.remaining_effort : null,
       Array.isArray(fields.cc) ? fields.cc : (fields.cc ? [fields.cc] : null),
+      accessDefaults.owner_team_id,
+      accessDefaults.visibility_scope,
+      createdByUserId,
     ]
   );
+
+  await materializeAclGrants({
+    artifactType: 'bug',
+    artifactId: result.rows[0].id,
+    grants: accessDefaults.default_acl_grants,
+    grantedBy: createdByUserId,
+    query,
+  });
 
   if (resolvedTestCases.length > 0) {
     await drainPending({

@@ -133,8 +133,9 @@ describe('POST /bugs — create with Zod + normalizer + sync', () => {
 
     const params = insertCall.mock.calls[0][1];
     expect(params).toContain('New');
-    expect(params).toHaveLength(23);
-    expect(insertCall.mock.calls[0][0]).toContain('$21,$22,$23,');
+    // 23 original params + 3 access columns (owner_team_id, visibility_scope, created_by_user_id)
+    expect(params).toHaveLength(26);
+    expect(insertCall.mock.calls[0][0]).toContain('$24,$25,$26');
   });
 
   it('normalizes raw severity "Critical impact" to "Critical Impact" before INSERT', async () => {

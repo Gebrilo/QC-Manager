@@ -7,6 +7,13 @@ const { emitToTuleap } = require('../services/emitters/user_story');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createUserStorySchema, updateUserStorySchema } = require('../schemas/userStory');
+const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
+const {
+    appendListFilter,
+    decorateRows,
+    enforceArtifact,
+    shadowList,
+} = require('../services/access/enforcement');
 
 function parseCsvParam(value) {
     if (!value) return [];
@@ -97,6 +104,14 @@ router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, 
             }
         }
 
+        const access = await appendListFilter(req, 'user_story', where, params, {
+            startIdx: pn,
+            tableAlias: 'us',
+            assigneeResourceExprs: [],
+            userExprs: ['us.created_by_user_id'],
+        });
+        pn = access.nextIdx;
+
         const whereSql = where.join(' AND ');
         const count = await pool.query(`SELECT COUNT(*) AS total FROM user_stories us WHERE ${whereSql}`, params);
         const result = await pool.query(
@@ -109,7 +124,9 @@ router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, 
             [...params, limit, offset]
         );
         const total = parseInt(count.rows[0].total, 10);
-        res.json({ data: result.rows, pagination: { page, limit, total, total_pages: Math.ceil(total / limit) } });
+        await shadowList(req, 'user_story', result.rows, { route: 'GET /user-stories' });
+        const data = await decorateRows(req, 'user_story', result.rows);
+        res.json({ data, pagination: { page, limit, total, total_pages: Math.ceil(total / limit) } });
     } catch (err) {
         next(err);
     }
@@ -129,7 +146,10 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
             [paramValue]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User story not found' });
-        res.json(result.rows[0]);
+        const access = await enforceArtifact(req, res, 'user_story', result.rows[0], 'view', { route: 'GET /user-stories/:id' });
+        if (!access.allowed) return;
+        const [story] = await decorateRows(req, 'user_story', result.rows);
+        res.json(story);
     } catch (err) {
         next(err);
     }
@@ -147,15 +167,22 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
         }
         const data = parsed.data;
 
+        const accessDefaults = await buildAccessDefaults({
+            creator: req.user ? { id: req.user.id } : null,
+            artifactType: 'user_story',
+            query: pool.query.bind(pool),
+        });
+
         const result = await pool.query(`
             INSERT INTO user_stories (
                 title, description, status, acceptance_criteria,
                 project_id, priority, assigned_to,
                 requirement_version, change_reason, ba_author,
                 initial_effort, remaining_effort,
-                sync_status
+                sync_status,
+                owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending'
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,$15
             )
             RETURNING *
         `, [
@@ -163,8 +190,17 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
             data.project_id, data.priority, data.assigned_to,
             data.requirement_version, data.change_reason, data.ba_author,
             data.initial_effort, data.remaining_effort,
+            accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ]);
         let story = result.rows[0];
+
+        await materializeAclGrants({
+            artifactType: 'user_story',
+            artifactId: story.id,
+            grants: accessDefaults.default_acl_grants,
+            grantedBy: req.user?.id || null,
+            query: pool.query.bind(pool),
+        });
 
         const config = await resolveUserStorySyncConfig(data.project_id);
 
@@ -221,6 +257,8 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
             return res.status(404).json({ success: false, error: 'User story not found' });
         }
         const original = originalRes.rows[0];
+        const access = await enforceArtifact(req, res, 'user_story', original, 'edit', { route: 'PATCH /user-stories/:id' });
+        if (!access.allowed) return;
 
         const parsed = updateUserStorySchema.safeParse(req.body);
         if (!parsed.success) {
@@ -355,6 +393,8 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async 
         if (original.deleted_at) {
             return res.status(400).json({ success: false, error: 'User story already deleted' });
         }
+        const access = await enforceArtifact(req, res, 'user_story', original, 'delete', { route: 'DELETE /user-stories/:id' });
+        if (!access.allowed) return;
 
         if (original.tuleap_artifact_id) {
             const configResult = await pool.query(
