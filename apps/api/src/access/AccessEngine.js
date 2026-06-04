@@ -247,8 +247,14 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         );
     }
 
-    // artifact_access ACL (reuses userBind from the assignee branch)
+    // artifact_access ACL
+    // subject_id is varchar; the assignee branch above already bound user.id
+    // in a uuid context (us.created_by_user_id = $N). Reusing that bind here
+    // makes pg infer $N as uuid, then aa.subject_id (varchar) = $N (uuid)
+    // fails with "operator does not exist: character varying = uuid".
+    // Bind user.id again so this $N is inferred from the varchar context only.
     {
+        const aclUserBind = bind(user.id);
         const roleBind = bind(canonicalRole(user.role));
         const teamForAcl = scope.team_id ? bind(scope.team_id) : 'NULL';
         const typeBind = bind(artifactType);
@@ -256,7 +262,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         branches.push(
             `EXISTS (SELECT 1 FROM artifact_access aa
                WHERE aa.artifact_type = ${typeBind} AND aa.artifact_id = ${tableAlias}.id AND aa.action = ${verbBind}
-                 AND ((aa.subject_type='user' AND aa.subject_id=${userBind})
+                 AND ((aa.subject_type='user' AND aa.subject_id=${aclUserBind})
                    OR (aa.subject_type='team' AND aa.subject_id=${teamForAcl})
                    OR (aa.subject_type='role' AND aa.subject_id=${roleBind})))`
         );

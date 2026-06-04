@@ -207,14 +207,30 @@ describe('AccessEngine.buildListFilter', () => {
         await expect(buildListFilter({ id: 'u', role: 'member' }, 'mysterious', 'view')).rejects.toThrow(/Unknown artifact type/);
     });
 
-    test('binds user.id once and reuses it across assignee + ACL branches', async () => {
+    test('binds user.id separately for assignee (uuid) and ACL (varchar) branches', async () => {
+        // artifact_access.subject_id is varchar while user-id columns
+        // (created_by_user_id / assigned_to-on-uuid-tables / etc.) are uuid.
+        // Sharing one $N across both made pg infer it as uuid, then
+        // aa.subject_id = $N (uuid) failed with "varchar = uuid". Each branch
+        // must get its own bind so its type is inferred from one column only.
+        mockResolve.mockReset();
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set(['qc.bugs.view_own']),
             scope: { team_id: 't-1', team_type: 'qc', pm_of_projects: [] },
         });
         const f = await buildListFilter({ id: 'u-7', role: 'member' }, 'bug', 'view');
         const occurrences = f.params.filter(p => p === 'u-7').length;
-        expect(occurrences).toBe(1);
+        expect(occurrences).toBe(2);
+
+        const userBranchMatch = f.clause.match(/bugs\.created_by_user_id\s*=\s*\$(\d+)/);
+        const aclMatch = f.clause.match(/aa\.subject_id\s*=\s*\$(\d+)/);
+        expect(userBranchMatch).not.toBeNull();
+        expect(aclMatch).not.toBeNull();
+        const assigneeBindNum = Number(userBranchMatch[1]);
+        const aclBindNum = Number(aclMatch[1]);
+        expect(aclBindNum).not.toBe(assigneeBindNum);
+        expect(f.params[assigneeBindNum - 1]).toBe('u-7');
+        expect(f.params[aclBindNum - 1]).toBe('u-7');
     });
 
     test('returns FALSE clause when user has no applicable branches', async () => {
