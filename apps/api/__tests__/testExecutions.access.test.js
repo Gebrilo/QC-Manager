@@ -120,13 +120,12 @@ describe('GET /test-executions/test-runs — per-role list visibility', () => {
         expect(dq.sql).toMatch(/AND TRUE/);
     });
 
-    test('pm: filter scopes by pm_of_projects (tr.project_id IN)', async () => {
+    test('pm with view_any: filter clause is TRUE (sees all runs)', async () => {
         setRole('pm');
         const res = await request(makeApp()).get('/test-executions/test-runs');
         expect(res.status).toBe(200);
         const dq = findTestRunsDataQuery();
-        expect(dq.sql).toMatch(/tr\.project_id IN \(/);
-        expect(dq.params).toContain('proj-pm');
+        expect(dq.sql).toMatch(/AND TRUE/);
     });
 
     test('team_manager: filter has no ts.owner_team_id branch (route disabled ownerTeamExpr)', async () => {

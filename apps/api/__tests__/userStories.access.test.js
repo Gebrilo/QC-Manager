@@ -121,13 +121,12 @@ describe('GET /user-stories — per-role list visibility', () => {
         expect(dq.sql).toMatch(/AND TRUE/);
     });
 
-    test('pm: filter scopes by pm_of_projects (us.project_id IN)', async () => {
+    test('pm with view_any: filter clause is TRUE (sees all stories)', async () => {
         setRole('pm');
         const res = await request(makeApp()).get('/user-stories');
         expect(res.status).toBe(200);
         const dq = findDataQuery();
-        expect(dq.sql).toMatch(/us\.project_id IN \(/);
-        expect(dq.params).toContain('proj-pm');
+        expect(dq.sql).toMatch(/AND TRUE/);
     });
 
     test('team_manager: filter includes owner_team_id branch', async () => {

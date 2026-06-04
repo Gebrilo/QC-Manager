@@ -116,43 +116,58 @@ async function canPerform(user, artifact, verb, req) {
     const keyAny = permKey(artifact.type, 'any', verb);
     const keyTeam = permKey(artifact.type, 'team', verb);
     const keyOwn = permKey(artifact.type, 'own', verb);
+    const keyBare = `qc.${ARTIFACT_PERMISSION_NAMESPACE[artifact.type]}.${verb}`;
+    const hasBareVerb = effectivePermissions.has(keyBare);
 
-    // Branch 2: project-scope role (PM of this project)
+    // Branch 1b: verb_any short-circuit
+    // Holding qc.{ns}.{verb}_any means "perform {verb} on any artifact of
+    // this type" — see-all/edit-all without team/ownership constraints.
+    // Without this, view_any only widened the existing narrow branches and
+    // silently failed when the user matched no team or assignee.
+    if (effectivePermissions.has(keyAny)) {
+        return { allowed: true, branch: 'verb_any' };
+    }
+
+    // Branch 2: project-scope role (PM of this project).
+    // keyAny short-circuited above; here we only honor the report-scope grant.
     if (artifact.project_id && scope.pm_of_projects.includes(artifact.project_id)) {
-        if (effectivePermissions.has(keyAny) || (verb === 'view' && effectivePermissions.has('qc.reports.view_project'))) {
+        if (verb === 'view' && effectivePermissions.has('qc.reports.view_project')) {
             return { allowed: true, branch: 'project_scope' };
         }
     }
 
     // Branch 3: owner_team match with view_team / edit_team etc.
     if (artifact.owner_team_id && scope.team_id && artifact.owner_team_id === scope.team_id) {
-        if (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+        if (effectivePermissions.has(keyTeam)) {
             return { allowed: true, branch: 'owner_team' };
         }
     }
 
-    // Branch 4: assignee (resource bridge) with view_own / edit_own
-    if (artifact.owner_user_id && artifact.owner_user_id === user.id) {
-        if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
-            return { allowed: true, branch: 'owner_user' };
-        }
+    // Branch 4: assignee (resource bridge) with view_own / edit_own.
+    // hasBareVerb (e.g. qc.tasks.view without _own/_team/_any) acts as a
+    // legacy own-scope grant so roles whose catalog only grants the
+    // unscoped verb (e.g. `contributor`, `tester` pre-matrix-edit) keep
+    // their "see / edit my assigned items" behavior after the engine is
+    // wired into the route.
+    const ownScopeAllowed = hasBareVerb
+        || effectivePermissions.has(keyOwn)
+        || effectivePermissions.has(keyTeam);
+
+    if (artifact.owner_user_id && artifact.owner_user_id === user.id && ownScopeAllowed) {
+        return { allowed: true, branch: 'owner_user' };
     }
 
-    if (artifact.assignee_user_id && artifact.assignee_user_id === user.id) {
-        if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
-            return { allowed: true, branch: 'assignee_user' };
-        }
+    if (artifact.assignee_user_id && artifact.assignee_user_id === user.id && ownScopeAllowed) {
+        return { allowed: true, branch: 'assignee_user' };
     }
 
-    if (await isAssignee(user.id, artifact.assignee_resource_id)) {
-        if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
-            return { allowed: true, branch: 'assignee' };
-        }
+    if (await isAssignee(user.id, artifact.assignee_resource_id) && ownScopeAllowed) {
+        return { allowed: true, branch: 'assignee' };
     }
 
     // Branch 5: teammate of assignee with view_team
     if (scope.team_id && await isTeammateOfAssignee(scope.team_id, artifact.assignee_resource_id)) {
-        if (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+        if (effectivePermissions.has(keyTeam)) {
             return { allowed: true, branch: 'teammate_of_assignee' };
         }
     }
@@ -166,7 +181,7 @@ async function canPerform(user, artifact, verb, req) {
     // Branch 7: visibility_scope = project + user is member of any project team
     if (verb === 'view' && artifact.visibility_scope === 'project'
         && await isProjectTeamMember(artifact.project_id, scope.team_id)) {
-        if (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+        if (effectivePermissions.has(keyTeam)) {
             return { allowed: true, branch: 'project_visibility' };
         }
     }
@@ -216,19 +231,32 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     const keyAny = permKey(artifactType, 'any', verb);
     const keyTeam = permKey(artifactType, 'team', verb);
     const keyOwn = permKey(artifactType, 'own', verb);
+    const keyBare = `qc.${ARTIFACT_PERMISSION_NAMESPACE[artifactType]}.${verb}`;
+    const hasBareVerb = effectivePermissions.has(keyBare);
+
+    // verb_any short-circuit (mirrors canPerform Branch 1b).
+    // qc.{ns}.{verb}_any means "see/edit any row of this type", so the
+    // narrow team/own/ACL branches are redundant.
+    if (effectivePermissions.has(keyAny)) {
+        return { clause: 'TRUE', params: [], nextIdx: startIdx };
+    }
+
     const params = [];
     let idx = startIdx;
     const branches = [];
     const bind = (val) => { params.push(val); return `$${idx++}`; };
 
     // owner_team
-    if (ownerTeamExpr && scope.team_id && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
+    if (ownerTeamExpr && scope.team_id && effectivePermissions.has(keyTeam)) {
         branches.push(`${ownerTeamExpr} = ${bind(scope.team_id)}`);
     }
 
     // owner/assignee user columns (created_by_user_id, assigned_to, executed_by...)
+    // hasBareVerb activates this branch so legacy roles whose catalog grants
+    // only the unscoped verb (qc.{ns}.{verb}, no _own/_team/_any) still see
+    // their assigned items. Mirrors canPerform's ownScopeAllowed.
     const userBind = bind(user.id);
-    if (effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny)) {
+    if (hasBareVerb || effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam)) {
         if (userExprs.length > 0) {
             branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}`).join(' OR ')})`);
         }
@@ -239,8 +267,8 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         }
     }
 
-    // teammate of assignee
-    if (scope.team_id && assigneeResourceExprs.length > 0 && (effectivePermissions.has(keyTeam) || effectivePermissions.has(keyAny))) {
+    // teammate of assignee (keyAny short-circuited above; only keyTeam reaches here)
+    if (scope.team_id && assigneeResourceExprs.length > 0 && effectivePermissions.has(keyTeam)) {
         const teamBind = bind(scope.team_id);
         branches.push(
             `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind} AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`

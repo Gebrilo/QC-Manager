@@ -88,9 +88,12 @@ describe('AccessEngine.canPerform — OR branches', () => {
         expect(out).toEqual({ allowed: true, branch: 'artifact_acl' });
     });
 
-    test('project-scope (PM of project) grants', async () => {
+    test('project-scope (PM of project) grants via qc.reports.view_project', async () => {
+        // verb_any short-circuits earlier now, so project_scope is reachable
+        // only for users who have qc.reports.view_project but lack the
+        // verb_any grant on the specific artifact type.
         mockResolve.mockResolvedValueOnce({
-            effectivePermissions: new Set(['qc.bugs.view_any']),
+            effectivePermissions: new Set(['qc.reports.view_project']),
             scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1'] },
         });
         const out = await canPerform(
@@ -136,6 +139,37 @@ describe('AccessEngine.canPerform — OR branches', () => {
         );
         expect(out.allowed).toBe(false);
         expect(out.reason).toBe(DENIAL_REASONS.ROLE_MISSING);
+    });
+
+    test('view_any allows regardless of ownership / team match', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.tasks.view_any']),
+            scope: { team_id: 't-x', team_type: 'qc', pm_of_projects: [] },
+        });
+        const out = await canPerform(
+            { id: 'tester-1', role: 'tester' },
+            { type: 'task', id: 'task-99', owner_team_id: 't-other', assignee_resource_id: null, project_id: 'p-other' },
+            'view'
+        );
+        expect(out).toEqual({ allowed: true, branch: 'verb_any' });
+    });
+
+    test('bare verb permits view of an owned item even without _own scope', async () => {
+        // contributor catalog has only qc.tasks.view (no view_own).
+        // Single-item GET should still let them load tasks they created
+        // (current legacy behavior — without this fallback the engine
+        // would 403 the same task they could see in the list).
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.tasks.view']),
+            scope: { team_id: 't-x', team_type: 'qc', pm_of_projects: [] },
+        });
+        const out = await canPerform(
+            { id: 'u-7', role: 'contributor' },
+            { type: 'task', id: 'task-1', owner_team_id: 't-other', owner_user_id: 'u-7', assignee_resource_id: null, project_id: 'p-x' },
+            'view'
+        );
+        expect(out.allowed).toBe(true);
+        expect(out.branch).toBe('owner_user');
     });
 
     test('unknown artifact type returns unknown_artifact reason without calling resolver', async () => {
@@ -189,14 +223,43 @@ describe('AccessEngine.buildListFilter', () => {
         expect(f.params).toEqual(expect.arrayContaining(['u', 't-1', 'p-9']));
     });
 
-    test('pm with view_any + pm_of_projects gets project_managers IN clause', async () => {
+    test('view_any short-circuits to TRUE (see-all regardless of team/own/PM scope)', async () => {
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set(['qc.bugs.view_any']),
+            scope: { team_id: 't-x', team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] },
+        });
+        const f = await buildListFilter({ id: 'pm', role: 'pm' }, 'bug', 'view');
+        expect(f.clause).toBe('TRUE');
+        expect(f.params).toEqual([]);
+    });
+
+    test('pm with view_team + pm_of_projects gets project_id IN clause', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.view_team']),
             scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] },
         });
         const f = await buildListFilter({ id: 'pm', role: 'pm' }, 'bug', 'view');
         expect(f.clause).toMatch(/project_id\s+IN/);
         expect(f.params).toEqual(expect.arrayContaining(['p-1', 'p-2']));
+    });
+
+    test('bare verb (qc.tasks.view) without scope variants emits user/assignee branches (legacy own fallback)', async () => {
+        // catalog grants some built-in roles only the unscoped verb (e.g.
+        // contributor: qc.tasks.view). The legacy route filtered them by
+        // resource bridge → "see assigned". Engine treats the bare verb
+        // as an implicit _own scope so wiring the engine into tasks.js
+        // doesn't regress those roles to FALSE / zero rows.
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.tasks.view']),
+            scope: { team_id: null, team_type: 'qc', pm_of_projects: [] },
+        });
+        const f = await buildListFilter({ id: 'u-9', role: 'contributor' }, 'task', 'view', {
+            tableAlias: 't',
+            assigneeResourceExprs: ['t.resource1_id', 't.resource2_id'],
+            userExprs: ['t.created_by_user_id'],
+        });
+        expect(f.clause).toMatch(/t\.created_by_user_id\s*=\s*\$/);
+        expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM resources r WHERE r\.user_id = \$/);
     });
 
     test('unknown artifact type throws', async () => {

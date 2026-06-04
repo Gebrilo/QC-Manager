@@ -13,6 +13,13 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { resolve: resolveRole } = require('../access/RoleResolver');
 const { canEditTask, canTakeOverTask } = require('../services/dashboards/teamMemberDashboards');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
+const { appendListFilter, enforceArtifact, decorateRows } = require('../services/access/enforcement');
+
+const TASK_FILTER_OPTS = Object.freeze({
+    tableAlias: 'v',
+    assigneeResourceExprs: ['v.resource1_id', 'v.resource2_id'],
+    userExprs: ['v.created_by_user_id'],
+});
 
 /**
  * Helper: Get the resource ID linked to the current user.
@@ -146,10 +153,11 @@ async function buildTaskTeamFilter(user) {
 // GET all tasks — filtered by team for managers, by resource for regular users
 router.get('/', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
-        const role = req.user?.role;
         const relatedType = req.query.related_type || req.query.related_artifact_type;
         const relatedId = req.query.related_id || req.query.related_artifact_id;
 
+        // related_artifact view bypasses scope filtering — caller already
+        // has the parent artifact, so showing its children is appropriate.
         if (relatedType === 'user_story' && relatedId) {
             const result = await db.query(
                 `SELECT * FROM v_tasks_with_metrics
@@ -160,47 +168,29 @@ router.get('/', requireAuth, requirePermission('qc.tasks.view'), async (req, res
             return res.json(result.rows);
         }
 
-        if (role === 'admin') {
+        const where = ['1=1'];
+        const params = [];
+        const access = await appendListFilter(req, 'task', where, params, {
+            ...TASK_FILTER_OPTS,
+            startIdx: params.length + 1,
+        });
+        if (!access.enabled) {
+            // No actor / engine disabled — admin wildcard short-circuits to TRUE
+            // via buildListFilter, so reaching this branch means a non-authed
+            // path. Return the legacy unfiltered view.
             const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
             return res.json(result.rows);
         }
 
-        if (role === 'manager') {
-            const teamId = await getManagerTeamId(req.user.id);
-            if (!teamId) return res.json([]); // No team assigned
-
-            const result = await db.query(`
-                SELECT v.* FROM v_tasks_with_metrics v
-                JOIN projects p ON p.id = v.project_id
-                WHERE p.team_id = $1 AND p.deleted_at IS NULL
-                ORDER BY v.created_at DESC
-            `, [teamId]);
-            return res.json(result.rows);
-        }
-
-        // Standard users: filter by their linked resource
-        if (req.user?.id) {
-            const resourceId = await getUserResourceId(req.user.id);
-            if (resourceId) {
-                const result = await db.query(`
-                    SELECT * FROM v_tasks_with_metrics
-                    WHERE resource1_id = $1 OR resource2_id = $1
-                    ORDER BY created_at DESC
-                `, [resourceId]);
-                return res.json(result.rows);
-            }
-            return res.json([]);
-        }
-
-        // Unauthenticated fallback
-        const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
+        const sql = `SELECT v.* FROM v_tasks_with_metrics v WHERE ${where.join(' AND ')} ORDER BY v.created_at DESC`;
+        const result = await db.query(sql, params);
         res.json(result.rows);
     } catch (err) {
         next(err);
     }
 });
 
-// GET single task by ID — enforce team scope for managers
+// GET single task by ID — access engine enforces scope per role+permissions
 router.get('/:id', requireAuth, requirePermission('qc.tasks.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -211,33 +201,25 @@ router.get('/:id', requireAuth, requirePermission('qc.tasks.view'), async (req, 
         }
 
         const task = result.rows[0];
-        const role = req.user?.role;
 
-        if (role === 'admin') return res.json(task);
-
-        if (role === 'manager') {
-            const teamId = await getManagerTeamId(req.user.id);
-            if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
-
-            // Verify task's project belongs to manager's team
-            const projCheck = await db.query(
-                `SELECT id FROM projects WHERE id = $1 AND team_id = $2 AND deleted_at IS NULL`,
-                [task.project_id, teamId]
+        // Tasks have two resource slots; pass whichever maps to req.user so
+        // the engine's single assignee_resource_id check (isAssignee) can
+        // grant via the assignee branch.
+        const resourceCandidates = [task.resource1_id, task.resource2_id].filter(Boolean);
+        let assigneeResourceId = resourceCandidates[0] || null;
+        if (req.user?.id && resourceCandidates.length > 0) {
+            const r = await db.query(
+                'SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL AND id = ANY($2::uuid[]) LIMIT 1',
+                [req.user.id, resourceCandidates]
             );
-            if (projCheck.rows.length === 0) {
-                return res.status(403).json({ error: 'You do not have access to this task' });
-            }
-            return res.json(task);
+            if (r.rows.length > 0) assigneeResourceId = r.rows[0].id;
         }
 
-        // Standard users: verify they are assigned to this task
-        if (req.user?.id) {
-            const resourceId = await getUserResourceId(req.user.id);
-            if (resourceId && (task.resource1_id === resourceId || task.resource2_id === resourceId)) {
-                return res.json(task);
-            }
-            return res.status(403).json({ error: 'You do not have access to this task' });
-        }
+        const enforcement = await enforceArtifact(req, res, 'task', task, 'view', {
+            route: 'GET /tasks/:id',
+            artifact: { assignee_resource_id: assigneeResourceId },
+        });
+        if (!enforcement.allowed) return; // enforceArtifact already wrote 403
 
         res.json(task);
     } catch (err) {
