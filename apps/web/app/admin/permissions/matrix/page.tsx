@@ -90,6 +90,14 @@ export default function PermissionsMatrixPage() {
 
     const customRoles = useMemo(() => roles.filter(role => !role.is_builtin), [roles]);
 
+    const ROLE_NAME_PATTERN = /^[a-z0-9_]+$/;
+    const newRoleNameError = newRoleName && !ROLE_NAME_PATTERN.test(newRoleName)
+        ? 'Use lowercase letters, digits, and underscores only'
+        : null;
+    const renameValueError = renameValue && !ROLE_NAME_PATTERN.test(renameValue)
+        ? 'Use lowercase letters, digits, and underscores only'
+        : null;
+
     const toggleCell = async (role: MatrixRole, permissionKey: string) => {
         if (!token || role.is_protected) return;
         const cellKey = `${role.role_identifier}:${permissionKey}`;
@@ -345,16 +353,32 @@ export default function PermissionsMatrixPage() {
                 <aside className="space-y-4">
                     <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Custom Roles</h2>
-                        <div className="mt-4 flex gap-2">
-                            <Input
-                                value={newRoleName}
-                                onChange={event => setNewRoleName(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                                placeholder="role_name"
-                                className="h-9"
-                            />
-                            <Button size="icon" variant="primary" onClick={createRole} disabled={creating || !newRoleName.trim()} aria-label="Create role">
-                                <Plus className="h-4 w-4" />
-                            </Button>
+                        <div className="mt-4 space-y-1">
+                            <div className="flex gap-2">
+                                <Input
+                                    value={newRoleName}
+                                    onChange={event => setNewRoleName(event.target.value)}
+                                    onKeyDown={event => { if (event.key === 'Enter' && !newRoleNameError && newRoleName.trim() && !creating) createRole(); }}
+                                    placeholder="e.g. qa_lead"
+                                    aria-invalid={!!newRoleNameError}
+                                    aria-describedby={newRoleNameError ? 'new-role-error' : 'new-role-hint'}
+                                    className="h-9"
+                                />
+                                <Button
+                                    size="icon"
+                                    variant="primary"
+                                    onClick={createRole}
+                                    disabled={creating || !newRoleName.trim() || !!newRoleNameError}
+                                    aria-label="Create role"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            {newRoleNameError ? (
+                                <p id="new-role-error" className="text-[11px] text-rose-600 dark:text-rose-400">{newRoleNameError}</p>
+                            ) : (
+                                <p id="new-role-hint" className="text-[11px] text-slate-400 dark:text-slate-500">Lowercase letters, digits, and underscores only</p>
+                            )}
                         </div>
 
                         <div className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">
@@ -365,12 +389,28 @@ export default function PermissionsMatrixPage() {
                                 <div key={role.role_identifier} className="flex items-center gap-2 py-3">
                                     {renamingRole === role.role_identifier ? (
                                         <>
-                                            <Input
-                                                value={renameValue}
-                                                onChange={event => setRenameValue(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                                                className="h-8"
-                                            />
-                                            <Button size="icon" variant="ghost" onClick={() => renameRole(role)} aria-label="Save role name">
+                                            <div className="min-w-0 flex-1 space-y-1">
+                                                <Input
+                                                    value={renameValue}
+                                                    onChange={event => setRenameValue(event.target.value)}
+                                                    onKeyDown={event => {
+                                                        if (event.key === 'Enter' && !renameValueError && renameValue.trim()) renameRole(role);
+                                                        if (event.key === 'Escape') setRenamingRole(null);
+                                                    }}
+                                                    aria-invalid={!!renameValueError}
+                                                    className="h-8"
+                                                />
+                                                {renameValueError && (
+                                                    <p className="text-[11px] text-rose-600 dark:text-rose-400">{renameValueError}</p>
+                                                )}
+                                            </div>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => renameRole(role)}
+                                                disabled={!renameValue.trim() || !!renameValueError}
+                                                aria-label="Save role name"
+                                            >
                                                 <Save className="h-4 w-4" />
                                             </Button>
                                             <Button size="icon" variant="ghost" onClick={() => setRenamingRole(null)} aria-label="Cancel rename">
