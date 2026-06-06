@@ -8,6 +8,8 @@ import { RouteGuard } from '@/components/providers/RouteGuard';
 import { SidebarProvider } from '@/components/providers/SidebarProvider';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { ToastProvider } from '@/components/ui/Toast';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { ApiErrorToaster } from '@/components/providers/ApiErrorToaster';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import { ActivationBanner } from '@/components/ui/ActivationBanner';
@@ -74,8 +76,9 @@ export default function RootLayout({
                             <RouteGuard>
                                 <SidebarProvider>
                                     <ToastProvider>
+                                        <ApiErrorToaster />
                                         {isAuthPage ? (
-                                            children
+                                            <ErrorBoundary>{children}</ErrorBoundary>
                                         ) : (
                                             <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 transition-colors duration-200 relative">
                                                 {/* Global decorative orbs */}
@@ -89,7 +92,7 @@ export default function RootLayout({
                                                     <ActivationBanner />
                                                     <main className="flex-1 min-h-0 overflow-y-auto">
                                                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                                                            {children}
+                                                            <ErrorBoundary>{children}</ErrorBoundary>
                                                         </div>
                                                     </main>
                                                 </div>

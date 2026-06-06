@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { fetchApi, tuleapApi, type TuleapArtifact } from '@/lib/api';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { PermissionGate } from '@/components/auth/PermissionGate';
+import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 
 export default function ProjectDetailPage() {
@@ -16,6 +18,8 @@ export default function ProjectDetailPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [confirmText, setConfirmText] = useState('');
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState<'overview' | 'user-stories'>('overview');
     const [userStories, setUserStories] = useState<TuleapArtifact[]>([]);
     const [storiesLoading, setStoriesLoading] = useState(false);
@@ -96,12 +100,22 @@ export default function ProjectDetailPage() {
         setDeleteError(null);
         try {
             await fetchApi(`/projects/${project.id}`, { method: 'DELETE' });
+            toast.success('Project archived');
             router.push('/work/projects');
         } catch (err: any) {
+            toast.error(err.message || 'Failed to archive project');
             setDeleteError(err.message);
             setIsDeleting(false);
         }
     };
+
+    const cancelDelete = () => {
+        setShowDeleteModal(false);
+        setDeleteError(null);
+        setConfirmText('');
+    };
+
+    const isConfirmed = confirmText === project.project_name;
 
     const logo = getLogo(project.id);
     // Formula for completion status based on percentage
@@ -134,16 +148,20 @@ export default function ProjectDetailPage() {
                             Quality
                         </Button>
                     </Link>
-                    <Link href={`/work/projects/${project.id}/edit`}>
-                        <Button variant="outline">Edit Project</Button>
-                    </Link>
-                    <Button
-                        variant="outline"
-                        onClick={handleDelete}
-                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
-                    >
-                        Delete
-                    </Button>
+                    <PermissionGate permission="qc.projects.edit">
+                        <Link href={`/work/projects/${project.id}/edit`}>
+                            <Button variant="outline">Edit Project</Button>
+                        </Link>
+                    </PermissionGate>
+                    <PermissionGate permission="qc.projects.delete" mode="hide">
+                        <Button
+                            variant="outline"
+                            onClick={handleDelete}
+                            className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                        >
+                            Delete
+                        </Button>
+                    </PermissionGate>
                 </div>
             </div>
 
@@ -278,21 +296,21 @@ export default function ProjectDetailPage() {
                         {deleteError && (
                             <p className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 rounded-lg">{deleteError}</p>
                         )}
+                        <div className="space-y-2 mt-4">
+                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                                Type <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{project.project_name}</span> to confirm:
+                            </label>
+                            <input
+                                value={confirmText}
+                                onChange={e => setConfirmText(e.target.value)}
+                                placeholder={project.project_name}
+                                autoFocus
+                                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                            />
+                        </div>
                         <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => { setShowDeleteModal(false); setDeleteError(null); }}
-                                disabled={isDeleting}
-                                className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                disabled={isDeleting}
-                                className="px-4 py-2 text-sm font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors disabled:opacity-50"
-                            >
-                                {isDeleting ? 'Archiving...' : 'Archive Project'}
-                            </button>
+                            <Button variant="outline" onClick={cancelDelete} disabled={isDeleting}>Cancel</Button>
+                            <Button variant="destructive" loading={isDeleting} loadingText="Archiving…" disabled={!isConfirmed} onClick={confirmDelete}>Archive Project</Button>
                         </div>
                     </div>
                 </div>

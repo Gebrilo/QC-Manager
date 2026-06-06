@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { projectsApi } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { PermissionGate } from '@/components/auth/PermissionGate';
+import { Button } from '@/components/ui/Button';
 
 interface Project {
     id: string;
@@ -335,6 +337,13 @@ export default function TestExecutionsPage() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Upload test results and track execution history</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <PermissionGate permission="qc.results.upload" mode="hide">
+                        <Link href="/test/results">
+                            <Button variant="primary">
+                                Upload Test Results
+                            </Button>
+                        </Link>
+                    </PermissionGate>
                     <button
                         onClick={handleDownloadTemplate}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 transition-all"
@@ -731,7 +740,7 @@ export default function TestExecutionsPage() {
                             </div>
                             <p className="text-slate-500 dark:text-slate-400">
                                 {testRuns.length === 0
-                                    ? 'No test runs yet. Upload your first Excel file above.'
+                                    ? 'No test runs yet. Click Upload Test Results above to import your first run.'
                                     : 'No test runs match your search criteria.'}
                             </p>
                         </div>

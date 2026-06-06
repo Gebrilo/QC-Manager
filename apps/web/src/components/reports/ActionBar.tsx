@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { type ReportDefinition, cn } from './reportTypes';
 import { Ico } from './ReportIcons';
+import { Button } from '@/components/ui/Button';
 
 interface ExportMenuProps {
     onPick: (fmt: string) => void;
@@ -139,22 +140,16 @@ export function ActionBar({
                             />
                         )}
                     </div>
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={onGenerate}
+                        loading={generating}
+                        loadingText="Generating… (est ~30s)"
                         disabled={generating}
-                        className={cn(
-                            'flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-semibold text-white transition flex-shrink-0',
-                            generating
-                                ? 'bg-slate-400 dark:bg-slate-700 cursor-wait'
-                                : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 active:scale-95 shadow-lg shadow-indigo-500/30'
-                        )}
+                        className="min-w-[220px]"
                     >
-                        {generating ? (
-                            <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" /> Generating</>
-                        ) : (
-                            <><Ico k="bolt" size={14} /> Generate</>
-                        )}
-                    </button>
+                        Generate
+                    </Button>
                 </div>
             </div>
 

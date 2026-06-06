@@ -1,9 +1,17 @@
 import type { TestCase, TestCaseListResponse, TestSuite, SuiteTestCase, TestSuiteListResponse, TestRun, TestRunExecution, TestRunProgress, TestRunListResponse } from '@/types';
 
-// NEXT_PUBLIC_API_URL is baked at build time. If the build arg was missing,
-// it collapses to "https://" (truthy but invalid). Guard against that here.
 const _rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 const API_URL = _rawApiUrl.length > 8 ? _rawApiUrl : 'https://api.gebrils.cloud';
+
+type ApiErrorEvent = { status: number; message: string; endpoint: string };
+const apiErrorListeners = new Set<(e: ApiErrorEvent) => void>();
+export function onApiError(fn: (e: ApiErrorEvent) => void) {
+    apiErrorListeners.add(fn);
+    return () => { apiErrorListeners.delete(fn); };
+}
+function emitApiError(e: ApiErrorEvent) {
+    apiErrorListeners.forEach(fn => { try { fn(e); } catch {} });
+}
 
 /**
  * Generic API fetch wrapper
@@ -49,6 +57,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
         if (response.status === 403) {
             const err = new Error(errorData.error || 'You do not have permission to perform this action');
             (err as any).status = 403;
+            emitApiError({ status: 403, message: err.message, endpoint });
             throw err;
         }
 
@@ -62,6 +71,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
         const err = new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
         (err as any).status = response.status;
+        emitApiError({ status: response.status, message: err.message, endpoint });
         throw err;
     }
 
@@ -130,6 +140,7 @@ export async function fetchApiBlob(endpoint: string, options: RequestInit = {}) 
 
         const err = new Error(errorText || `API Error: ${response.statusText}`);
         (err as any).status = response.status;
+        emitApiError({ status: response.status, message: err.message, endpoint });
         throw err;
     }
 

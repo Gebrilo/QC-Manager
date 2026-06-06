@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { useToast } from '@/components/ui/Toast';
 import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
@@ -40,6 +41,8 @@ interface UserStoryFormProps {
 
 export function UserStoryForm({ initialData, isEdit, artifactId, projectId: initialProjectId }: UserStoryFormProps) {
     const router = useRouter();
+    const toast = useToast();
+    const formRef = useRef<HTMLFormElement>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
@@ -98,21 +101,26 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
 
             if (isEdit && artifactId) {
                 await tuleapApi.updateUnified(artifactId, payload);
+                toast.success('Story saved');
                 router.push(`/work/stories/${artifactId}`);
             } else {
                 const result = await tuleapApi.createUnified(payload);
+                toast.success('Story created');
                 router.push(`/work/stories/${result.qc_id || result.tuleap_artifact_id}`);
             }
             router.refresh();
         } catch (err: any) {
-            setError(err.message || 'Failed to save user story');
+            const message = err.message || 'Failed to save user story';
+            setError(message);
+            toast.error(message);
+            formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-3xl mx-auto">
+        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-3xl mx-auto">
             <ErrorBanner message={error} />
 
             <FormSection title="General">
@@ -246,8 +254,13 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => router.back()} className="w-24 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting} className="w-40 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 border-none">
-                    {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create User Story'}
+                <Button
+                    type="submit"
+                    loading={isSubmitting}
+                    loadingText="Saving…"
+                    className="w-40 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 border-none"
+                >
+                    {isEdit ? 'Save Changes' : 'Create User Story'}
                 </Button>
             </div>
         </form>

@@ -6,17 +6,20 @@ import { fetchApi } from '@/lib/api';
 import ProjectForm from '@/components/projects/ProjectForm';
 import { Project } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/ui/Toast';
 
 export default function EditProjectPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
     const { hasPermission, loading: authLoading } = useAuth();
+    const toast = useToast();
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.projects.edit')) {
+            toast.error("You don't have permission to edit this project");
             router.replace(`/work/projects/${id}`);
         }
     }, [authLoading, hasPermission, router, id]);

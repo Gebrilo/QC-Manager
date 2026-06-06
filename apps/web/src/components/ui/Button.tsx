@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { twMerge } from 'tailwind-merge';
 import { clsx, type ClassValue } from 'clsx';
+import { Spinner } from './Spinner';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -10,12 +11,16 @@ export interface ButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
     size?: 'default' | 'sm' | 'lg' | 'icon';
+    loading?: boolean;
+    loadingText?: string;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ className, variant = 'default', size = 'default', ...props }, ref) => {
+    ({ className, variant = 'default', size = 'default', loading, loadingText, disabled, children, ...props }, ref) => {
+        const isDisabled = disabled || loading;
         return (
             <button
+                aria-busy={loading || undefined}
                 className={cn(
                     "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ring-offset-white dark:ring-offset-slate-950",
                     {
@@ -33,9 +38,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                     },
                     className
                 )}
+                disabled={isDisabled}
                 ref={ref}
                 {...props}
-            />
+            >
+                {loading && <Spinner size="sm" className="mr-2 text-current" />}
+                {loading && loadingText ? loadingText : children}
+            </button>
         );
     }
 );

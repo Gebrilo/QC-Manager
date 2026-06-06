@@ -8,9 +8,11 @@ import { LibraryRail } from '@/components/reports/LibraryRail';
 import { ActionBar } from '@/components/reports/ActionBar';
 import { DocumentPreview } from '@/components/reports/DocumentPreview';
 import { RecentScheduledPanel } from '@/components/reports/RecentScheduledPanel';
-import { ShareModal, ScheduleModal, Toast } from '@/components/reports/ReportModals';
+import { ShareModal, ScheduleModal } from '@/components/reports/ReportModals';
 import { reportsApi, projectsApi, type Project } from '@/lib/api';
 import { createReportPdfBlob, downloadReportAsPdf } from '@/lib/reportPdf';
+import { useToast } from '@/components/ui/Toast';
+import { Spinner } from '@/components/ui/Spinner';
 
 type BackendReportType = 'project_status' | 'resource_utilization' | 'task_export' | 'test_results' | 'dashboard';
 type BackendFormat = 'xlsx' | 'csv' | 'json' | 'pdf';
@@ -120,9 +122,8 @@ export default function ReportsPage() {
     const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
     const [stamp, setStamp] = useState(stampNow);
     const [modal, setModal] = useState<'share' | 'schedule' | null>(null);
-    const [toast, setToast] = useState<string | null>(null);
-    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const toast = useToast();
 
     useEffect(() => {
         projectsApi.list()
@@ -145,10 +146,8 @@ export default function ReportsPage() {
         : 'All projects';
 
     const notify = useCallback((msg: string) => {
-        setToast(msg);
-        if (toastTimer.current) clearTimeout(toastTimer.current);
-        toastTimer.current = setTimeout(() => setToast(null), 2400);
-    }, []);
+        toast.success(msg);
+    }, [toast]);
 
     const clearPolling = useCallback(() => {
         if (pollTimer.current) {
@@ -159,7 +158,6 @@ export default function ReportsPage() {
 
     useEffect(() => {
         return () => {
-            if (toastTimer.current) clearTimeout(toastTimer.current);
             clearPolling();
         };
     }, [clearPolling]);
@@ -187,25 +185,25 @@ export default function ReportsPage() {
                     try {
                         const file = await reportsApi.download(jobId);
                         saveBlobToDevice(file.blob, file.fileName);
-                        notify(`${reportName} generated. Download started.`);
+                        toast.success(`${reportName} generated. Download started.`);
                     } catch (err: any) {
-                        notify(err?.message || `${reportName} generated, but download failed.`);
+                        toast.error(err?.message || `${reportName} generated, but download failed.`);
                     }
                 } else {
-                    notify(`${reportName} generated, but no download link was provided.`);
+                    toast.warning(`${reportName} generated, but no download link was provided.`);
                 }
                 return;
             }
 
             if (job.status === 'failed') {
                 setGenerating(false);
-                notify(job.error_message || `${reportName} generation failed.`);
+                toast.error(job.error_message || `${reportName} generation failed.`);
                 return;
             }
 
             if (attempt >= maxAttempts) {
                 setGenerating(false);
-                notify('Report generation timed out. Please try again.');
+                toast.error('Report generation timed out. Please try again.');
                 return;
             }
 
@@ -215,7 +213,7 @@ export default function ReportsPage() {
         } catch {
             if (attempt >= maxAttempts) {
                 setGenerating(false);
-                notify('Could not check report status. Please try again.');
+                toast.error('Could not check report status. Please try again.');
                 return;
             }
 
@@ -223,7 +221,7 @@ export default function ReportsPage() {
                 pollJobUntilDone(jobId, reportName, generatedStamp, attempt + 1);
             }, pollIntervalMs);
         }
-    }, [notify]);
+    }, [toast]);
 
     async function handleGenerate() {
         clearPolling();
@@ -248,7 +246,7 @@ export default function ReportsPage() {
                     : report;
                 const gauge = realData?.gauge ?? GAUGE_DATA[report.id] ?? { value: 0, label: 'Headline', caption: '' };
                 await downloadReportAsPdf({ report: merged, gauge, range, project: projectLabel, stamp: generatedStamp });
-                notify(`${report.name} PDF generated. Download started.`);
+                toast.success(`${report.name} PDF generated. Download started.`);
                 setGenerating(false);
                 // Record the PDF generation in the backend for history, then refresh the panel
                 reportsApi.generate({ report_type: reportType, format: 'pdf' }).catch(() => {});
@@ -261,11 +259,11 @@ export default function ReportsPage() {
                 format: backendFormat,
             });
 
-            notify(`Generating ${report.name}...`);
+            toast.info(`Generating ${report.name}...`);
             await pollJobUntilDone(response.data.job_id, report.name, generatedStamp);
         } catch (err: any) {
             setGenerating(false);
-            notify(err?.message || `Failed to start ${report.name} generation.`);
+            toast.error(err?.message || `Failed to start ${report.name} generation.`);
         }
     }
 
@@ -362,6 +360,20 @@ export default function ReportsPage() {
                     </div>
                 </div>
 
+                {generating && (
+                    <div className="glass-card rounded-xl p-4 flex items-center gap-3 border border-indigo-200 dark:border-indigo-900 mb-5">
+                        <Spinner size="sm" />
+                        <div className="flex-1">
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Generating report…
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                This typically takes ~30 seconds.
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Studio layout: rail + workspace */}
                 <div className="flex gap-5 items-start">
                     <LibraryRail activeId={report.id} onSelect={setActiveId} />
@@ -420,7 +432,6 @@ export default function ReportsPage() {
                     notify={notify}
                 />
             )}
-            <Toast toast={toast} />
         </div>
     );
 }
