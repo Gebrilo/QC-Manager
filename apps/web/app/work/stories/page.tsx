@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { projectsApi, userStoriesApi, type Project, type UserStory } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ViewToggle } from '@/components/tasks/ViewToggle';
 import { SyncBadge } from '@/components/shared/SyncBadge';
 
@@ -125,7 +126,6 @@ export default function UserStoriesPage() {
     }), [stories]);
 
     const hasAnyFilter = !!(searchTerm || selectedProject || selectedStatus || selectedPriority);
-    const canCreateStory = hasPermission('qc.user_stories.create') || hasPermission('qc.projects.view');
 
     return (
         <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
@@ -141,7 +141,7 @@ export default function UserStoriesPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
-                    {canCreateStory && (
+                    <PermissionGate permission="qc.user_stories.create" fallbackTooltip="Requires editor access to create stories">
                         <Link
                             href="/work/stories/create"
                             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
@@ -151,7 +151,7 @@ export default function UserStoriesPage() {
                             </svg>
                             New Story
                         </Link>
-                    )}
+                    </PermissionGate>
                 </div>
             </div>
 
