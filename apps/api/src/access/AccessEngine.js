@@ -255,8 +255,8 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     // hasBareVerb activates this branch so legacy roles whose catalog grants
     // only the unscoped verb (qc.{ns}.{verb}, no _own/_team/_any) still see
     // their assigned items. Mirrors canPerform's ownScopeAllowed.
-    const userBind = bind(user.id);
     if (hasBareVerb || effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam)) {
+        const userBind = bind(user.id);
         if (userExprs.length > 0) {
             branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}`).join(' OR ')})`);
         }

@@ -334,7 +334,7 @@ export default function TestExecutionsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Test Executions</h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Upload test results and track execution history</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Track test execution runs and history</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <PermissionGate permission="qc.results.upload" mode="hide">
@@ -707,16 +707,19 @@ export default function TestExecutionsPage() {
                                     ))}
                                 </select>
                                 {/* Export Button */}
-                                <button
-                                    onClick={handleExportResults}
-                                    disabled={filteredRuns.length === 0}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 transition-all"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Export CSV
-                                </button>
+                                <PermissionGate permission="qc.testexecutions.view" fallbackTooltip="Requires access to test executions to export">
+                                    <button
+                                        onClick={handleExportResults}
+                                        disabled={filteredRuns.length === 0}
+                                        title={filteredRuns.length === 0 ? 'No test runs to export' : undefined}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 transition-all"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Export CSV
+                                    </button>
+                                </PermissionGate>
                             </div>
                         </div>
                     </div>
@@ -740,7 +743,7 @@ export default function TestExecutionsPage() {
                             </div>
                             <p className="text-slate-500 dark:text-slate-400">
                                 {testRuns.length === 0
-                                    ? 'No test runs yet. Click Upload Test Results above to import your first run.'
+                                    ? 'No test runs yet. Go to Results to upload test results and create your first run.'
                                     : 'No test runs match your search criteria.'}
                             </p>
                         </div>

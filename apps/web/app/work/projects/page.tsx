@@ -82,10 +82,7 @@ export default function ProjectsPage() {
             // Match using Project internal ID (p.id) since tasks store project UUID
             const s = stats.get(p.id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
 
-            // Formula: Completion % = Task Hrs Done / Task Hrs Est
-            // Note: If no estimate, but work done? Context says IF(Est>0, Done/Est, 0)
-            let pct = 0;
-            if (s.est > 0) pct = (s.doneHrs / s.est) * 100;
+            let pct = s.totalCnt > 0 ? (s.doneCnt / s.totalCnt) * 100 : 0;
 
             // Formula: Status
             // No Tasks if count=0

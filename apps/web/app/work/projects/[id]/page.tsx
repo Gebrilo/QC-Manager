@@ -148,7 +148,7 @@ export default function ProjectDetailPage() {
                             Quality
                         </Button>
                     </Link>
-                    <PermissionGate permission="qc.projects.edit">
+                    <PermissionGate permission="qc.projects.edit" fallbackTooltip="Requires editor access to edit projects">
                         <Link href={`/work/projects/${project.id}/edit`}>
                             <Button variant="outline">Edit Project</Button>
                         </Link>
@@ -233,9 +233,11 @@ export default function ProjectDetailPage() {
             <div className="glass-card rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">User Stories</h3>
-                    <Link href={`/work/stories/create?projectId=${project.id}`}>
-                        <Button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm px-4 py-2 rounded-xl">+ Create User Story</Button>
-                    </Link>
+                    <PermissionGate permission="qc.user_stories.create" fallbackTooltip="Requires editor access to create stories">
+                        <Link href={`/work/stories/create?projectId=${project.id}`}>
+                            <Button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm px-4 py-2 rounded-xl">+ Create User Story</Button>
+                        </Link>
+                    </PermissionGate>
                 </div>
                 {storiesLoading ? (
                     <div className="text-center py-8 text-slate-400 animate-pulse">Loading user stories...</div>

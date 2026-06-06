@@ -604,17 +604,14 @@ const runMigrations = async () => {
                 SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog_count,
                 CASE WHEN COUNT(t.id) = 0 THEN 'No Tasks' WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete' ELSE 'Active' END AS status,
                 CASE
-                    WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
-                    THEN ROUND((COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) /
-                         COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 1) * 100)::NUMERIC, 2)
+                    WHEN COUNT(t.id) > 0
+                    THEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END)::NUMERIC / COUNT(t.id)) * 100, 2)
                     ELSE 0
                 END AS overall_completion_pct,
                 CASE
                     WHEN COUNT(t.id) = 0 THEN 'No Tasks'
                     WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete'
-                    WHEN CASE WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
-                         THEN (COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) /
-                               COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 1) * 100) ELSE 0 END >= 70
+                    WHEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END)::NUMERIC / COUNT(t.id)) * 100, 2) >= 70
                     THEN 'On Track'
                     ELSE 'At Risk'
                 END AS dynamic_status,
@@ -1089,6 +1086,25 @@ const runMigrations = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_project_id ON test_result(project_id) WHERE deleted_at IS NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_executed_at ON test_result(executed_at) WHERE deleted_at IS NULL`);
+
+        await client.query(`
+            CREATE OR REPLACE VIEW v_latest_test_results AS
+            SELECT DISTINCT ON (tr.project_id, tr.test_case_id)
+                tr.id,
+                tr.test_case_id,
+                tr.test_case_title,
+                tr.project_id,
+                tr.status,
+                tr.executed_at,
+                tr.notes,
+                tr.tester_name,
+                p.project_name,
+                CURRENT_DATE - tr.executed_at AS days_since_execution
+            FROM test_result tr
+            LEFT JOIN projects p ON tr.project_id = p.id
+            WHERE tr.deleted_at IS NULL
+            ORDER BY tr.project_id, tr.test_case_id, tr.executed_at DESC, tr.created_at DESC
+        `);
 
         // =====================================================
         // GOVERNANCE VIEWS
