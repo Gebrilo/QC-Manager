@@ -135,7 +135,7 @@ export default function ReportsPage() {
 
     const report = REPORTS.find(r => r.id === activeId) || REPORTS[0];
     const { from: effFrom, to: effTo } = rangeToDates(range, dateFrom, dateTo);
-    const { override: realData, loading: dataLoading } = useReportData(report.id, {
+    const { override: realData, loading: dataLoading, degraded } = useReportData(report.id, {
         dateFrom: effFrom,
         dateTo: effTo,
         projectId: project || undefined,
@@ -336,6 +336,7 @@ export default function ReportsPage() {
                         project={projectLabel}
                         realData={realData}
                         dataLoading={false}
+                        degraded={degraded}
                     />
                 </div>
             </div>
@@ -406,6 +407,7 @@ export default function ReportsPage() {
                             project={projectLabel}
                             realData={realData}
                             dataLoading={dataLoading && fmt !== 'PDF'}
+                            degraded={degraded}
                         />
                         <RecentScheduledPanel
                             notify={notify}

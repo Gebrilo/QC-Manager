@@ -8,6 +8,7 @@ import {
 } from './reportTypes';
 import { Gauge, Sparkline, ColumnChart } from './ReportCharts';
 import { Ico } from './ReportIcons';
+import { Info } from 'lucide-react';
 
 function StatusBadge({ status, paper = false }: { status: string; paper?: boolean }) {
     const s = STATUS_CONFIG[status] || STATUS_CONFIG.ontrack;
@@ -44,10 +45,11 @@ interface DocumentPreviewProps {
     project: string;
     realData?: { kpis?: ReportDefinition['kpis']; chart?: ReportDefinition['chart']; rows?: ReportDefinition['rows']; summary?: string; summaryTone?: ReportDefinition['summaryTone']; gauge?: { value: number; label: string; caption: string } } | null;
     dataLoading?: boolean;
+    degraded?: boolean;
     paperRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function DocumentPreview({ report, generating, stamp, range, project, realData, dataLoading, paperRef }: DocumentPreviewProps) {
+export function DocumentPreview({ report, generating, stamp, range, project, realData, dataLoading, degraded, paperRef }: DocumentPreviewProps) {
     const merged = realData
         ? {
             ...report,
@@ -78,7 +80,15 @@ export function DocumentPreview({ report, generating, stamp, range, project, rea
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{report.category} Report</p>
-                            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-900 tracking-tight mt-1 leading-none">{report.name}</h3>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-900 tracking-tight leading-none">{report.name}</h3>
+                                {degraded && (
+                                    <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                        <Info className="w-3 h-3" />
+                                        Showing latest snapshot - live governance view requires elevated access
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-xs text-slate-400 mt-2">Generated {stamp}</p>
                         </div>
                         <div className="text-right flex-shrink-0">

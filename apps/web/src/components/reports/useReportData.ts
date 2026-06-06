@@ -9,6 +9,7 @@ import {
     getTestCoverage,
 } from '@/services/governanceApi';
 import { fetchApi } from '@/lib/api';
+import { useAuth } from '@/components/providers/AuthProvider';
 import type { ReportDefinition, ReportKpi, ChartBar, ReportRow, ReportStatus } from './reportTypes';
 
 type ReportOverride = Pick<ReportDefinition, 'kpis' | 'chart' | 'rows' | 'summary' | 'summaryTone'> & {
@@ -464,28 +465,52 @@ const FETCHERS: Record<string, (params: FetcherParams) => Promise<ReportOverride
     'quality-trend': fetchQualityTrend,
 };
 
+const LIVE_GOVERNANCE_REPORTS = new Set([
+    'readiness',
+    'quality',
+    'coverage',
+    'proj-status',
+    'bug-dist',
+    'quality-trend',
+]);
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useReportData(reportId: string, params: FetcherParams = {}) {
     const { dateFrom, dateTo, projectId } = params;
+    const { hasPermission } = useAuth();
     const [override, setOverride] = useState<ReportOverride | null>(null);
     const [loading, setLoading] = useState(false);
+    const [degraded, setDegraded] = useState(false);
 
     useEffect(() => {
         const fetcher = FETCHERS[reportId];
         if (!fetcher) return;
 
+        const requiresGovernance = LIVE_GOVERNANCE_REPORTS.has(reportId);
+        if (requiresGovernance && !hasPermission('qc.governance.view')) {
+            setOverride(null);
+            setDegraded(true);
+            setLoading(false);
+            return;
+        }
+
         let cancelled = false;
         setOverride(null);
+        setDegraded(false);
         setLoading(true);
 
         fetcher({ dateFrom, dateTo, projectId })
             .then(data => { if (!cancelled) setOverride(data); })
-            .catch(() => { if (!cancelled) setOverride(null); })
+            .catch((err) => {
+                if (cancelled) return;
+                setOverride(null);
+                if (err?.status === 403) setDegraded(true);
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
 
         return () => { cancelled = true; };
-    }, [reportId, dateFrom, dateTo, projectId]);
+    }, [reportId, dateFrom, dateTo, projectId, hasPermission]);
 
-    return { override, loading };
+    return { override, loading, degraded };
 }

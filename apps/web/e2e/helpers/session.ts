@@ -4,7 +4,7 @@ type MockUser = {
     id: string;
     name: string;
     email: string;
-    role: 'admin' | 'manager' | 'user' | 'viewer' | 'contributor';
+    role: 'admin' | 'manager' | 'team_manager' | 'pm' | 'member' | 'user' | 'viewer' | 'tester' | 'contributor';
     status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     preferences?: Record<string, unknown>;
 };
@@ -68,18 +68,34 @@ export async function mockAuthenticatedSession(
     }, { token, session: supabaseSession });
 
     // Mock both the old production API and new localhost API URLs
+    const authBody = JSON.stringify({ user, permissions });
+
+    await page.route('**/auth/sync', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: authBody,
+        });
+    });
     await page.route('**/auth/me', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ user, permissions }),
+            body: authBody,
+        });
+    });
+    await page.route('http://localhost:3001/auth/sync*', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: authBody,
         });
     });
     await page.route('http://localhost:3001/auth/me*', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ user, permissions }),
+            body: authBody,
         });
     });
 
