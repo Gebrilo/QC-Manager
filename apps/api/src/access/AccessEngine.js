@@ -248,7 +248,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
 
     // owner_team
     if (ownerTeamExpr && scope.team_id && effectivePermissions.has(keyTeam)) {
-        branches.push(`${ownerTeamExpr} = ${bind(scope.team_id)}`);
+        branches.push(`${ownerTeamExpr} = ${bind(scope.team_id)}::uuid`);
     }
 
     // owner/assignee user columns (created_by_user_id, assigned_to, executed_by...)
@@ -258,11 +258,11 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     if (hasBareVerb || effectivePermissions.has(keyOwn) || effectivePermissions.has(keyTeam)) {
         const userBind = bind(user.id);
         if (userExprs.length > 0) {
-            branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}`).join(' OR ')})`);
+            branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}::uuid`).join(' OR ')})`);
         }
         if (assigneeResourceExprs.length > 0) {
             branches.push(
-                `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind} AND r.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r.id = ${expr}`).join(' OR ')}))`
+                `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind}::uuid AND r.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r.id = ${expr}`).join(' OR ')}))`
             );
         }
     }
@@ -271,7 +271,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     if (scope.team_id && assigneeResourceExprs.length > 0 && effectivePermissions.has(keyTeam)) {
         const teamBind = bind(scope.team_id);
         branches.push(
-            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind} AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
+            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
         );
     }
 
@@ -284,21 +284,21 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     {
         const aclUserBind = bind(user.id);
         const roleBind = bind(canonicalRole(user.role));
-        const teamForAcl = scope.team_id ? bind(scope.team_id) : 'NULL';
+        const teamForAcl = scope.team_id ? `${bind(scope.team_id)}::text` : 'NULL';
         const typeBind = bind(artifactType);
         const verbBind = bind(verb);
         branches.push(
             `EXISTS (SELECT 1 FROM artifact_access aa
-               WHERE aa.artifact_type = ${typeBind} AND aa.artifact_id = ${tableAlias}.id AND aa.action = ${verbBind}
-                 AND ((aa.subject_type='user' AND aa.subject_id=${aclUserBind})
+               WHERE aa.artifact_type = ${typeBind}::text AND aa.artifact_id = ${tableAlias}.id AND aa.action = ${verbBind}::text
+                 AND ((aa.subject_type='user' AND aa.subject_id=${aclUserBind}::text)
                    OR (aa.subject_type='team' AND aa.subject_id=${teamForAcl})
-                   OR (aa.subject_type='role' AND aa.subject_id=${roleBind})))`
+                   OR (aa.subject_type='role' AND aa.subject_id=${roleBind}::text)))`
         );
     }
 
     // project_managers (PM of project)
     if (scope.pm_of_projects.length > 0) {
-        const placeholders = scope.pm_of_projects.map(p => bind(p)).join(', ');
+        const placeholders = scope.pm_of_projects.map(p => `${bind(p)}::uuid`).join(', ');
         branches.push(`${projectExpr} IN (${placeholders})`);
     }
 
@@ -306,7 +306,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     if (verb === 'view' && visibilityExpr && scope.team_id) {
         const tb = bind(scope.team_id);
         branches.push(
-            `(${visibilityExpr} = 'project' AND EXISTS (SELECT 1 FROM project_teams pt WHERE pt.project_id = ${projectExpr} AND pt.team_id = ${tb}))`
+            `(${visibilityExpr} = 'project' AND EXISTS (SELECT 1 FROM project_teams pt WHERE pt.project_id = ${projectExpr} AND pt.team_id = ${tb}::uuid))`
         );
     }
 

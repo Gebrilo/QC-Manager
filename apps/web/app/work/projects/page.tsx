@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { InfoTooltip } from '@/components/ui/Tooltip';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -17,6 +18,7 @@ interface ProjectStats {
     tasksTotal: number;
     tasksDone: number;
     completionPct: number;
+    effortPct: number | null;
     computedStatus: string;
 }
 
@@ -53,7 +55,7 @@ export default function ProjectsPage() {
     const projectStats = useMemo(() => {
         // Map project ID to basic sums
         const stats = new Map<string, {
-            est: number, act: number, doneHrs: number,
+            est: number, act: number, doneHrs: number, doneEstHrs: number,
             doneCnt: number, totalCnt: number
         }>();
 
@@ -61,7 +63,7 @@ export default function ProjectsPage() {
             if (!t.project_id) return;
             // Tasks link via project UUID (p.id), not display ID (p.project_id)
 
-            const current = stats.get(t.project_id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
+            const current = stats.get(t.project_id) || { est: 0, act: 0, doneHrs: 0, doneEstHrs: 0, doneCnt: 0, totalCnt: 0 };
 
             // Use R1+R2 hours if total_est_hrs not available from API
             const tEst = Number(t.total_est_hrs) || (Number(t.r1_estimate_hrs || 0) + Number(t.r2_estimate_hrs || 0));
@@ -74,13 +76,14 @@ export default function ProjectsPage() {
             if (t.status === 'Done') {
                 current.doneCnt++;
                 current.doneHrs += tAct; // "Task Hrs Done" = Sum of Actuals for Done tasks
+                current.doneEstHrs += tEst;
             }
             stats.set(t.project_id, current);
         });
 
         return projects.map(p => {
             // Match using Project internal ID (p.id) since tasks store project UUID
-            const s = stats.get(p.id) || { est: 0, act: 0, doneHrs: 0, doneCnt: 0, totalCnt: 0 };
+            const s = stats.get(p.id) || { est: 0, act: 0, doneHrs: 0, doneEstHrs: 0, doneCnt: 0, totalCnt: 0 };
 
             let pct = s.totalCnt > 0 ? (s.doneCnt / s.totalCnt) * 100 : 0;
 
@@ -103,6 +106,7 @@ export default function ProjectsPage() {
                 tasksTotal: s.totalCnt,
                 tasksDone: s.doneCnt,
                 completionPct: pct,
+                effortPct: s.est > 0 ? Math.round((s.doneHrs / s.est) * 100 * 100) / 100 : null,
                 computedStatus: status
             } as ProjectWithStats;
         });
@@ -266,7 +270,10 @@ export default function ProjectsPage() {
                                         <StatItem label="Task Hrs Est" value={project.taskHrsEst.toFixed(1)} />
                                         <StatItem label="Task Hrs Actual" value={project.taskHrsActual.toFixed(1)} />
                                         <StatItem label="Task Hrs Done" value={project.taskHrsDone.toFixed(1)} highlight />
-                                        <StatItem label="Completion %" value={`${Math.round(project.completionPct)}%`} />
+                                        <StatItem label="Completion %" value={`${Math.round(project.completionPct)}%`} tooltip="Percentage of tasks marked Done" />
+                                        {project.effortPct != null && (
+                                            <StatItem label="Effort Completion" value={`${project.effortPct}%`} tooltip="Actual vs estimated hours for Done tasks" />
+                                        )}
                                         {/* Additional stats if needed */}
                                     </div>
 
@@ -282,10 +289,13 @@ export default function ProjectsPage() {
     );
 }
 
-function StatItem({ label, value, highlight = false }: { label: string, value: string | number, highlight?: boolean }) {
+function StatItem({ label, value, highlight = false, tooltip }: { label: string, value: string | number, highlight?: boolean, tooltip?: string }) {
     return (
         <div className="flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">{label}</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1 flex items-center gap-1">
+                {label}
+                {tooltip && <InfoTooltip content={tooltip} position="top" />}
+            </span>
             <span className={`text-sm font-semibold ${highlight ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
                 {value}
             </span>

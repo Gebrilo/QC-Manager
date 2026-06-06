@@ -15,6 +15,7 @@ import { QuickNavCards } from '@/components/shared/QuickNavCards';
 import { AdminDashboardView } from '@/components/my-dashboard/AdminDashboardView';
 import { ManagerDashboardView } from '@/components/my-dashboard/ManagerDashboardView';
 import { StatCard } from '@/components/ui/StatCard';
+import { Mail } from 'lucide-react';
 
 interface PersonalTask { id: string; status: 'pending' | 'in_progress' | 'done' | 'cancelled'; }
 
@@ -128,7 +129,16 @@ export function MyDashboardClient() {
                     </svg>
                     <div>
                         <p className="text-amber-800 dark:text-amber-300 font-semibold">Your account is not linked to a resource yet</p>
-                        <p className="text-amber-600 dark:text-amber-500 text-sm mt-1">Contact your administrator to link your account so you can see your personal stats. In the meantime, here&apos;s an overview of the organisation.</p>
+                        <p className="text-amber-600 dark:text-amber-500 text-sm mt-1">
+                            Contact your administrator to link your account so you can see your personal stats. In the meantime, here&apos;s an overview of the organisation.
+                            <a
+                                href="mailto:?subject=Please link my QC-Manager account"
+                                className="inline-flex items-center gap-1 ml-1 text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                            >
+                                <Mail className="w-3.5 h-3.5" />
+                                Contact admin
+                            </a>
+                        </p>
                     </div>
                 </div>
 
@@ -162,7 +172,7 @@ export function MyDashboardClient() {
                 )}
 
                 <div>
-                    <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">Quick Actions</h2>
+                    <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">Get Started</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <Link href="/work/projects"
                             className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">

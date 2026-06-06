@@ -68,6 +68,7 @@ export interface Project {
     task_hrs_actual?: number;
     dynamic_status?: string;
     overall_completion_pct?: number; // Added from view
+    effort_completion_pct?: number; // Hours-weighted completion (actual vs estimated)
 }
 
 export interface Resource {

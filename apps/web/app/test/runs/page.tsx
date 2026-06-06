@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Button } from '@/components/ui/Button';
+import { Upload } from 'lucide-react';
 
 interface Project {
     id: string;
@@ -338,8 +339,9 @@ export default function TestExecutionsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <PermissionGate permission="qc.results.upload" mode="hide">
-                        <Link href="/test/results">
-                            <Button variant="primary">
+                        <Link href="/test/results/upload">
+                            <Button variant="primary" className="flex items-center gap-2">
+                                <Upload className="w-4 h-4" />
                                 Upload Test Results
                             </Button>
                         </Link>
@@ -743,7 +745,7 @@ export default function TestExecutionsPage() {
                             </div>
                             <p className="text-slate-500 dark:text-slate-400">
                                 {testRuns.length === 0
-                                    ? 'No test runs yet. Go to Results to upload test results and create your first run.'
+                                    ? 'No test runs yet. Click Upload Test Results above to import your first run.'
                                     : 'No test runs match your search criteria.'}
                             </p>
                         </div>

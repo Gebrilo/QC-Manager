@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
+import { InfoTooltip } from '@/components/ui/Tooltip';
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -215,7 +216,7 @@ export default function ProjectDetailPage() {
                             <StatRow label="Tasks Done" value={`${project.tasks_done_count || 0} / ${project.tasks_total_count || 0}`} />
                             <div className="pt-2">
                                 <div className="flex justify-between text-xs mb-1">
-                                    <span>Completion</span>
+                                    <span className="flex items-center gap-1">Completion <InfoTooltip content="Percentage of tasks marked Done" position="right" /></span>
                                     <span>{project.overall_completion_pct || 0}%</span>
                                 </div>
                                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -225,6 +226,20 @@ export default function ProjectDetailPage() {
                                     />
                                 </div>
                             </div>
+                            {project.effort_completion_pct != null && (
+                                <div className="pt-1">
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="flex items-center gap-1">Effort Completion <InfoTooltip content="Actual vs estimated hours for Done tasks" position="right" /></span>
+                                        <span>{project.effort_completion_pct}%</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-amber-500"
+                                            style={{ width: `${Math.min(project.effort_completion_pct, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
