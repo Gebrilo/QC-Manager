@@ -16,6 +16,7 @@ function TestResultsContent() {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [projectFilter, setProjectFilter] = useState(searchParams?.get('project_id') || 'all');
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | 'all'>('all');
@@ -61,8 +62,10 @@ function TestResultsContent() {
       const response = await fetchApi<{ data: TestResult[] } | TestResult[]>(`/test-results?${params.toString()}`);
       const data = Array.isArray(response) ? response : (response as any).data || [];
       setTestResults(data);
-    } catch (error) {
+      setLoadError(null);
+    } catch (error: any) {
       console.error('Failed to load test results:', error);
+      setLoadError(error.message || 'Failed to load test results');
     } finally {
       setLoading(false);
     }
@@ -178,7 +181,16 @@ function TestResultsContent() {
         </div>
       </div>
 
-      {testResults.length === 0 ? (
+      {loadError ? (
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg p-6 text-center">
+          <svg className="w-8 h-8 text-rose-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-rose-800 dark:text-rose-300 font-medium mb-1">Failed to load test results</p>
+          <p className="text-sm text-rose-600 dark:text-rose-400 mb-3">{loadError}</p>
+          <Button onClick={() => { setLoadError(null); loadTestResults(); }}>Retry</Button>
+        </div>
+      ) : testResults.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             No test results found. Upload your test results to get started.

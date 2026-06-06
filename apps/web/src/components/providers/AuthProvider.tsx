@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const data = await res.json();
             applyPreferences(data.user.preferences);
             setUser({ ...data.user });
-            setPermissions(data.permissions || []);
+            setPermissions(data.effective_permissions || data.permissions || []);
             return true;
         } catch {
             return false;

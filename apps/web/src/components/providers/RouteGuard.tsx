@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus } from '../../config/routes';
+import { UnauthorizedPage } from '../PermissionGuard';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
     const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
@@ -13,49 +14,37 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (loading) return;
 
-        // Redirect authenticated users away from auth pages
         if (user && (pathname === '/login' || pathname === '/register')) {
-            console.log('[RouteGuard] redirect from auth page → landing', { role: user.role, status: user.status, landing: getLandingPage(user, permissions) });
             router.replace(getLandingPage(user, permissions));
             return;
         }
 
         if (isPublicRoute(pathname || '')) return;
 
-        // All non-public routes require authentication
         if (!user) {
-            console.log('[RouteGuard] no user → /login', { pathname });
             router.replace('/login');
             return;
         }
 
         const route = getRouteConfig(pathname || '');
-
-        // If no route config exists, require authentication only (already checked above)
         if (!route) return;
 
-        // Permission-validated landing page based on user preferences
         const landing = getLandingPage(user, permissions);
 
         if (!routeAllowsStatus(route, user)) {
-            console.log('[RouteGuard] status scope denied → /my-tasks', { pathname, role: user.role, status: user.status, scopes: route.scopes });
             router.replace('/me/tasks');
             return;
         }
 
         if (route.adminOnly && !isAdmin) {
-            console.log('[RouteGuard] adminOnly denied → landing', { pathname, role: user.role, isAdmin, landing });
             router.replace(landing);
             return;
         }
 
         if (route.permission && !hasPermission(route.permission)) {
-            console.log('[RouteGuard] permission denied → landing', { pathname, permission: route.permission, role: user.role, isAdmin, permCount: permissions.length, landing });
             router.replace(landing);
             return;
         }
-
-        console.log('[RouteGuard] access OK', { pathname, role: user.role, status: user.status, isAdmin });
     }, [loading, user, permissions, pathname, router, hasPermission, isAdmin]);
 
     if (loading) {
@@ -76,15 +65,23 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         return <>{children}</>;
     }
 
-    // Block rendering for unauthenticated users on protected routes
+    if (!user) return null;
+
+    return <>{children}</>;
+}
+
+export function PagePermissionGuard({ children }: { children: React.ReactNode }) {
+    const { user, hasPermission, isAdmin } = useAuth();
+    const pathname = usePathname();
+
     if (!user) return null;
 
     const route = getRouteConfig(pathname || '');
-    if (route) {
-        if (!routeAllowsStatus(route, user)) return null;
-        if (route.adminOnly && !isAdmin) return null;
-        if (route.permission && !hasPermission(route.permission)) return null;
-    }
+    if (!route) return <>{children}</>;
+
+    if (!routeAllowsStatus(route, user)) return <UnauthorizedPage />;
+    if (route.adminOnly && !isAdmin) return <UnauthorizedPage />;
+    if (route.permission && !hasPermission(route.permission)) return <UnauthorizedPage />;
 
     return <>{children}</>;
 }

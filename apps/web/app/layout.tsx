@@ -4,7 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
-import { RouteGuard } from '@/components/providers/RouteGuard';
+import { RouteGuard, PagePermissionGuard } from '@/components/providers/RouteGuard';
 import { SidebarProvider } from '@/components/providers/SidebarProvider';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -92,7 +92,9 @@ export default function RootLayout({
                                                     <ActivationBanner />
                                                     <main className="flex-1 min-h-0 overflow-y-auto">
                                                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                                                            <ErrorBoundary>{children}</ErrorBoundary>
+                                                            <ErrorBoundary>
+                                                                <PagePermissionGuard>{children}</PagePermissionGuard>
+                                                            </ErrorBoundary>
                                                         </div>
                                                     </main>
                                                 </div>

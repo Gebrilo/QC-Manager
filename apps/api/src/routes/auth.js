@@ -195,6 +195,12 @@ router.post('/sync', async (req, res, next) => {
             );
             const permissions = permsResult.rows.map(p => p.permission_key);
 
+            let effective_permissions = permissions;
+            try {
+                const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
+                effective_permissions = Array.from(resolved.effectivePermissions);
+            } catch {}
+
             return res.json({
                 user: {
                     id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
@@ -203,6 +209,7 @@ router.post('/sync', async (req, res, next) => {
                     avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                 },
                 permissions,
+                effective_permissions,
                 token: accessToken,
             });
         }
@@ -234,6 +241,12 @@ router.post('/sync', async (req, res, next) => {
                     );
                     const permissions = permsResult.rows.map(p => p.permission_key);
 
+                    let effective_permissions = permissions;
+                    try {
+                        const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
+                        effective_permissions = Array.from(resolved.effectivePermissions);
+                    } catch {}
+
                     return res.json({
                         user: {
                             id: user.id, name: user.name, display_name: user.display_name, email: user.email, phone: user.phone,
@@ -242,6 +255,7 @@ router.post('/sync', async (req, res, next) => {
                             avatar_url: user.avatar_url || null, avatar_type: user.avatar_type || null,
                         },
                         permissions,
+                        effective_permissions,
                         token: accessToken,
                     });
                 }
@@ -287,6 +301,12 @@ router.post('/sync', async (req, res, next) => {
         );
         const permissions = permsResult.rows.map(p => p.permission_key);
 
+        let effective_permissions = permissions;
+        try {
+            const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
+            effective_permissions = Array.from(resolved.effectivePermissions);
+        } catch {}
+
         res.status(201).json({
             user: {
                 id: user.id, name: user.name, email: user.email, phone: user.phone,
@@ -295,6 +315,7 @@ router.post('/sync', async (req, res, next) => {
                 avatar_url: null, avatar_type: null,
             },
             permissions,
+            effective_permissions,
             token: accessToken,
         });
 

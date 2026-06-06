@@ -65,6 +65,7 @@ export default function UserStoriesPage() {
     const [stories, setStories] = useState<UserStory[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState('');
@@ -83,22 +84,26 @@ export default function UserStoriesPage() {
         if (typeof window !== 'undefined') localStorage.setItem('stories_view_mode', mode);
     };
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const [storiesData, projectsData] = await Promise.all([
-                    userStoriesApi.list({ limit: 200 }),
-                    projectsApi.list().catch(() => []),
-                ]);
-                setStories(storiesData.data ?? []);
-                setProjects(Array.isArray(projectsData) ? projectsData : []);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
+    const loadStories = async () => {
+        setIsLoading(true);
+        try {
+            const [storiesData, projectsData] = await Promise.all([
+                userStoriesApi.list({ limit: 200 }),
+                projectsApi.list().catch(() => []),
+            ]);
+            setStories(storiesData.data ?? []);
+            setProjects(Array.isArray(projectsData) ? projectsData : []);
+            setLoadError(null);
+        } catch (err: any) {
+            console.error(err);
+            setLoadError(err.message || 'Failed to load user stories');
+        } finally {
+            setIsLoading(false);
         }
-        load();
+    };
+
+    useEffect(() => {
+        loadStories();
     }, []);
 
     const filtered = useMemo(() => {
@@ -210,6 +215,22 @@ export default function UserStoriesPage() {
                     </button>
                 )}
             </div>
+
+            {/* ── Error banner ────────────────────────────────────────── */}
+            {loadError && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                        <p className="text-sm font-medium text-rose-800 dark:text-rose-300">Failed to load user stories</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 mt-0.5">{loadError}</p>
+                    </div>
+                    <button onClick={loadStories} className="ml-auto text-xs text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-medium underline">
+                        Retry
+                    </button>
+                </div>
+            )}
 
             {/* ── Table / Board ──────────────────────────────────────── */}
             {viewMode === 'board' ? (

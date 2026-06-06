@@ -109,18 +109,34 @@ export function MyDashboardClient() {
 
     if (error === 'no-resource') {
         return (
-            <div className="rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-6 text-center">
-                <p className="text-amber-800 dark:text-amber-300 font-medium">Your account is not linked to a resource yet.</p>
-                <p className="text-amber-600 dark:text-amber-500 text-sm mt-1">Contact your administrator to link your account.</p>
+            <div className="space-y-6">
+                {showQuickNav && (
+                    <QuickNavCards journeys={[]} pendingTasks={0} />
+                )}
+                <div className="rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8 text-center">
+                    <svg className="w-12 h-12 text-amber-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <p className="text-amber-800 dark:text-amber-300 font-semibold text-lg">Your account is not linked to a resource yet</p>
+                    <p className="text-amber-600 dark:text-amber-500 text-sm mt-2">Contact your administrator to link your account. In the meantime, you can use the quick actions above to navigate the app.</p>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-6 text-center">
-                <p className="text-rose-700 dark:text-rose-400 font-medium">Failed to load dashboard.</p>
-                <button onClick={load} className="mt-3 text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Try again</button>
+            <div className="space-y-6">
+                {showQuickNav && (
+                    <QuickNavCards journeys={[]} pendingTasks={0} />
+                )}
+                <div className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-8 text-center">
+                    <svg className="w-12 h-12 text-rose-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-rose-700 dark:text-rose-400 font-semibold text-lg">Failed to load dashboard</p>
+                    <button onClick={load} className="mt-3 text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Try again</button>
+                </div>
             </div>
         );
     }
@@ -136,7 +152,18 @@ export function MyDashboardClient() {
     }
 
     // User: personal view
-    if (!data) return null;
+    if (!data) {
+        return (
+            <div className="space-y-6">
+                {showQuickNav && (
+                    <QuickNavCards journeys={journeys} pendingTasks={pendingPersonalTasks} />
+                )}
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 p-8 text-center">
+                    <p className="text-slate-600 dark:text-slate-400">No dashboard data available yet.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-700">
