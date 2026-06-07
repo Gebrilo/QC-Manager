@@ -35,7 +35,8 @@ function LoadingSkeleton() {
 }
 
 export function MyDashboardClient() {
-    const { user, isAdmin, isManager } = useAuth();
+    const { user, isAdmin, isManager, hasPermission } = useAuth();
+    const canViewBugs = hasPermission('qc.bugs.view');
 
     // Elevated-role state
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -211,18 +212,20 @@ export function MyDashboardClient() {
                                 <p className="text-xs text-slate-400">User stories</p>
                             </div>
                         </Link>
-                        <Link href="/work/bugs"
-                            className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
-                            <div className="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-950 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Bugs</p>
-                                <p className="text-xs text-slate-400">Reported issues</p>
-                            </div>
-                        </Link>
+                        {canViewBugs && (
+                            <Link href="/work/bugs"
+                                className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
+                                <div className="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-950 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Bugs</p>
+                                    <p className="text-xs text-slate-400">Reported issues</p>
+                                </div>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
