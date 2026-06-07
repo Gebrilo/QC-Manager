@@ -8,6 +8,7 @@ import { fetchApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 function TestResultsSkeleton() {
   return (
@@ -67,6 +68,7 @@ function TestResultsSkeleton() {
 
 function TestResultsContent() {
   const searchParams = useSearchParams();
+  const { hasPermission } = useAuth();
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,7 @@ function TestResultsContent() {
   const [projectFilter, setProjectFilter] = useState(searchParams?.get('project_id') || 'all');
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | 'all'>('all');
   const [latestOnly, setLatestOnly] = useState(true);
+  const canUpload = hasPermission('qc.testresults.upload');
 
   useEffect(() => {
     loadProjects();
@@ -157,11 +160,13 @@ function TestResultsContent() {
             View and manage test execution results
           </p>
         </div>
-        <Link href="/test/results/upload">
-          <Button>
-            Upload Test Results
-          </Button>
-        </Link>
+        {canUpload && (
+          <Link href="/test/results/upload">
+            <Button>
+              Upload Test Results
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="mb-6 space-y-4">
@@ -242,12 +247,25 @@ function TestResultsContent() {
         </div>
       ) : testResults.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            No test results found. Upload your test results to get started.
-          </p>
-          <Link href="/test/results/upload">
-            <Button>Upload Test Results</Button>
-          </Link>
+          {canUpload ? (
+            <>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No test results found. Upload your test results to get started.
+              </p>
+              <Link href="/test/results/upload">
+                <Button>Upload Test Results</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium text-slate-700 dark:text-slate-300">
+                No test results available
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Contact your administrator to upload test results.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
