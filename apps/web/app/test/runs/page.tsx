@@ -363,6 +363,7 @@ export default function TestExecutionsPage() {
         return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     };
     const canCreateRun = hasPermission('qc.testexecutions.create') || hasPermission('qc.testresults.upload');
+    const canViewGovernance = hasPermission('qc.governance.view');
 
     return (
         <div className="space-y-8">
@@ -390,15 +391,17 @@ export default function TestExecutionsPage() {
                         </svg>
                         Download Template
                     </button>
-                    <button
-                        onClick={() => router.push('/quality/governance')}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium text-white transition-all"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Governance
-                    </button>
+                    {canViewGovernance && (
+                        <button
+                            onClick={() => router.push('/quality/governance')}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium text-white transition-all"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Governance
+                        </button>
+                    )}
                 </div>
             </div>
 
