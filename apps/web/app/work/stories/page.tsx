@@ -8,6 +8,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ViewToggle } from '@/components/tasks/ViewToggle';
 import { SyncBadge } from '@/components/shared/SyncBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const STATUS_OPTIONS = ['Draft', 'Changes', 'Review', 'Approved'];
 const PRIORITY_OPTIONS = ['P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low', 'None'];
@@ -171,7 +172,11 @@ export default function UserStoriesPage() {
                     <div key={s.label} className="glass-card rounded-xl px-4 py-3 flex items-center justify-between">
                         <div>
                             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{s.label}</div>
-                            <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                            {isLoading ? (
+                                <Skeleton className="mt-1 h-7 w-12" />
+                            ) : (
+                                <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                            )}
                         </div>
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
                     </div>
@@ -309,9 +314,21 @@ function StoriesTableView({ stories, isLoading, onDelete }: { stories: UserStory
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                             {isLoading ? (
-                                <tr>
-                                    <td colSpan={7} className="px-5 py-12 text-center text-slate-400">Loading…</td>
-                                </tr>
+                                Array.from({ length: 6 }).map((_, rowIndex) => (
+                                    <tr key={rowIndex}>
+                                        <td className="pl-5 pr-3 py-3.5 sticky left-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+                                            <Skeleton className="h-5 w-14" />
+                                        </td>
+                                        <td className="px-3 py-3.5" style={{ minWidth: 280, maxWidth: 360 }}>
+                                            <Skeleton className="h-5 w-64 max-w-full" />
+                                        </td>
+                                        <td className="px-3 py-3.5"><Skeleton className="h-5 w-28" /></td>
+                                        <td className="px-3 py-3.5"><Skeleton className="h-5 w-20 rounded-full" /></td>
+                                        <td className="px-3 py-3.5"><Skeleton className="h-5 w-24 rounded-full" /></td>
+                                        <td className="px-3 py-3.5"><Skeleton className="h-5 w-10" /></td>
+                                        <td className="pl-3 pr-5 py-3.5"><Skeleton className="ml-auto h-5 w-16" /></td>
+                                    </tr>
+                                ))
                             ) : stories.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-5 py-12 text-center text-slate-400">No user stories found.</td>
@@ -462,8 +479,8 @@ function StoriesBoardView({ stories, isLoading, onStoryClick }: { stories: UserS
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {STORY_BOARD_COLUMNS.map(col => (
                     <div key={col.status} className="space-y-3">
-                        <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-                        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
+                        <Skeleton className="h-10 rounded-xl" />
+                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
                     </div>
                 ))}
             </div>

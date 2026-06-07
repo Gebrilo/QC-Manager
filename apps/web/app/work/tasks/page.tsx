@@ -10,6 +10,7 @@ import { ViewToggle } from '@/components/tasks/ViewToggle';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface Project { id: string; project_id: string; project_name: string; }
 interface Resource { id: string; resource_name: string; }
@@ -170,7 +171,11 @@ export default function TasksPage() {
                     <div key={s.label} className="glass-card rounded-xl px-4 py-3 flex items-center justify-between">
                         <div>
                             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{s.label}</div>
-                            <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                            {isLoading ? (
+                                <Skeleton className="mt-1 h-7 w-12" />
+                            ) : (
+                                <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{s.value}</div>
+                            )}
                         </div>
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
                     </div>
@@ -284,8 +289,8 @@ function TaskBoardView({ tasks, filteredTasks, isLoading, onTaskClick }: { tasks
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {TASK_BOARD_COLUMNS.map(col => (
                     <div key={col.status} className="space-y-3">
-                        <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-                        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />)}
+                        <Skeleton className="h-10 rounded-xl" />
+                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
                     </div>
                 ))}
             </div>

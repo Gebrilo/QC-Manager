@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Upload } from 'lucide-react';
 
 interface Project {
@@ -73,6 +74,40 @@ const SAMPLE_TEMPLATE = [
     ['TC-004', 'Password Reset', 'Not Executed', '', 'Authentication', '', '', 'No'],
     ['TC-005', 'Search Function', 'Pass', 'Retested', 'Search', 'REQ-005', '0.5', 'Yes'],
 ];
+
+function TestRunHistorySkeleton() {
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-700/50">
+                    <tr>
+                        {['Run ID', 'Name', 'Project', 'Total', 'Pass', 'Fail', 'Blocked', 'Pass Rate', 'Date', 'Actions'].map((header) => (
+                            <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                {header}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {Array.from({ length: 6 }).map((_, rowIndex) => (
+                        <tr key={rowIndex}>
+                            <td className="px-4 py-4"><Skeleton className="h-5 w-20" /></td>
+                            <td className="px-4 py-4"><Skeleton className="h-5 w-40" /></td>
+                            <td className="px-4 py-4"><Skeleton className="h-5 w-32" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-6 w-16 rounded-full" /></td>
+                            <td className="px-4 py-4"><Skeleton className="h-5 w-24" /></td>
+                            <td className="px-4 py-4"><Skeleton className="mx-auto h-8 w-8 rounded-lg" /></td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
 
 export default function TestExecutionsPage() {
     const router = useRouter();
@@ -727,15 +762,7 @@ export default function TestExecutionsPage() {
                     </div>
 
                     {loading ? (
-                        <div className="p-12 text-center">
-                            <div className="inline-flex items-center gap-3 text-slate-400">
-                                <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Loading test runs...
-                            </div>
-                        </div>
+                        <TestRunHistorySkeleton />
                     ) : filteredRuns.length === 0 ? (
                         <div className="p-12 text-center">
                             <div className="w-16 h-16 mx-auto bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">

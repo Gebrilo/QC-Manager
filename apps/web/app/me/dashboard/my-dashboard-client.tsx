@@ -15,20 +15,21 @@ import { QuickNavCards } from '@/components/shared/QuickNavCards';
 import { AdminDashboardView } from '@/components/my-dashboard/AdminDashboardView';
 import { ManagerDashboardView } from '@/components/my-dashboard/ManagerDashboardView';
 import { StatCard } from '@/components/ui/StatCard';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Mail } from 'lucide-react';
 
 interface PersonalTask { id: string; status: 'pending' | 'in_progress' | 'done' | 'cancelled'; }
 
 function LoadingSkeleton() {
     return (
-        <div className="space-y-6 animate-pulse">
+        <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="glass-card p-6 h-24 rounded-xl bg-slate-100 dark:bg-slate-800" />
+                    <Skeleton key={i} className="glass-card h-24 rounded-xl" />
                 ))}
             </div>
-            <div className="glass-card h-48 rounded-xl bg-slate-100 dark:bg-slate-800" />
-            <div className="glass-card h-64 rounded-xl bg-slate-100 dark:bg-slate-800" />
+            <Skeleton className="glass-card h-48 rounded-xl" />
+            <Skeleton className="glass-card h-64 rounded-xl" />
         </div>
     );
 }

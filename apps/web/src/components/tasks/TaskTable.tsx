@@ -15,6 +15,7 @@ import { TaskStatusBadge } from './TaskStatusBadge';
 import Link from 'next/link';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export const HIDEABLE_TASK_COLUMNS: { id: string; header: string }[] = [
     { id: 'project_name',       header: 'Project' },
@@ -249,14 +250,25 @@ export function TaskTable({
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                         {isLoading ? (
-                            <tr>
-                                <td
-                                    colSpan={table.getVisibleLeafColumns().length}
-                                    className="px-5 py-12 text-center text-slate-400"
-                                >
-                                    Loading…
-                                </td>
-                            </tr>
+                            Array.from({ length: 6 }).map((_, rowIndex) => (
+                                <tr key={rowIndex}>
+                                    {table.getVisibleLeafColumns().map((column, cellIndex) => (
+                                        <td
+                                            key={column.id}
+                                            className={[
+                                                'py-3.5',
+                                                cellIndex === 0
+                                                    ? 'pl-5 pr-3 sticky left-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm'
+                                                    : cellIndex === table.getVisibleLeafColumns().length - 1
+                                                        ? 'pl-3 pr-5'
+                                                        : 'px-3',
+                                            ].join(' ')}
+                                        >
+                                            <Skeleton className={cellIndex === 1 ? 'h-5 w-64 max-w-full' : 'h-5 w-24 max-w-full'} />
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))
                          ) : table.getRowModel().rows.length === 0 ? (
                              <tr>
                                  <td

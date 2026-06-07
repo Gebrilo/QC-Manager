@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { InfoTooltip } from '@/components/ui/Tooltip';
+import { Skeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -20,6 +21,34 @@ interface ProjectWithStats extends Project {
     completionPct: number;
     effortPct: number | null;
     computedStatus: string;
+}
+
+function ProjectCardSkeleton() {
+    return (
+        <Card className="space-y-6">
+            <div className="flex items-start gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <Skeleton className="h-16 w-16 shrink-0 rounded-xl" />
+                <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-2 flex-1">
+                            <Skeleton className="h-6 w-48 max-w-full" />
+                            <Skeleton className="h-4 w-full max-w-md" />
+                        </div>
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-y-6 gap-x-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-4 w-14" />
+                    </div>
+                ))}
+            </div>
+            <Skeleton className="h-3 w-full rounded-full" />
+        </Card>
+    );
 }
 
 export default function ProjectsPage() {
@@ -179,8 +208,8 @@ export default function ProjectsPage() {
 
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-6">
-                    {[1, 2].map(i => (
-                        <div key={i} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <ProjectCardSkeleton key={i} />
                     ))}
                 </div>
             ) : projects.length === 0 ? (

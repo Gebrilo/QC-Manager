@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { INITIAL_SCHEDULED, STATUS_CONFIG, cn, type ScheduledItem } from './reportTypes';
 import { Ico } from './ReportIcons';
 import { reportsApi } from '@/lib/api';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 // Map backend report_type to display name + category
 const REPORT_TYPE_LABELS: Record<string, { name: string; category: string }> = {
@@ -143,9 +144,32 @@ export function RecentScheduledPanel({ notify, onSchedule, refreshKey }: RecentS
             {tab === 'recent' ? (
                 <div className="overflow-x-auto">
                     {historyLoading ? (
-                        <div className="flex items-center justify-center py-10">
-                            <span className="w-5 h-5 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
-                        </div>
+                        <table className="w-full min-w-[640px]">
+                            <thead>
+                                <tr className="bg-slate-50/70 dark:bg-slate-800/40">
+                                    {['Report', 'Category', 'Format', 'Generated', 'By', 'Status', ''].map((h, i) => (
+                                        <th key={i} className={cn(
+                                            'text-[10px] uppercase tracking-[0.1em] font-bold text-slate-400 py-2.5 text-left',
+                                            i === 0 ? 'pl-5 pr-4' : 'px-4',
+                                            i === 6 && 'pr-5'
+                                        )}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <tr key={i} className={cn(i > 0 && 'border-t border-slate-50 dark:border-slate-800/60')}>
+                                        <td className="pl-5 pr-4 py-3"><Skeleton className="h-5 w-36" /></td>
+                                        <td className="px-4 py-3"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-4 py-3"><Skeleton className="h-4 w-16" /></td>
+                                        <td className="px-4 py-3"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-4 py-3"><Skeleton className="h-4 w-28" /></td>
+                                        <td className="px-4 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                                        <td className="pr-5 py-3"><Skeleton className="ml-auto h-4 w-20" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : history.length === 0 ? (
                         <div className="py-10 text-center text-sm text-slate-400">No generated reports yet.</div>
                     ) : (

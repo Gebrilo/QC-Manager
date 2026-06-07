@@ -5,11 +5,65 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TestResult, ExecutionStatus, Project } from '@/types';
 import { fetchApi } from '@/lib/api';
-import { FilterBar } from '@/components/ui/FilterBar';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/ui/Spinner';
-import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from '@/components/ui/Skeleton';
+
+function TestResultsSkeleton() {
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-10 w-40 rounded-lg" />
+      </div>
+
+      <div className="mb-6 space-y-4">
+        <div className="flex gap-2">
+          <Skeleton className="h-10 flex-1 rounded-lg" />
+          <Skeleton className="h-10 w-20 rounded-lg" />
+        </div>
+        <div className="flex gap-4 items-center flex-wrap">
+          <Skeleton className="h-10 w-44 rounded-md" />
+          <Skeleton className="h-10 w-40 rounded-md" />
+          <Skeleton className="h-6 w-36" />
+          <Skeleton className="ml-auto h-5 w-20" />
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                {['Test Case ID', 'Title', 'Project', 'Status', 'Executed', 'Tester', 'Notes'].map(header => (
+                  <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {Array.from({ length: 6 }).map((_, rowIndex) => (
+                <tr key={rowIndex}>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-24" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-44" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-32" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-24" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-28" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-40" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TestResultsContent() {
   const searchParams = useSearchParams();
@@ -91,11 +145,7 @@ function TestResultsContent() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <TestResultsSkeleton />;
   }
 
   return (
@@ -280,7 +330,7 @@ function TestResultsContent() {
 
 export default function TestResultsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>}>
+    <Suspense fallback={<TestResultsSkeleton />}>
       <TestResultsContent />
     </Suspense>
   );
