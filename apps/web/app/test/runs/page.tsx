@@ -376,7 +376,7 @@ export default function TestExecutionsPage() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Track test runs and history</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <PermissionGate permission="qc.results.upload" mode="hide">
+                    <PermissionGate permission="qc.testresults.upload" mode="hide">
                         <Link href="/test/results/upload">
                             <Button variant="primary" className="flex items-center gap-2">
                                 <Upload className="w-4 h-4" />
