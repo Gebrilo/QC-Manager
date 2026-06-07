@@ -5,13 +5,13 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus } from '../../config/routes';
 import { UnauthorizedPage } from '../PermissionGuard';
-import { useToast } from '../ui/Toast';
+import { useToastSafe } from '../ui/Toast';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
     const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const toast = useToast();
+    const toast = useToastSafe();
     const lastRedirectPath = useRef<string | null>(null);
 
     useEffect(() => {

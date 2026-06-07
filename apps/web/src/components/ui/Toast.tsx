@@ -145,3 +145,25 @@ export function useToast() {
     }
     return memo;
 }
+
+const noopToast = {
+    info:    () => {},
+    success: () => {},
+    warning: () => {},
+    error:   () => {},
+};
+
+export function useToastSafe() {
+    const ctx = useContext(ToastContext);
+    const push = ctx?.push;
+    const memo = useMemo(() => {
+        if (!push) return noopToast;
+        return {
+            info:    (msg: string, options?: PushOptions) => push('info', msg, options),
+            success: (msg: string, options?: PushOptions) => push('success', msg, options),
+            warning: (msg: string, options?: PushOptions) => push('warning', msg, options),
+            error:   (msg: string, options?: PushOptions) => push('error', msg, options),
+        };
+    }, [push]);
+    return memo;
+}
