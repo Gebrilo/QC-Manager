@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { fetchApi } from '@/lib/api';
-import { Project, Task } from '@/types';
+import { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -11,7 +11,7 @@ import { InfoTooltip } from '@/components/ui/Tooltip';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 
-interface ProjectStats {
+interface ProjectWithStats extends Project {
     taskHrsEst: number;
     taskHrsActual: number;
     taskHrsDone: number;
@@ -22,11 +22,8 @@ interface ProjectStats {
     computedStatus: string;
 }
 
-type ProjectWithStats = Project & ProjectStats;
-
 export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
-    const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -35,12 +32,8 @@ export default function ProjectsPage() {
     useEffect(() => {
         async function load() {
             try {
-                const [pData, tData] = await Promise.all([
-                    fetchApi<Project[]>('/projects', { cache: 'no-store' }),
-                    fetchApi<Task[]>('/tasks', { cache: 'no-store' })
-                ]);
+                const pData = await fetchApi<Project[]>('/projects', { cache: 'no-store' });
                 setProjects(pData);
-                setTasks(tData);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -53,64 +46,43 @@ export default function ProjectsPage() {
 
 
     const projectStats = useMemo(() => {
-        // Map project ID to basic sums
-        const stats = new Map<string, {
-            est: number, act: number, doneHrs: number, doneEstHrs: number,
-            doneCnt: number, totalCnt: number
-        }>();
-
-        tasks.forEach(t => {
-            if (!t.project_id) return;
-            // Tasks link via project UUID (p.id), not display ID (p.project_id)
-
-            const current = stats.get(t.project_id) || { est: 0, act: 0, doneHrs: 0, doneEstHrs: 0, doneCnt: 0, totalCnt: 0 };
-
-            // Use R1+R2 hours if total_est_hrs not available from API
-            const tEst = Number(t.total_est_hrs) || (Number(t.r1_estimate_hrs || 0) + Number(t.r2_estimate_hrs || 0));
-            const tAct = Number(t.total_actual_hrs) || (Number(t.r1_actual_hrs || 0) + Number(t.r2_actual_hrs || 0));
-
-            current.est += tEst;
-            current.act += tAct;
-            current.totalCnt++;
-
-            if (t.status === 'Done') {
-                current.doneCnt++;
-                current.doneHrs += tAct; // "Task Hrs Done" = Sum of Actuals for Done tasks
-                current.doneEstHrs += tEst;
-            }
-            stats.set(t.project_id, current);
-        });
-
         return projects.map(p => {
-            // Match using Project internal ID (p.id) since tasks store project UUID
-            const s = stats.get(p.id) || { est: 0, act: 0, doneHrs: 0, doneEstHrs: 0, doneCnt: 0, totalCnt: 0 };
+            // Use API-provided metrics from v_projects_with_metrics view
+            // These are calculated server-side and include all tasks regardless of user permissions
+            const tasksTotal = Number(p.tasks_total_count) || 0;
+            const tasksDone = Number(p.tasks_done_count) || 0;
+            const completionPct = Number(p.overall_completion_pct) || 0;
+            
+            // Calculate effort completion if not provided by API
+            const taskHrsEst = Number(p.task_hrs_est) || 0;
+            const taskHrsActual = Number(p.task_hrs_actual) || 0;
+            const taskHrsDone = Number(p.task_hrs_done) || 0;
+            const effortPct = p.effort_completion_pct != null ? Number(p.effort_completion_pct) : 
+                              (taskHrsEst > 0 ? Math.round((taskHrsDone / taskHrsEst) * 100 * 100) / 100 : null);
 
-            let pct = s.totalCnt > 0 ? (s.doneCnt / s.totalCnt) * 100 : 0;
-
-            // Formula: Status
-            // No Tasks if count=0
-            // Complete if Tasks Done = Tasks Total
-            // On Track if Pct >= 70%
-            // At Risk if Pct < 70%
-
-            let status = 'At Risk';
-            if (s.totalCnt === 0) status = 'No Tasks';
-            else if (s.doneCnt === s.totalCnt) status = 'Complete';
-            else if (pct >= 70) status = 'On Track';
+            // Determine dynamic status based on completion percentage
+            // Formula matches API: No Tasks if count=0, Complete if all done, On Track if >=70%, else At Risk
+            let status = p.dynamic_status || 'Active';
+            if (!status || status === 'Active') {
+                if (tasksTotal === 0) status = 'No Tasks';
+                else if (tasksDone === tasksTotal) status = 'Complete';
+                else if (completionPct >= 70) status = 'On Track';
+                else status = 'At Risk';
+            }
 
             return {
                 ...p,
-                taskHrsEst: s.est,
-                taskHrsActual: s.act,
-                taskHrsDone: s.doneHrs,
-                tasksTotal: s.totalCnt,
-                tasksDone: s.doneCnt,
-                completionPct: pct,
-                effortPct: s.est > 0 ? Math.round((s.doneHrs / s.est) * 100 * 100) / 100 : null,
+                taskHrsEst,
+                taskHrsActual,
+                taskHrsDone,
+                tasksTotal,
+                tasksDone,
+                completionPct,
+                effortPct,
                 computedStatus: status
             } as ProjectWithStats;
         });
-    }, [projects, tasks]);
+    }, [projects]);
 
     const filteredProjects = useMemo(() => {
         return projectStats.filter(p => {

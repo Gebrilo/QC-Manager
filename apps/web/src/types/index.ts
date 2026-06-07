@@ -66,6 +66,7 @@ export interface Project {
     tasks_todo_count?: number; // Added from view
     task_hrs_est?: number;
     task_hrs_actual?: number;
+    task_hrs_done?: number; // Sum of actual hours for done tasks
     dynamic_status?: string;
     overall_completion_pct?: number; // Added from view
     effort_completion_pct?: number; // Hours-weighted completion (actual vs estimated)
