@@ -27,14 +27,6 @@ async function buildTeamFilter(user) {
     }
     return { clause: '', params: [] };
 }
-    if (user.role === 'manager') {
-        const teamId = await getManagerTeamId(user.id);
-        if (!teamId) return { clause: 'AND 1=0', params: [] }; // No team → no projects
-        return { clause: 'AND team_id = $1', params: [teamId] };
-    }
-    // Other roles: return all (legacy behaviour for non-manager/non-admin)
-    return { clause: '', params: [] };
-}
 
 // GET all projects (from View), scoped by team for managers
 router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('qc.projects.view'), async (req, res, next) => {
