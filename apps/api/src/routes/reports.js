@@ -5,7 +5,7 @@ const axios = require('axios');
 const { z } = require('zod');
 const { triggerWorkflow } = require('../utils/n8n');
 const { v4: uuidv4 } = require('uuid');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
 const XLSX = require('xlsx');
 
 const FORMAT_MIME = {
@@ -146,7 +146,7 @@ const shareReportSchema = z.object({
 });
 
 // POST /reports - Generate report (returns job_id)
-router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (req, res, next) => {
+router.post('/', requireAuth, blockContributors, requirePermission('qc.reports.generate'), async (req, res, next) => {
     try {
         // Validate request
         const data = generateReportSchema.parse(req.body);
@@ -293,7 +293,7 @@ router.post('/', requireAuth, requirePermission('qc.reports.generate'), async (r
 });
 
 // POST /reports/share - Prepare and optionally attach a report share email
-router.post('/share', requireAuth, requirePermission('qc.reports.generate'), async (req, res, next) => {
+router.post('/share', requireAuth, blockContributors, requirePermission('qc.reports.generate'), async (req, res, next) => {
     try {
         const data = shareReportSchema.parse(req.body);
         const fromEmail = systemReportSenderEmail();
@@ -443,7 +443,7 @@ router.post('/share', requireAuth, requirePermission('qc.reports.generate'), asy
 });
 
 // GET /reports/:job_id/download - Proxy report file download through API (avoids browser CORS)
-router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
+router.get('/:job_id/download', requireAuth, blockContributors, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
         const { job_id } = req.params;
 
@@ -503,7 +503,7 @@ router.get('/:job_id/download', requireAuth, requirePermission('qc.reports.view'
 });
 
 // GET /reports/:job_id - Check report status
-router.get('/:job_id', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
+router.get('/:job_id', requireAuth, blockContributors, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
         const { job_id } = req.params;
 
@@ -575,7 +575,7 @@ router.post('/callback', async (req, res, next) => {
 });
 
 // GET /reports - List all report jobs (with pagination)
-router.get('/', requireAuth, requirePermission('qc.reports.view'), async (req, res, next) => {
+router.get('/', requireAuth, blockContributors, requirePermission('qc.reports.view'), async (req, res, next) => {
     try {
         const { user_email, status, limit = 50, offset = 0 } = req.query;
 

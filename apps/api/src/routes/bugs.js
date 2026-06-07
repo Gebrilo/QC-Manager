@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
 const { emitToTuleap: emitBug } = require('../services/emitters/bug');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
@@ -95,7 +95,7 @@ async function tryEmitAndWriteback(bug, data, config, mode) {
     return updateRes.rows[0];
 }
 
-router.get('/summary', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/summary', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const project_id = validUUID(req.query.project_id);
 
@@ -182,7 +182,7 @@ router.get('/summary', requireAuth, requirePermission('qc.bugs.view'), async (re
     }
 });
 
-router.get('/', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
         const project_id = validUUID(req.query.project_id);
@@ -279,7 +279,7 @@ router.get('/', requireAuth, requirePermission('qc.bugs.view'), async (req, res)
     }
 });
 
-router.get('/:id', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -321,7 +321,7 @@ router.get('/:id', requireAuth, requirePermission('qc.bugs.view'), async (req, r
     }
 });
 
-router.get('/by-project/:projectId', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/by-project/:projectId', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -354,7 +354,7 @@ router.get('/by-project/:projectId', requireAuth, requirePermission('qc.bugs.vie
     }
 });
 
-router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, res) => {
+router.post('/', requireAuth, blockContributors, requirePermission('qc.bugs.create'), async (req, res) => {
     try {
         const parsed = createBugSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -478,7 +478,7 @@ router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, r
     }
 });
 
-router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req, res) => {
+router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -580,7 +580,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req,
     }
 });
 
-router.post('/:id/sync', requireAuth, requirePermission('qc.bugs.edit'), async (req, res) => {
+router.post('/:id/sync', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -627,7 +627,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.bugs.edit'), async (
     }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.bugs.delete'), async (req, res) => {
+router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.delete'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -717,7 +717,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.bugs.delete'), async (r
 // BUG TEST EXECUTION LINKING ENDPOINTS
 // =====================================================
 
-router.get('/:id/test-executions', requireAuth, requirePermission('qc.bugs.view'), async (req, res, next) => {
+router.get('/:id/test-executions', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
@@ -743,7 +743,7 @@ router.get('/:id/test-executions', requireAuth, requirePermission('qc.bugs.view'
     }
 });
 
-router.post('/:id/test-executions', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.post('/:id/test-executions', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { test_execution_id } = req.body;
@@ -786,7 +786,7 @@ router.post('/:id/test-executions', requireAuth, requirePermission('qc.bugs.edit
     }
 });
 
-router.delete('/:id/test-executions/:executionId', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.delete('/:id/test-executions/:executionId', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id, executionId } = req.params;
 
@@ -826,7 +826,7 @@ router.delete('/:id/test-executions/:executionId', requireAuth, requirePermissio
 // BUG TASK LINKING ENDPOINTS
 // =====================================================
 
-router.get('/:id/tasks', requireAuth, requirePermission('qc.bugs.view'), async (req, res, next) => {
+router.get('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
@@ -850,7 +850,7 @@ router.get('/:id/tasks', requireAuth, requirePermission('qc.bugs.view'), async (
     }
 });
 
-router.post('/:id/tasks', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.post('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { task_id, relationship_type = 'reported_against' } = req.body;
@@ -893,7 +893,7 @@ router.post('/:id/tasks', requireAuth, requirePermission('qc.bugs.edit'), async 
     }
 });
 
-router.delete('/:id/tasks/:taskId', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.delete('/:id/tasks/:taskId', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id, taskId } = req.params;
 
