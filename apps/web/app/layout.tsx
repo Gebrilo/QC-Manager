@@ -114,9 +114,9 @@ export default function RootLayout({
                 <TooltipProvider delayDuration={300}>
                     <ThemeProvider>
                         <AuthProvider>
-                            <RouteGuard>
-                                <SidebarProvider>
-                                    <ToastProvider>
+                            <ToastProvider>
+                                <RouteGuard>
+                                    <SidebarProvider>
                                         <ApiErrorToaster />
                                         {isAuthPage ? (
                                             <ErrorBoundary>{children}</ErrorBoundary>
@@ -141,9 +141,9 @@ export default function RootLayout({
                                                 </div>
                                             </div>
                                         )}
-                                    </ToastProvider>
-                                </SidebarProvider>
-                            </RouteGuard>
+                                    </SidebarProvider>
+                                </RouteGuard>
+                            </ToastProvider>
                         </AuthProvider>
                     </ThemeProvider>
                 </TooltipProvider>
