@@ -125,6 +125,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'quality',
         label: 'Quality',
         icon: ShieldCheck,
+        roles: ['admin', 'manager', 'team_manager', 'pm', 'member', 'user', 'tester'],
         children: [
             { path: '/work/projects', label: 'Projects', icon: FolderKanban },
             {
