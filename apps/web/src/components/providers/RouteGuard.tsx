@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus } from '../../config/routes';
+import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus, SCOPES } from '../../config/routes';
 import { UnauthorizedPage } from '../PermissionGuard';
 import { useToastSafe } from '../ui/Toast';
 
@@ -34,7 +34,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         const landing = getLandingPage(user, permissions);
 
-        if (user.role === 'contributor' && route.scopes?.includes('active_only')) {
+        // Contributors cannot access routes with active_only scope
+        // This check ensures contributors are redirected even if they have the permission
+        if (user.role === 'contributor' && route.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) {
             if (lastRedirectPath.current !== pathname) {
                 toast.warning("You don't have permission to access this page. Redirected to My Tasks.");
                 lastRedirectPath.current = pathname;
@@ -103,6 +105,7 @@ export function PagePermissionGuard({ children }: { children: React.ReactNode })
     const route = getRouteConfig(pathname || '');
     if (!route) return <>{children}</>;
 
+    // Contributors cannot access routes with active_only scope
     if (user.role === 'contributor' && route.scopes?.includes('active_only')) return <UnauthorizedPage />;
     if (!routeAllowsStatus(route, user)) return <UnauthorizedPage />;
     if (route.adminOnly && !isAdmin) return <UnauthorizedPage />;

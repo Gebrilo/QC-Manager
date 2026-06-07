@@ -319,4 +319,4 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
     return [];
 }
 
-export { ROUTES, PUBLIC_PATHS, NAVIGATION_SECTIONS };
+export { ROUTES, PUBLIC_PATHS, NAVIGATION_SECTIONS, SCOPES };
