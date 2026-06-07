@@ -89,8 +89,8 @@ export function Sidebar() {
                 <li key={node.label} className={depth === 0 ? 'pt-1.5' : undefined}>
                     {isExpanded && (
                         <div className={`flex items-center gap-2 px-3 py-1.5 ${depth > 0 ? 'ml-3' : ''}`}>
-                            {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={1.75} aria-hidden="true" />}
-                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 truncate">
+                            {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 dark:text-slate-400" strokeWidth={1.75} aria-hidden="true" />}
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400 truncate">
                                 {node.label}
                             </span>
                         </div>
