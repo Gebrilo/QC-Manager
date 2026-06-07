@@ -87,7 +87,24 @@
       "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\('deps:'\\); [print\\(' ',k,v\\) for k,v in {**p.get\\('dependencies',{}\\),**p.get\\('devDependencies',{}\\)}.items\\(\\) if any\\(x in k.lower\\(\\) for x in ['toast','dialog','radix','headless','popover','sonner','hot-toast']\\)]\")",
       "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\('test scripts:'\\); [print\\(' ',k,'=',v\\) for k,v in p.get\\('scripts',{}\\).items\\(\\) if 'test' in k.lower\\(\\) or 'playwright' in k.lower\\(\\)]\")",
       "Bash(npx playwright *)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(xargs -I{} sh -c 'grep -l \"/api/dashboard\\\\|dashboard\\\\.\" apps/api/__tests__/{} 2>/dev/null')",
+      "Bash(sed -n '380,400p' /root/QC-Manager/docs/superpowers/plans/2026-06-04-pm-dashboard-access-engine-slice-10.md)",
+      "Bash(sed -n '540,570p' /root/QC-Manager/docs/superpowers/plans/2026-06-04-pm-dashboard-access-engine-slice-10.md)",
+      "Bash(gh api *)",
+      "Bash(gh workflow *)",
+      "Bash(docker cp *)",
+      "Bash(docker restart *)",
+      "Bash(gh issue *)",
+      "Bash(mkdir -p /tmp/issue-comments)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(python3 -c \"import sys; data = sys.stdin.read\\(\\); print\\(data[:3000]\\)\")",
+      "Bash(playwright-cli open *)",
+      "Bash(npx playwright-cli *)",
+      "Bash(xargs ls)",
+      "Bash(xxd /tmp/design_raw.bin)",
+      "Bash(gh label *)"
     ]
   }
 }

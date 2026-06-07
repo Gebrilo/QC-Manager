@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus } from '../../config/routes';
 import { UnauthorizedPage } from '../PermissionGuard';
+import { useToast } from '../ui/Toast';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
     const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    const toast = useToast();
+    const lastRedirectPath = useRef<string | null>(null);
 
     useEffect(() => {
         if (loading) return;
@@ -32,25 +35,41 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const landing = getLandingPage(user, permissions);
 
         if (user.role === 'contributor' && route.scopes?.includes('active_only')) {
+            if (lastRedirectPath.current !== pathname) {
+                toast.warning("You don't have permission to access this page. Redirected to My Tasks.");
+                lastRedirectPath.current = pathname;
+            }
             router.replace('/me/tasks');
             return;
         }
 
         if (!routeAllowsStatus(route, user)) {
+            if (lastRedirectPath.current !== pathname) {
+                toast.warning("You don't have permission to access this page. Redirected to My Tasks.");
+                lastRedirectPath.current = pathname;
+            }
             router.replace('/me/tasks');
             return;
         }
 
         if (route.adminOnly && !isAdmin) {
+            if (lastRedirectPath.current !== pathname) {
+                toast.warning("You don't have permission to access this page. Redirected to your landing page.");
+                lastRedirectPath.current = pathname;
+            }
             router.replace(landing);
             return;
         }
 
         if (route.permission && !hasPermission(route.permission)) {
+            if (lastRedirectPath.current !== pathname) {
+                toast.warning("You don't have permission to access this page. Redirected to your landing page.");
+                lastRedirectPath.current = pathname;
+            }
             router.replace(landing);
             return;
         }
-    }, [loading, user, permissions, pathname, router, hasPermission, isAdmin]);
+    }, [loading, user, permissions, pathname, router, hasPermission, isAdmin, toast]);
 
     if (loading) {
         return (
