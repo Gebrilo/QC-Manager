@@ -53,6 +53,7 @@ export default function TasksPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { user } = useAuth();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState('');
@@ -139,17 +140,22 @@ export default function TasksPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
-                    <PermissionGate permission="qc.tasks.create" fallbackTooltip="Requires editor access to create tasks">
-                        <Link
-                            href="/work/tasks/create"
-                            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
-                        >
-                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
-                            New Task
-                        </Link>
-                    </PermissionGate>
+                <PermissionGate permission="qc.tasks.create" fallbackTooltip="Requires editor access to create tasks">
+                    <Link
+                        href="/work/tasks/create"
+                        className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                    >
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        New Task
+                    </Link>
+                </PermissionGate>
+                {!hasAnyFilter && filteredTasks.length === 0 && !isLoading && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        Tasks you can view may be limited by your permissions. Check your dashboard to see tasks assigned to you.
+                    </div>
+                )}
                 </div>
             </div>
 
@@ -250,6 +256,7 @@ export default function TasksPage() {
             {viewMode === 'board' ? (
                 <TaskBoardView
                     tasks={filteredTasks}
+                    filteredTasks={filteredTasks}
                     isLoading={isLoading}
                     onTaskClick={(id) => router.push(`/work/tasks/${id}`)}
                 />
@@ -265,7 +272,7 @@ export default function TasksPage() {
     );
 }
 
-function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[]; isLoading: boolean; onTaskClick: (id: string) => void }) {
+function TaskBoardView({ tasks, filteredTasks, isLoading, onTaskClick }: { tasks: Task[]; filteredTasks: Task[]; isLoading: boolean; onTaskClick: (id: string) => void }) {
     const grouped = useMemo(() => {
         const g: Record<string, Task[]> = { Backlog: [], 'In Progress': [], Done: [], Cancelled: [] };
         tasks.forEach(t => { if (g[t.status]) g[t.status].push(t); });
@@ -296,11 +303,16 @@ function TaskBoardView({ tasks, isLoading, onTaskClick }: { tasks: Task[]; isLoa
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${col.badge}`}>{colTasks.length}</span>
                         </div>
                         <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-320px)]">
-                            {colTasks.length === 0 ? (
-                                <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center">
-                                    <p className="text-sm text-slate-400">No tasks</p>
-                                </div>
-                            ) : colTasks.map(task => (
+                             {colTasks.length === 0 ? (
+                                 <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center">
+                                     <p className="text-sm text-slate-400">No tasks</p>
+                                     {!isLoading && filteredTasks.length === 0 && (
+                                         <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 max-w-[150px] mx-auto">
+                                             Tasks you can view may be limited by permissions
+                                         </p>
+                                     )}
+                                 </div>
+                             ) : colTasks.map(task => (
                                 <div
                                     key={task.id}
                                     onClick={() => onTaskClick(task.id)}

@@ -257,16 +257,23 @@ export function TaskTable({
                                     Loading…
                                 </td>
                             </tr>
-                        ) : table.getRowModel().rows.length === 0 ? (
-                            <tr>
-                                <td
-                                    colSpan={table.getVisibleLeafColumns().length}
-                                    className="px-5 py-12 text-center text-slate-400"
-                                >
-                                    No tasks found.
-                                </td>
-                            </tr>
-                        ) : (
+                         ) : table.getRowModel().rows.length === 0 ? (
+                             <tr>
+                                 <td
+                                     colSpan={table.getVisibleLeafColumns().length}
+                                     className="px-5 py-12 text-center"
+                                 >
+                                     <div className="flex flex-col items-center gap-3">
+                                         <p className="text-slate-400">No tasks found.</p>
+                                         {tasks.length === 0 && (
+                                             <p className="text-xs text-slate-500 dark:text-slate-500 max-w-md">
+                                                 Tasks you can view may be limited by your permissions. Check your My Dashboard to see tasks assigned to you.
+                                             </p>
+                                         )}
+                                     </div>
+                                 </td>
+                             </tr>
+                         ) : (
                             table.getRowModel().rows.map(row => (
                                 <tr
                                     key={row.id}
