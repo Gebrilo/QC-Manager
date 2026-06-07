@@ -148,7 +148,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
                 label: 'Test Execution',
                 icon: PlayCircle,
                 children: [
-                    { path: '/test/runs', label: 'Runs', icon: PlayCircle },
+                    { path: '/test/runs', label: 'Test Runs', icon: PlayCircle },
                     { path: '/test/results', label: 'Results', icon: FileText },
                 ],
             },
