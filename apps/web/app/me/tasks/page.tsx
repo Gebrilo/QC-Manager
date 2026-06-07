@@ -34,7 +34,7 @@ const PRIORITY_CONFIG = {
 };
 
 export default function MyTasksPage() {
-    const { token } = useAuth();
+    const { token, hasPermission } = useAuth();
     const [tasks, setTasks] = useState<PersonalTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -45,6 +45,8 @@ export default function MyTasksPage() {
 
     const [selectedTask, setSelectedTask] = useState<PersonalTask | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
+
+    const canCreateTask = hasPermission('qc.mywork.tasks.create');
 
     useEffect(() => {
         const stored = localStorage.getItem('qc_my_tasks_view');
@@ -149,12 +151,22 @@ export default function MyTasksPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
-                    <button
-                        onClick={() => openModal(null)}
-                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors"
-                    >
-                        + New Task
-                    </button>
+                    {canCreateTask ? (
+                        <button
+                            onClick={() => openModal(null)}
+                            className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors"
+                        >
+                            + New Task
+                        </button>
+                    ) : (
+                        <button
+                            disabled
+                            className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500 cursor-not-allowed shadow-sm"
+                            title="You need editor access to create personal tasks"
+                        >
+                            + New Task
+                        </button>
+                    )}
                 </div>
             </div>
 
