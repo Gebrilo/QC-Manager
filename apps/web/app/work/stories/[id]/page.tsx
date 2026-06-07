@@ -13,6 +13,8 @@ import {
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 
 function getStatusBadgeVariant(status: string | undefined): 'info' | 'warning' | 'default' | 'success' {
@@ -29,6 +31,8 @@ export default function UserStoryDetailPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [story, setStory] = useState<UserStory | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -50,15 +54,21 @@ export default function UserStoryDetailPage() {
     const handleDelete = async () => {
         if (!story) return;
         if (!story.tuleap_artifact_id) {
-            alert('This user story does not have a Tuleap artifact ID to delete.');
+            toast.warning('This user story does not have a Tuleap artifact ID to delete.');
             return;
         }
-        if (!confirm('Are you sure you want to delete this user story?')) return;
+        const confirmed = await confirmAction({
+            title: 'Delete user story',
+            message: 'Are you sure you want to delete this user story?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await tuleapApi.remove(story.tuleap_artifact_id);
             router.push('/work/stories');
         } catch (err: any) {
-            alert(`Failed to delete: ${err.message}`);
+            toast.error(`Failed to delete: ${err.message}`);
         }
     };
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { SyncPanel } from '@/components/shared/SyncPanel';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
     LinkedArtifactsSection,
@@ -20,6 +21,7 @@ export default function TestCaseDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const confirmAction = useConfirm();
 
     const [testCase, setTestCase] = useState<(TestCase & { execution_history?: TestCaseExecution[]; activity?: TestCaseActivityEntry[] }) | null>(null);
     const [loading, setLoading] = useState(true);
@@ -34,7 +36,13 @@ export default function TestCaseDetailPage() {
     }, [id]);
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this test case? This action can be undone by an admin.')) return;
+        const confirmed = await confirmAction({
+            title: 'Delete test case',
+            message: 'Are you sure you want to delete this test case? This action can be undone by an admin.',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await testCasesApi.delete(id);
             router.push('/test/cases');

@@ -14,6 +14,7 @@ import {
     SortingState,
 } from '@tanstack/react-table';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // ── Pill colour maps ────────────────────────────────────────────────────────
 const STATUS_PILL: Record<string, string> = {
@@ -51,6 +52,7 @@ const columnHelper = createColumnHelper<TestSuite>();
 
 export default function TestSuitesPage() {
     const { hasPermission } = useAuth();
+    const confirmAction = useConfirm();
     const [suites, setSuites] = useState<TestSuite[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -109,7 +111,13 @@ export default function TestSuitesPage() {
 
     const handleDeleteSuite = useCallback(async (suite: TestSuite) => {
         if (suite._can?.delete === false) return;
-        if (!window.confirm(`Delete test suite "${suite.name}"?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Delete test suite',
+            message: `Delete test suite "${suite.name}"?`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await testSuitesApi.delete(suite.id);
             setSuites(prev => prev.filter(item => item.id !== suite.id));
@@ -117,7 +125,7 @@ export default function TestSuitesPage() {
         } catch (error) {
             console.error('Failed to delete test suite:', error);
         }
-    }, []);
+    }, [confirm]);
 
     const columns = useMemo(() => [
         columnHelper.accessor('suite_id', {

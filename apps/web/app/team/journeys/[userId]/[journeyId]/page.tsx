@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import { ArrowLeft, CheckCircle2, Lock, Download, FileText } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 interface TaskProgress {
     total: number;
@@ -80,6 +81,7 @@ export default function TeamJourneyDetailsPage() {
     const router = useRouter();
     const userId = params?.userId as string;
     const journeyId = params?.journeyId as string;
+    const toast = useToast();
 
     const [journey, setJourney] = useState<JourneyDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -120,7 +122,7 @@ export default function TeamJourneyDetailsPage() {
             document.body.removeChild(a);
         } catch (err: any) {
             console.error('Download error:', err);
-            alert(err.message || 'Failed to download attachment');
+            toast.error(err.message || 'Failed to download attachment');
         } finally {
             setDownloadingTasks(prev => ({ ...prev, [taskId]: false }));
         }

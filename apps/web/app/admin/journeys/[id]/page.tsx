@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { journeysApi, fetchApi, JourneyFull, JourneyChapter, JourneyQuest, JourneyTask, JourneyAssignment } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface SimpleUser {
     id: string;
@@ -18,6 +20,7 @@ export default function AdminJourneyEditorPage() {
     const id = params?.id as string;
     const router = useRouter();
     const { isAdmin } = useAuth();
+    const toast = useToast();
     const [journey, setJourney] = useState<JourneyFull | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -54,11 +57,11 @@ export default function AdminJourneyEditorPage() {
     const handleUpdateJourney = async () => {
         setSaving(true);
         try {
-            await journeysApi.update(id, journeyForm);
+            await journeysApi.update(id, { ...journeyForm, next_journey_id: journeyForm.next_journey_id || null });
             setEditingJourney(false);
             loadJourney();
         } catch (err: any) {
-            alert(err.message || 'Failed to update');
+            toast.error(err.message || 'Failed to update');
         } finally {
             setSaving(false);
         }
@@ -156,7 +159,7 @@ export default function AdminJourneyEditorPage() {
                                     className="w-full h-9 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
                             </div>
                             <div className="flex justify-end sm:col-span-2">
-                                <button onClick={() => journeysApi.update(id, { ...journeyForm, next_journey_id: journeyForm.next_journey_id || null }).then(() => { setEditingJourney(false); loadJourney(); }).catch((e: any) => alert(e.message))} disabled={saving}
+                                <button onClick={handleUpdateJourney} disabled={saving}
                                     className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">
                                     {saving ? 'Saving...' : 'Save Changes'}
                                 </button>
@@ -204,6 +207,7 @@ export default function AdminJourneyEditorPage() {
 
 // --- Add Chapter Button ---
 function AddChapterButton({ journeyId, onCreated }: { journeyId: string; onCreated: () => void }) {
+    const toast = useToast();
     const [show, setShow] = useState(false);
     const [form, setForm] = useState({ slug: '', title: '', description: '', sort_order: 0, is_mandatory: true, xp_reward: 0 });
     const [saving, setSaving] = useState(false);
@@ -217,7 +221,7 @@ function AddChapterButton({ journeyId, onCreated }: { journeyId: string; onCreat
             setForm({ slug: '', title: '', description: '', sort_order: 0, is_mandatory: true, xp_reward: 0 });
             onCreated();
         } catch (err: any) {
-            alert(err.message);
+            toast.error(err.message || 'Failed to create chapter');
         } finally {
             setSaving(false);
         }
@@ -256,17 +260,25 @@ function AddChapterButton({ journeyId, onCreated }: { journeyId: string; onCreat
 
 // --- Chapter Editor ---
 function ChapterEditor({ chapter, journeyId, onChanged }: { chapter: JourneyChapter; journeyId: string; onChanged: () => void }) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [form, setForm] = useState({ title: chapter.title, slug: chapter.slug, description: chapter.description || '', sort_order: chapter.sort_order, is_mandatory: chapter.is_mandatory, xp_reward: chapter.xp_reward || 0 });
     const [saving, setSaving] = useState(false);
 
     const handleDelete = async () => {
-        if (!confirm(`Delete chapter "${chapter.title}" and all its quests/tasks?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Delete chapter',
+            message: `Delete chapter "${chapter.title}" and all its quests/tasks?`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await journeysApi.deleteChapter(chapter.id);
             onChanged();
-        } catch (err: any) { alert(err.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete chapter'); }
     };
 
     const handleUpdate = async () => {
@@ -275,7 +287,7 @@ function ChapterEditor({ chapter, journeyId, onChanged }: { chapter: JourneyChap
             await journeysApi.updateChapter(chapter.id, form);
             setEditing(false);
             onChanged();
-        } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+        } catch (err: any) { toast.error(err.message || 'Failed to update chapter'); } finally { setSaving(false); }
     };
 
     return (
@@ -358,6 +370,7 @@ function ChapterEditor({ chapter, journeyId, onChanged }: { chapter: JourneyChap
 
 // --- Add Quest Button ---
 function AddQuestButton({ chapterId, onCreated }: { chapterId: string; onCreated: () => void }) {
+    const toast = useToast();
     const [show, setShow] = useState(false);
     const [form, setForm] = useState({ slug: '', title: '', description: '', sort_order: 0, is_mandatory: true });
     const [saving, setSaving] = useState(false);
@@ -370,7 +383,7 @@ function AddQuestButton({ chapterId, onCreated }: { chapterId: string; onCreated
             setShow(false);
             setForm({ slug: '', title: '', description: '', sort_order: 0, is_mandatory: true });
             onCreated();
-        } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+        } catch (err: any) { toast.error(err.message || 'Failed to create quest'); } finally { setSaving(false); }
     };
 
     if (!show) {
@@ -393,17 +406,25 @@ function AddQuestButton({ chapterId, onCreated }: { chapterId: string; onCreated
 
 // --- Quest Editor ---
 function QuestEditor({ quest, onChanged }: { quest: JourneyQuest; onChanged: () => void }) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [form, setForm] = useState({ title: quest.title, slug: quest.slug, description: quest.description || '', sort_order: quest.sort_order, is_mandatory: quest.is_mandatory });
     const [saving, setSaving] = useState(false);
 
     const handleDelete = async () => {
-        if (!confirm(`Delete quest "${quest.title}" and all its tasks?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Delete quest',
+            message: `Delete quest "${quest.title}" and all its tasks?`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await journeysApi.deleteQuest(quest.id);
             onChanged();
-        } catch (err: any) { alert(err.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete quest'); }
     };
 
     const handleUpdate = async () => {
@@ -412,7 +433,7 @@ function QuestEditor({ quest, onChanged }: { quest: JourneyQuest; onChanged: () 
             await journeysApi.updateQuest(quest.id, form);
             setEditing(false);
             onChanged();
-        } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+        } catch (err: any) { toast.error(err.message || 'Failed to update quest'); } finally { setSaving(false); }
     };
 
     return (
@@ -560,6 +581,8 @@ function ValidationConfigEditor({ type, config, onChange }: {
 
 // --- Task Editor ---
 function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => void }) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [editing, setEditing] = useState(false);
     const [form, setForm] = useState({
         title: task.title, slug: task.slug, description: task.description || '', instructions: task.instructions || '',
@@ -569,11 +592,17 @@ function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => v
     const [saving, setSaving] = useState(false);
 
     const handleDelete = async () => {
-        if (!confirm(`Delete task "${task.title}"?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Delete task',
+            message: `Delete task "${task.title}"?`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await journeysApi.deleteTask(task.id);
             onChanged();
-        } catch (err: any) { alert(err.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete task'); }
     };
 
     const handleUpdate = async () => {
@@ -582,7 +611,7 @@ function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => v
             await journeysApi.updateTask(task.id, form);
             setEditing(false);
             onChanged();
-        } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+        } catch (err: any) { toast.error(err.message || 'Failed to update task'); } finally { setSaving(false); }
     };
 
     if (editing) {
@@ -657,6 +686,7 @@ function TaskEditor({ task, onChanged }: { task: JourneyTask; onChanged: () => v
 
 // --- Add Task Button ---
 function AddTaskButton({ questId, onCreated }: { questId: string; onCreated: () => void }) {
+    const toast = useToast();
     const [show, setShow] = useState(false);
     const [form, setForm] = useState({
         slug: '', title: '', description: '', instructions: '',
@@ -674,7 +704,7 @@ function AddTaskButton({ questId, onCreated }: { questId: string; onCreated: () 
             setShow(false);
             setForm({ slug: '', title: '', description: '', instructions: '', validation_type: 'checkbox', validation_config: {}, sort_order: 0, is_mandatory: true, estimated_minutes: undefined });
             onCreated();
-        } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+        } catch (err: any) { toast.error(err.message || 'Failed to create task'); } finally { setSaving(false); }
     };
 
     if (!show) {
@@ -733,6 +763,8 @@ function AddTaskButton({ questId, onCreated }: { questId: string; onCreated: () 
 
 // --- Assign Users Section ---
 function AssignUsersSection({ journeyId, isAdmin }: { journeyId: string; isAdmin: boolean }) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [users, setUsers] = useState<SimpleUser[]>([]);
     const [assignments, setAssignments] = useState<JourneyAssignment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -772,20 +804,26 @@ function AssignUsersSection({ journeyId, isAdmin }: { journeyId: string; isAdmin
             await journeysApi.assignToUser(journeyId, userId);
             loadData();
         } catch (err: any) {
-            alert(err.message || 'Failed to assign');
+            toast.error(err.message || 'Failed to assign');
         } finally {
             setAssigning(null);
         }
     };
 
     const handleUnassign = async (userId: string) => {
-        if (!confirm('Unassign this user? Their progress will be deleted.')) return;
+        const confirmed = await confirmAction({
+            title: 'Unassign user',
+            message: 'Unassign this user? Their progress will be deleted.',
+            confirmLabel: 'Unassign',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         setAssigning(userId);
         try {
             await journeysApi.unassignUser(journeyId, userId);
             loadData();
         } catch (err: any) {
-            alert(err.message || 'Failed to unassign');
+            toast.error(err.message || 'Failed to unassign');
         } finally {
             setAssigning(null);
         }

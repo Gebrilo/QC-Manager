@@ -285,10 +285,12 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
             artifactType: 'task',
             query: db.query.bind(db),
         });
+        const createActor = await resolveRole(req.user, req);
+        const canSetPriority = createActor.effectivePermissions.has('*') || createActor.effectivePermissions.has('qc.tasks.change_priority');
 
         const query = `
             INSERT INTO tasks (
-                task_id, project_id, task_name, status,
+                task_id, project_id, task_name, status, priority,
                 resource1_id, resource2_id,
                 estimate_days,
                 r1_estimate_hrs, r1_actual_hrs,
@@ -298,12 +300,12 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
                 owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                $18, $19, $20
+                $18, $19, $20, $21
             ) RETURNING *
         `;
 
         const values = [
-            data.task_id, data.project_id, data.task_name, data.status,
+            data.task_id, data.project_id, data.task_name, data.status, canSetPriority ? data.priority : 'Medium',
             data.resource1_uuid, data.resource2_uuid || null,
             data.estimate_days,
             data.r1_estimate_hrs, data.r1_actual_hrs,
@@ -475,6 +477,12 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         }
 
         // Construct dynamic update
+        const priorityActor = await resolveRole(req.user, req);
+        const canChangePriority = priorityActor.effectivePermissions.has('*') || priorityActor.effectivePermissions.has('qc.tasks.change_priority');
+        if (Object.prototype.hasOwnProperty.call(data, 'priority') && !canChangePriority) {
+            delete data.priority;
+        }
+
         const fields = [];
         const values = [];
         let idx = 1;
@@ -483,6 +491,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             project_id: 'project_id',
             task_name: 'task_name',
             status: 'status',
+            priority: 'priority',
             resource1_uuid: 'resource1_id',
             resource2_uuid: 'resource2_id',
             estimate_days: 'estimate_days',

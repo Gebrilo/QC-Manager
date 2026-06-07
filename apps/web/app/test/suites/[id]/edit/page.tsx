@@ -7,6 +7,7 @@ import { TestSuite, SuiteTestCase, SuiteType, ReadinessScope } from '@/types';
 import { testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
 import { formatDistanceToNow, format } from 'date-fns';
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
@@ -259,6 +260,7 @@ export default function EditTestSuitePage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const toast = useToast();
 
     const [suite, setSuite]         = useState<TestSuite | null>(null);
     const [loading, setLoading]     = useState(true);
@@ -346,7 +348,7 @@ export default function EditTestSuitePage() {
             await testSuitesApi.removeTestCases(id, { test_case_ids: [caseId] });
             setTestCases(prev => prev.filter(tc => tc.test_case_id !== caseId));
         } catch (err: any) {
-            alert(err.message || 'Failed to remove test case');
+            toast.error(err.message || 'Failed to remove test case');
         } finally {
             setRemovingId(null);
         }
@@ -375,7 +377,7 @@ export default function EditTestSuitePage() {
             setCaseSearch('');
             await loadSuite();
         } catch (err: any) {
-            alert(err.message || 'Failed to add test cases');
+            toast.error(err.message || 'Failed to add test cases');
         } finally {
             setAddingCases(false);
         }

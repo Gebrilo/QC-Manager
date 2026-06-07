@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { governanceApi } from '@/services/governanceApi';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/ui/Toast';
 
 interface ReleaseControlProps {
     projectId: string;
@@ -13,6 +14,7 @@ interface ReleaseControlProps {
 }
 
 export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps) {
+    const toast = useToast();
     const [gates, setGates] = useState<any>(null);
     const [approvals, setApprovals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -60,7 +62,10 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
     const allPassed = gatesEvaluation.every(g => g.passed);
 
     const handleSubmit = async () => {
-        if (!version) return alert('Version is required');
+        if (!version) {
+            toast.error('Version is required');
+            return;
+        }
 
         try {
             await governanceApi.submitApproval({
@@ -79,7 +84,7 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
             setComments('');
             loadData();
         } catch (e) {
-            alert('Error submitting approval');
+            toast.error('Error submitting approval');
         }
     };
 

@@ -7,6 +7,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/Tooltip';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -65,6 +66,7 @@ function grantedCount(role: MatrixRole, permissions: PermissionKey[]): number {
 
 export default function PermissionsMatrixPage() {
     const { token, isAdmin } = useAuth();
+    const confirmAction = useConfirm();
 
     const [activeArtifact, setActiveArtifact]   = useState('task');
     const [artifactTypes, setArtifactTypes]     = useState<ArtifactType[]>([]);
@@ -210,7 +212,14 @@ export default function PermissionsMatrixPage() {
     };
 
     const deleteRole = async (role: MatrixRole) => {
-        if (!token || !confirm(`Delete role "${role.role_identifier}"? This cannot be undone.`)) return;
+        if (!token) return;
+        const confirmed = await confirmAction({
+            title: 'Delete role',
+            message: `Delete role "${role.role_identifier}"? This cannot be undone.`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API_URL}/admin/access/roles/${role.role_identifier}`, {
                 method: 'DELETE',

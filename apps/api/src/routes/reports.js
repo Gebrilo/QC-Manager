@@ -443,7 +443,7 @@ router.post('/share', requireAuth, blockContributors, requirePermission('qc.repo
 });
 
 // GET /reports/:job_id/download - Proxy report file download through API (avoids browser CORS)
-router.get('/:job_id/download', requireAuth, blockContributors, requirePermission('qc.reports.view'), async (req, res, next) => {
+router.get('/:job_id/download', requireAuth, blockContributors, requirePermission('qc.reports.export'), async (req, res, next) => {
     try {
         const { job_id } = req.params;
 

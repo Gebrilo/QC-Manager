@@ -15,6 +15,8 @@ import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { SyncPanel } from '@/components/shared/SyncPanel';
 import { tasksApi } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 
 // ── Status pill config ──────────────────────────────────────────────────────
@@ -73,6 +75,8 @@ export default function TaskDetailPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [task, setTask] = useState<Task | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -92,13 +96,19 @@ export default function TaskDetailPage() {
 
     const handleDelete = async () => {
         if (!task) return;
-        if (!confirm(`Are you sure you want to delete task "${task.task_name}"? This will archive the task.`)) return;
+        const confirmed = await confirmAction({
+            title: 'Archive task',
+            message: `Are you sure you want to delete task "${task.task_name}"? This will archive the task.`,
+            confirmLabel: 'Archive',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await fetchApi(`/tasks/${task.id}`, { method: 'DELETE' });
-            alert('Task deleted successfully');
+            toast.success('Task deleted successfully');
             router.push('/work/tasks');
         } catch (err: any) {
-            alert(`Failed to delete task: ${err.message}`);
+            toast.error(`Failed to delete task: ${err.message}`);
         }
     };
 

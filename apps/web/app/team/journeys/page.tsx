@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { fetchApi } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useToast } from '@/components/ui/Toast';
 
 interface TeamMember {
     id: string;
@@ -42,6 +43,7 @@ interface TeamJourney {
 }
 
 export default function TeamJourneysPage() {
+    const toast = useToast();
     const [team, setTeam] = useState<TeamMember[]>([]);
     const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
     const [journeys, setJourneys] = useState<TeamJourney[]>([]);
@@ -70,7 +72,7 @@ export default function TeamJourneysPage() {
             setTeam(prev => prev.map(m => m.id === userId ? { ...m, ready_for_activation: ready } : m));
             if (selectedUser?.id === userId) setSelectedUser(prev => prev ? { ...prev, ready_for_activation: ready } : prev);
         } catch (err: any) {
-            alert(err.message || 'Failed to update status');
+            toast.error(err.message || 'Failed to update status');
         }
     };
 

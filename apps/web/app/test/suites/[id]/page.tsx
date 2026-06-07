@@ -8,6 +8,8 @@ import { testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
+import { ConfirmDialog, useConfirm } from '@/components/ui/ConfirmDialog';
 import { formatDistanceToNow, format } from 'date-fns';
 
 function getSuiteStatusVariant(status: string): 'success' | 'warning' | 'default' {
@@ -35,6 +37,8 @@ export default function TestSuiteDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const toast = useToast();
+    const confirmAction = useConfirm();
 
     const [suite, setSuite] = useState<(TestSuite & { test_cases?: SuiteTestCase[] }) | null>(null);
     const [loading, setLoading] = useState(true);
@@ -45,6 +49,8 @@ export default function TestSuiteDetailPage() {
     const [addingCases, setAddingCases] = useState(false);
     const [removingCaseId, setRemovingCaseId] = useState<string | null>(null);
     const [cloning, setCloning] = useState(false);
+    const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+    const [cloneName, setCloneName] = useState('');
 
     const loadSuite = useCallback(async () => {
         try {
@@ -63,7 +69,13 @@ export default function TestSuiteDetailPage() {
     }, [loadSuite]);
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this test suite?')) return;
+        const confirmed = await confirmAction({
+            title: 'Delete test suite',
+            message: 'Are you sure you want to delete this test suite?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await testSuitesApi.delete(id);
             router.push('/test/suites');
@@ -79,7 +91,7 @@ export default function TestSuiteDetailPage() {
             await testSuitesApi.removeTestCases(id, { test_case_ids: [caseId] });
             await loadSuite();
         } catch (err: any) {
-            alert(err.message || 'Failed to remove test case');
+            toast.error(err.message || 'Failed to remove test case');
         } finally {
             setRemovingCaseId(null);
         }
@@ -109,22 +121,31 @@ export default function TestSuiteDetailPage() {
             setAvailableCases([]);
             await loadSuite();
         } catch (err: any) {
-            alert(err.message || 'Failed to add test cases');
+            toast.error(err.message || 'Failed to add test cases');
         } finally {
             setAddingCases(false);
         }
     };
 
-    const handleClone = async () => {
-        const name = prompt('Enter name for the cloned suite:', `${suite?.name} (Copy)`);
-        if (!name) return;
+    const handleClone = () => {
+        setCloneName(`${suite?.name || 'Suite'} (Copy)`);
+        setCloneDialogOpen(true);
+    };
+
+    const handleConfirmClone = async () => {
+        const name = cloneName.trim();
+        if (!name) {
+            toast.error('Suite name is required');
+            return;
+        }
+        setCloneDialogOpen(false);
         setCloning(true);
         try {
             await testSuitesApi.clone(id, { name });
             router.push('/test/suites');
             router.refresh();
         } catch (err: any) {
-            alert(err.message || 'Failed to clone suite');
+            toast.error(err.message || 'Failed to clone suite');
         } finally {
             setCloning(false);
         }
@@ -168,6 +189,7 @@ export default function TestSuiteDetailPage() {
     const passRate = suite.last_run_pass_rate != null ? Math.round(suite.last_run_pass_rate * 100) : null;
 
     return (
+        <>
         <div className="max-w-5xl mx-auto py-8 px-4">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
@@ -318,5 +340,22 @@ export default function TestSuiteDetailPage() {
                 )}
             </div>
         </div>
+        <ConfirmDialog
+            open={cloneDialogOpen}
+            title="Clone test suite"
+            message="Enter a name for the cloned suite."
+            confirmLabel="Clone"
+            onConfirm={handleConfirmClone}
+            onCancel={() => setCloneDialogOpen(false)}
+        >
+            <input
+                type="text"
+                value={cloneName}
+                onChange={e => setCloneName(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoFocus
+            />
+        </ConfirmDialog>
+        </>
     );
 }

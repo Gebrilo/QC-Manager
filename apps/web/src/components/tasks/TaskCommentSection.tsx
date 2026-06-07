@@ -5,12 +5,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { taskCommentsApi, type TaskComment } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface TaskCommentSectionProps {
     taskId: string;
 }
 
 export function TaskCommentSection({ taskId }: TaskCommentSectionProps) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [comments, setComments] = useState<TaskComment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [newComment, setNewComment] = useState('');
@@ -42,21 +46,27 @@ export function TaskCommentSection({ taskId }: TaskCommentSectionProps) {
             await loadComments();
         } catch (err) {
             console.error('Failed to add comment:', err);
-            alert('Failed to add comment');
+            toast.error('Failed to add comment');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDelete = async (commentId: string) => {
-        if (!confirm('Are you sure you want to delete this comment?')) return;
+        const confirmed = await confirmAction({
+            title: 'Delete comment',
+            message: 'Are you sure you want to delete this comment?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
 
         try {
             await taskCommentsApi.delete(taskId, commentId);
             await loadComments();
         } catch (err) {
             console.error('Failed to delete comment:', err);
-            alert('Failed to delete comment');
+            toast.error('Failed to delete comment');
         }
     };
 

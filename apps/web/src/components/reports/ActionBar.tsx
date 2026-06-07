@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { type ReportDefinition, cn } from './reportTypes';
 import { Ico } from './ReportIcons';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface ExportMenuProps {
     onPick: (fmt: string) => void;
@@ -99,6 +100,8 @@ export function ActionBar({
     onShare, onSchedule, notify,
 }: ActionBarProps) {
     const [menu, setMenu] = useState(false);
+    const { hasPermission } = useAuth();
+    const canExport = hasPermission('qc.reports.export');
 
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible">
@@ -128,18 +131,20 @@ export function ActionBar({
                         className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                         <Ico k="share" size={14} /> <span className="hidden sm:inline">Share</span>
                     </button>
-                    <div className="relative">
-                        <button onClick={() => setMenu(m => !m)}
-                            className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
-                            <Ico k="download" size={14} /> Export <Ico k="chevDown" size={12} cls="text-slate-400" />
-                        </button>
-                        {menu && (
-                            <ExportMenu
-                                onClose={() => setMenu(false)}
-                                onPick={f => { setMenu(false); setFmt(f); notify(`Exported ${report.name} as ${f}`); }}
-                            />
-                        )}
-                    </div>
+                    {canExport && (
+                        <div className="relative">
+                            <button onClick={() => setMenu(m => !m)}
+                                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                                <Ico k="download" size={14} /> Export <Ico k="chevDown" size={12} cls="text-slate-400" />
+                            </button>
+                            {menu && (
+                                <ExportMenu
+                                    onClose={() => setMenu(false)}
+                                    onPick={f => { setMenu(false); setFmt(f); notify(`Exported ${report.name} as ${f}`); }}
+                                />
+                            )}
+                        </div>
+                    )}
                     <Button
                         variant="primary"
                         onClick={onGenerate}
@@ -187,19 +192,21 @@ export function ActionBar({
                         ...projects.map(p => ({ value: p.id, label: p.name })),
                     ]}
                 />
-                <div className="ml-auto flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
-                    {['PDF', 'Excel', 'CSV'].map(f => (
-                        <button key={f} onClick={() => setFmt(f)}
-                            className={cn(
-                                'px-2.5 h-6 rounded-md text-[11px] font-bold transition',
-                                fmt === f
-                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                            )}>
-                            {f}
-                        </button>
-                    ))}
-                </div>
+                {canExport && (
+                    <div className="ml-auto flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        {['PDF', 'Excel', 'CSV'].map(f => (
+                            <button key={f} onClick={() => setFmt(f)}
+                                className={cn(
+                                    'px-2.5 h-6 rounded-md text-[11px] font-bold transition',
+                                    fmt === f
+                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                )}>
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

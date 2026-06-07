@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -191,6 +192,7 @@ const RoleCard = memo(function RoleCard({
     onDeleted: () => void;
     onNotify: (type: 'success' | 'error', msg: string) => void;
 }) {
+    const confirmAction = useConfirm();
     const permsRef = useRef<Set<string>>(new Set(role.permissions));
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -244,7 +246,13 @@ const RoleCard = memo(function RoleCard({
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm(`Delete custom role "${role.name}"? This cannot be undone.`)) return;
+        const confirmed = await confirmAction({
+            title: 'Delete custom role',
+            message: `Delete custom role "${role.name}"? This cannot be undone.`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API_URL}/roles/${role.name}`, {
                 method: 'DELETE',

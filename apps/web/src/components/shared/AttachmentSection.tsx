@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { attachmentsApi, type Attachment } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface Props {
     artifactType: 'bug' | 'user_story' | 'task';
@@ -27,6 +29,8 @@ function FileIcon({ mimeType }: { mimeType: string }) {
 }
 
 export function AttachmentSection({ artifactType, artifactId, tempId, id }: Props) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [stagedFiles, setStagedFiles] = useState<Array<{ storagePath: string; originalName: string; mimeType: string; sizeBytes: number }>>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +59,7 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
                 setStagedFiles(prev => [...prev, result]);
             }
         } catch (err: any) {
-            alert(err.message || 'Upload failed');
+            toast.error(err.message || 'Upload failed');
         } finally {
             setIsUploading(false);
         }
@@ -66,7 +70,7 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
             const { url } = await attachmentsApi.getUrl(id);
             setPreview({ url, mimeType, name });
         } catch {
-            alert('Could not load preview');
+            toast.error('Could not load preview');
         }
     }
 
@@ -75,27 +79,39 @@ export function AttachmentSection({ artifactType, artifactId, tempId, id }: Prop
             const { url } = await attachmentsApi.getUrl(id);
             window.open(url, '_blank');
         } catch {
-            alert('Could not get download link');
+            toast.error('Could not get download link');
         }
     }
 
     async function handleDelete(id: string) {
-        if (!confirm('Delete this attachment?')) return;
+        const confirmed = await confirmAction({
+            title: 'Delete attachment',
+            message: 'Delete this attachment?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await attachmentsApi.delete(id);
             setAttachments(prev => prev.filter(a => a.id !== id));
         } catch (err: any) {
-            alert(err.message || 'Delete failed');
+            toast.error(err.message || 'Delete failed');
         }
     }
 
     async function handleDeleteStaged(storagePath: string) {
-        if (!confirm('Remove this attachment?')) return;
+        const confirmed = await confirmAction({
+            title: 'Remove attachment',
+            message: 'Remove this attachment?',
+            confirmLabel: 'Remove',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await attachmentsApi.deleteStaged(storagePath);
             setStagedFiles(prev => prev.filter(f => f.storagePath !== storagePath));
         } catch (err: any) {
-            alert(err.message || 'Delete failed');
+            toast.error(err.message || 'Delete failed');
         }
     }
 

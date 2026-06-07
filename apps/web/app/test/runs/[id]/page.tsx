@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { fetchApi } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 import { formatDistanceToNow, format } from 'date-fns';
 
 interface TestRunDetail {
@@ -79,6 +80,7 @@ export default function TestRunDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const toast = useToast();
 
     const [run, setRun] = useState<TestRunDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -117,7 +119,7 @@ export default function TestRunDetailPage() {
                 ),
             } : null);
         } catch (err: any) {
-            alert(err.message || 'Failed to update status');
+            toast.error(err.message || 'Failed to update status');
         } finally {
             setUpdatingId(null);
         }
@@ -134,7 +136,7 @@ export default function TestRunDetailPage() {
             setBulkStatus('');
             await loadRun();
         } catch (err: any) {
-            alert(err.message || 'Failed to bulk update');
+            toast.error(err.message || 'Failed to bulk update');
         }
     };
 

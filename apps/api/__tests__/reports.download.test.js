@@ -3,11 +3,12 @@ const express = require('express');
 const { Readable } = require('stream');
 
 const mockQuery = jest.fn();
+const mockRequirePermission = jest.fn(() => (req, _res, next) => next());
 jest.mock('../src/config/db', () => ({ query: (...args) => mockQuery(...args) }));
 jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, _res, next) => next(),
   blockContributors: (_req, _res, next) => next(),
-  requirePermission: () => (req, _res, next) => next(),
+  requirePermission: (...args) => mockRequirePermission(...args),
 }));
 
 const mockAxiosGet = jest.fn();
@@ -36,6 +37,7 @@ function makeApp() {
 describe('GET /reports/:job_id/download', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetModules();
   });
 
   it('returns 404 when report job does not exist', async () => {
@@ -45,6 +47,14 @@ describe('GET /reports/:job_id/download', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Report job not found');
+  });
+
+  it('requires report export permission', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    await request(makeApp()).get('/reports/job-1/download');
+
+    expect(mockRequirePermission).toHaveBeenCalledWith('qc.reports.export');
   });
 
   it('returns 409 when report is not completed', async () => {

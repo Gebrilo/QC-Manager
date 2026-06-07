@@ -5,6 +5,8 @@ import { bugLinksApi } from '@/lib/api';
 import { RelationshipPicker } from '@/components/shared/RelationshipPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 
 interface LinkedExecution {
@@ -44,6 +46,8 @@ const STATUS_VARIANT: Record<string, 'complete' | 'danger' | 'warning' | 'defaul
 };
 
 export function BugLinksPanel({ bugId, triageStatus }: BugLinksPanelProps) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [executions, setExecutions] = useState<LinkedExecution[]>([]);
     const [tasks, setTasks] = useState<LinkedTask[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -73,17 +77,23 @@ export function BugLinksPanel({ bugId, triageStatus }: BugLinksPanelProps) {
             await bugLinksApi.addTestExecution(bugId, item.id);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to link execution');
+            toast.error(err.message || 'Failed to link execution');
         }
     };
 
     const handleRemoveExecution = async (executionId: string) => {
-        if (!confirm('Remove this test execution link?')) return;
+        const confirmed = await confirmAction({
+            title: 'Remove test execution link',
+            message: 'Remove this test execution link?',
+            confirmLabel: 'Remove',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await bugLinksApi.removeTestExecution(bugId, executionId);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to remove link');
+            toast.error(err.message || 'Failed to remove link');
         }
     };
 
@@ -92,17 +102,23 @@ export function BugLinksPanel({ bugId, triageStatus }: BugLinksPanelProps) {
             await bugLinksApi.addTask(bugId, item.id);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to link task');
+            toast.error(err.message || 'Failed to link task');
         }
     };
 
     const handleRemoveTask = async (taskId: string) => {
-        if (!confirm('Remove this task link?')) return;
+        const confirmed = await confirmAction({
+            title: 'Remove task link',
+            message: 'Remove this task link?',
+            confirmLabel: 'Remove',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await bugLinksApi.removeTask(bugId, taskId);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to remove link');
+            toast.error(err.message || 'Failed to remove link');
         }
     };
 

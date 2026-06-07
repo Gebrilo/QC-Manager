@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { myJourneysApi, JourneyWithProgress, JourneyChapter, JourneyQuest, JourneyTask } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -278,6 +279,7 @@ function TaskItem({
     journeyId: string;
     onComplete: () => void;
 }) {
+    const toast = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [textValue, setTextValue] = useState('');
     const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
@@ -294,7 +296,7 @@ function TaskItem({
         } catch (err: any) {
             console.error('Failed to complete task:', err);
             if (err.message?.includes('previous chapter')) {
-                alert(err.message);
+                toast.error(err.message);
             }
         } finally {
             setIsSubmitting(false);

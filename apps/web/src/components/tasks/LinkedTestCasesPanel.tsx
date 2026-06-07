@@ -5,6 +5,8 @@ import { taskTestCaseLinksApi, fetchApi } from '@/lib/api';
 import { RelationshipPicker } from '@/components/shared/RelationshipPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 
 interface LinkedTestCase {
@@ -31,6 +33,8 @@ const STATUS_VARIANT: Record<string, 'complete' | 'inprogress' | 'notasks' | 'de
 };
 
 export function LinkedTestCasesPanel({ taskId }: LinkedTestCasesPanelProps) {
+    const toast = useToast();
+    const confirmAction = useConfirm();
     const [links, setLinks] = useState<LinkedTestCase[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -55,17 +59,23 @@ export function LinkedTestCasesPanel({ taskId }: LinkedTestCasesPanelProps) {
             await taskTestCaseLinksApi.addTestCase(taskId, item.id);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to add link');
+            toast.error(err.message || 'Failed to add link');
         }
     };
 
     const handleRemove = async (testCaseId: string) => {
-        if (!confirm('Remove this test case link?')) return;
+        const confirmed = await confirmAction({
+            title: 'Remove test case link',
+            message: 'Remove this test case link?',
+            confirmLabel: 'Remove',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await taskTestCaseLinksApi.removeTestCase(taskId, testCaseId);
             await load();
         } catch (err: any) {
-            alert(err.message || 'Failed to remove link');
+            toast.error(err.message || 'Failed to remove link');
         }
     };
 

@@ -10,6 +10,7 @@ import { Project, Resource } from '@/types';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -241,6 +242,7 @@ export default function CreateTaskPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const canChangePriority = hasPermission('qc.tasks.change_priority');
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.tasks.create')) {
@@ -278,6 +280,7 @@ export default function CreateTaskPage() {
             setIsSubmitting={setIsSubmitting}
             error={error}
             setError={setError}
+            canChangePriority={canChangePriority}
         />
     );
 }
@@ -292,6 +295,7 @@ function CreateForm({
     setIsSubmitting,
     error,
     setError,
+    canChangePriority,
 }: {
     projects: Project[];
     resources: Resource[];
@@ -300,7 +304,9 @@ function CreateForm({
     setIsSubmitting: (v: boolean) => void;
     error: string | null;
     setError: (v: string | null) => void;
+    canChangePriority: boolean;
 }) {
+    const toast = useToast();
     const [activeSection, setActiveSection] = useState('task-general');
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
@@ -380,7 +386,7 @@ function CreateForm({
                 body: JSON.stringify({ ...payload, temp_id: tempId }),
             });
             if (result?.sync_status === 'failed') {
-                alert('Task saved locally, but Tuleap sync failed: ' + (result.last_sync_error || 'Unknown error'));
+                toast.warning('Task saved locally, but Tuleap sync failed: ' + (result.last_sync_error || 'Unknown error'));
             }
             router.push('/work/tasks');
             router.refresh();
@@ -545,15 +551,24 @@ function CreateForm({
                             <FieldLabel>Priority</FieldLabel>
                             <div className="flex flex-wrap gap-2 mt-0.5">
                                 {PRIORITY_OPTIONS.map(opt => (
-                                    <label key={opt.value} className="cursor-pointer">
-                                        <input type="radio" value={opt.value} {...register('priority')} className="sr-only" />
-                                        <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${priorityValue === opt.value
+                                    canChangePriority ? (
+                                        <label key={opt.value} className="cursor-pointer">
+                                            <input type="radio" value={opt.value} {...register('priority')} className="sr-only" />
+                                            <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${priorityValue === opt.value
+                                                ? opt.active
+                                                : `bg-white dark:bg-slate-800 ${opt.idle} hover:opacity-80`
+                                            }`}>
+                                                {opt.value}
+                                            </span>
+                                        </label>
+                                    ) : (
+                                        <span key={opt.value} className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border ${priorityValue === opt.value
                                             ? opt.active
-                                            : `bg-white dark:bg-slate-800 ${opt.idle} hover:opacity-80`
+                                            : `bg-white dark:bg-slate-800 ${opt.idle} opacity-50`
                                         }`}>
                                             {opt.value}
                                         </span>
-                                    </label>
+                                    )
                                 ))}
                             </div>
                         </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Project } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 interface ProjectFormProps {
     initialData?: Project;
@@ -14,6 +15,7 @@ interface ProjectFormProps {
 
 export default function ProjectForm({ initialData, onSuccess, isEdit = false }: ProjectFormProps) {
     const router = useRouter();
+    const toast = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [logoPreview, setLogoPreview] = useState<string | null>(() => {
         if (initialData?.id && typeof window !== 'undefined') {
@@ -88,7 +90,7 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
             onSuccess();
         } catch (error: any) {
             console.error('Failed to save project:', error);
-            alert(`Failed to save project: ${error.message || 'Unknown error'}`);
+            toast.error(`Failed to save project: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSubmitting(false);
         }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { teamsApi, TeamApi, TeamApiMember, TeamApiProject, fetchApi as apiFetch } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface User {
     id: string;
@@ -26,6 +27,7 @@ interface Project {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TeamsAdminPage() {
+    const confirmAction = useConfirm();
     const [teams, setTeams] = useState<TeamApi[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
@@ -163,7 +165,13 @@ export default function TeamsAdminPage() {
     // ── Remove member ────────────────────────────────────────────────────────
     const handleRemoveMember = async (userId: string, userName: string) => {
         if (!selectedTeam) return;
-        if (!confirm(`Remove ${userName} from team?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Remove team member',
+            message: `Remove ${userName} from team?`,
+            confirmLabel: 'Remove',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await apiFetch(`/teams/${selectedTeam.id}/members/${userId}`, { method: 'DELETE' });
             showSuccess('Member removed from team');
@@ -193,7 +201,13 @@ export default function TeamsAdminPage() {
     // ── Unassign project ─────────────────────────────────────────────────────
     const handleUnassignProject = async (projectId: string, projectName: string) => {
         if (!selectedTeam) return;
-        if (!confirm(`Unassign "${projectName}" from this team?`)) return;
+        const confirmed = await confirmAction({
+            title: 'Unassign project',
+            message: `Unassign "${projectName}" from this team?`,
+            confirmLabel: 'Unassign',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await apiFetch(`/teams/${selectedTeam.id}/projects/${projectId}`, { method: 'DELETE' });
             showSuccess('Project unassigned');

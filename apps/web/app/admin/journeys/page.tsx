@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { journeysApi, Journey } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 export default function AdminJourneysPage() {
+    const toast = useToast();
     const [journeys, setJourneys] = useState<Journey[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
@@ -59,7 +61,7 @@ export default function AdminJourneysPage() {
             setDeleteTarget(null);
             loadJourneys();
         } catch (err: any) {
-            alert(err.message || 'Failed to delete');
+            toast.error(err.message || 'Failed to delete');
         } finally {
             setIsDeleting(false);
         }

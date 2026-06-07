@@ -285,6 +285,7 @@ export default function EditTaskPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const canChangePriority = hasPermission('qc.tasks.change_priority');
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.tasks.edit')) {
@@ -325,6 +326,7 @@ export default function EditTaskPage() {
             setIsSubmitting={setIsSubmitting}
             error={error}
             setError={setError}
+            canChangePriority={canChangePriority}
         />
     );
 }
@@ -341,6 +343,7 @@ function EditForm({
     setIsSubmitting,
     error,
     setError,
+    canChangePriority,
 }: {
     task: Task;
     projects: Project[];
@@ -351,6 +354,7 @@ function EditForm({
     setIsSubmitting: (v: boolean) => void;
     error: string | null;
     setError: (v: string | null) => void;
+    canChangePriority: boolean;
 }) {
     const [activeSection, setActiveSection] = useState('task-general');
 
@@ -596,15 +600,24 @@ function EditForm({
                             <FieldLabel>Priority</FieldLabel>
                             <div className="flex flex-wrap gap-2 mt-0.5">
                                 {PRIORITY_OPTIONS.map(opt => (
-                                    <label key={opt.value} className="cursor-pointer">
-                                        <input type="radio" value={opt.value} {...register('priority')} className="sr-only" />
-                                        <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${priorityValue === opt.value
+                                    canChangePriority ? (
+                                        <label key={opt.value} className="cursor-pointer">
+                                            <input type="radio" value={opt.value} {...register('priority')} className="sr-only" />
+                                            <span className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${priorityValue === opt.value
+                                                ? opt.active
+                                                : `bg-white dark:bg-slate-800 ${opt.idle} hover:opacity-80`
+                                            }`}>
+                                                {opt.value}
+                                            </span>
+                                        </label>
+                                    ) : (
+                                        <span key={opt.value} className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold border ${priorityValue === opt.value
                                             ? opt.active
-                                            : `bg-white dark:bg-slate-800 ${opt.idle} hover:opacity-80`
+                                            : `bg-white dark:bg-slate-800 ${opt.idle} opacity-50`
                                         }`}>
                                             {opt.value}
                                         </span>
-                                    </label>
+                                    )
                                 ))}
                             </div>
                         </div>

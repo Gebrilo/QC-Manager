@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { developmentPlansApi, IDPPlan, IDPObjective, IDPTask } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { TaskStatusBadge, inferBadgeKind } from '@/components/idp/TaskStatusBadge';
 import { TaskCommentsPanel } from '@/components/idp/TaskCommentsPanel';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -20,6 +21,7 @@ export default function IDPBuilderPage() {
     const params = useParams();
     const userId = params.userId as string;
     const toast = useToast();
+    const confirmAction = useConfirm();
     const { user } = useAuth();
 
     const [plans, setPlans] = useState<IDPPlan[]>([]);
@@ -136,7 +138,14 @@ export default function IDPBuilderPage() {
     }
 
     async function handleDeleteObjective(chapterId: string) {
-        if (!plan || !confirm('Delete this objective and all its tasks?')) return;
+        if (!plan) return;
+        const confirmed = await confirmAction({
+            title: 'Delete objective',
+            message: 'Delete this objective and all its tasks?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await developmentPlansApi.deleteObjective(userId, chapterId);
             await loadPlan();
@@ -162,7 +171,14 @@ export default function IDPBuilderPage() {
     }
 
     async function handleDeleteTask(taskId: string) {
-        if (!plan || !confirm('Delete this task?')) return;
+        if (!plan) return;
+        const confirmed = await confirmAction({
+            title: 'Delete task',
+            message: 'Delete this task?',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await developmentPlansApi.deleteTask(userId, taskId);
             await loadPlan();
@@ -170,7 +186,13 @@ export default function IDPBuilderPage() {
     }
 
     async function handleCompletePlan() {
-        if (!plan || !confirm('Mark this plan as complete? This action cannot be undone.')) return;
+        if (!plan) return;
+        const confirmed = await confirmAction({
+            title: 'Complete plan',
+            message: 'Mark this plan as complete? This action cannot be undone.',
+            confirmLabel: 'Complete',
+        });
+        if (!confirmed) return;
         try {
             await developmentPlansApi.completePlan(userId, plan?.id);
             toast.success('Plan marked as complete!');
@@ -179,7 +201,14 @@ export default function IDPBuilderPage() {
     }
 
     async function handleDeletePlan() {
-        if (!plan || !confirm('Delete this plan and all its objectives and tasks? This cannot be undone.')) return;
+        if (!plan) return;
+        const confirmed = await confirmAction({
+            title: 'Delete plan',
+            message: 'Delete this plan and all its objectives and tasks? This cannot be undone.',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await developmentPlansApi.deletePlan(userId, plan.id);
             toast.success('Plan deleted');
