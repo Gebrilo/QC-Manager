@@ -36,6 +36,7 @@ export function Sidebar() {
         const route = getRouteConfig(path);
         if (!route) return false;
         if (!routeAllowsStatus(route, user)) return false;
+        if (user.role === 'contributor' && route.scopes?.includes('active_only')) return false;
         if (route.adminOnly && !isAdmin) return false;
         if (route.permission && !hasPermission(route.permission)) return false;
         return true;

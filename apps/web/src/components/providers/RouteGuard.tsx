@@ -31,6 +31,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         const landing = getLandingPage(user, permissions);
 
+        if (user.role === 'contributor' && route.scopes?.includes('active_only')) {
+            router.replace('/me/tasks');
+            return;
+        }
+
         if (!routeAllowsStatus(route, user)) {
             router.replace('/me/tasks');
             return;
@@ -79,6 +84,7 @@ export function PagePermissionGuard({ children }: { children: React.ReactNode })
     const route = getRouteConfig(pathname || '');
     if (!route) return <>{children}</>;
 
+    if (user.role === 'contributor' && route.scopes?.includes('active_only')) return <UnauthorizedPage />;
     if (!routeAllowsStatus(route, user)) return <UnauthorizedPage />;
     if (route.adminOnly && !isAdmin) return <UnauthorizedPage />;
     if (route.permission && !hasPermission(route.permission)) return <UnauthorizedPage />;
