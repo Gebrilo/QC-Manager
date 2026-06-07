@@ -22,6 +22,7 @@ function buildDashboardApp({ user, hasPermission = true }) {
     jest.doMock('../src/config/db', () => db);
     jest.doMock('../src/middleware/authMiddleware', () => ({
         requireAuth: (req, _res, next) => { req.user = user; next(); },
+        blockContributors: (_req, _res, next) => next(),
         requirePermission: () => (_req, res, next) =>
             hasPermission ? next() : res.status(403).json({ error: 'forbidden' }),
     }));
@@ -36,6 +37,7 @@ function buildTasksApp({ user, hasPermission = true }) {
     jest.doMock('../src/config/db', () => db);
     jest.doMock('../src/middleware/authMiddleware', () => ({
         requireAuth: (req, _res, next) => { req.user = user; next(); },
+        blockContributors: (_req, _res, next) => next(),
         requirePermission: () => (_req, res, next) =>
             hasPermission ? next() : res.status(403).json({ error: 'forbidden' }),
         optionalAuth: (_req, _res, next) => next(),

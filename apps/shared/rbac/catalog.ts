@@ -465,6 +465,7 @@ const BUILT_IN_ROLE_PERMISSION_DEFAULTS = Object.freeze({
     member: Object.freeze([...new Set(collectRolePermissions('member', new Set()))]),
     viewer: Object.freeze([...new Set(collectRolePermissions('viewer', new Set()))]),
     tester: Object.freeze([...new Set(collectRolePermissions('tester', new Set()))]),
+    contributor: Object.freeze([...new Set(collectRolePermissions('contributor', new Set()))]),
 });
 
 module.exports = {

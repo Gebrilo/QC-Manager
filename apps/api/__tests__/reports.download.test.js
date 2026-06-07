@@ -6,6 +6,7 @@ const mockQuery = jest.fn();
 jest.mock('../src/config/db', () => ({ query: (...args) => mockQuery(...args) }));
 jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, _res, next) => next(),
+  blockContributors: (_req, _res, next) => next(),
   requirePermission: () => (req, _res, next) => next(),
 }));
 

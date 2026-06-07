@@ -99,10 +99,9 @@ describe('RoleResolver.resolve', () => {
         );
     });
 
-    test('contributor (not in BUILT_IN_ROLE_PERMISSION_DEFAULTS) still resolves via catalog', async () => {
-        // Defense against silent lockout: a role that exists in ROLES but not in
-        // the pre-baked defaults map must still get its catalog permissions via
-        // collectRolePermissions, never an empty Set.
+    test('contributor still resolves via catalog when role_permissions is empty', async () => {
+        // Defense against silent lockout: contributor must still get catalog
+        // permissions when a database has no normalized role_permission rows yet.
         mockQuery
             .mockResolvedValueOnce(rows([])) // role_permissions empty
             .mockResolvedValueOnce(rows([])) // user_permissions empty

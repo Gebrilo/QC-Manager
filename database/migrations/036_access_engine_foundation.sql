@@ -194,10 +194,33 @@ ALTER TABLE app_user ADD CONSTRAINT valid_role CHECK (role IN
     ('admin','manager','team_manager','pm','member','user','viewer','tester','contributor'));
 
 -- =====================================================================
--- 11. Migrate legacy roles user/tester/contributor → member
+-- 11. Migrate legacy active-workspace aliases user/tester → member.
+-- Contributor is intentionally preserved as a preparation-only onboarding role.
 -- =====================================================================
 UPDATE app_user SET role = 'member'
-WHERE role IN ('user','tester','contributor');
+WHERE role IN ('user','tester');
+
+-- Repair accounts hit by the previous contributor -> member rewrite. Active
+-- members without a team are preparation users, not active workspace members.
+UPDATE app_user
+SET role = 'contributor',
+    status = 'PREPARATION',
+    team_membership_active = false
+WHERE role = 'member'
+  AND active = true
+  AND status = 'ACTIVE'
+  AND COALESCE(team_membership_active, false) = false
+  AND team_id IS NULL;
+
+DELETE FROM user_permissions
+WHERE user_id IN (SELECT id FROM app_user WHERE role = 'contributor');
+
+INSERT INTO user_permissions (user_id, permission_key, granted)
+SELECT u.id, rp.permission_key, true
+FROM app_user u
+JOIN role_permissions rp ON rp.role_identifier = 'contributor'
+WHERE u.role = 'contributor'
+ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true;
 
 -- =====================================================================
 -- 12. Backfill owner_team_id (from projects.team_id) + visibility_scope = 'team'

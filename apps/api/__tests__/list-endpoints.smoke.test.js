@@ -6,6 +6,7 @@ const request = require('supertest');
 
 jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, res, next) => { req.user = { id: 'user-1', role: 'admin' }; next(); },
+  blockContributors: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
   requireRole: () => (req, res, next) => next(),
   optionalAuth: (req, res, next) => { req.user = { id: 'user-1', role: 'admin' }; next(); },

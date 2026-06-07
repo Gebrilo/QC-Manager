@@ -25,6 +25,7 @@ jest.mock('../src/config/db', () => ({
 const mockCurrentUser = { value: null };
 jest.mock('../src/middleware/authMiddleware', () => ({
     requireAuth: (req, _res, next) => { req.user = mockCurrentUser.value; next(); },
+    blockContributors: (_req, _res, next) => next(),
     requirePermission: () => (_req, _res, next) => next(),
 }));
 

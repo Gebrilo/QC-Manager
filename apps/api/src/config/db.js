@@ -2370,7 +2370,7 @@ const runMigrations = async () => {
             )
         `);
 
-        const { ALL_PERMISSION_VALUES, BUILT_IN_ROLE_PERMISSION_DEFAULTS } = require('../../../shared/rbac/catalog.ts');
+        const { ALL_PERMISSION_VALUES, BUILT_IN_ROLE_PERMISSION_DEFAULTS, collectRolePermissions } = require('../../../shared/rbac/catalog.ts');
         for (const permKey of ALL_PERMISSION_VALUES) {
             const domain = permKey.split('.').slice(0, -1).join('.');
             await client.query(`
@@ -2835,7 +2835,34 @@ const runMigrations = async () => {
             ALTER TABLE app_user ADD CONSTRAINT valid_role CHECK (role IN
                 ('admin','manager','team_manager','pm','member','user','viewer','tester','contributor'))
         `);
-        await client.query(`UPDATE app_user SET role = 'member' WHERE role IN ('user','tester','contributor')`);
+        await client.query(`UPDATE app_user SET role = 'member' WHERE role IN ('user','tester')`);
+
+        const contributorPermissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor
+            || collectRolePermissions('contributor', new Set());
+        await client.query(`
+            UPDATE app_user
+            SET role = 'contributor',
+                status = 'PREPARATION',
+                team_membership_active = false
+            WHERE role = 'member'
+              AND active = true
+              AND status = 'ACTIVE'
+              AND COALESCE(team_membership_active, false) = false
+              AND team_id IS NULL
+        `);
+        await client.query(`
+            DELETE FROM user_permissions
+            WHERE user_id IN (SELECT id FROM app_user WHERE role = 'contributor')
+        `);
+        for (const permissionKey of contributorPermissions) {
+            await client.query(`
+                INSERT INTO user_permissions (user_id, permission_key, granted)
+                SELECT id, $1, true
+                FROM app_user
+                WHERE role = 'contributor'
+                ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true
+            `, [permissionKey]);
+        }
 
         await client.query(`
             DO $$

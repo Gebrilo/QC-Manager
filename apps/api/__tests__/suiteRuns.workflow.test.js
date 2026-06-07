@@ -17,6 +17,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
     req.user = { id: '11111111-1111-1111-1111-111111111111', email: 'tester@example.com' };
     next();
   },
+  blockContributors: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
 }));
 

@@ -110,7 +110,7 @@ describe('Access engine — expanded catalog (issue #80)', () => {
     });
 
     test('BUILT_IN_ROLE_PERMISSION_DEFAULTS exposes a key array per built-in role with resolved permissions', () => {
-        for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer']) {
+        for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer', 'contributor']) {
             expect(Array.isArray(BUILT_IN_ROLE_PERMISSION_DEFAULTS[role])).toBe(true);
         }
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.admin).toEqual(['*']);
@@ -120,6 +120,15 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         // pm gets project-scope keys; viewer does not
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.pm).toContain('qc.reports.view_project');
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.viewer).not.toContain('qc.reports.view_project');
+    });
+
+    test('contributor remains preparation-only and has no active quality permissions', () => {
+        expect(canUserUseScope({ role: 'contributor' }, SCOPES.PREPARATION_ONLY.key)).toBe(true);
+        expect(canUserUseScope({ role: 'contributor' }, SCOPES.ACTIVE_ONLY.key)).toBe(false);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.MY_TASKS_VIEW);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.PROJECTS_VIEW);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.TESTCASES_VIEW);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.BUGS_VIEW);
     });
 
     test('canUserPerform resolves manager → team_manager via aliasFor', () => {

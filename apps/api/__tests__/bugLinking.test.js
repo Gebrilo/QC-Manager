@@ -12,6 +12,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
         };
         next();
     },
+    blockContributors: (req, res, next) => next(),
     requirePermission: () => (req, res, next) => next(),
 }));
 
