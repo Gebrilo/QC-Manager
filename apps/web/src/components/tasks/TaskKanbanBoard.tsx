@@ -21,6 +21,7 @@ interface TaskKanbanBoardProps {
     onStatusChange: (taskId: string, newStatus: string) => void;
     onOpen: (task: PersonalTask) => void;
     onDelete: (taskId: string) => void;
+    canDelete: boolean;
 }
 
 const KANBAN_STATUSES: PersonalTask['status'][] = ['pending', 'in_progress', 'done', 'cancelled'];
@@ -51,7 +52,7 @@ const columnColors: Record<string, { badge: string; border: string }> = {
     },
 };
 
-export function TaskKanbanBoard({ tasks, isLoading, onStatusChange, onOpen, onDelete }: TaskKanbanBoardProps) {
+export function TaskKanbanBoard({ tasks, isLoading, onStatusChange, onOpen, onDelete, canDelete }: TaskKanbanBoardProps) {
     // Group tasks by status. Unknown statuses fall into pending
     const grouped = useMemo(() => {
         const groups: Record<string, PersonalTask[]> = {};
@@ -138,6 +139,7 @@ export function TaskKanbanBoard({ tasks, isLoading, onStatusChange, onOpen, onDe
                                         onStatusChange={onStatusChange}
                                         onOpen={onOpen}
                                         onDelete={onDelete}
+                                        canDelete={canDelete}
                                     />
                                 ))
                             ) : (

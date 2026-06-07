@@ -47,6 +47,7 @@ export default function MyTasksPage() {
     const [modalOpen, setModalOpen] = useState(false);
 
     const canCreateTask = hasPermission('qc.mywork.tasks.create');
+    const canDeleteTask = hasPermission('qc.mywork.tasks.delete');
 
     useEffect(() => {
         const stored = localStorage.getItem('qc_my_tasks_view');
@@ -117,11 +118,15 @@ export default function MyTasksPage() {
     };
 
     const handleDelete = (taskId: string) => {
+        if (!canDeleteTask) {
+            setError('You do not have permission to delete personal tasks.');
+            return;
+        }
         setDeleteTarget(taskId);
     };
 
     const confirmDelete = async () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget || !canDeleteTask) return;
         setIsDeleting(true);
         try {
             const res = await fetch(`${API_URL}/my-tasks/${deleteTarget}`, {
@@ -186,6 +191,7 @@ export default function MyTasksPage() {
                     onStatusChange={handleStatusChange}
                     onOpen={openModal}
                     onDelete={handleDelete}
+                    canDelete={canDeleteTask}
                 />
             ) : (
                 <>
@@ -212,7 +218,7 @@ export default function MyTasksPage() {
                                 <div className="space-y-2">
                                     <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active ({activeTasks.length})</h3>
                                     {activeTasks.map(task => (
-                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} />
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} canDelete={canDeleteTask} />
                                     ))}
                                 </div>
                             )}
@@ -220,7 +226,7 @@ export default function MyTasksPage() {
                                 <div className="space-y-2">
                                     <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Completed ({completedTasks.length})</h3>
                                     {completedTasks.map(task => (
-                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} />
+                                        <TaskCard key={task.id} task={task} onStatusChange={handleStatusChange} onOpen={openModal} onDelete={handleDelete} canDelete={canDeleteTask} />
                                     ))}
                                 </div>
                             )}
@@ -236,11 +242,12 @@ export default function MyTasksPage() {
                     onClose={closeModal}
                     onSave={handleModalSave}
                     onDelete={handleDelete}
+                    canDelete={canDeleteTask}
                 />
             )}
 
             {/* Delete Confirmation Modal */}
-            {deleteTarget && (
+            {deleteTarget && canDeleteTask && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 space-y-4">
                         <div className="flex items-center gap-3">
@@ -277,11 +284,12 @@ export default function MyTasksPage() {
     );
 }
 
-function TaskCard({ task, onStatusChange, onOpen, onDelete }: {
+function TaskCard({ task, onStatusChange, onOpen, onDelete, canDelete }: {
     task: PersonalTask;
     onStatusChange: (id: string, status: string) => void;
     onOpen: (task: PersonalTask) => void;
     onDelete: (id: string) => void;
+    canDelete: boolean;
 }) {
     const [expanded, setExpanded] = useState(false);
     const isLong = (task.description?.length ?? 0) > 120;
@@ -338,13 +346,15 @@ function TaskCard({ task, onStatusChange, onOpen, onDelete }: {
                         </p>
                     )}
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={e => { e.stopPropagation(); onDelete(task.id); }} className="p-1.5 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
+                {canDelete && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={e => { e.stopPropagation(); onDelete(task.id); }} className="p-1.5 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Delete task">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

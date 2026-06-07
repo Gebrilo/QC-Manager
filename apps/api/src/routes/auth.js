@@ -67,7 +67,7 @@ const DEFAULT_PERMISSIONS = {
         'qc.resources.view',
         'qc.testexecutions.view',
         'qc.reports.view',
-        'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
+        'qc.mywork.tasks.view',
         'qc.mywork.dashboard.view',
     ],
     contributor: [

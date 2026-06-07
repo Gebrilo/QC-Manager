@@ -19,6 +19,7 @@ interface MyTaskKanbanCardProps {
     onStatusChange: (taskId: string, newStatus: string) => void;
     onOpen: (task: PersonalTask) => void;
     onDelete: (taskId: string) => void;
+    canDelete: boolean;
 }
 
 const STATUSES: PersonalTask['status'][] = ['pending', 'in_progress', 'done', 'cancelled'];
@@ -41,7 +42,7 @@ function isOverdue(dueDate: string | null): boolean {
     return new Date(dueDate) < new Date();
 }
 
-export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyTaskKanbanCardProps) {
+export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete, canDelete }: MyTaskKanbanCardProps) {
     const [expanded, setExpanded] = useState(false);
     const isLong = (task.description?.length ?? 0) > 120;
 
@@ -66,17 +67,19 @@ export function MyTaskKanbanCard({ task, onStatusChange, onOpen, onDelete }: MyT
                 <span className={`font-medium text-sm ${isDone ? 'line-through text-slate-400 dark:text-slate-600' : 'text-slate-900 dark:text-white'} line-clamp-2`}>
                     {task.title}
                 </span>
-                {/* Delete Button */}
-                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={e => { e.stopPropagation(); onDelete(task.id); }}
-                        className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
+                {canDelete && (
+                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={e => { e.stopPropagation(); onDelete(task.id); }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            aria-label="Delete task"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Description with expand/collapse */}

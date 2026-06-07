@@ -27,9 +27,10 @@ interface TaskDetailModalProps {
     onClose: () => void;
     onSave: (data: TaskFormPayload, id?: string) => Promise<void>;
     onDelete: (id: string) => void;
+    canDelete: boolean;
 }
 
-export function TaskDetailModal({ task, onClose, onSave, onDelete }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, onClose, onSave, onDelete, canDelete }: TaskDetailModalProps) {
     const isCreate = task === null;
     const [formData, setFormData] = useState<TaskFormPayload>({
         title: '',
@@ -182,7 +183,7 @@ export function TaskDetailModal({ task, onClose, onSave, onDelete }: TaskDetailM
 
                 {/* Footer */}
                 <div className="px-5 py-4 flex items-center justify-between">
-                    {!isCreate ? (
+                    {!isCreate && canDelete ? (
                         <button
                             onClick={handleDelete}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800 transition-colors"
