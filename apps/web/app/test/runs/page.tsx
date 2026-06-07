@@ -306,7 +306,9 @@ export default function TestExecutionsPage() {
         const a = document.createElement('a');
         a.href = url;
         a.download = 'test_results_template.csv';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
 
