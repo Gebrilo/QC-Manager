@@ -93,6 +93,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     if (!user) return null;
 
+    // Synchronous contributor guard — prevents flash of content before useEffect redirect
+    if (pathname && !isPublicRoute(pathname)) {
+        const blockedRoute = getRouteConfig(pathname);
+        if (blockedRoute && user.role === 'contributor' && blockedRoute.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) {
+            return null;
+        }
+    }
+
     return <>{children}</>;
 }
 
