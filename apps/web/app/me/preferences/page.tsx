@@ -319,6 +319,7 @@ export default function PreferencesPage() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeSection, setActiveSection] = useState('profile');
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
     const allowedLandingPages = useMemo(() => {
         return LANDING_PAGE_OPTIONS.filter(opt => {
@@ -372,6 +373,12 @@ export default function PreferencesPage() {
         }
     }, [allowedLandingPages, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    useEffect(() => {
+        if (!lastSaved) return;
+        const timeout = setTimeout(() => setLastSaved(null), 3000);
+        return () => clearTimeout(timeout);
+    }, [lastSaved]);
+
     // Scroll spy
     useEffect(() => {
         const main = document.querySelector('main');
@@ -406,6 +413,7 @@ export default function PreferencesPage() {
         try {
             await profileApi.update({ display_name: displayName });
             setProfileMsg({ type: 'success', text: 'Display name updated!' });
+            setLastSaved(new Date());
         } catch (err: any) {
             setProfileMsg({ type: 'error', text: err.message || 'Failed to save' });
         } finally { setProfileSaving(false); }
@@ -415,6 +423,7 @@ export default function PreferencesPage() {
         setPrefSaving(true);
         try {
             await profileApi.update({ preferences: next });
+            setLastSaved(new Date());
         } catch { /* silent */ } finally { setPrefSaving(false); }
     };
 
@@ -436,6 +445,7 @@ export default function PreferencesPage() {
             if (error) throw error;
             setPwSent(true);
             setPwMsg({ type: 'success', text: `Reset link sent to ${profile.email}` });
+            setLastSaved(new Date());
         } catch (err: any) {
             setPwMsg({ type: 'error', text: err.message || 'Failed to send reset email.' });
         } finally { setPwSending(false); }
@@ -461,6 +471,7 @@ export default function PreferencesPage() {
             setAvatarUrl(`${apiUrl}${result.avatar_url}`);
             await refreshUser();
             setAvatarMsg({ type: 'success', text: 'Avatar updated!' });
+            setLastSaved(new Date());
         } catch (err: any) {
             setAvatarMsg({ type: 'error', text: err.message || 'Upload failed.' });
         } finally {
@@ -478,6 +489,7 @@ export default function PreferencesPage() {
             setAvatarUrl(null);
             await refreshUser();
             setAvatarMsg({ type: 'success', text: 'Avatar removed.' });
+            setLastSaved(new Date());
         } catch (err: any) {
             setAvatarMsg({ type: 'error', text: err.message || 'Failed to remove avatar.' });
         } finally { setAvatarSaving(false); }
@@ -513,10 +525,12 @@ export default function PreferencesPage() {
                             <span className="text-violet-600 dark:text-violet-300 font-medium">Settings</span>.
                         </p>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        All changes saved
-                    </div>
+                    {lastSaved && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            All changes saved
+                        </div>
+                    )}
                 </div>
             </header>
 
