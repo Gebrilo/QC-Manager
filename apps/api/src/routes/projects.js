@@ -4,7 +4,7 @@ const db = require('../config/db');
 const { createProjectSchema, updateProjectSchema } = require('../schemas/project');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, requireStatusScope } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireStatusScope, requireRoleOrPermission } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const { SCOPES } = require('../../../shared/rbac/catalog.ts');
 
@@ -19,6 +19,16 @@ async function buildTeamFilter(user) {
     }
     if (user.role === 'manager') {
         const teamId = await getManagerTeamId(user.id);
+        if (!teamId) return { clause: 'AND 1=0', params: [] };
+        return { clause: 'AND team_id = $1', params: [teamId] };
+    }
+    if (user.role === 'contributor') {
+        return { clause: 'AND 1=0', params: [] };
+    }
+    return { clause: '', params: [] };
+}
+    if (user.role === 'manager') {
+        const teamId = await getManagerTeamId(user.id);
         if (!teamId) return { clause: 'AND 1=0', params: [] }; // No team → no projects
         return { clause: 'AND team_id = $1', params: [teamId] };
     }
@@ -27,7 +37,7 @@ async function buildTeamFilter(user) {
 }
 
 // GET all projects (from View), scoped by team for managers
-router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), async (req, res, next) => {
+router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('qc.projects.view'), async (req, res, next) => {
     try {
         const { clause, params } = await buildTeamFilter(req.user);
 
@@ -42,7 +52,7 @@ router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), async (
 });
 
 // GET single project (from View) — enforce team scope for managers
-router.get('/:id', requireAuth, async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(
