@@ -39,10 +39,11 @@ const adminPermissions = [
 
 export async function mockAuthenticatedSession(
     page: Page,
-    options?: { user?: Partial<MockUser>; permissions?: string[]; token?: string }
+    options?: { user?: Partial<MockUser>; permissions?: string[]; effectivePermissions?: string[]; token?: string }
 ) {
     const user = { ...defaultUser, ...options?.user };
     const permissions = options?.permissions || adminPermissions;
+    const effectivePermissions = options?.effectivePermissions || permissions;
     const token = options?.token || 'e2e-auth-token';
 
     const supabaseSession = JSON.stringify({
@@ -68,7 +69,11 @@ export async function mockAuthenticatedSession(
     }, { token, session: supabaseSession });
 
     // Mock both the old production API and new localhost API URLs
-    const authBody = JSON.stringify({ user, permissions });
+    const authBody = JSON.stringify({
+        user,
+        permissions,
+        effective_permissions: effectivePermissions,
+    });
 
     await page.route('**/auth/sync', async (route) => {
         await route.fulfill({

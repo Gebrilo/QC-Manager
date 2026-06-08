@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const data = await res.json();
             return {
                 user: { ...data.user },
-                permissions: data.permissions || [],
+                permissions: data.effective_permissions || data.permissions || [],
             };
         } catch (err) {
             console.error('[AuthProvider] Backend sync failed:', err);
