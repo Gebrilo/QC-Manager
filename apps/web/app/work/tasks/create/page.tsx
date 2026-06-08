@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { fetchApi } from '@/lib/api';
@@ -15,6 +15,13 @@ import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
+const optionalNumber = (schema: z.ZodNumber) =>
+    z.preprocess((value) => {
+        if (value === undefined || value === null) return undefined;
+        if (typeof value === 'string' && value.trim() === '') return undefined;
+        return Number(value);
+    }, schema.optional());
+
 const schema = z.object({
     task_id: z.string().regex(/^TSK-[0-9]{3}$/, 'Format: TSK-XXX'),
     project_id: z.string().uuid(),
@@ -26,14 +33,14 @@ const schema = z.object({
     blocked_reason: z.string().optional().default(''),
     resource1_uuid: z.string().uuid(),
     resource2_uuid: z.string().optional().or(z.literal('')),
-    initial_estimate: z.coerce.number().nullable().optional(),
-    final_estimate: z.coerce.number().nullable().optional(),
-    actual_effort: z.coerce.number().nullable().optional(),
-    estimate_days: z.coerce.number().positive().optional(),
-    r1_estimate_hrs: z.coerce.number().min(0).optional(),
-    r1_actual_hrs: z.coerce.number().min(0).optional(),
-    r2_estimate_hrs: z.coerce.number().min(0).optional(),
-    r2_actual_hrs: z.coerce.number().min(0).optional(),
+    initial_estimate: optionalNumber(z.number()),
+    final_estimate: optionalNumber(z.number()),
+    actual_effort: optionalNumber(z.number()),
+    estimate_days: optionalNumber(z.number().positive()),
+    r1_estimate_hrs: optionalNumber(z.number().min(0)),
+    r1_actual_hrs: optionalNumber(z.number().min(0)),
+    r2_estimate_hrs: optionalNumber(z.number().min(0)),
+    r2_actual_hrs: optionalNumber(z.number().min(0)),
     expected_start_date: z.string().optional().or(z.literal('')),
     actual_start_date: z.string().optional().or(z.literal('')),
     deadline: z.string().optional().or(z.literal('')),
@@ -42,6 +49,60 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+type FormField = keyof FormData;
+
+const SECTION_FIELDS: { sectionId: string; fields: FormField[] }[] = [
+    { sectionId: 'task-general', fields: ['task_name', 'project_id', 'task_id', 'status', 'priority', 'team'] },
+    { sectionId: 'task-description', fields: ['description', 'blocked_reason'] },
+    { sectionId: 'task-assignment', fields: ['resource1_uuid', 'resource2_uuid'] },
+    {
+        sectionId: 'task-planning',
+        fields: [
+            'estimate_days',
+            'actual_effort',
+            'initial_estimate',
+            'final_estimate',
+            'r1_estimate_hrs',
+            'r1_actual_hrs',
+            'r2_estimate_hrs',
+            'r2_actual_hrs',
+        ],
+    },
+    { sectionId: 'task-dates', fields: ['expected_start_date', 'actual_start_date', 'deadline', 'completed_date'] },
+    { sectionId: 'task-links', fields: ['parent_user_story_id'] },
+];
+
+const FIELD_LABELS: Partial<Record<FormField, string>> = {
+    task_id: 'Task ID',
+    project_id: 'Project',
+    task_name: 'Task Name',
+    status: 'Status',
+    priority: 'Priority',
+    description: 'Description',
+    team: 'Team',
+    blocked_reason: 'Blocked Reason',
+    resource1_uuid: 'Primary Resource',
+    resource2_uuid: 'Secondary Resource',
+    initial_estimate: 'Initial Estimate',
+    final_estimate: 'Final Estimate',
+    actual_effort: 'Actual Effort',
+    estimate_days: 'Estimate Days',
+    r1_estimate_hrs: 'R1 Estimate Hours',
+    r1_actual_hrs: 'R1 Actual Hours',
+    r2_estimate_hrs: 'R2 Estimate Hours',
+    r2_actual_hrs: 'R2 Actual Hours',
+    expected_start_date: 'Expected Start Date',
+    actual_start_date: 'Actual Start Date',
+    deadline: 'Deadline',
+    completed_date: 'Completed Date',
+    parent_user_story_id: 'Parent User Story',
+};
+
+function errorLabels(errors: FieldErrors<FormData>) {
+    return (Object.keys(errors) as FormField[])
+        .map(field => FIELD_LABELS[field] ?? field.replace(/_/g, ' '))
+        .join(', ');
+}
 
 // ── Design primitives ──────────────────────────────────────────────────────
 
@@ -312,6 +373,7 @@ function CreateForm({
 
     const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
+        mode: 'onChange',
         defaultValues: {
             task_id: `TSK-${Math.floor(Math.random() * 900) + 100}`,
             project_id: projects[0]?.id || '',
@@ -323,9 +385,9 @@ function CreateForm({
             blocked_reason: '',
             resource1_uuid: resources.filter(r => r.is_active !== false)[0]?.id || '',
             resource2_uuid: '',
-            initial_estimate: null,
-            final_estimate: null,
-            actual_effort: null,
+            initial_estimate: undefined,
+            final_estimate: undefined,
+            actual_effort: undefined,
             estimate_days: undefined,
             r1_estimate_hrs: undefined,
             r1_actual_hrs: 0,
@@ -358,6 +420,15 @@ function CreateForm({
     const statusValue = watch('status');
     const priorityValue = watch('priority');
     const resource2Value = watch('resource2_uuid');
+    const taskNameValue = watch('task_name');
+    const projectIdValue = watch('project_id');
+    const resource1Value = watch('resource1_uuid');
+    const missingRequiredFields = [
+        !taskNameValue?.trim() ? 'Task Name' : null,
+        !projectIdValue ? 'Project' : null,
+        !resource1Value ? 'Primary Resource' : null,
+    ].filter(Boolean) as string[];
+    const hasValidationErrors = Object.keys(errors).length > 0;
 
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
@@ -397,6 +468,17 @@ function CreateForm({
         }
     };
 
+    const onInvalid = (formErrors: FieldErrors<FormData>) => {
+        const firstSection = SECTION_FIELDS.find(({ fields }) => fields.some(field => formErrors[field]));
+        const firstField = firstSection?.fields.find(field => formErrors[field]);
+        const firstInput = firstField ? document.querySelector(`[name="${firstField}"]`) : null;
+        const firstTarget = firstInput instanceof HTMLElement ? firstInput : null;
+        const sectionTarget = firstSection ? document.getElementById(firstSection.sectionId) : null;
+
+        (firstTarget ?? sectionTarget)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        toast.error(`Fix required fields: ${errorLabels(formErrors) || 'highlighted fields'}`);
+    };
+
     const activeResources = resources.filter(r => r.is_active !== false);
     const resource1Options = activeResources.map(r => ({
         value: r.id,
@@ -413,7 +495,7 @@ function CreateForm({
     const SaveButton = ({ size }: { size?: 'sm' }) => (
         <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || missingRequiredFields.length > 0}
             className={`rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold shadow-md shadow-violet-500/25 transition-all flex items-center gap-2 ${size === 'sm' ? 'h-9 px-4 text-sm' : 'h-9 px-5 text-sm'}`}
         >
             {isSubmitting ? (
@@ -427,7 +509,7 @@ function CreateForm({
     );
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="max-w-[1400px] mx-auto px-6 py-6">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="max-w-[1400px] mx-auto px-6 py-6">
 
             {/* ── Header ──────────────────────────────────────────────── */}
             <div className="flex items-start justify-between mb-6 gap-6">
@@ -648,14 +730,17 @@ function CreateForm({
                         <div>
                             <FieldLabel>Actual Effort (hrs)</FieldLabel>
                             <input type="number" step="0.5" {...register('actual_effort')} placeholder="0" className={fieldCls} />
+                            <FieldError message={errors.actual_effort?.message} />
                         </div>
                         <div>
                             <FieldLabel>Initial Est. (hrs)</FieldLabel>
                             <input type="number" step="0.5" {...register('initial_estimate')} placeholder="0" className={fieldCls} />
+                            <FieldError message={errors.initial_estimate?.message} />
                         </div>
                         <div>
                             <FieldLabel>Final Est. (hrs)</FieldLabel>
                             <input type="number" step="0.5" {...register('final_estimate')} placeholder="0" className={fieldCls} />
+                            <FieldError message={errors.final_estimate?.message} />
                         </div>
                         <div>
                             <FieldLabel>R1 Est. (hrs)</FieldLabel>
@@ -746,11 +831,26 @@ function CreateForm({
             {/* ── Sticky action bar ────────────────────────────────────── */}
             <div className="sticky bottom-4 mt-6 z-10">
                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl px-4 py-3 flex items-center justify-between shadow-xl border border-slate-200/60 dark:border-slate-700/60">
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
-                        </svg>
-                        <span>Fill in Task Name, Project, and Primary Resource to create</span>
+                    <div className={`flex items-center gap-3 text-xs ${missingRequiredFields.length === 0 && !hasValidationErrors
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                        {missingRequiredFields.length === 0 && !hasValidationErrors ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M5 13l4 4L19 7" />
+                            </svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+                            </svg>
+                        )}
+                        <span>
+                            {missingRequiredFields.length > 0
+                                ? `Required: ${missingRequiredFields.join(', ')}`
+                                : hasValidationErrors
+                                    ? `${Object.keys(errors).length} field${Object.keys(errors).length === 1 ? '' : 's'} need attention`
+                                    : 'All required fields filled, ready to create'}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Link

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,14 @@ import { FormSection } from '@/components/ui/FormSection';
 import { Project, Resource, Task } from '@/types';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
+
+const optionalNumber = (schema: z.ZodNumber) =>
+    z.preprocess((value) => {
+        if (value === undefined || value === null) return undefined;
+        if (typeof value === 'string' && value.trim() === '') return undefined;
+        return Number(value);
+    }, schema.optional());
 
 const taskSchema = z.object({
     task_id: z.string().regex(/^TSK-[0-9]{3}$/, 'Format: TSK-XXX'),
@@ -25,14 +33,14 @@ const taskSchema = z.object({
     blocked_reason: z.string().optional().default(''),
     resource1_uuid: z.string().uuid(),
     resource2_uuid: z.string().optional().or(z.literal('')),
-    initial_estimate: z.coerce.number().nullable().optional(),
-    final_estimate: z.coerce.number().nullable().optional(),
-    actual_effort: z.coerce.number().nullable().optional(),
-    estimate_days: z.coerce.number().positive().optional(),
-    r1_estimate_hrs: z.coerce.number().min(0).optional(),
-    r1_actual_hrs: z.coerce.number().min(0).optional(),
-    r2_estimate_hrs: z.coerce.number().min(0).optional(),
-    r2_actual_hrs: z.coerce.number().min(0).optional(),
+    initial_estimate: optionalNumber(z.number()),
+    final_estimate: optionalNumber(z.number()),
+    actual_effort: optionalNumber(z.number()),
+    estimate_days: optionalNumber(z.number().positive()),
+    r1_estimate_hrs: optionalNumber(z.number().min(0)),
+    r1_actual_hrs: optionalNumber(z.number().min(0)),
+    r2_estimate_hrs: optionalNumber(z.number().min(0)),
+    r2_actual_hrs: optionalNumber(z.number().min(0)),
     expected_start_date: z.string().optional().or(z.literal('')),
     actual_start_date: z.string().optional().or(z.literal('')),
     deadline: z.string().optional().or(z.literal('')),
@@ -41,6 +49,39 @@ const taskSchema = z.object({
 });
 
 type FormData = z.infer<typeof taskSchema>;
+type FormField = keyof FormData;
+
+const FIELD_LABELS: Partial<Record<FormField, string>> = {
+    task_id: 'Task ID',
+    project_id: 'Project',
+    task_name: 'Task Name',
+    status: 'Status',
+    priority: 'Priority',
+    description: 'Description',
+    team: 'Team',
+    blocked_reason: 'Blocked Reason',
+    resource1_uuid: 'Primary Resource',
+    resource2_uuid: 'Secondary Resource',
+    initial_estimate: 'Initial Estimate',
+    final_estimate: 'Final Estimate',
+    actual_effort: 'Actual Effort',
+    estimate_days: 'Estimate Days',
+    r1_estimate_hrs: 'R1 Estimate Hours',
+    r1_actual_hrs: 'R1 Actual Hours',
+    r2_estimate_hrs: 'R2 Estimate Hours',
+    r2_actual_hrs: 'R2 Actual Hours',
+    expected_start_date: 'Expected Start Date',
+    actual_start_date: 'Actual Start Date',
+    deadline: 'Deadline',
+    completed_date: 'Completed Date',
+    parent_user_story_id: 'Parent User Story',
+};
+
+function errorLabels(errors: FieldErrors<FormData>) {
+    return (Object.keys(errors) as FormField[])
+        .map(field => FIELD_LABELS[field] ?? field.replace(/_/g, ' '))
+        .join(', ');
+}
 
 interface TaskFormProps {
     initialData?: Task;
@@ -59,11 +100,13 @@ function normalizePriority(priority?: string): 'High' | 'Medium' | 'Low' {
 
 export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormProps) {
     const router = useRouter();
+    const toast = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const { register, handleSubmit, formState: { errors }, watch } = useForm<FormData>({
         resolver: zodResolver(taskSchema) as any,
+        mode: 'onChange',
         defaultValues: {
             task_id: initialData?.task_id || `TSK-${Math.floor(Math.random() * 900) + 100}`,
             project_id: initialData?.project_id || '',
@@ -75,9 +118,9 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
             blocked_reason: (initialData as any)?.blocked_reason || '',
             resource1_uuid: initialData?.resource1_uuid || initialData?.resource1_id || '',
             resource2_uuid: initialData?.resource2_uuid || initialData?.resource2_id || '',
-            initial_estimate: (initialData as any)?.initial_estimate != null ? Number((initialData as any).initial_estimate) : null,
-            final_estimate: (initialData as any)?.final_estimate != null ? Number((initialData as any).final_estimate) : null,
-            actual_effort: (initialData as any)?.actual_effort != null ? Number((initialData as any).actual_effort) : null,
+            initial_estimate: (initialData as any)?.initial_estimate != null ? Number((initialData as any).initial_estimate) : undefined,
+            final_estimate: (initialData as any)?.final_estimate != null ? Number((initialData as any).final_estimate) : undefined,
+            actual_effort: (initialData as any)?.actual_effort != null ? Number((initialData as any).actual_effort) : undefined,
             estimate_days: initialData?.estimate_days ? Number(initialData.estimate_days) : undefined,
             r1_estimate_hrs: initialData?.r1_estimate_hrs ? Number(initialData.r1_estimate_hrs) : (initialData?.estimate_days ? Number(initialData.estimate_days) * 8 : undefined),
             r1_actual_hrs: initialData?.r1_actual_hrs ? Number(initialData.r1_actual_hrs) : 0,
@@ -91,8 +134,15 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
         },
     });
 
+    const taskNameValue = watch('task_name');
+    const projectIdValue = watch('project_id');
     const resource1Value = watch('resource1_uuid');
     const resource2Value = watch('resource2_uuid');
+    const missingRequiredFields = [
+        !taskNameValue?.trim() ? 'Task Name' : null,
+        !projectIdValue ? 'Project' : null,
+        !resource1Value ? 'Primary Resource' : null,
+    ].filter(Boolean) as string[];
 
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
@@ -137,6 +187,17 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
         }
     };
 
+    const onInvalid = (formErrors: FieldErrors<FormData>) => {
+        const firstField = Object.keys(formErrors)[0] as FormField | undefined;
+        const firstInput = firstField ? document.querySelector(`[name="${firstField}"]`) : null;
+
+        if (firstInput instanceof HTMLElement) {
+            firstInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        toast.error(`Fix required fields: ${errorLabels(formErrors) || 'highlighted fields'}`);
+    };
+
     const projectOptions = projects.map(p => ({ value: p.id, label: `${p.project_id} - ${p.project_name || 'Unnamed'}` }));
     const activeResources = resources.filter(r => r.is_active !== false);
     const resourceOptions = activeResources.map(r => {
@@ -152,7 +213,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
     ];
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-3xl mx-auto">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6 max-w-3xl mx-auto">
             <ErrorBanner message={error} />
 
             <FormSection title="Task Details">
@@ -257,6 +318,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                     type="number"
                     step="0.5"
                     {...register('initial_estimate')}
+                    error={errors.initial_estimate?.message}
                     placeholder="0"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
@@ -265,6 +327,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                     type="number"
                     step="0.5"
                     {...register('final_estimate')}
+                    error={errors.final_estimate?.message}
                     placeholder="0"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
@@ -313,6 +376,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                     type="number"
                     step="0.5"
                     {...register('actual_effort')}
+                    error={errors.actual_effort?.message}
                     placeholder="0"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
@@ -357,7 +421,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <Button type="button" variant="outline" onClick={() => router.back()} className="w-24 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting} className="w-36 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 border-none">
+                <Button type="submit" disabled={isSubmitting || missingRequiredFields.length > 0} className="w-36 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/30 border-none">
                     {isSubmitting ? <span className="animate-spin mr-2">⏳</span> : null}
                     {isEdit ? 'Save Changes' : 'Create Task'}
                 </Button>
