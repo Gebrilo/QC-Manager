@@ -102,6 +102,7 @@ export function ActionBar({
     const [menu, setMenu] = useState(false);
     const { hasPermission } = useAuth();
     const canExport = hasPermission('qc.reports.export');
+    const canGenerate = hasPermission('qc.reports.generate');
 
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-visible">
@@ -145,16 +146,18 @@ export function ActionBar({
                             )}
                         </div>
                     )}
-                    <Button
-                        variant="primary"
-                        onClick={onGenerate}
-                        loading={generating}
-                        loadingText="Generating… (est ~30s)"
-                        disabled={generating}
-                        className="min-w-[220px]"
-                    >
-                        Generate
-                    </Button>
+                    {canGenerate && (
+                        <Button
+                            variant="primary"
+                            onClick={onGenerate}
+                            loading={generating}
+                            loadingText="Generating… (est ~30s)"
+                            disabled={generating}
+                            className="min-w-[220px]"
+                        >
+                            Generate
+                        </Button>
+                    )}
                 </div>
             </div>
 

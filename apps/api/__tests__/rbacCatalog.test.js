@@ -122,6 +122,14 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.viewer).not.toContain('qc.reports.view_project');
     });
 
+    test('pm can view global work and test-run routes without mutation permissions', () => {
+        expect(canUserPerform({ role: 'pm' }, PERMISSIONS.TASKS_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'pm' }, PERMISSIONS.BUGS_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'pm' }, PERMISSIONS.TESTEXECUTIONS_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'pm' }, PERMISSIONS.BUGS_CREATE)).toBe(false);
+        expect(canUserPerform({ role: 'pm' }, PERMISSIONS.TESTEXECUTIONS_CREATE)).toBe(false);
+    });
+
     test('contributor remains preparation-only and has no active quality permissions', () => {
         expect(canUserUseScope({ role: 'contributor' }, SCOPES.PREPARATION_ONLY.key)).toBe(true);
         expect(canUserUseScope({ role: 'contributor' }, SCOPES.ACTIVE_ONLY.key)).toBe(false);
