@@ -51,3 +51,7 @@ A role passes when:
 - Page-level route guards can allow a page while action buttons still require a narrower permission.
 - A role with `ACTIVE_ONLY` routes must have `status = ACTIVE`; `contributor` scenarios assume `status = PREPARATION`.
 
+## Related packs
+
+- [`../full-app-audit/`](../full-app-audit/README.md) — page-by-page functional + UX sweep run as admin. Complements this RBAC pack: this one answers "can this role only do what it should?"; the full-app-audit pack answers "does every page and button work correctly with good UX?"
+
