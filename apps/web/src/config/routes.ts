@@ -101,7 +101,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/team/journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
     { path: '/team/journeys/[userId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/team/journeys/[userId]/[journeyId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/team/idp', label: 'Dev Plans', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.6, icon: GraduationCap },
+    { path: '/team/idp', label: 'Development Plans', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.6, icon: GraduationCap },
     { path: '/team/idp/[userId]', label: 'IDP Builder', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/me/preferences', label: 'Preferences' },
 ];
@@ -306,8 +306,10 @@ function findNodePath(nodes: NavigationNode[], targetPath: string): NavigationNo
 }
 
 export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
+    const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
+
     for (const section of NAVIGATION_SECTIONS) {
-        const nodePath = findNodePath(section.children, pathname);
+        const nodePath = findNodePath(section.children, normalizedPathname);
         if (nodePath) {
             return [
                 { label: section.label },

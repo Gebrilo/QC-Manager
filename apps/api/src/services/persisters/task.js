@@ -19,9 +19,18 @@ function normalizeTaskStatus(status) {
 
 async function generateTaskId(query) {
   const result = await query(
-    "SELECT task_id FROM tasks WHERE task_id LIKE 'TSK-%' ORDER BY task_id DESC LIMIT 1"
+    `SELECT task_id
+     FROM tasks
+     WHERE task_id ~ '^TSK-[0-9]+$'
+     ORDER BY (substring(task_id from 5))::int DESC
+     LIMIT 1`
   );
-  const lastId = result.rows.length > 0 ? parseInt(result.rows[0].task_id.replace('TSK-', ''), 10) : 0;
+  const lastId = result.rows.length > 0 ? parseInt(result.rows[0].task_id.slice(4), 10) : 0;
+
+  if (!Number.isFinite(lastId)) {
+    throw new Error(`Failed to parse last task_id: ${result.rows[0]?.task_id}`);
+  }
+
   return `TSK-${String(lastId + 1).padStart(3, '0')}`;
 }
 
@@ -333,4 +342,4 @@ async function resolveResourceByName(name, query) {
   return result.rows.length > 0 ? result.rows[0].id : null;
 }
 
-module.exports = { dispatchAction };
+module.exports = { dispatchAction, generateTaskId };

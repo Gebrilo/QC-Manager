@@ -16,21 +16,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setTheme] = useState<Theme>('light');
-    const [density, setDensity] = useState<Density>('comfortable');
-
-    useEffect(() => {
-        const storedTheme = localStorage.getItem('theme') as Theme | null;
-        const storedDensity = localStorage.getItem('density') as Density | null;
-
-        if (storedTheme === 'dark') {
-            setTheme('dark');
-        }
-
-        if (storedDensity) {
-            setDensity(storedDensity);
-        }
-    }, []);
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window === 'undefined') return 'light';
+        return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+    });
+    const [density, setDensity] = useState<Density>(() => {
+        if (typeof window === 'undefined') return 'comfortable';
+        return localStorage.getItem('density') === 'compact' ? 'compact' : 'comfortable';
+    });
 
     useEffect(() => {
         const root = window.document.documentElement;

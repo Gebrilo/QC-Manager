@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../providers/ThemeProvider';
@@ -14,9 +14,14 @@ import { Breadcrumb } from './Breadcrumb';
 export function TopBar() {
     const router = useRouter();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isThemeMounted, setIsThemeMounted] = useState(false);
     const { theme, toggleTheme } = useTheme();
     const { user, permissions, logout } = useAuth();
     const { toggleExpanded, toggleMobile } = useSidebar();
+
+    useEffect(() => {
+        setIsThemeMounted(true);
+    }, []);
 
     if (!user) return null;
 
@@ -73,12 +78,12 @@ export function TopBar() {
                     <button
                         onClick={toggleTheme}
                         className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                        aria-label={!isThemeMounted ? 'Toggle theme' : theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
                     >
-                        {theme === 'light' ? (
-                            <Moon className="w-[18px] h-[18px]" strokeWidth={1.75} />
-                        ) : (
+                        {isThemeMounted && theme === 'dark' ? (
                             <Sun className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                        ) : (
+                            <Moon className="w-[18px] h-[18px]" strokeWidth={1.75} />
                         )}
                     </button>
 

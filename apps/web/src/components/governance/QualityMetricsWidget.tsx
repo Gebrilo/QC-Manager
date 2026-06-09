@@ -109,7 +109,7 @@ export function QualityMetricsWidget({ data }: QualityMetricsWidgetProps) {
                         <div className="h-9 px-3 rounded-lg border border-violet-300/60 dark:border-violet-700/50 bg-violet-50/60 dark:bg-violet-950/30 flex items-center">
                             {pertResult !== null
                                 ? <span className="text-sm font-bold text-violet-700 dark:text-violet-300">{pertResult}h ± {pertSd}h</span>
-                                : <span className="text-sm text-slate-400">—</span>
+                                : <span className="text-xs leading-tight text-slate-400">Fill all three fields (O, ML, P)</span>
                             }
                         </div>
                     </div>

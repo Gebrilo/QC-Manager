@@ -1,4 +1,4 @@
-const { dispatchAction } = require('../src/services/persisters/task');
+const { dispatchAction, generateTaskId } = require('../src/services/persisters/task');
 const { resolveLinks, drainPending } = require('../src/services/tuleapLinkResolver');
 
 jest.mock('../src/services/tuleapLinkResolver', () => ({
@@ -192,5 +192,22 @@ describe('task persister — dispatchAction', () => {
 
     const insertCall = query.mock.calls.find(c => /INSERT INTO tasks/i.test(c[0]));
     expect(insertCall).toBeDefined();
+  });
+});
+
+describe('task persister — generateTaskId', () => {
+  it('skips non-numeric task IDs when generating the next ID', async () => {
+    const query = jest.fn().mockResolvedValueOnce({ rows: [{ task_id: 'TSK-408' }] });
+
+    await expect(generateTaskId(query)).resolves.toBe('TSK-409');
+
+    expect(query.mock.calls[0][0]).toContain("task_id ~ '^TSK-[0-9]+$'");
+    expect(query.mock.calls[0][0]).toContain('(substring(task_id from 5))::int DESC');
+  });
+
+  it('fails explicitly if the numeric lookup returns an invalid task ID', async () => {
+    const query = jest.fn().mockResolvedValueOnce({ rows: [{ task_id: 'TSK-NaN' }] });
+
+    await expect(generateTaskId(query)).rejects.toThrow('Failed to parse last task_id: TSK-NaN');
   });
 });

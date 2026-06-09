@@ -477,7 +477,7 @@ export default function RolesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Role Management</h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage roles and their permission assignments</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage roles, custom role creation, and permission assignments.</p>
                 </div>
                 <button
                     type="button"

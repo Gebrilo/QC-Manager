@@ -74,6 +74,7 @@ function TestResultsContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [projectFilter, setProjectFilter] = useState(searchParams?.get('project_id') || 'all');
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | 'all'>('all');
   const [latestOnly, setLatestOnly] = useState(true);
@@ -84,8 +85,16 @@ function TestResultsContent() {
   }, []);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
     loadTestResults();
-  }, [projectFilter, statusFilter, latestOnly]);
+  }, [projectFilter, statusFilter, latestOnly, debouncedSearchQuery]);
 
   const loadProjects = async () => {
     try {
@@ -109,8 +118,8 @@ function TestResultsContent() {
         params.append('status', statusFilter);
       }
 
-      if (searchQuery) {
-        params.append('test_case_id', searchQuery);
+      if (debouncedSearchQuery) {
+        params.append('test_case_id', debouncedSearchQuery);
       }
 
       params.append('latest_only', latestOnly.toString());
@@ -126,14 +135,6 @@ function TestResultsContent() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-  };
-
-  const handleSearchSubmit = () => {
-    loadTestResults();
   };
 
   const getStatusBadgeVariant = (status: ExecutionStatus): 'success' | 'danger' | 'default' | 'warning' => {
@@ -174,11 +175,10 @@ function TestResultsContent() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by test case ID..."
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <Button onClick={handleSearchSubmit}>Search</Button>
         </div>
 
         <div className="flex gap-4 items-center flex-wrap">
@@ -250,11 +250,8 @@ function TestResultsContent() {
           {canUpload ? (
             <>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                No test results found. Upload your test results to get started.
+                No test results found. Use "Upload Test Results" above to get started.
               </p>
-              <Link href="/test/results/upload">
-                <Button>Upload Test Results</Button>
-              </Link>
             </>
           ) : (
             <>

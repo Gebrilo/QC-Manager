@@ -132,6 +132,7 @@ export default function TestExecutionsPage() {
     const [filterProject, setFilterProject] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [activeTab, setActiveTab] = useState<'upload' | 'history'>('upload');
 
     // Load projects and recent uploads
     useEffect(() => {
@@ -366,6 +367,26 @@ export default function TestExecutionsPage() {
     };
     const canCreateRun = hasPermission('qc.testexecutions.create') || hasPermission('qc.testresults.upload');
     const canViewGovernance = hasPermission('qc.governance.view');
+    const visibleTab = canCreateRun ? activeTab : 'history';
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const tab = new URLSearchParams(window.location.search).get('tab');
+        setActiveTab(tab === 'history' || !canCreateRun ? 'history' : 'upload');
+    }, [canCreateRun]);
+
+    const switchTab = (tab: 'upload' | 'history') => {
+        setActiveTab(tab);
+        router.replace(tab === 'history' ? '/test/runs?tab=history' : '/test/runs', { scroll: false });
+    };
+
+    const tabClass = (tab: 'upload' | 'history') => [
+        'h-10 px-4 border-b-2 text-sm font-semibold transition-colors',
+        visibleTab === tab
+            ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
+            : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+    ].join(' ');
 
     return (
         <div className="space-y-8">
@@ -377,12 +398,10 @@ export default function TestExecutionsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <PermissionGate permission="qc.testresults.upload" mode="hide">
-                        <Link href="/test/results/upload">
-                            <Button variant="primary" className="flex items-center gap-2">
-                                <Upload className="w-4 h-4" />
-                                Upload Test Results
-                            </Button>
-                        </Link>
+                        <Button variant="primary" className="flex items-center gap-2" onClick={() => switchTab('upload')}>
+                            <Upload className="w-4 h-4" />
+                            Upload Test Results
+                        </Button>
                     </PermissionGate>
                     <button
                         onClick={handleDownloadTemplate}
@@ -407,8 +426,32 @@ export default function TestExecutionsPage() {
                 </div>
             </div>
 
+            <div className="border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                    {canCreateRun && (
+                        <button
+                            type="button"
+                            className={tabClass('upload')}
+                            aria-current={visibleTab === 'upload' ? 'page' : undefined}
+                            onClick={() => switchTab('upload')}
+                        >
+                            Upload
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        className={tabClass('history')}
+                        aria-current={visibleTab === 'history' ? 'page' : undefined}
+                        onClick={() => switchTab('history')}
+                    >
+                        Run History
+                    </button>
+                </div>
+            </div>
+
                 {/* Upload Section */}
-                {canCreateRun && (
+                {visibleTab === 'upload' && canCreateRun && (
+                <>
                 <section className="glass-card p-6">
                     <div className="mb-6">
                         <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -670,7 +713,6 @@ export default function TestExecutionsPage() {
                         </div>
                     </div>
                 </section>
-                )}
 
                 {/* Upload Result */}
                 {uploadResult && (
@@ -705,8 +747,11 @@ export default function TestExecutionsPage() {
                         </div>
                     </section>
                 )}
+                </>
+                )}
 
                 {/* Test Run History */}
+                {visibleTab === 'history' && (
                 <section className="glass-card overflow-hidden p-0">
                     <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -777,9 +822,20 @@ export default function TestExecutionsPage() {
                             </div>
                             <p className="text-slate-500 dark:text-slate-400">
                                 {testRuns.length === 0
-                                    ? 'No test runs yet. Click Upload Test Results above to import your first run.'
+                                    ? canCreateRun
+                                        ? 'No test runs yet. Use the Upload tab to import your first run.'
+                                        : 'No test runs yet.'
                                     : 'No test runs match your search criteria.'}
                             </p>
+                            {testRuns.length === 0 && canCreateRun && (
+                                <button
+                                    type="button"
+                                    onClick={() => switchTab('upload')}
+                                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium text-white transition-all"
+                                >
+                                    Upload
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -863,6 +919,7 @@ export default function TestExecutionsPage() {
                         </div>
                     )}
                 </section>
+                )}
             {/* Custom animations */}
             <style jsx>{`
                 @keyframes slideIn {

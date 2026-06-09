@@ -262,6 +262,10 @@ export default function TestCasesPage() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
     });
+    const pageStart = pagination.total === 0
+        ? 0
+        : Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total);
+    const pageEnd = Math.min(pagination.page * pagination.limit, pagination.total);
 
     return (
         <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
@@ -271,8 +275,11 @@ export default function TestCasesPage() {
                 <div>
                     <h1 className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Test Cases</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
-                        Manage your test case registry · Total{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span>
+                        Manage your test case registry · Showing{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                            {pageStart}{pagination.total > 0 ? `-${pageEnd}` : ''}
+                        </span>{' '}
+                        of <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -490,7 +497,9 @@ export default function TestCasesPage() {
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                     <span>
                         Showing{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{testCases.length}</span>{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                            {pageStart}{pagination.total > 0 ? `-${pageEnd}` : ''}
+                        </span>{' '}
                         of {pagination.total}
                     </span>
                     {pagination.total_pages > 1 && (

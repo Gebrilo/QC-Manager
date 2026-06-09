@@ -53,7 +53,7 @@ function normalizePriority(priority?: string): 'High' | 'Medium' | 'Low' {
 function getTaskDisplayId(task: Task): string {
     if (task.task_id && !task.task_id.includes('NaN')) return task.task_id;
     if ((task as any).tuleap_artifact_id) return `TSK-${(task as any).tuleap_artifact_id}`;
-    return `TSK-${task.id.slice(0, 8)}`;
+    return '-';
 }
 
 // ── Design primitives ──────────────────────────────────────────────────────
