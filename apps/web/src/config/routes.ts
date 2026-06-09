@@ -118,7 +118,6 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
             { path: '/me/journeys', label: 'My Journeys', icon: Map },
             { path: '/me/idp', label: 'My Development Plan', icon: GraduationCap },
             { path: '/me/idp/history', label: 'Plan History', icon: History },
-            { path: '/me/preferences', label: 'Preferences', icon: Settings2 },
         ],
     },
     {

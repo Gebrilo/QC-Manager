@@ -7,7 +7,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useAuth } from '../providers/AuthProvider';
 import { useSidebar } from '../providers/SidebarProvider';
 import { getLandingPage } from '../../config/routes';
-import { Menu, Moon, Sun, LogOut, User, Settings, ChevronDown } from 'lucide-react';
+import { Menu, Moon, Sun, LogOut, Settings, ChevronDown } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Breadcrumb } from './Breadcrumb';
 
@@ -115,14 +115,6 @@ export function TopBar() {
                                     onClick={() => setIsUserMenuOpen(false)}
                                 />
                                 <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 z-20 py-1">
-                                    <Link
-                                        href="/me/profile"
-                                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                        onClick={() => setIsUserMenuOpen(false)}
-                                    >
-                                        <User className="w-4 h-4" strokeWidth={1.75} />
-                                        Profile
-                                    </Link>
                                     <Link
                                         href="/me/preferences"
                                         className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
