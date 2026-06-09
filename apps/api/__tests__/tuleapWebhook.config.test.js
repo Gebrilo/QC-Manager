@@ -126,6 +126,108 @@ describe('POST /tuleap-webhook/config', () => {
     });
 });
 
+describe('GET /tuleap-webhook/status', () => {
+    test('returns operational metrics from webhook log data', async () => {
+        mockQuery
+            .mockResolvedValueOnce({
+                rows: [
+                    { latency_ms: '200.4' },
+                    { latency_ms: '99.6' },
+                ],
+            })
+            .mockResolvedValueOnce({
+                rows: [{
+                    avg_latency_ms: '150.2',
+                    p95_latency_ms: '195.1',
+                    last_ingested_at: '2026-06-09T12:01:00.000Z',
+                    recent_failures: '1',
+                }],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ last_success_at: '2026-06-09T12:00:00.000Z' }],
+            });
+
+        const mockReq = { query: {} };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/status' && layer.route.methods.get
+        );
+        expect(routeLayer).toBeDefined();
+
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.data).toMatchObject({
+            last_ingested_at: '2026-06-09T12:01:00.000Z',
+            last_success_at: '2026-06-09T12:00:00.000Z',
+            avg_latency_ms: 150,
+            p95_latency_ms: 195,
+            ping_history: [100, 200],
+            sync_mode: 'webhook',
+            sync_mode_label: 'via n8n · realtime',
+            recent_failures: 1,
+        });
+    });
+});
+
+describe('GET /tuleap-webhook/sync-history', () => {
+    test('returns recent sync history and respects limit', async () => {
+        mockQuery
+            .mockResolvedValueOnce({
+                rows: [{
+                    id: 'log-1',
+                    tuleap_artifact_id: 123,
+                    tuleap_tracker_id: 456,
+                    artifact_type: 'bug',
+                    action: 'update',
+                    processing_status: 'processed',
+                    processing_result: 'updated bug',
+                    error_message: null,
+                    created_at: '2026-06-09T11:59:59.000Z',
+                    processed_at: '2026-06-09T12:00:00.000Z',
+                    configured_tracker_type: 'bug',
+                    qc_project_name: 'PPO',
+                }],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ last_success_at: '2026-06-09T12:00:00.000Z' }],
+            });
+
+        const mockReq = { query: { limit: '5' } };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn()
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/sync-history' && layer.route.methods.get
+        );
+        expect(routeLayer).toBeDefined();
+
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockQuery.mock.calls[0][1]).toEqual([5]);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(true);
+        expect(response.count).toBe(1);
+        expect(response.last_success_at).toBe('2026-06-09T12:00:00.000Z');
+        expect(response.data[0]).toMatchObject({
+            id: 'log-1',
+            tuleap_artifact_id: 123,
+            tuleap_tracker_id: 456,
+            processing_status: 'processed',
+            qc_project_name: 'PPO',
+        });
+    });
+});
+
 describe('GET /tuleap-webhook/resources', () => {
 
     // T034: Resource lookup by name

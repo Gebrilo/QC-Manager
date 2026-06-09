@@ -244,6 +244,121 @@ router.get('/task-history', async (req, res) => {
 });
 
 // =====================================================
+// GET /tuleap-webhook/status
+// Operational metrics for the Tuleap integration page
+// =====================================================
+router.get('/status', async (req, res) => {
+    try {
+        const pingHistoryRes = await pool.query(`
+            SELECT EXTRACT(EPOCH FROM (processed_at - created_at)) * 1000 AS latency_ms
+            FROM tuleap_webhook_log
+            WHERE processed_at IS NOT NULL
+              AND created_at > NOW() - INTERVAL '24 hours'
+            ORDER BY created_at DESC
+            LIMIT 24
+        `);
+
+        const aggRes = await pool.query(`
+            SELECT
+                AVG(EXTRACT(EPOCH FROM (processed_at - created_at)) * 1000) AS avg_latency_ms,
+                percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (processed_at - created_at)) * 1000
+                ) AS p95_latency_ms,
+                MAX(created_at) AS last_ingested_at,
+                COUNT(*) FILTER (WHERE processing_status = 'failed') AS recent_failures
+            FROM tuleap_webhook_log
+            WHERE created_at > NOW() - INTERVAL '24 hours'
+        `);
+        const lastSuccessRes = await pool.query(`
+            SELECT MAX(processed_at) AS last_success_at
+            FROM tuleap_webhook_log
+            WHERE processing_status = 'processed'
+        `);
+
+        const agg = aggRes.rows[0] || {};
+        const pingHistory = pingHistoryRes.rows
+            .map(row => Math.max(0, Math.round(Number(row.latency_ms || 0))))
+            .reverse();
+
+        res.json({
+            success: true,
+            data: {
+                last_ingested_at: agg.last_ingested_at || null,
+                last_success_at: lastSuccessRes.rows[0]?.last_success_at || null,
+                avg_latency_ms: agg.avg_latency_ms != null ? Math.round(Number(agg.avg_latency_ms)) : null,
+                p95_latency_ms: agg.p95_latency_ms != null ? Math.round(Number(agg.p95_latency_ms)) : null,
+                ping_history: pingHistory,
+                sync_mode: 'webhook',
+                sync_mode_label: 'via n8n · realtime',
+                recent_failures: Number(agg.recent_failures || 0),
+            },
+        });
+    } catch (error) {
+        console.error('Error fetching Tuleap status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch Tuleap status',
+            message: error.message,
+        });
+    }
+});
+
+// =====================================================
+// GET /tuleap-webhook/sync-history
+// Recent webhook ingestions for the Tuleap integration page
+// =====================================================
+router.get('/sync-history', async (req, res) => {
+    try {
+        const parsedLimit = Number.parseInt(req.query.limit, 10);
+        const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 20, 1), 100);
+
+        const result = await pool.query(`
+            SELECT
+                wl.id,
+                wl.tuleap_artifact_id,
+                wl.tuleap_tracker_id,
+                wl.artifact_type,
+                wl.action,
+                wl.processing_status,
+                wl.processing_result,
+                wl.error_message,
+                wl.created_at,
+                wl.processed_at,
+                c.tracker_type AS configured_tracker_type,
+                p.project_name AS qc_project_name
+            FROM tuleap_webhook_log wl
+            LEFT JOIN tuleap_sync_config c
+                ON c.tuleap_tracker_id = wl.tuleap_tracker_id
+               AND c.is_active = true
+            LEFT JOIN projects p
+                ON p.id = c.qc_project_id
+            ORDER BY wl.created_at DESC
+            LIMIT $1
+        `, [limit]);
+
+        const lastSuccessRes = await pool.query(`
+            SELECT MAX(processed_at) AS last_success_at
+            FROM tuleap_webhook_log
+            WHERE processing_status = 'processed'
+        `);
+
+        res.json({
+            success: true,
+            count: result.rows.length,
+            last_success_at: lastSuccessRes.rows[0]?.last_success_at || null,
+            data: result.rows,
+        });
+    } catch (error) {
+        console.error('Error fetching sync history:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch sync history',
+            message: error.message,
+        });
+    }
+});
+
+// =====================================================
 // GET /tuleap-webhook/config
 // Get sync configurations
 // =====================================================

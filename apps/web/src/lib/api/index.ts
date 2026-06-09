@@ -1893,6 +1893,32 @@ export interface TuleapSyncConfig {
     updated_at: string;
 }
 
+export interface TuleapStatus {
+    last_ingested_at: string | null;
+    last_success_at: string | null;
+    avg_latency_ms: number | null;
+    p95_latency_ms: number | null;
+    ping_history: number[];
+    sync_mode: string;
+    sync_mode_label: string;
+    recent_failures: number;
+}
+
+export interface TuleapSyncHistoryItem {
+    id: string;
+    tuleap_artifact_id: number;
+    tuleap_tracker_id: number | null;
+    artifact_type: string | null;
+    action: string;
+    processing_status: 'received' | 'processed' | 'failed' | 'duplicate' | 'rejected';
+    processing_result: string | null;
+    error_message: string | null;
+    created_at: string;
+    processed_at: string | null;
+    configured_tracker_type: string | null;
+    qc_project_name: string | null;
+}
+
 // ============================================================================
 // API Client - Task/Test Case Links
 // ============================================================================
@@ -2056,6 +2082,14 @@ export const tuleapConfigApi = {
         const query = params ? '?' + new URLSearchParams(params).toString() : '';
         return fetchApi<{ success: boolean; data: TuleapSyncConfig[] }>(`/tuleap-webhook/config${query}`);
     },
+
+    status: async () =>
+        fetchApi<{ success: boolean; data: TuleapStatus }>('/tuleap-webhook/status'),
+
+    syncHistory: async (limit = 20) =>
+        fetchApi<{ success: boolean; count: number; last_success_at: string | null; data: TuleapSyncHistoryItem[] }>(
+            `/tuleap-webhook/sync-history?limit=${limit}`
+        ),
 
     get: async (id: string) =>
         fetchApi<TuleapSyncConfig>(`/tuleap-webhook/config/${id}`),

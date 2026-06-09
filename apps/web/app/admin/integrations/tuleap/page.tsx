@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { tuleapConfigApi, TuleapSyncConfig, fetchApi, Project as ApiProject } from '@/lib/api';
+import { tuleapConfigApi, TuleapStatus, TuleapSyncConfig, TuleapSyncHistoryItem, fetchApi, Project as ApiProject } from '@/lib/api';
 import { TrackerConfigDrawer, GroupedMapping } from './TrackerConfigDrawer';
 import { NewMappingModal } from './NewMappingModal';
 
@@ -15,6 +15,7 @@ interface ProjectOption {
 }
 
 type TrackerType = 'bug' | 'task' | 'user_story' | 'test_case';
+type ConnectionState = 'untested' | 'ok' | 'fail';
 
 const TRACKER_TYPES: TrackerType[] = ['bug', 'task', 'user_story', 'test_case'];
 
@@ -24,6 +25,33 @@ const TRACKER_META: Record<TrackerType, { label: string; dot: string; chip: stri
     user_story: { label: 'User Story',dot: 'bg-amber-500',   chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
     test_case:  { label: 'Test Case', dot: 'bg-emerald-500', chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
 };
+
+function timeAgo(iso: string) {
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return '—';
+
+    const diffMs = Date.now() - then;
+    const future = diffMs < 0;
+    const absMs = Math.abs(diffMs);
+    const minutes = Math.floor(absMs / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    let value = 'just now';
+    if (days > 0) value = `${days}d`;
+    else if (hours > 0) value = `${hours}h`;
+    else if (minutes > 0) value = `${minutes}m`;
+
+    return value === 'just now' ? value : future ? `in ${value}` : `${value} ago`;
+}
+
+function formatLatency(createdAt: string, processedAt: string | null) {
+    if (!processedAt) return '—';
+    const created = new Date(createdAt).getTime();
+    const processed = new Date(processedAt).getTime();
+    if (Number.isNaN(created) || Number.isNaN(processed)) return '—';
+    return `${Math.max(0, Math.round(processed - created))} ms`;
+}
 
 // ── icon primitives ───────────────────────────────────────────────────────────
 
@@ -57,13 +85,20 @@ const I = {
 
 // ── sparkline chart ───────────────────────────────────────────────────────────
 
-const PING_HISTORY = [82, 78, 84, 80, 76, 79, 88, 90, 84, 77, 82, 86, 79, 75, 80, 83, 81, 78, 84, 79, 82, 85, 80, 77];
-
 function PingChart({ data }: { data: number[] }) {
     const w = 220, h = 56;
+    if (data.length < 2) {
+        return (
+            <div className="h-14 rounded-lg border border-dashed border-slate-200/70 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/20 flex items-center justify-center text-[11px] text-slate-400">
+                No recent webhook latency
+            </div>
+        );
+    }
+
     const max = Math.max(...data) * 1.1;
     const min = Math.min(...data) * 0.9;
-    const norm = (v: number) => h - ((v - min) / (max - min)) * h;
+    const range = Math.max(max - min, 1);
+    const norm = (v: number) => h - ((v - min) / range) * h;
     const step = w / (data.length - 1);
     const pts = data.map((v, i) => [i * step, norm(v)] as [number, number]);
     const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
@@ -113,8 +148,19 @@ function KpiTile({ label, value, sub, accent = 'violet', icon }: { label: string
 
 // ── diagnostics panel ─────────────────────────────────────────────────────────
 
-function DiagnosticsPanel({ testResult }: { testResult: { ok: boolean; msg: string } | null }) {
-    const ok = testResult?.ok ?? true;
+function DiagnosticsPanel({
+    testResult,
+    pingHistory,
+    avgLatencyMs,
+}: {
+    testResult: { ok: boolean; msg: string } | null;
+    pingHistory: number[];
+    avgLatencyMs: number | null;
+}) {
+    const ok = testResult?.ok;
+    const statusTone = testResult
+        ? ok ? 'emerald' : 'rose'
+        : 'slate';
     return (
         <div className="h-full rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-br from-slate-50/80 to-white/40 dark:from-slate-900/80 dark:to-slate-900/40 p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between">
@@ -122,10 +168,18 @@ function DiagnosticsPanel({ testResult }: { testResult: { ok: boolean; msg: stri
                     <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Live diagnostics</div>
                     <div className="flex items-center gap-2">
                         <span className="relative flex w-2 h-2">
-                            <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping ${ok ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                            <span className={`relative inline-flex w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            {ok && <span className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping bg-emerald-400" />}
+                            <span className={`relative inline-flex w-2 h-2 rounded-full ${
+                                statusTone === 'emerald' ? 'bg-emerald-500' : statusTone === 'rose' ? 'bg-rose-500' : 'bg-slate-400'
+                            }`} />
                         </span>
-                        <span className={`text-sm font-semibold ${ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        <span className={`text-sm font-semibold ${
+                            statusTone === 'emerald'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : statusTone === 'rose'
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-slate-500 dark:text-slate-400'
+                        }`}>
                             {testResult ? (ok ? 'Operational' : 'Connection failed') : 'Not tested'}
                         </span>
                     </div>
@@ -135,9 +189,13 @@ function DiagnosticsPanel({ testResult }: { testResult: { ok: boolean; msg: stri
             <div>
                 <div className="flex items-baseline justify-between mb-1">
                     <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Latency · last 24 pings</span>
-                    <span className="text-xs font-mono text-slate-600 dark:text-slate-300">77<span className="text-slate-400 ml-0.5">ms</span></span>
+                    <span className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                        {avgLatencyMs != null ? (
+                            <>{avgLatencyMs}<span className="text-slate-400 ml-0.5">ms</span></>
+                        ) : '—'}
+                    </span>
                 </div>
-                <PingChart data={PING_HISTORY} />
+                <PingChart data={pingHistory} />
             </div>
 
             {testResult && (
@@ -170,13 +228,14 @@ function DiagnosticsPanel({ testResult }: { testResult: { ok: boolean; msg: stri
 
 function ConnectionCard({
     baseUrl, setBaseUrl, accessKey, setAccessKey, showKey, setShowKey,
-    trackerId, setTrackerId, testingConn, testResult, onTest,
+    trackerId, setTrackerId, testingConn, testResult, pingHistory, avgLatencyMs, onTest,
 }: {
     baseUrl: string; setBaseUrl: (v: string) => void;
     accessKey: string; setAccessKey: (v: string) => void;
     showKey: boolean; setShowKey: (v: boolean) => void;
     trackerId: string; setTrackerId: (v: string) => void;
     testingConn: boolean; testResult: { ok: boolean; msg: string } | null;
+    pingHistory: number[]; avgLatencyMs: number | null;
     onTest: () => void;
 }) {
     return (
@@ -202,7 +261,7 @@ function ConnectionCard({
                         <div className="relative group">
                             <input
                                 type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
-                                placeholder="https://tuleap.example.com"
+                                placeholder="Enter your Tuleap base URL"
                                 className="w-full h-11 px-3.5 pr-10 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
                             />
                             <button className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-500 transition-colors" title="Copy"
@@ -210,6 +269,7 @@ function ConnectionCard({
                                 {I.copy}
                             </button>
                         </div>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">e.g. https://tuleap.example.com, no trailing slash</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="sm:col-span-2">
@@ -217,26 +277,30 @@ function ConnectionCard({
                             <div className="relative">
                                 <input
                                     type={showKey ? 'text' : 'password'} value={accessKey} onChange={e => setAccessKey(e.target.value)}
-                                    placeholder="tlp-k1-…"
+                                    placeholder="Enter your Tuleap access key"
                                     className="w-full h-11 px-3.5 pr-10 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm font-mono text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
                                 />
                                 <button onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-500 transition-colors">
                                     {showKey ? I.eyeOff : I.eye}
                                 </button>
                             </div>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Personal access key from Tuleap account keys</p>
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1.5">Test tracker ID</label>
                             <input
                                 type="number" value={trackerId} onChange={e => setTrackerId(e.target.value)}
-                                placeholder="e.g. 104"
+                                placeholder="Tracker ID (e.g. 104)"
                                 className="w-full h-11 px-3.5 rounded-lg bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/70 dark:border-slate-700/70 text-sm font-mono text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
                             />
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap pt-1">
-                        <button onClick={onTest} disabled={testingConn || !trackerId}
+                        <button
+                            onClick={onTest}
+                            disabled={testingConn || !trackerId || !baseUrl || !accessKey}
+                            title={!baseUrl ? 'Enter the Tuleap base URL' : !accessKey ? 'Enter an access key' : !trackerId ? 'Enter a tracker ID' : undefined}
                             className="inline-flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30 hover:from-violet-600 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95">
                             {testingConn
                                 ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56" stroke="currentColor" strokeWidth="2.5"/></svg>
@@ -249,12 +313,17 @@ function ConnectionCard({
                                 Connected successfully
                             </span>
                         )}
+                        {(!baseUrl || !accessKey || !trackerId) && !testingConn && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                                Fill in Base URL, access key, and tracker ID to enable
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 {/* diagnostics */}
                 <div className="lg:col-span-2 p-6">
-                    <DiagnosticsPanel testResult={testResult} />
+                    <DiagnosticsPanel testResult={testResult} pingHistory={pingHistory} avgLatencyMs={avgLatencyMs} />
                 </div>
             </div>
         </div>
@@ -283,9 +352,6 @@ function MappingCard({ group, onConfigure, onDelete }: { group: GroupedMapping; 
                         </span>
                     </div>
                 </div>
-                <button onClick={onConfigure} className="text-slate-400 hover:text-violet-500 transition-colors p-1 -mr-1" title="Configure">
-                    {I.cog}
-                </button>
             </div>
 
             {/* tracker grid */}
@@ -372,10 +438,9 @@ function FieldMappingPreviewCard() {
                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">{I.filter}</div>
                     <div>
                         <h2 className="text-base font-semibold text-slate-900 dark:text-white">Field mapping</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">QC fields → Tuleap tracker fields</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Default mapping · customizable in project mappings</p>
                     </div>
                 </div>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">Configure per tracker in drawer</span>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
                 {FIELD_RULES.map(r => (
@@ -391,58 +456,84 @@ function FieldMappingPreviewCard() {
                         </div>
                     </div>
                 ))}
+                <div className="px-5 py-3 bg-slate-50/60 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">These are the defaults. Customize mappings per project.</span>
+                    <a href="#project-mappings" className="text-[11px] font-semibold text-violet-600 dark:text-violet-300 hover:underline">Jump to project mappings</a>
+                </div>
             </div>
         </div>
     );
 }
 
-function ScheduleCard() {
-    const opts = [
-        { label: 'Realtime', sub: 'webhook', active: false, badge: 'Recommended' },
-        { label: '5 min',    sub: 'polling', active: true,  badge: null },
-        { label: '15 min',   sub: 'polling', active: false, badge: null },
-        { label: '1 hour',   sub: 'polling', active: false, badge: null },
-    ];
+function SyncHistoryCard({ items }: { items: TuleapSyncHistoryItem[] }) {
+    const statusTone: Record<TuleapSyncHistoryItem['processing_status'], string> = {
+        processed: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+        failed: 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300',
+        duplicate: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+        rejected: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
+        received: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    };
+
     return (
         <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-700/40 rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">{I.clock}</div>
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">{I.clock}</div>
                     <div>
-                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Sync schedule</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">How often Tuleap data refreshes</p>
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Sync history</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Recent Tuleap webhook ingestions</p>
                     </div>
                 </div>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">{items.length} recent</span>
             </div>
-            <div className="p-5 space-y-4">
-                <div className="grid grid-cols-2 gap-2.5">
-                    {opts.map(o => (
-                        <button key={o.label}
-                            className={`relative px-4 py-3 rounded-xl border text-left transition-all ${
-                                o.active
-                                    ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-transparent text-white shadow-lg shadow-violet-500/30'
-                                    : 'bg-white/60 dark:bg-slate-900/50 border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 hover:border-violet-400/60'
-                            }`}>
-                            {o.badge && <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] uppercase tracking-wider font-bold shadow-sm">{o.badge}</span>}
-                            <div className="text-base font-bold">{o.label}</div>
-                            <div className={`text-[10px] uppercase tracking-wider font-semibold mt-0.5 ${o.active ? 'text-white/80' : 'text-slate-400'}`}>{o.sub}</div>
-                        </button>
-                    ))}
+
+            {items.length === 0 ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                    No Tuleap webhook activity has been recorded yet.
                 </div>
-                <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-slate-50/60 dark:bg-slate-800/30 p-3.5">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Next sync</span>
-                        <span className="text-xs font-mono text-slate-600 dark:text-slate-300">via n8n webhook</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-200/70 dark:bg-slate-700/50 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full w-3/5" />
-                    </div>
-                    <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                        <span>Webhook-driven via n8n</span>
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">{I.check} Active</span>
-                    </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-slate-100 dark:border-slate-800/80">
+                                <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Time</th>
+                                <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Tracker</th>
+                                <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Artifact</th>
+                                <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Type</th>
+                                <th className="text-left py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Status</th>
+                                <th className="text-right py-3 px-5 text-[10px] uppercase tracking-wider font-bold text-slate-400">Latency</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map(item => (
+                                <tr
+                                    key={item.id}
+                                    title={item.error_message || undefined}
+                                    className={`border-b border-slate-100 dark:border-slate-800/80 transition-colors ${
+                                        item.processing_status === 'failed'
+                                            ? 'bg-rose-50/40 dark:bg-rose-900/10 hover:bg-rose-50/70 dark:hover:bg-rose-900/20'
+                                            : 'hover:bg-violet-50/30 dark:hover:bg-violet-900/10'
+                                    }`}
+                                >
+                                    <td className="py-3 px-5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{timeAgo(item.created_at)}</td>
+                                    <td className="py-3 px-5">
+                                        <div className="font-mono text-slate-700 dark:text-slate-200">#{item.tuleap_tracker_id || '—'}</div>
+                                        <div className="text-[11px] text-slate-400 truncate max-w-[180px]">{item.qc_project_name || item.configured_tracker_type || 'Unmapped'}</div>
+                                    </td>
+                                    <td className="py-3 px-5 font-mono text-slate-700 dark:text-slate-200">#{item.tuleap_artifact_id}</td>
+                                    <td className="py-3 px-5 text-slate-600 dark:text-slate-300">{item.artifact_type || item.configured_tracker_type || '—'}</td>
+                                    <td className="py-3 px-5">
+                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold ${statusTone[item.processing_status] || statusTone.received}`}>
+                                            {item.processing_status}
+                                        </span>
+                                    </td>
+                                    <td className="py-3 px-5 text-right font-mono text-slate-500 dark:text-slate-400">{formatLatency(item.created_at, item.processed_at)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
@@ -473,6 +564,8 @@ export default function TuleapSettingsPage() {
 
     // Unconfigured trackers
     const [unconfigured, setUnconfigured] = useState<{ tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[]>([]);
+    const [status, setStatus] = useState<TuleapStatus | null>(null);
+    const [syncHistory, setSyncHistory] = useState<TuleapSyncHistoryItem[]>([]);
 
     const showSuccessMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(null), 3500); };
     const showErrorMsg   = (msg: string) => { setError(msg);   setTimeout(() => setError(null), 5000); };
@@ -480,15 +573,19 @@ export default function TuleapSettingsPage() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [configRes, projData, unconfRes] = await Promise.all([
+            const [configRes, projData, unconfRes, statusRes, historyRes] = await Promise.all([
                 tuleapConfigApi.list(),
                 fetchApi<ApiProject[]>('/projects'),
                 fetchApi<{ data: { tuleap_tracker_id: number; latest_artifact_id: number | null; latest_attempt: string; attempt_count: number }[] }>('/tuleap-webhook/config/unconfigured').catch(() => ({ data: [] as any })),
+                tuleapConfigApi.status().catch(() => null),
+                tuleapConfigApi.syncHistory(20).catch(() => null),
             ]);
             const configList = configRes.data ?? (configRes as any);
             setConfigs(Array.isArray(configList) ? configList : []);
             setProjects(projData.map((p: ApiProject) => ({ id: p.id, project_id: p.project_id, project_name: p.project_name })));
             setUnconfigured(Array.isArray(unconfRes.data) ? unconfRes.data : []);
+            setStatus(statusRes?.data ?? null);
+            setSyncHistory(Array.isArray(historyRes?.data) ? historyRes.data : []);
         } catch (err: any) {
             showErrorMsg(err.message || 'Failed to load data');
         } finally {
@@ -513,14 +610,14 @@ export default function TuleapSettingsPage() {
 
     // Test connection
     const handleTestConnection = async () => {
-        if (!testTrackerId) { showErrorMsg('Enter a Tracker ID to test'); return; }
+        if (!baseUrl || !accessKey || !testTrackerId) { showErrorMsg('Enter Base URL, access key, and Tracker ID to test'); return; }
         setTestingConn(true);
         setTestResult(null);
         try {
             const res = await tuleapConfigApi.testConnection({
-                tuleap_base_url: baseUrl || undefined,
+                tuleap_base_url: baseUrl,
                 tuleap_tracker_id: Number(testTrackerId),
-                access_key: accessKey || undefined,
+                access_key: accessKey,
             });
             const tracker = res.tracker;
             setTestResult({ ok: true, msg: `Connected to "${tracker.name}" (${tracker.item_name}) — ${tracker.fields.length} fields detected` });
@@ -565,6 +662,27 @@ export default function TuleapSettingsPage() {
     const totalTrackers   = configs.length;
     const healthyCount    = groupedMappings.filter(g => g.configs.every(c => c.is_active)).length;
     const degradedCount   = groupedMappings.length - healthyCount;
+    const connectionState: ConnectionState = testResult === null ? 'untested' : testResult.ok ? 'ok' : 'fail';
+    const connectionBadge = {
+        untested: {
+            wrap: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+            dot: 'bg-slate-400',
+            ping: false,
+            label: 'Not tested',
+        },
+        ok: {
+            wrap: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+            dot: 'bg-emerald-500',
+            ping: true,
+            label: 'Connected',
+        },
+        fail: {
+            wrap: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',
+            dot: 'bg-rose-500',
+            ping: false,
+            label: 'Connection failed',
+        },
+    }[connectionState];
 
     return (
         <div className="min-h-screen relative">
@@ -605,12 +723,12 @@ export default function TuleapSettingsPage() {
                                 {I.back}
                             </Link>
                             <h1 className="text-[28px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">Tuleap Integration</h1>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[10px] uppercase tracking-wider font-bold">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${connectionBadge.wrap}`}>
                                 <span className="relative flex w-1.5 h-1.5">
-                                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
-                                    <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    {connectionBadge.ping && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />}
+                                    <span className={`relative inline-flex w-1.5 h-1.5 rounded-full ${connectionBadge.dot}`} />
                                 </span>
-                                Connected
+                                {connectionBadge.label}
                             </span>
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 ml-8 mt-1">
@@ -626,12 +744,31 @@ export default function TuleapSettingsPage() {
                 </div>
 
                 {/* ── KPI strip ── */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <KpiTile label="Mapped projects"  value={connectedCount}  sub={`of ${projects.length} QC projects`} accent="violet"  icon={I.folder} />
                     <KpiTile label="Trackers synced"  value={totalTrackers}   sub="bugs · tasks · stories · cases"      accent="blue"    icon={I.link} />
                     <KpiTile label="Healthy mappings" value={healthyCount}    sub={`${degradedCount} degraded`}          accent="emerald" icon={I.sparkle} />
-                    <KpiTile label="Avg latency"      value="77 ms"           sub="p95 · 142 ms"                        accent="amber"   icon={I.bolt} />
-                    <KpiTile label="Sync mode"        value="Webhook"         sub="via n8n · realtime"                  accent="rose"    icon={I.clock} />
+                    <KpiTile
+                        label="Last sync"
+                        value={status?.last_success_at ? timeAgo(status.last_success_at) : '—'}
+                        sub={status?.last_success_at ? new Date(status.last_success_at).toLocaleString() : 'no sync recorded'}
+                        accent="emerald"
+                        icon={I.clock}
+                    />
+                    <KpiTile
+                        label="Avg latency"
+                        value={status?.avg_latency_ms != null ? `${status.avg_latency_ms} ms` : '—'}
+                        sub={status?.p95_latency_ms != null ? `p95 · ${status.p95_latency_ms} ms` : 'no recent data'}
+                        accent="amber"
+                        icon={I.bolt}
+                    />
+                    <KpiTile
+                        label="Sync mode"
+                        value={status?.sync_mode === 'webhook' || status?.sync_mode_label ? 'Webhook' : '—'}
+                        sub={status?.sync_mode_label || 'no status data'}
+                        accent="rose"
+                        icon={I.clock}
+                    />
                 </div>
 
                 {/* ── Connection settings + diagnostics ── */}
@@ -641,11 +778,13 @@ export default function TuleapSettingsPage() {
                     showKey={showKey} setShowKey={setShowKey}
                     trackerId={testTrackerId} setTrackerId={setTestTrackerId}
                     testingConn={testingConn} testResult={testResult}
+                    pingHistory={status?.ping_history ?? []}
+                    avgLatencyMs={status?.avg_latency_ms ?? null}
                     onTest={handleTestConnection}
                 />
 
                 {/* ── Project mappings ── */}
-                <section>
+                <section id="project-mappings" className="scroll-mt-6">
                     <div className="flex items-end justify-between mb-3 px-1">
                         <div>
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Project mappings</h2>
@@ -693,11 +832,11 @@ export default function TuleapSettingsPage() {
                     )}
                 </section>
 
-                {/* ── Field mapping preview + sync schedule ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                    <div className="lg:col-span-3"><FieldMappingPreviewCard /></div>
-                    <div className="lg:col-span-2"><ScheduleCard /></div>
-                </div>
+                {/* ── Field mapping preview ── */}
+                <FieldMappingPreviewCard />
+
+                {/* ── Sync history ── */}
+                <SyncHistoryCard items={syncHistory} />
 
                 {/* ── Unconfigured trackers ── */}
                 {unconfigured.length > 0 && (
