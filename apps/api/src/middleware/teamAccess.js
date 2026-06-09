@@ -10,7 +10,7 @@
  */
 
 const db = require('../config/db');
-const { SCOPES, canUserUseScope } = require('../../../shared/rbac/catalog.ts');
+const { SCOPES, canUserUseScope, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 /**
  * Get the team record for the current manager (req.user).
@@ -139,7 +139,7 @@ async function requireTeamScope(req, res, next) {
 async function canAccessUser(requestUser, targetUserId) {
     if (requestUser.role === 'admin') return true;
     if (requestUser.id === targetUserId) return true;
-    if (requestUser.role !== 'manager') return false;
+    if (!isTeamManagerRole(requestUser.role)) return false;
 
     const teamId = await getManagerTeamId(requestUser.id);
     if (!teamId) return false;
@@ -199,7 +199,7 @@ function attachTeamScope(req, res, next) {
         return next();
     }
 
-    if (req.user.role !== 'manager') {
+    if (!isTeamManagerRole(req.user.role)) {
         return res.status(403).json({ error: 'Manager or admin access required' });
     }
 

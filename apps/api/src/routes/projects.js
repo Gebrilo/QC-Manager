@@ -6,7 +6,7 @@ const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, requireStatusScope, requireRoleOrPermission } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
-const { SCOPES } = require('../../../shared/rbac/catalog.ts');
+const { SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 /**
  * Resolve team-scoped WHERE clause for projects.
@@ -17,7 +17,7 @@ async function buildTeamFilter(user) {
     if (user.role === 'admin') {
         return { clause: '', params: [] };
     }
-    if (user.role === 'manager') {
+    if (isTeamManagerRole(user.role)) {
         const teamId = await getManagerTeamId(user.id);
         if (!teamId) return { clause: 'AND 1=0', params: [] };
         return { clause: 'AND team_id = $1', params: [teamId] };
@@ -56,7 +56,7 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
         const project = result.rows[0];
 
         // Enforce team scope for managers
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId || project.team_id !== teamId) {
                 return res.status(403).json({ error: 'You do not have access to this project' });
@@ -76,7 +76,7 @@ router.post('/', requireAuth, requirePermission('qc.projects.create'), async (re
 
         // Managers must create projects in their own team
         let teamId = data.team_id || null;
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const managerTeamId = await getManagerTeamId(req.user.id);
             if (!managerTeamId) {
                 return res.status(403).json({ error: 'You are not assigned to a team. Ask an admin to assign you.' });
@@ -126,7 +126,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
         const internalProject = currentResult.rows[0];
 
         // Managers can only edit projects in their team
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId || internalProject.team_id !== teamId) {
                 return res.status(403).json({ error: 'You do not have access to this project' });
@@ -179,7 +179,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.projects.delete'), asyn
         const original = originalRes.rows[0];
 
         // Managers can only delete projects in their team
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId || original.team_id !== teamId) {
                 return res.status(403).json({ error: 'You do not have access to this project' });

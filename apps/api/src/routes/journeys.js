@@ -15,7 +15,7 @@ const {
 // ============================================================================
 
 // GET /journeys — List all journeys with counts
-router.get('/', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const result = await db.query(`
             SELECT j.*,
@@ -37,7 +37,7 @@ router.get('/', requireAuth, requireRole('admin', 'manager'), async (req, res, n
 });
 
 // GET /journeys/:id — Full nested tree
-router.get('/:id', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:id', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const journey = await db.query(`SELECT * FROM journeys WHERE id = $1 AND deleted_at IS NULL`, [id]);
@@ -72,7 +72,7 @@ router.get('/:id', requireAuth, requireRole('admin', 'manager'), async (req, res
 });
 
 // POST /journeys — Create journey
-router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const data = createJourneySchema.parse(req.body);
         const result = await db.query(
@@ -85,7 +85,7 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res, 
 });
 
 // PATCH /journeys/:id — Update journey
-router.patch('/:id', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateJourneySchema.parse(req.body);
@@ -129,7 +129,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.admin.manage_settings')
 // Admin Endpoints — Chapter CRUD
 // ============================================================================
 
-router.post('/:journeyId/chapters', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:journeyId/chapters', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { journeyId } = req.params;
         const data = createChapterSchema.parse(req.body);
@@ -142,7 +142,7 @@ router.post('/:journeyId/chapters', requireAuth, requireRole('admin', 'manager')
     } catch (err) { next(err); }
 });
 
-router.patch('/chapters/:id', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/chapters/:id', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateChapterSchema.parse(req.body);
@@ -173,7 +173,7 @@ router.delete('/chapters/:id', requireAuth, requirePermission('qc.admin.manage_s
 // Admin Endpoints — Quest CRUD
 // ============================================================================
 
-router.post('/chapters/:chapterId/quests', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/chapters/:chapterId/quests', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { chapterId } = req.params;
         const data = createQuestSchema.parse(req.body);
@@ -186,7 +186,7 @@ router.post('/chapters/:chapterId/quests', requireAuth, requireRole('admin', 'ma
     } catch (err) { next(err); }
 });
 
-router.patch('/quests/:id', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/quests/:id', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateQuestSchema.parse(req.body);
@@ -217,7 +217,7 @@ router.delete('/quests/:id', requireAuth, requirePermission('qc.admin.manage_set
 // Admin Endpoints — Task CRUD
 // ============================================================================
 
-router.post('/quests/:questId/tasks', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/quests/:questId/tasks', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { questId } = req.params;
         const data = createTaskSchema.parse(req.body);
@@ -230,7 +230,7 @@ router.post('/quests/:questId/tasks', requireAuth, requireRole('admin', 'manager
     } catch (err) { next(err); }
 });
 
-router.patch('/tasks/:id', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/tasks/:id', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = updateTaskSchema.parse(req.body);
@@ -269,7 +269,7 @@ router.delete('/tasks/:id', requireAuth, requirePermission('qc.admin.manage_sett
 // Admin — Assign journey to user
 // ============================================================================
 
-router.post('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:id/assign/:userId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id, userId } = req.params;
         const result = await db.query(
@@ -285,7 +285,7 @@ router.post('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'),
 });
 
 // DELETE /journeys/:id/assign/:userId — Unassign journey from user
-router.delete('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.delete('/:id/assign/:userId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id, userId } = req.params;
         const result = await db.query(
@@ -309,7 +309,7 @@ router.delete('/:id/assign/:userId', requireAuth, requireRole('admin', 'manager'
 });
 
 // GET /journeys/:id/assignments — List assigned users for a journey
-router.get('/:id/assignments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:id/assignments', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await db.query(`
@@ -324,7 +324,7 @@ router.get('/:id/assignments', requireAuth, requireRole('admin', 'manager'), asy
 });
 
 // GET /journeys/user/:userId/progress — Manager/admin view of all assigned journeys for a user
-router.get('/user/:userId/progress', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/user/:userId/progress', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
 

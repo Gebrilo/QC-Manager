@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const {
     canUserPerform,
+    canonicalRole,
     getPermissionLookupKeys,
     getScope,
 } = require('../../../shared/rbac/catalog.ts');
@@ -90,11 +91,12 @@ async function requireAuth(req, res, next) {
  * @param {string[]} roles - Allowed roles
  */
 function requireRole(...roles) {
+    const canonicalRoles = roles.map(role => canonicalRole(role));
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        if (!roles.includes(req.user.role)) {
+        if (!canonicalRoles.includes(canonicalRole(req.user.role))) {
             return res.status(403).json({ error: 'Insufficient permissions' });
         }
         next();

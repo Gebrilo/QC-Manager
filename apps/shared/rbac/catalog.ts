@@ -238,16 +238,6 @@ const ROLE_DEFINITIONS = Object.freeze({
         ]),
         scopes: Object.freeze([SCOPES.TEAM.key, SCOPES.ACTIVE_ONLY.key]),
     }),
-    // `manager` is a legacy role identifier kept for backwards compatibility.
-    // Issue #91 did not remove this alias because non-engine IDP/team/resource
-    // paths still branch on role === 'manager'. Resolution happens via
-    // `inherits: ['team_manager']`; `aliasFor` is informational metadata for
-    // admin UI and tooling.
-    manager: Object.freeze({
-        inherits: Object.freeze(['team_manager']),
-        permissions: Object.freeze([]),
-        aliasFor: 'team_manager',
-    }),
     pm: Object.freeze({
         inherits: Object.freeze([]),
         permissions: Object.freeze([
@@ -278,35 +268,6 @@ const ROLE_DEFINITIONS = Object.freeze({
         ]),
         scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
     }),
-    member: Object.freeze({
-        // Day-1 parity for legacy tester users (PRD risk #1)
-        inherits: Object.freeze(['tester']),
-        permissions: Object.freeze([
-            PERMISSIONS.TASKS_VIEW_OWN,
-            PERMISSIONS.TASKS_VIEW_TEAM,
-            PERMISSIONS.TASKS_EDIT_OWN,
-            PERMISSIONS.TASKS_DELETE_OWN,
-            PERMISSIONS.TASKS_LOG_TIME,
-            PERMISSIONS.BUGS_VIEW_OWN,
-            PERMISSIONS.BUGS_VIEW_TEAM,
-            PERMISSIONS.BUGS_EDIT_OWN,
-            PERMISSIONS.TESTCASES_VIEW_OWN,
-            PERMISSIONS.TESTCASES_VIEW_TEAM,
-            PERMISSIONS.TESTCASES_EDIT_OWN,
-            PERMISSIONS.TESTCASES_VIEW_STEPS,
-            PERMISSIONS.TESTEXECUTIONS_VIEW_OWN,
-            PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM,
-            PERMISSIONS.TESTEXECUTIONS_EDIT_OWN,
-            PERMISSIONS.TESTSUITES_VIEW_OWN,
-            PERMISSIONS.TESTSUITES_VIEW_TEAM,
-            PERMISSIONS.USER_STORIES_VIEW_OWN,
-            PERMISSIONS.USER_STORIES_VIEW_TEAM,
-            PERMISSIONS.DASHBOARDS_MEMBER_VIEW,
-            PERMISSIONS.REPORTS_VIEW_OWN,
-            PERMISSIONS.REPORTS_VIEW_TEAM,
-        ]),
-        scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
-    }),
     tester: Object.freeze({
         inherits: Object.freeze([]),
         permissions: Object.freeze([
@@ -334,6 +295,28 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.MY_TASKS_EDIT,
             PERMISSIONS.MY_TASKS_DELETE,
             PERMISSIONS.MY_DASHBOARD_VIEW,
+            PERMISSIONS.TASKS_VIEW_OWN,
+            PERMISSIONS.TASKS_VIEW_TEAM,
+            PERMISSIONS.TASKS_EDIT_OWN,
+            PERMISSIONS.TASKS_DELETE_OWN,
+            PERMISSIONS.TASKS_LOG_TIME,
+            PERMISSIONS.BUGS_VIEW_OWN,
+            PERMISSIONS.BUGS_VIEW_TEAM,
+            PERMISSIONS.BUGS_EDIT_OWN,
+            PERMISSIONS.TESTCASES_VIEW_OWN,
+            PERMISSIONS.TESTCASES_VIEW_TEAM,
+            PERMISSIONS.TESTCASES_EDIT_OWN,
+            PERMISSIONS.TESTCASES_VIEW_STEPS,
+            PERMISSIONS.TESTEXECUTIONS_VIEW_OWN,
+            PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM,
+            PERMISSIONS.TESTEXECUTIONS_EDIT_OWN,
+            PERMISSIONS.TESTSUITES_VIEW_OWN,
+            PERMISSIONS.TESTSUITES_VIEW_TEAM,
+            PERMISSIONS.USER_STORIES_VIEW_OWN,
+            PERMISSIONS.USER_STORIES_VIEW_TEAM,
+            PERMISSIONS.DASHBOARDS_MEMBER_VIEW,
+            PERMISSIONS.REPORTS_VIEW_OWN,
+            PERMISSIONS.REPORTS_VIEW_TEAM,
         ]),
         scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
     }),
@@ -367,16 +350,24 @@ const ROLE_DEFINITIONS = Object.freeze({
         ]),
         scopes: Object.freeze([SCOPES.PREPARATION_ONLY.key]),
     }),
-    user: Object.freeze({
-        inherits: Object.freeze(['tester']),
-        permissions: Object.freeze([]),
-        aliasFor: 'tester',
-    }),
 });
 
 const ROLES = ROLE_DEFINITIONS;
+const LEGACY_ROLE_CANONICAL = Object.freeze({
+    manager: 'team_manager',
+    user: 'tester',
+    member: 'tester',
+});
 const ALL_PERMISSION_VALUES = Object.freeze(Object.values(PERMISSIONS));
 const ALL_SCOPE_VALUES = Object.freeze(Object.values(SCOPES).map(scope => scope.key));
+
+function canonicalRole(roleName) {
+    return LEGACY_ROLE_CANONICAL[roleName] || roleName;
+}
+
+function isTeamManagerRole(roleName) {
+    return canonicalRole(roleName) === 'team_manager';
+}
 
 function resolvePermissionKey(key) {
     return key;
@@ -391,18 +382,20 @@ function getPermissionLookupKeys(key) {
 }
 
 function collectRolePermissions(roleName, seen) {
-    const role = ROLES[roleName];
-    if (!role || seen.has(roleName)) return [];
-    seen.add(roleName);
+    const canonicalName = canonicalRole(roleName);
+    const role = ROLES[canonicalName];
+    if (!role || seen.has(canonicalName)) return [];
+    seen.add(canonicalName);
 
     const inherited = (role.inherits || []).flatMap(parent => collectRolePermissions(parent, seen));
     return [...inherited, ...(role.permissions || [])];
 }
 
 function collectRoleScopes(roleName, seen) {
-    const role = ROLES[roleName];
-    if (!role || seen.has(roleName)) return [];
-    seen.add(roleName);
+    const canonicalName = canonicalRole(roleName);
+    const role = ROLES[canonicalName];
+    if (!role || seen.has(canonicalName)) return [];
+    seen.add(canonicalName);
 
     const inherited = (role.inherits || []).flatMap(parent => collectRoleScopes(parent, seen));
     return [...inherited, ...(role.scopes || [])];
@@ -465,7 +458,6 @@ const BUILT_IN_ROLE_PERMISSION_DEFAULTS = Object.freeze({
     admin: Object.freeze(['*']),
     pm: Object.freeze([...new Set(collectRolePermissions('pm', new Set()))]),
     team_manager: Object.freeze([...new Set(collectRolePermissions('team_manager', new Set()))]),
-    member: Object.freeze([...new Set(collectRolePermissions('member', new Set()))]),
     viewer: Object.freeze([...new Set(collectRolePermissions('viewer', new Set()))]),
     tester: Object.freeze([...new Set(collectRolePermissions('tester', new Set()))]),
     contributor: Object.freeze([...new Set(collectRolePermissions('contributor', new Set()))]),
@@ -480,10 +472,12 @@ module.exports = {
     BUILT_IN_ROLE_PERMISSION_DEFAULTS,
     canUserPerform,
     canUserUseScope,
+    canonicalRole,
     collectRolePermissions,
     collectRoleScopes,
     getScope,
     getPermissionLookupKeys,
+    isTeamManagerRole,
     isKnownPermissionKey,
     resolvePermissionKey,
 };

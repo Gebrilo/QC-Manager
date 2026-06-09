@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const storage = require('../config/storage');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 const ALLOWED_MIMES = [
     'application/pdf',
@@ -86,7 +87,7 @@ router.delete('/file/:id', requireAuth, async (req, res, next) => {
         if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
         const file = result.rows[0];
         const { id: userId, role } = req.user;
-        if (role !== 'admin' && role !== 'manager' && file.uploaded_by !== userId) {
+        if (role !== 'admin' && !isTeamManagerRole(role) && file.uploaded_by !== userId) {
             return res.status(403).json({ error: 'You can only delete your own attachments' });
         }
         await storage.deleteArtifactFile(file.storage_path);

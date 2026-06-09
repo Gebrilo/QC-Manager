@@ -38,9 +38,9 @@ export function ResourceTable({
 }: ResourceTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-    const { user } = useAuth();
+    const { user, isAdmin, isManager } = useAuth();
     const { density } = useTheme();
-    const canViewDashboard = user?.role === 'admin' || user?.role === 'manager';
+    const canViewDashboard = isAdmin || isManager;
 
     const columns = useMemo(
         () => [

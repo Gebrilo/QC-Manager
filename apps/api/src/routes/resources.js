@@ -6,7 +6,7 @@ const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, requireRole, requireStatusScope } = require('../middleware/authMiddleware');
 const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
-const { SCOPES } = require('../../../shared/rbac/catalog.ts');
+const { SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 const { computeTaskTimeline } = require('../utils/workingDays');
 
 // ========================================
@@ -16,7 +16,7 @@ const { computeTaskTimeline } = require('../utils/workingDays');
 // GET all resources — admins/non-managers see all; managers see their team only
 router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), requirePermission('qc.resources.view'), async (req, res, next) => {
     try {
-        if (req.user.role !== 'manager') {
+        if (!isTeamManagerRole(req.user.role)) {
             const result = await db.query(
                 `SELECT v.*, r.tuleap_username FROM v_resources_with_utilization v JOIN resources r ON r.id = v.id ORDER BY v.resource_name ASC`
             );
@@ -39,7 +39,7 @@ router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), require
 });
 
 // GET resource analytics dashboard (admin/manager only)
-router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -53,7 +53,7 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'manager'), async
         }
         const resource = profileResult.rows[0];
 
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const allowed = resource.user_id
                 ? await canAccessUser(req.user, resource.user_id)
                 : false;
@@ -204,7 +204,7 @@ router.get('/:id', requireAuth, requirePermission('qc.resources.view'), async (r
 
         const resource = result.rows[0];
 
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             if (!resource.user_id) {
                 return res.status(403).json({ error: 'Access restricted to your team' });
             }
@@ -221,7 +221,7 @@ router.get('/:id', requireAuth, requirePermission('qc.resources.view'), async (r
 });
 
 // POST auto-map resources to users by matching email
-router.post('/auto-map', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/auto-map', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         // Find all unlinked resources that have an email matching an app_user
         const candidates = await db.query(`

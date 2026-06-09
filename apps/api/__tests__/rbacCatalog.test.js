@@ -21,9 +21,9 @@ describe('RBAC catalog resolver', () => {
         }, PERMISSIONS.TASKS_VIEW)).toBe(true);
     });
 
-    test('manager inherits tester permissions', () => {
-        expect(canUserPerform({ role: 'manager' }, PERMISSIONS.TESTCASES_CREATE)).toBe(true);
-        expect(canUserPerform({ role: 'manager' }, PERMISSIONS.TESTRESULTS_UPLOAD)).toBe(true);
+    test('team_manager inherits tester permissions', () => {
+        expect(canUserPerform({ role: 'team_manager' }, PERMISSIONS.TESTCASES_CREATE)).toBe(true);
+        expect(canUserPerform({ role: 'team_manager' }, PERMISSIONS.TESTRESULTS_UPLOAD)).toBe(true);
     });
 
     test('tester role can use task and test permissions without admin rights', () => {
@@ -54,8 +54,8 @@ describe('RBAC catalog resolver', () => {
         expect(resolvePermissionKey(PERMISSIONS.TASKS_VIEW)).toBe(PERMISSIONS.TASKS_VIEW);
     });
 
-    test('team scope is declared in the catalog and granted to managers', () => {
-        expect(canUserUseScope({ role: 'manager' }, SCOPES.TEAM.key)).toBe(true);
+    test('team scope is declared in the catalog and granted to team managers', () => {
+        expect(canUserUseScope({ role: 'team_manager' }, SCOPES.TEAM.key)).toBe(true);
         expect(canUserUseScope({ role: 'tester' }, SCOPES.TEAM.key)).toBe(false);
     });
 });
@@ -93,24 +93,30 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         }
     });
 
-    test('new built-in roles exist: pm, team_manager, member, viewer; manager aliases team_manager', () => {
+    test('consolidated built-in roles exist and legacy aliases are removed', () => {
+        expect(Object.keys(ROLES).sort()).toEqual(['admin', 'contributor', 'pm', 'team_manager', 'tester', 'viewer']);
         expect(ROLES.pm).toBeDefined();
         expect(ROLES.team_manager).toBeDefined();
-        expect(ROLES.member).toBeDefined();
+        expect(ROLES.tester).toBeDefined();
         expect(ROLES.viewer).toBeDefined();
-        expect(ROLES.manager.aliasFor).toBe('team_manager');
+        expect(ROLES.manager).toBeUndefined();
+        expect(ROLES.user).toBeUndefined();
+        expect(ROLES.member).toBeUndefined();
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.member).toBeUndefined();
     });
 
-    test('member seeded with union of legacy tester permissions (PRD risk #1)', () => {
-        const legacyTester = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester;
-        const member = BUILT_IN_ROLE_PERMISSION_DEFAULTS.member;
-        for (const key of legacyTester) {
-            expect(member).toContain(key);
-        }
+    test('tester includes former member scoped permissions', () => {
+        const tester = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester;
+        expect(tester).toContain(PERMISSIONS.TASKS_VIEW_OWN);
+        expect(tester).toContain(PERMISSIONS.TASKS_VIEW_TEAM);
+        expect(tester).toContain(PERMISSIONS.TASKS_LOG_TIME);
+        expect(tester).toContain(PERMISSIONS.TESTCASES_VIEW_STEPS);
+        expect(tester).toContain(PERMISSIONS.DASHBOARDS_MEMBER_VIEW);
+        expect(tester).toContain(PERMISSIONS.REPORTS_VIEW_TEAM);
     });
 
     test('BUILT_IN_ROLE_PERMISSION_DEFAULTS exposes a key array per built-in role with resolved permissions', () => {
-        for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer', 'contributor']) {
+        for (const role of ['admin', 'pm', 'team_manager', 'tester', 'viewer', 'contributor']) {
             expect(Array.isArray(BUILT_IN_ROLE_PERMISSION_DEFAULTS[role])).toBe(true);
         }
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.admin).toEqual(['*']);
@@ -139,7 +145,9 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.BUGS_VIEW);
     });
 
-    test('canUserPerform resolves manager → team_manager via aliasFor', () => {
+    test('legacy role identifiers canonicalize during migration rollout', () => {
         expect(canUserPerform({ role: 'manager' }, PERMISSIONS.TESTCASES_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'user' }, PERMISSIONS.TESTCASES_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'member' }, PERMISSIONS.TESTCASES_VIEW_STEPS)).toBe(true);
     });
 });

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-const { resolvePermissionKey } = require('../../../../shared/rbac/catalog.ts');
+const { canonicalRole, resolvePermissionKey } = require('../../../../shared/rbac/catalog.ts');
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -15,7 +15,7 @@ interface User {
     display_name?: string | null;
     email: string;
     phone?: string;
-    role: 'admin' | 'manager' | 'team_manager' | 'pm' | 'member' | 'user' | 'viewer' | 'tester' | 'contributor';
+    role: string;
     status: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
     team_membership_active: boolean;
     onboarding_completed?: boolean;
@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, permissions]);
 
     const isAdmin = user?.role === 'admin';
-    const isManager = user?.role === 'manager' || user?.role === 'team_manager';
+    const isManager = canonicalRole(user?.role) === 'team_manager';
     const userStatus = user?.status ?? null;
 
     return (

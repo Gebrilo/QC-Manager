@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
+const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 const EMPTY_METRICS = {
     total_tasks: 0,
@@ -63,7 +64,7 @@ async function getTeamMetrics(teamId) {
 router.get('/', requireAuth, requirePermission('qc.dashboard.view'), async (req, res, next) => {
     try {
         // Manager: scope metrics to their team
-        if (req.user?.role === 'manager') {
+        if (isTeamManagerRole(req.user?.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId) return res.json(EMPTY_METRICS);
             const metrics = await getTeamMetrics(teamId);
@@ -81,7 +82,7 @@ router.get('/', requireAuth, requirePermission('qc.dashboard.view'), async (req,
 // GET /metrics (alias) — same scoping logic
 router.get('/metrics', requireAuth, requirePermission('qc.dashboard.view'), async (req, res, next) => {
     try {
-        if (req.user?.role === 'manager') {
+        if (isTeamManagerRole(req.user?.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId) return res.json(EMPTY_METRICS);
             const metrics = await getTeamMetrics(teamId);

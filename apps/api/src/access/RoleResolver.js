@@ -3,15 +3,9 @@
 const db = require('../config/db');
 const {
     BUILT_IN_ROLE_PERMISSION_DEFAULTS,
-    ROLES,
+    canonicalRole,
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
-
-function canonicalRole(role) {
-    const def = ROLES[role];
-    if (def && def.aliasFor) return def.aliasFor;
-    return role;
-}
 
 async function loadRolePermissions(roleIdentifier) {
     const result = await db.query(

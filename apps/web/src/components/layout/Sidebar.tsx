@@ -14,6 +14,8 @@ import {
 } from '../../config/routes';
 import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 
+const { canonicalRole } = require('../../../../shared/rbac/catalog.ts');
+
 export function Sidebar() {
     const { user, permissions, isAdmin, hasPermission } = useAuth();
     const { isExpanded, isMobileOpen, toggleExpanded, closeMobile } = useSidebar();
@@ -58,7 +60,7 @@ export function Sidebar() {
         if (!user) return [];
 
         return NAVIGATION_SECTIONS
-            .filter(section => !section.roles || section.roles.includes(user.role))
+            .filter(section => !section.roles || section.roles.includes(canonicalRole(user.role)))
             .map(section => ({
                 ...section,
                 children: section.children

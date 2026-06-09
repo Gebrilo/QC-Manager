@@ -124,7 +124,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'quality',
         label: 'Quality',
         icon: ShieldCheck,
-        roles: ['admin', 'manager', 'team_manager', 'pm', 'member', 'user', 'tester'],
+        roles: ['admin', 'team_manager', 'pm', 'tester'],
         children: [
             { path: '/work/projects', label: 'Projects', icon: FolderKanban },
             {
@@ -160,7 +160,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'manage',
         label: 'Manage',
         icon: Users,
-        roles: ['manager', 'team_manager', 'admin'],
+        roles: ['team_manager', 'admin'],
         children: [
             { path: '/dashboards/team-manager', label: 'Team Dashboard', icon: LayoutGrid },
             { path: '/team/resources', label: 'Resources', icon: Users },

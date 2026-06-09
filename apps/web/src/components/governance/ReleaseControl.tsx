@@ -25,8 +25,8 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
     const [comments, setComments] = useState('');
     const [action, setAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
 
-    const { user } = useAuth();
-    const canAuthorize = user?.role === 'admin' || user?.role === 'manager';
+    const { user, isAdmin, isManager } = useAuth();
+    const canAuthorize = isAdmin || isManager;
 
     useEffect(() => {
         loadData();

@@ -19,7 +19,7 @@ export default function ResourcesPage() {
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [preparationCount, setPreparationCount] = useState(0);
-    const { hasPermission, user } = useAuth();
+    const { hasPermission, isAdmin, isManager } = useAuth();
 
     const canCreate = hasPermission('qc.resources.create');
     const canEdit = hasPermission('qc.resources.edit');
@@ -120,7 +120,7 @@ export default function ResourcesPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                    {(isAdmin || isManager) && (
                         <Button
                             onClick={handleAutoMap}
                             disabled={isAutoMapping}

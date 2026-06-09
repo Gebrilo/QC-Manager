@@ -199,7 +199,7 @@ function bugsToRows(bugs: ResourceAnalytics['bugs']) {
 
 export default function ResourceDashboardPage() {
     const params = useParams();
-    const { user, token, isAdmin } = useAuth();
+    const { token, isAdmin, isManager } = useAuth();
     const [data, setData] = useState<ResourceAnalytics | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -207,7 +207,6 @@ export default function ResourceDashboardPage() {
     const tasksPagination = usePagination(data?.tasks.length ?? 0);
     const bugsPagination = usePagination(data?.bugs.length ?? 0);
 
-    const isManager = user?.role === 'manager';
     const canAccess = isAdmin || isManager;
 
     useEffect(() => {

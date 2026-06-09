@@ -32,21 +32,21 @@ describe('admin access matrix routes', () => {
         const res = await request(makeApp())
             .patch('/admin/access/matrix')
             .send({
-                role_identifier: 'member',
+                role_identifier: 'tester',
                 permission_key: 'qc.bugs.triage',
                 granted: true,
             });
 
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({
-            role_identifier: 'member',
+            role_identifier: 'tester',
             permission_key: 'qc.bugs.triage',
             granted: true,
         });
 
         expect(mockQuery).toHaveBeenCalledWith(
             'DELETE FROM role_permissions WHERE role_identifier = $1',
-            ['member']
+            ['tester']
         );
         expect(mockQuery.mock.calls.some(([sql, params]) => (
             sql.includes('INSERT INTO role_permissions') && params[1] === 'qc.bugs.triage'

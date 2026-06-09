@@ -22,14 +22,14 @@ describe('RoleResolver.resolve', () => {
         expect(out.scope).toEqual({ team_id: null, team_type: null, pm_of_projects: [] });
     });
 
-    test('member without role_permissions row falls back to catalog defaults', async () => {
+    test('tester without role_permissions row falls back to catalog defaults', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([])) // role_permissions empty
             .mockResolvedValueOnce(rows([])) // user_permissions empty
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
-        const out = await resolve({ id: 'u2', role: 'member' });
+        const out = await resolve({ id: 'u2', role: 'tester' });
         expect(out.effectivePermissions.has('qc.tasks.view_own')).toBe(true);
         expect(out.effectivePermissions.has('qc.testcases.view_steps')).toBe(true);
         expect(out.scope.team_type).toBe('qc');
@@ -57,12 +57,12 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
-        const out = await resolve({ id: 'u4', role: 'member' });
+        const out = await resolve({ id: 'u4', role: 'tester' });
         expect(out.effectivePermissions.has('qc.bugs.triage')).toBe(true);
         expect(out.effectivePermissions.has('qc.tasks.view_own')).toBe(false);
     });
 
-    test('manager role aliases team_manager', async () => {
+    test('legacy manager role canonicalizes to team_manager', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
@@ -121,7 +121,7 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
-        const req = { user: { id: 'u7', role: 'member' } };
+        const req = { user: { id: 'u7', role: 'tester' } };
         const first = await resolve(req.user, req);
         const second = await resolve(req.user, req);
         expect(first).toBe(second);

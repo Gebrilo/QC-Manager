@@ -21,6 +21,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { getManagerTeam } = require('../middleware/teamAccess');
+const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 // ──────────────────────────────────────────────
 // Admin-only endpoints
@@ -61,7 +62,7 @@ router.post('/', requireAuth, requirePermission('qc.admin.manage_teams'), async 
             return res.status(400).json({ error: 'Team name is required' });
         }
 
-        // Validate manager exists and has role = manager (or admin)
+        // Validate manager exists and has a team manager role (or admin)
         if (manager_id) {
             const managerCheck = await db.query(
                 `SELECT id, role FROM app_user WHERE id = $1`,
@@ -70,8 +71,8 @@ router.post('/', requireAuth, requirePermission('qc.admin.manage_teams'), async 
             if (managerCheck.rows.length === 0) {
                 return res.status(400).json({ error: 'Manager user not found' });
             }
-            if (!['admin', 'manager'].includes(managerCheck.rows[0].role)) {
-                return res.status(400).json({ error: 'Assigned manager must have role "manager" or "admin"' });
+            if (managerCheck.rows[0].role !== 'admin' && !isTeamManagerRole(managerCheck.rows[0].role)) {
+                return res.status(400).json({ error: 'Assigned manager must have role "team_manager" or "admin"' });
             }
         }
 
@@ -199,8 +200,8 @@ router.patch('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), as
                     `SELECT id, role FROM app_user WHERE id = $1`, [manager_id]
                 );
                 if (managerCheck.rows.length === 0) return res.status(400).json({ error: 'Manager user not found' });
-                if (!['admin', 'manager'].includes(managerCheck.rows[0].role)) {
-                    return res.status(400).json({ error: 'Assigned manager must have role "manager" or "admin"' });
+                if (managerCheck.rows[0].role !== 'admin' && !isTeamManagerRole(managerCheck.rows[0].role)) {
+                    return res.status(400).json({ error: 'Assigned manager must have role "team_manager" or "admin"' });
                 }
             }
             fields.push(`manager_id = $${idx++}`);

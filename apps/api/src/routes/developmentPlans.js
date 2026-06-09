@@ -5,6 +5,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { canAccessUser } = require('../middleware/teamAccess');
+const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 const multer = require('multer');
 const storage = require('../config/storage');
 
@@ -652,7 +653,7 @@ router.get('/attachments/:attachmentId', requireAuth, async (req, res, next) => 
         if (att.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
 
         const file = att.rows[0];
-        if (userRole !== 'admin' && userRole !== 'manager') {
+        if (userRole !== 'admin' && !isTeamManagerRole(userRole)) {
             if (file.owner_user_id !== userId) {
                 return res.status(403).json({ error: 'Access denied' });
             }
@@ -685,7 +686,7 @@ router.delete('/attachments/:attachmentId', requireAuth, async (req, res, next) 
 
         const file = att.rows[0];
 
-        if (userRole === 'admin' || userRole === 'manager') {
+        if (userRole === 'admin' || isTeamManagerRole(userRole)) {
             // Manager can delete any file
         } else {
             if (file.uploaded_by_role !== 'resource' || file.user_id !== userId) {
@@ -703,7 +704,7 @@ router.delete('/attachments/:attachmentId', requireAuth, async (req, res, next) 
 
 // ─── POST /:userId/tasks/:taskId/links — manager adds a link ─────────────────
 
-router.post('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         const { url, label } = req.body;
@@ -739,7 +740,7 @@ router.post('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'm
 
 // ─── GET /:userId/tasks/:taskId/links — manager views links ──────────────────
 
-router.get('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         const allowed = await canAccessUser(req.user, userId);
@@ -759,7 +760,7 @@ router.get('/:userId/tasks/:taskId/links', requireAuth, requireRole('admin', 'ma
 
 // ─── DELETE /:userId/tasks/:taskId/links/:linkId — manager deletes a link ────
 
-router.delete('/:userId/tasks/:taskId/links/:linkId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.delete('/:userId/tasks/:taskId/links/:linkId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId, linkId } = req.params;
         const allowed = await canAccessUser(req.user, userId);
@@ -776,7 +777,7 @@ router.delete('/:userId/tasks/:taskId/links/:linkId', requireAuth, requireRole('
 
 // ─── POST /:userId/tasks/:taskId/attachments — manager uploads material ──────
 
-router.post('/:userId/tasks/:taskId/attachments', requireAuth, requireRole('admin', 'manager'), idpUpload.single('file'), async (req, res, next) => {
+router.post('/:userId/tasks/:taskId/attachments', requireAuth, requireRole('admin', 'team_manager'), idpUpload.single('file'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
@@ -814,7 +815,7 @@ router.post('/:userId/tasks/:taskId/attachments', requireAuth, requireRole('admi
 
 // ─── GET /:userId/tasks/:taskId/comments — manager reads ─────────────────────
 
-router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         const allowed = await canAccessUser(req.user, userId);
@@ -838,7 +839,7 @@ router.get('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 
 
 // ─── POST /:userId/tasks/:taskId/comments — manager comments ─────────────────
 
-router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
@@ -870,7 +871,7 @@ router.post('/:userId/tasks/:taskId/comments', requireAuth, requireRole('admin',
 
 // ─── PATCH /:userId/plan/:planId — edit plan-level fields ──────────────────
 
-router.patch('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/:userId/plan/:planId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, planId } = req.params;
         const { title, description } = req.body;
@@ -906,7 +907,7 @@ router.patch('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager
     } catch (err) { next(err); }
 });
 
-router.delete('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.delete('/:userId/plan/:planId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, planId } = req.params;
 
@@ -925,7 +926,7 @@ router.delete('/:userId/plan/:planId', requireAuth, requireRole('admin', 'manage
     } catch (err) { next(err); }
 });
 
-router.post('/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { title, description, required_xp = 0 } = req.body;
@@ -1078,7 +1079,7 @@ async function buildPlanDetail(plan, userId) {
     return { ...plan, plan_type: 'idp', objectives, progress: allProgress };
 }
 
-router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:userId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { planId } = req.query;
@@ -1109,7 +1110,7 @@ router.get('/:userId', requireAuth, requireRole('admin', 'manager'), async (req,
 
 // ─── POST /:userId/objectives — add objective (chapter + system quest) ────────
 
-router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId/objectives', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { title, description, start_date, due_date, sort_order = 0, planId } = req.body;
@@ -1142,7 +1143,7 @@ router.post('/:userId/objectives', requireAuth, requireRole('admin', 'manager'),
 
 // ─── PATCH /:userId/objectives/:chapterId — update objective ──────────────────
 
-router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
         const { title, description, start_date, due_date, sort_order } = req.body;
@@ -1177,7 +1178,7 @@ router.patch('/:userId/objectives/:chapterId', requireAuth, requireRole('admin',
 
 // ─── DELETE /:userId/objectives/:chapterId — delete objective ─────────────────
 
-router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
 
@@ -1196,7 +1197,7 @@ router.delete('/:userId/objectives/:chapterId', requireAuth, requireRole('admin'
 
 // ─── POST /:userId/objectives/:chapterId/tasks — add action item ──────────────
 
-router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, chapterId } = req.params;
         const { title, description, start_date, due_date, priority, difficulty, is_mandatory = true, requires_attachment = false, sort_order = 0 } = req.body;
@@ -1229,7 +1230,7 @@ router.post('/:userId/objectives/:chapterId/tasks', requireAuth, requireRole('ad
 
 // ─── PATCH /:userId/tasks/:taskId — update task ───────────────────────────────
 
-router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
         const { title, description, start_date, due_date, priority, difficulty, is_mandatory, requires_attachment, sort_order } = req.body;
@@ -1283,7 +1284,7 @@ router.patch('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manage
 
 // ─── DELETE /:userId/tasks/:taskId — delete task ──────────────────────────────
 
-router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId, taskId } = req.params;
 
@@ -1308,7 +1309,7 @@ router.delete('/:userId/tasks/:taskId', requireAuth, requireRole('admin', 'manag
 
 // ─── POST /:userId/complete — mark plan complete + award XP ──────────────────
 
-router.post('/:userId/complete', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.post('/:userId/complete', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { planId } = req.body;
@@ -1352,7 +1353,7 @@ router.post('/:userId/complete', requireAuth, requireRole('admin', 'manager'), a
 
 // ─── GET /:userId/report — performance report ─────────────────────────────────
 
-router.get('/:userId/report', requireAuth, requireRole('admin', 'manager'), async (req, res, next) => {
+router.get('/:userId/report', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { planId } = req.query;

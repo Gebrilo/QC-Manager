@@ -14,6 +14,7 @@ const { resolve: resolveRole } = require('../access/RoleResolver');
 const { canEditTask, canTakeOverTask } = require('../services/dashboards/teamMemberDashboards');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 const { appendListFilter, enforceArtifact, decorateRows } = require('../services/access/enforcement');
+const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
 const TASK_FILTER_OPTS = Object.freeze({
     tableAlias: 'v',
@@ -136,7 +137,7 @@ async function buildTaskTeamFilter(user) {
     if (user.role === 'admin') {
         return { join: '', clause: '', params: [] };
     }
-    if (user.role === 'manager') {
+    if (isTeamManagerRole(user.role)) {
         const teamId = await getManagerTeamId(user.id);
         if (!teamId) {
             return { join: '', clause: 'AND 1=0', params: [] };
@@ -234,7 +235,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         const data = createTaskSchema.parse(req.body);
 
         // Team-scope validation for managers
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId) {
                 return res.status(403).json({ error: 'You are not assigned to a team' });
@@ -410,7 +411,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         }
 
         // Enforce team scope for managers
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
 
@@ -637,7 +638,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.task
         const original = originalRes.rows[0];
 
         // Enforce team scope for managers
-        if (req.user.role === 'manager') {
+        if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
             if (!teamId) return res.status(403).json({ error: 'You are not assigned to a team' });
 

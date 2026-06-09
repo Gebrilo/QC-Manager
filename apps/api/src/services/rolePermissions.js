@@ -3,17 +3,13 @@
 const {
     ALL_PERMISSION_VALUES,
     ROLES,
+    canonicalRole,
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 const BUILT_IN_ROLES = Object.freeze(Object.keys(ROLES));
 const ROLE_NAME_PATTERN = /^[a-z0-9_]+$/;
-
-function canonicalRole(roleName) {
-    const def = ROLES[roleName];
-    return def && def.aliasFor ? def.aliasFor : roleName;
-}
 
 function isBuiltInRole(roleName) {
     return BUILT_IN_ROLES.includes(roleName);
@@ -42,8 +38,9 @@ function aliasesForCanonical(canonical) {
 }
 
 function roleStorageNames(roleName) {
-    if (!isBuiltInRole(roleName)) return [roleName];
     const canonical = canonicalRole(roleName);
+    if (BUILT_IN_ROLES.includes(canonical)) return [canonical];
+    if (!isBuiltInRole(roleName)) return [roleName];
     const names = aliasesForCanonical(canonical);
     return names.length > 0 ? names : [roleName];
 }

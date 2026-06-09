@@ -140,13 +140,13 @@ describe('Access Engine Slice 2 wiring (issue #81)', () => {
     expect(updateCall.sql).not.toMatch(/created_by_user_id\s*=/);
   });
 
-  test('Member POSTs a task → owner_team_id matches member team, visibility_scope matches default', async () => {
+  test('Tester POSTs a task → owner_team_id matches tester team, visibility_scope matches default', async () => {
     // Direct-create flow is exercised via the buildAccessDefaults helper called
-    // from the route. We exercise the helper directly with a member-like creator.
+    // from the route. We exercise the helper directly with a tester-like creator.
     const { buildAccessDefaults, materializeAclGrants } = require('../src/services/accessDefaults');
 
     const responses = [
-      // lookupHumanCreatorTeam — member belongs to a QC team
+      // lookupHumanCreatorTeam — tester belongs to a QC team
       { match: (sql) => /FROM app_user u\s+LEFT JOIN teams/i.test(sql), response: { rows: [{ team_id: 'team-qc-uuid', team_type_id: 'tt-qc', team_type: 'qc' }] } },
       // loadDefaultRow — task for qc
       { match: (sql) => /FROM default_artifact_visibility/i.test(sql), response: { rows: [{ default_scope: 'team', default_acl_grants: [{ role: 'pm', action: 'view' }] }] } },
@@ -215,7 +215,7 @@ describe('Access Engine Slice 2 wiring (issue #81)', () => {
       // resolveResourceByName again for second branch
       { match: (sql) => /FROM resources WHERE deleted_at IS NULL AND \(LOWER\(resource_name\)/i.test(sql), response: { rows: [] } },
       // generateTaskId
-      { match: (sql) => /FROM tasks WHERE task_id LIKE/i.test(sql), response: { rows: [{ task_id: 'TSK-007' }] } },
+      { match: (sql) => /SELECT task_id\s+FROM tasks\s+WHERE task_id ~/i.test(sql), response: { rows: [{ task_id: 'TSK-007' }] } },
       // lookupTuleapCreatorTeam
       { match: (sql) => /FROM teams t\s+LEFT JOIN team_types/i.test(sql), response: { rows: [{ team_id: 'team-dev-uuid', team_type_id: 'tt-dev', team_type: 'dev' }] } },
       // loadDefaultRow for dev/task

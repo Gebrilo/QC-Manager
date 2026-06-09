@@ -30,7 +30,7 @@ function artifactFor(role, artifactType) {
     id: `${artifactType}-1`,
     project_id: role === 'pm' ? 'p-pm' : 'p-other',
     owner_team_id: role === 'team_manager' || role === 'viewer' ? 't-role' : 't-other',
-    owner_user_id: role === 'member' ? 'u-member' : 'u-other',
+    owner_user_id: role === 'tester' ? 'u-tester' : 'u-other',
     visibility_scope: 'team',
   };
   return base;
@@ -58,10 +58,10 @@ function roleFixture(role, artifactType) {
       allowed: ACTIONS,
     };
   }
-  if (role === 'member') {
+  if (role === 'tester') {
     return {
-      user: { id: 'u-member', role },
-      resolved: { effectivePermissions: permissions(artifactType, 'own', ACTIONS), scope: { team_id: 't-member', team_type: 'qc', pm_of_projects: [] } },
+      user: { id: 'u-tester', role },
+      resolved: { effectivePermissions: permissions(artifactType, 'own', ACTIONS), scope: { team_id: 't-tester', team_type: 'qc', pm_of_projects: [] } },
       allowed: ACTIONS,
     };
   }
@@ -78,7 +78,7 @@ describe('AccessEngine permission matrix — issue #82 artifacts', () => {
     mockQuery.mockResolvedValue({ rows: [] });
   });
 
-  for (const role of ['admin', 'pm', 'team_manager', 'member', 'viewer']) {
+  for (const role of ['admin', 'pm', 'team_manager', 'tester', 'viewer']) {
     for (const artifactType of ARTIFACTS) {
       for (const action of ACTIONS) {
         test(`${role} / ${artifactType} / ${action}`, async () => {

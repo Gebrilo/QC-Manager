@@ -2835,8 +2835,6 @@ const runMigrations = async () => {
             ALTER TABLE app_user ADD CONSTRAINT valid_role CHECK (role IN
                 ('admin','manager','team_manager','pm','member','user','viewer','tester','contributor'))
         `);
-        await client.query(`UPDATE app_user SET role = 'member' WHERE role IN ('user','tester')`);
-
         const contributorPermissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor
             || collectRolePermissions('contributor', new Set());
         await client.query(`
@@ -2844,7 +2842,7 @@ const runMigrations = async () => {
             SET role = 'contributor',
                 status = 'PREPARATION',
                 team_membership_active = false
-            WHERE role = 'member'
+            WHERE role IN ('member', 'tester')
               AND active = true
               AND status = 'ACTIVE'
               AND COALESCE(team_membership_active, false) = false
@@ -2923,16 +2921,14 @@ const runMigrations = async () => {
         `);
 
         // ============================================================
-        // Migration 040: Seed team-manager and member dashboard permissions
+        // Migration 040: Seed team-manager and tester dashboard permissions
         // ============================================================
         await client.query(`
             INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
             VALUES
                 ('team_manager', 'qc.dashboards.team_manager.view', NULL),
                 ('team_manager', 'qc.tasks.take_over', NULL),
-                ('manager',      'qc.dashboards.team_manager.view', NULL),
-                ('manager',      'qc.tasks.take_over', NULL),
-                ('member',       'qc.dashboards.member.view', NULL),
+                ('tester',       'qc.dashboards.member.view', NULL),
                 ('admin',        'qc.dashboards.team_manager.view', NULL),
                 ('admin',        'qc.dashboards.member.view', NULL)
             ON CONFLICT (role_identifier, permission_key) DO NOTHING
@@ -2997,6 +2993,35 @@ const runMigrations = async () => {
             FROM numeric_max, corrupt_tasks
             WHERE t.id = corrupt_tasks.id
         `);
+
+        // ============================================================
+        // Migration 043: Consolidate RBAC roles (issue #189)
+        // ============================================================
+        const legacyRoleState = await client.query(`
+            SELECT (
+                EXISTS (SELECT 1 FROM app_user WHERE role IN ('manager', 'user', 'member')) OR
+                EXISTS (SELECT 1 FROM role_permissions WHERE role_identifier IN ('manager', 'user', 'member')) OR
+                EXISTS (SELECT 1 FROM custom_roles WHERE name IN ('manager', 'user', 'member'))
+            ) AS has_legacy_roles
+        `);
+        const hasLegacyRoles = legacyRoleState.rows[0]?.has_legacy_roles === true;
+
+        await client.query(`UPDATE app_user SET role = 'team_manager' WHERE role = 'manager'`);
+        await client.query(`UPDATE app_user SET role = 'tester' WHERE role IN ('user', 'member')`);
+        if (hasLegacyRoles) {
+            await client.query(`DELETE FROM role_permissions WHERE role_identifier IN ('manager', 'user', 'member', 'tester')`);
+            await client.query(`DELETE FROM custom_roles WHERE name IN ('manager', 'user', 'member')`);
+
+            const consolidatedTesterPermissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester
+                || collectRolePermissions('tester', new Set());
+            for (const permissionKey of consolidatedTesterPermissions) {
+                await client.query(`
+                    INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                    VALUES ('tester', $1, NULL)
+                    ON CONFLICT (role_identifier, permission_key) DO NOTHING
+                `, [permissionKey]);
+            }
+        }
 
         // Add columns needed by quality-metrics views
         const trAlterColumns = [

@@ -9,7 +9,7 @@ function lifecycleError(status, message) {
     return err;
 }
 
-async function activateUser(userId, actorId, options = {}, actorRole = 'manager') {
+async function activateUser(userId, actorId, options = {}, actorRole = 'team_manager') {
     const { weekly_capacity_hrs = 40, department = null } = options;
 
     const userResult = await db.query(
@@ -96,7 +96,7 @@ async function rollbackUser(userId, actorId) {
     }
 }
 
-async function markReadyForActivation(userId, actorId, ready, actorRole = 'manager') {
+async function markReadyForActivation(userId, actorId, ready, actorRole = 'team_manager') {
     const userResult = await db.query(
         `SELECT id, status, team_id FROM app_user WHERE id = $1`,
         [userId]

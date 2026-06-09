@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { teamsApi, TeamApi, TeamApiMember, TeamApiProject, fetchApi as apiFetch } from '@/lib/api';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 
+const { isTeamManagerRole } = require('../../../../shared/rbac/catalog.ts');
+
 interface User {
     id: string;
     name: string;
@@ -216,7 +218,7 @@ export default function TeamsAdminPage() {
         } catch (err: any) { showError(err.message); }
     };
 
-    const managers = users.filter(u => ['manager', 'admin'].includes(u.role));
+    const managers = users.filter(u => u.role === 'admin' || isTeamManagerRole(u.role));
     const unassignedUsers = users.filter(u => !u.team_id || (selectedTeam && u.team_id === selectedTeam.id ? false : !u.team_id));
     const unassignedProjects = projects.filter(p => !p.team_id || p.team_id === selectedTeam?.id);
 

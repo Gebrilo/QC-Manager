@@ -31,9 +31,10 @@ interface Permission {
 
 const ROLE_COLORS: Record<string, string> = {
     admin: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800',
-    manager: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    team_manager: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    pm: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+    tester: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
     contributor: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800',
-    user: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
     viewer: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
 };
 
@@ -110,10 +111,11 @@ export default function UsersPage() {
     const [convertForm, setConvertForm] = useState({ weekly_capacity_hrs: 40, department: '', role: '' });
     const [availableRoles, setAvailableRoles] = useState<{ name: string; is_builtin: boolean }[]>([
         { name: 'admin', is_builtin: true },
-        { name: 'manager', is_builtin: true },
-        { name: 'contributor', is_builtin: true },
-        { name: 'user', is_builtin: true },
+        { name: 'team_manager', is_builtin: true },
+        { name: 'pm', is_builtin: true },
+        { name: 'tester', is_builtin: true },
         { name: 'viewer', is_builtin: true },
+        { name: 'contributor', is_builtin: true },
     ]);
 
     const fetchRoles = useCallback(async () => {
