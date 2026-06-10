@@ -43,6 +43,13 @@ async function resolveTaskSyncConfig(projectId) {
 }
 
 async function tryEmitAndWriteback(task, config, mode) {
+    // Resolve assigned_to name from primary resource
+    let assignedTo = null;
+    if (task.resource1_id) {
+        const r = await db.query('SELECT resource_name FROM resources WHERE id = $1', [task.resource1_id]);
+        if (r.rows.length > 0) assignedTo = r.rows[0].resource_name;
+    }
+
     const unified = {
         artifact_type: 'task',
         project_id: task.project_id,
@@ -50,6 +57,7 @@ async function tryEmitAndWriteback(task, config, mode) {
             title: task.task_name,
             description: task.notes || task.description || null,
             status: task.status,
+            assigned_to: assignedTo,
         },
         fields: {},
         ...(task.tuleap_artifact_id ? { tuleap: { artifact_id: task.tuleap_artifact_id } } : {}),
@@ -532,37 +540,32 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         triggerWorkflow('task-updated', updated);
 
         const config = await resolveTaskSyncConfig(updated.project_id);
+        const projectChanged = Object.prototype.hasOwnProperty.call(data, 'project_id')
+            && data.project_id !== original.project_id;
+
         if (!config) {
             await db.query(
                 `UPDATE tasks SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
                 [id]
             );
+        } else if (projectChanged && original.tuleap_artifact_id) {
+            // Project changed — artifact belongs to old project's tracker.
+            // Orphan the sync so the task becomes standalone in the new project.
+            // User can re-sync manually via the Sync button on the task page.
+            await db.query(
+                `UPDATE tasks SET sync_status = 'standalone', last_sync_attempted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+                [id]
+            );
         } else if (original.tuleap_artifact_id) {
-            const tuleapCommon = {};
-            if (data.task_name !== undefined) tuleapCommon.title = data.task_name;
-            const desc = data.notes !== undefined ? data.notes : data.description;
-            if (desc !== undefined) tuleapCommon.description = desc;
-            if (data.status !== undefined) tuleapCommon.status = data.status;
-            if (data.resource1_uuid !== undefined) {
-                if (data.resource1_uuid === null) {
-                    tuleapCommon.assigned_to = null;
-                } else {
-                    const r = await db.query('SELECT resource_name FROM resources WHERE id = $1', [data.resource1_uuid]);
-                    if (r.rows.length > 0) tuleapCommon.assigned_to = r.rows[0].resource_name;
-                }
-            }
-
-            if (Object.keys(tuleapCommon).length > 0) {
-                try {
-                    const emitTaskRow = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
-                    await tryEmitAndWriteback(emitTaskRow.rows[0], config, 'update');
-                } catch (emitErr) {
-                    console.error(`[route:tasks:patch] emit_failed task_id=${id} artifact_id=${original.tuleap_artifact_id} err="${emitErr.message}"`);
-                    await db.query(
-                        `UPDATE tasks SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2`,
-                        [String(emitErr.message).slice(0, 1024), id]
-                    );
-                }
+            try {
+                const emitTaskRow = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+                await tryEmitAndWriteback(emitTaskRow.rows[0], config, 'update');
+            } catch (emitErr) {
+                console.error(`[route:tasks:patch] emit_failed task_id=${id} artifact_id=${original.tuleap_artifact_id} err="${emitErr.message}"`);
+                await db.query(
+                    `UPDATE tasks SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2`,
+                    [String(emitErr.message).slice(0, 1024), id]
+                );
             }
         } else {
             try {
