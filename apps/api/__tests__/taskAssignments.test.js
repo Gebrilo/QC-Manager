@@ -17,6 +17,7 @@ const {
     primaryOf,
     firstSecondaryOf,
     orderAssignments,
+    applyTuleapPrimary,
 } = require('../src/services/assignments/taskAssignments');
 
 describe('assignmentsFromPayload', () => {
@@ -173,5 +174,91 @@ describe('sumActualHrs / getTaskAssignments', () => {
         expect(query.mock.calls[0][0]).toMatch(/JOIN resources res/);
         expect(query.mock.calls[0][0]).toMatch(/assignment_type = 'PRIMARY'\) DESC/);
         expect(query.mock.calls[0][1]).toEqual(['t1']);
+    });
+});
+
+describe('applyTuleapPrimary — inbound Tuleap assigned_to → PRIMARY', () => {
+    // #199 / ADR 0009 §3. The first query is always the SELECT of the task's
+    // current assignment rows; later calls are the demote/remove/promote/insert.
+    const mkRow = (over) => ({ id: 'a-x', resource_id: 'rX', assignment_type: 'SECONDARY', actual_hrs: 0, ...over });
+    const hasCall = (query, re, idArg) =>
+        query.mock.calls.some(c => re.test(c[0]) && (idArg === undefined || (c[1] || [])[0] === idArg));
+
+    it('no-ops (and issues no query) when there is no assigned resource', async () => {
+        const query = jest.fn();
+        const res = await applyTuleapPrimary({ query, taskId: 't1', resourceId: null });
+        expect(res.action).toBe('noop');
+        expect(query).not.toHaveBeenCalled();
+    });
+
+    it('inserts a fresh PRIMARY when the task has no assignments', async () => {
+        const query = jest.fn().mockResolvedValueOnce({ rows: [] });
+        const res = await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW' });
+        const insert = query.mock.calls.find(c => /INSERT INTO task_resource_assignment/.test(c[0]));
+        expect(insert).toBeDefined();
+        expect(insert[0]).toMatch(/'PRIMARY'/);
+        expect(insert[1]).toEqual(['t1', 'rW']);
+        expect(res.action).toBe('created');
+    });
+
+    it('does nothing when the resource is already the primary', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [mkRow({ id: 'p', resource_id: 'rW', assignment_type: 'PRIMARY' })],
+        });
+        const res = await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW' });
+        expect(res.action).toBe('unchanged');
+        expect(query).toHaveBeenCalledTimes(1); // only the SELECT
+    });
+
+    it('reassign Y→W: demotes Y to SECONDARY when Y logged effort, never deletes Y', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [mkRow({ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 5 })],
+        });
+        const res = await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW', demoteWhenEffort: true });
+        expect(hasCall(query, /UPDATE task_resource_assignment SET assignment_type = 'SECONDARY'/, 'pY')).toBe(true);
+        expect(hasCall(query, /DELETE/)).toBe(false);
+        const insert = query.mock.calls.find(c => /INSERT INTO task_resource_assignment/.test(c[0]));
+        expect(insert[1]).toEqual(['t1', 'rW']);
+        expect(res.action).toBe('reassigned');
+    });
+
+    it('reassign Y→W: removes Y when it logged no effort', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [mkRow({ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 0 })],
+        });
+        await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW' });
+        expect(hasCall(query, /DELETE FROM task_resource_assignment WHERE id = \$1/, 'pY')).toBe(true);
+    });
+
+    it('reassign Y→W: promotes W\'s existing SECONDARY instead of inserting a duplicate', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [
+                mkRow({ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 3 }),
+                mkRow({ id: 'sW', resource_id: 'rW', assignment_type: 'SECONDARY', actual_hrs: 2 }),
+            ],
+        });
+        await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW' });
+        expect(hasCall(query, /UPDATE task_resource_assignment SET assignment_type = 'PRIMARY'/, 'sW')).toBe(true);
+        expect(hasCall(query, /INSERT/)).toBe(false);
+    });
+
+    it('removes Y even with effort when demote-on-reassign is disabled', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [mkRow({ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 9 })],
+        });
+        await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW', demoteWhenEffort: false });
+        expect(hasCall(query, /DELETE/, 'pY')).toBe(true);
+        expect(hasCall(query, /SET assignment_type = 'SECONDARY'/)).toBe(false);
+    });
+
+    it('leaves locally-managed secondaries (neither Y nor W) untouched', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [
+                mkRow({ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 1 }),
+                mkRow({ id: 'sZ', resource_id: 'rZ', assignment_type: 'SECONDARY', actual_hrs: 4 }),
+            ],
+        });
+        await applyTuleapPrimary({ query, taskId: 't1', resourceId: 'rW' });
+        expect(query.mock.calls.some(c => (c[1] || []).includes('sZ'))).toBe(false);
     });
 });

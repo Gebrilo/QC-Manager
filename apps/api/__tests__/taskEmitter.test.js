@@ -1,4 +1,4 @@
-const { emitToTuleap } = require('../src/services/emitters/task');
+const { emitToTuleap, buildTaskEmitUnified } = require('../src/services/emitters/task');
 
 jest.mock('../src/services/tuleapClient', () => ({
   createTuleapClient: jest.fn(),
@@ -178,5 +178,32 @@ describe('task emitter — emitToTuleap', () => {
 
     const payload = defaultClient.post.mock.calls[0][1];
     expect(payload.values.find(v => v.field_id === 202)).toBeUndefined();
+  });
+});
+
+describe('buildTaskEmitUnified — outbound payload (#199)', () => {
+  it('pushes the primary as assigned_to and the summed actual_effort + primary final estimate', () => {
+    const task = {
+      project_id: 'proj-1',
+      task_name: 'Build feature',
+      notes: 'do it',
+      status: 'In Progress',
+      actual_effort: 24,       // task total = SUM(actual_hrs), maintained by the dual-write trigger
+      final_estimate: 10,      // the primary's final estimate
+      tuleap_artifact_id: 555,
+    };
+    const u = buildTaskEmitUnified(task, 'walter');
+    expect(u.common.assigned_to).toBe('walter');
+    expect(u.common.title).toBe('Build feature');
+    expect(u.fields.actual_effort).toBe(24);
+    expect(u.fields.final_estimate).toBe(10);
+    expect(u.tuleap.artifact_id).toBe(555);
+  });
+
+  it('omits effort fields when the task has none, and omits tuleap when not yet synced', () => {
+    const u = buildTaskEmitUnified({ project_id: 'p1', task_name: 'T', status: 'Todo' }, null);
+    expect(u.fields.actual_effort).toBeUndefined();
+    expect(u.fields.final_estimate).toBeUndefined();
+    expect(u.tuleap).toBeUndefined();
   });
 });

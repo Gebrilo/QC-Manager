@@ -6,7 +6,7 @@ const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { requireAuth, requirePermission, optionalAuth, blockContributors } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
-const { emitToTuleap: emitTask } = require('../services/emitters/task');
+const { emitToTuleap: emitTask, buildTaskEmitUnified } = require('../services/emitters/task');
 const { adoptStagedAttachments } = require('./artifactAttachments');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
@@ -63,18 +63,10 @@ async function tryEmitAndWriteback(task, config, mode) {
         if (r.rows.length > 0) assignedTo = r.rows[0].resource_name;
     }
 
-    const unified = {
-        artifact_type: 'task',
-        project_id: task.project_id,
-        common: {
-            title: task.task_name,
-            description: task.notes || task.description || null,
-            status: task.status,
-            assigned_to: assignedTo,
-        },
-        fields: {},
-        ...(task.tuleap_artifact_id ? { tuleap: { artifact_id: task.tuleap_artifact_id } } : {}),
-    };
+    // ADR 0009 §3 — assigned_to = PRIMARY (task.resource1_id is the primary,
+    // kept in sync by the dual-write trigger); actual_effort = task total
+    // (SUM of all assignments' actual_hrs); final_estimate = primary's.
+    const unified = buildTaskEmitUnified(task, assignedTo);
 
     const emitDeps = { client: defaultClient, registry: defaultRegistry, query: db.query.bind(db) };
 

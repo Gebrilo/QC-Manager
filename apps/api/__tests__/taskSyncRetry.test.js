@@ -13,7 +13,11 @@ jest.mock('../src/middleware/authMiddleware', () => ({
 jest.mock('../src/middleware/audit', () => ({ auditLog: jest.fn() }));
 jest.mock('../src/utils/n8n', () => ({ triggerWorkflow: jest.fn() }));
 jest.mock('../src/middleware/teamAccess', () => ({ getManagerTeamId: jest.fn() }));
-jest.mock('../src/services/emitters/task', () => ({ emitToTuleap: jest.fn() }));
+jest.mock('../src/services/emitters/task', () => ({
+  emitToTuleap: jest.fn(),
+  // buildTaskEmitUnified is a pure payload builder — use the real one.
+  buildTaskEmitUnified: jest.requireActual('../src/services/emitters/task').buildTaskEmitUnified,
+}));
 jest.mock('../src/services/tuleapClient', () => ({
   createTuleapClient: jest.fn(),
   defaultClient: { post: jest.fn(), put: jest.fn(), delete: jest.fn() },

@@ -4,6 +4,13 @@ const {
   buildAccessDefaults,
   materializeAclGrants,
 } = require('../accessDefaults');
+const { applyTuleapPrimary } = require('../assignments/taskAssignments');
+
+// ADR 0009 §3 — Tracker Config setting: on reassignment, demote the previous
+// primary to SECONDARY when it logged effort (default), else remove it.
+function demoteOnReassign(config) {
+  return config?.demote_previous_primary !== false;
+}
 
 const VALID_TASK_ACTIONS = new Set(['sync', 'delete', 'reject', 'archive']);
 
@@ -204,6 +211,8 @@ async function handleSync(unified, config, { query }) {
   if (existing.rows.length > 0) {
     const task = existing.rows[0];
 
+    const assignedResourceId = common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null;
+
     const result = await query(`
       UPDATE tasks SET
         task_name = COALESCE($1, task_name),
@@ -225,12 +234,23 @@ async function handleSync(unified, config, { query }) {
       common.title || null,
       common.description || null,
       common.status ? normalizeTaskStatus(common.status) : null,
-      common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null,
+      assignedResourceId,
       tuleapUrl,
       parentStoryTuleapArtifactId,
       parentUserStoryId,
       task.id,
     ]);
+
+    // ADR 0009 §3 — map assigned_to onto the PRIMARY assignment via the junction.
+    // This is what fixes the misattribution bug: on reassignment Y→W the previous
+    // primary Y is demoted/removed (its logged hours stay with Y) rather than the
+    // legacy update silently re-pointing resource1_id while leaving r1_actual_hrs.
+    await applyTuleapPrimary({
+      query,
+      taskId: result.rows[0].id,
+      resourceId: assignedResourceId,
+      demoteWhenEffort: demoteOnReassign(config),
+    });
 
     return { action: 'updated', id: result.rows[0].id, data: result.rows[0] };
   }
@@ -265,6 +285,14 @@ async function handleSync(unified, config, { query }) {
       RETURNING *
     `, [normalizeTaskStatus(common.status), common.title, common.description, resourceId, tuleapUrl,
       parentStoryTuleapArtifactId, parentUserStoryId, task.id]);
+
+    // ADR 0009 §3 — assigned_to → PRIMARY assignment (junction is source of truth).
+    await applyTuleapPrimary({
+      query,
+      taskId: result.rows[0].id,
+      resourceId,
+      demoteWhenEffort: demoteOnReassign(config),
+    });
 
     if (resolved.length > 0) {
       await drainPending({
@@ -318,6 +346,14 @@ async function handleSync(unified, config, { query }) {
     grants: accessDefaults.default_acl_grants,
     grantedBy: createdByUserId,
     query,
+  });
+
+  // ADR 0009 §3 — assigned_to → PRIMARY assignment (junction is source of truth).
+  await applyTuleapPrimary({
+    query,
+    taskId: result.rows[0].id,
+    resourceId,
+    demoteWhenEffort: demoteOnReassign(config),
   });
 
   if (resolved.length > 0) {

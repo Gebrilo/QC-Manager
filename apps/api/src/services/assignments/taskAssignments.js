@@ -223,6 +223,67 @@ async function sumActualHrs(query, taskId) {
     return r.rows[0] ? Number(r.rows[0].total) : 0;
 }
 
+/**
+ * Inbound Tuleap sync: make `resourceId` the PRIMARY assignment of a task,
+ * implementing ADR 0009 §3. Tuleap's `assigned_to` is single-select, so this
+ * only ever moves the PRIMARY — locally-managed SECONDARY rows survive.
+ *
+ * On reassignment Y→W:
+ *   - the previous primary Y is **demoted to SECONDARY** when it logged
+ *     `actual_hrs > 0` and the Tracker Config allows it (`demoteWhenEffort`),
+ *     so Y's effort is preserved and never reattributed to W; otherwise Y is
+ *     removed;
+ *   - W is promoted from its existing SECONDARY row if present, else inserted
+ *     fresh with zero effort.
+ *
+ * The dual-write trigger reconciles the legacy resource1_id / r1_* columns from
+ * the resulting rows, which is what fixes the misattribution bug in the old
+ * `resource1_id = COALESCE(...)` update path.
+ */
+async function applyTuleapPrimary({ query, taskId, resourceId, demoteWhenEffort = true }) {
+    if (!resourceId) return { action: 'noop' };
+
+    const cur = await query(
+        `SELECT id, resource_id, assignment_type, actual_hrs
+           FROM task_resource_assignment WHERE task_id = $1`,
+        [taskId]
+    );
+    const rows = cur.rows || [];
+    const primary = rows.find(r => r.assignment_type === 'PRIMARY') || null;
+
+    if (primary && primary.resource_id === resourceId) return { action: 'unchanged' };
+
+    // 1) Resolve the outgoing primary (Y).
+    if (primary) {
+        if (demoteWhenEffort && num(primary.actual_hrs) > 0) {
+            await query(
+                `UPDATE task_resource_assignment SET assignment_type = 'SECONDARY', updated_at = NOW() WHERE id = $1`,
+                [primary.id]
+            );
+        } else {
+            await query('DELETE FROM task_resource_assignment WHERE id = $1', [primary.id]);
+        }
+    }
+
+    // 2) Install W as the new primary — promote its existing SECONDARY or insert.
+    const wRow = rows.find(r => r.resource_id === resourceId && (!primary || r.id !== primary.id));
+    if (wRow) {
+        await query(
+            `UPDATE task_resource_assignment SET assignment_type = 'PRIMARY', updated_at = NOW() WHERE id = $1`,
+            [wRow.id]
+        );
+    } else {
+        await query(
+            `INSERT INTO task_resource_assignment (task_id, resource_id, assignment_type, estimate_hrs, actual_hrs)
+             VALUES ($1, $2, 'PRIMARY', 0, 0)`,
+            [taskId, resourceId]
+        );
+    }
+
+    if (primary) return { action: 'reassigned' };
+    return wRow ? { action: 'promoted' } : { action: 'created' };
+}
+
 function primaryOf(list) {
     return (list || []).find(a => a.assignment_type === 'PRIMARY') || null;
 }
@@ -242,4 +303,5 @@ module.exports = {
     primaryOf,
     firstSecondaryOf,
     orderAssignments,
+    applyTuleapPrimary,
 };

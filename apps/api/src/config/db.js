@@ -1591,6 +1591,14 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS status_value_map JSONB DEFAULT '{}'
         `);
 
+        // ADR 0009 §3 — Tracker Config toggle: on inbound reassignment, demote the
+        // previous PRIMARY to SECONDARY when it logged effort (default), else remove
+        // it. Read by services/persisters/task.js (demoteOnReassign).
+        await client.query(`
+            ALTER TABLE tuleap_sync_config
+                ADD COLUMN IF NOT EXISTS demote_previous_primary BOOLEAN NOT NULL DEFAULT true
+        `);
+
         await client.query(`
             ALTER TABLE bugs
                 ADD COLUMN IF NOT EXISTS environment VARCHAR(20),
