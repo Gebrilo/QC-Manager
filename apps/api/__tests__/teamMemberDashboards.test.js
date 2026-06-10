@@ -160,6 +160,62 @@ describe('GET /api/dashboards/member', () => {
         expect(res.body.my_bugs).toHaveLength(1);
         expect(res.body.my_bugs[0].id).toBe('bug-mine');
     });
+
+    test('a secondary contribution shows as a supporting task with the viewer\'s own per-assignment hours (#195)', async () => {
+        const app = buildDashboardApp({ user: { id: 'member-1', role: 'member' } });
+        let myTasksSql = '';
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: (sql) => { myTasksSql = sql; return [
+                { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'SECONDARY', my_estimate_hrs: '8', my_actual_hrs: '16',
+                  total_est_hrs: '24', total_actual_hrs: '24' },
+            ]; } },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '16' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        const task = res.body.my_tasks[0];
+        expect(task.assignment_role).toBe('supporting');     // SECONDARY → supporting, not owning
+        expect(task.my_estimate_hrs).toBe(8);                // viewer's own per-assignment values
+        expect(task.my_actual_hrs).toBe(16);
+        // my_tasks resolves via the junction and exposes the viewer's own assignment
+        expect(myTasksSql).toMatch(/JOIN task_resource_assignment/);
+        expect(myTasksSql).toMatch(/my_a\.assignment_type AS my_assignment_type/);
+        // logged time includes the secondary contribution (summed from the junction)
+        expect(res.body.logged_time_this_week).toBe(16);
+    });
+
+    test('the primary sees the same task as owning (#195)', async () => {
+        const app = buildDashboardApp({ user: { id: 'owner-1', role: 'member' } });
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: [
+                { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'PRIMARY', my_estimate_hrs: '16', my_actual_hrs: '8' },
+            ] },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '8' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        expect(res.body.my_tasks[0].assignment_role).toBe('owning');
+    });
 });
 
 describe('PATCH /api/tasks/:id task take-over enforcement', () => {

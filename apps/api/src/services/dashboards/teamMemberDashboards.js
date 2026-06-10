@@ -6,7 +6,9 @@ const { withAccess } = require('./pmDashboard');
 
 const TASK_FILTER_OPTS = {
     tableAlias: 't',
-    assigneeResourceExprs: ['t.resource1_id', 't.resource2_id'],
+    // ADR 0009 / #195 — resolve assignees via the junction so a 3rd+ secondary's
+    // tasks surface on their dashboard, not just the two cached resource slots.
+    assigneeJunction: { table: 'task_resource_assignment', idExpr: 't.id' },
     userExprs: ['t.created_by_user_id'],
 };
 
@@ -93,6 +95,17 @@ function normalizeTask(row, can) {
         deadline: row.deadline,
         total_est_hrs: number(row.total_est_hrs),
         total_actual_hrs: number(row.total_actual_hrs),
+        // ADR 0009 / #195 — the viewer's own perspective on this task (present
+        // only on the personal dashboard, which joins the viewer's assignment):
+        // owning when they're the PRIMARY, supporting when SECONDARY, plus their
+        // own per-assignment estimate/actual.
+        ...(row.my_assignment_type !== undefined ? {
+            assignment_role: row.my_assignment_type === 'PRIMARY' ? 'owning'
+                : row.my_assignment_type === 'SECONDARY' ? 'supporting'
+                : null,
+            my_estimate_hrs: number(row.my_estimate_hrs),
+            my_actual_hrs: number(row.my_actual_hrs),
+        } : {}),
         _can: can,
     };
 }
@@ -157,14 +170,14 @@ async function getTeamDashboard(db, user, req) {
         db.query(`SELECT t.status, COUNT(*)::int AS c FROM tasks t WHERE ${taskWhere} GROUP BY t.status`, taskFilter.params),
         db.query(
             `WITH visible_tasks AS (
-                SELECT t.*
+                SELECT t.id
                    FROM tasks t
                   WHERE ${taskWhere}
              ),
              assignments AS (
-                SELECT resource1_id AS resource_id FROM visible_tasks WHERE resource1_id IS NOT NULL
-                UNION ALL
-                SELECT resource2_id AS resource_id FROM visible_tasks WHERE resource2_id IS NOT NULL
+                SELECT tra.resource_id
+                  FROM task_resource_assignment tra
+                  JOIN visible_tasks vt ON vt.id = tra.task_id
              )
              SELECT au.id AS user_id, r.id AS resource_id, COALESCE(au.name, r.resource_name) AS name, COUNT(a.resource_id)::int AS total
                FROM app_user au
@@ -177,7 +190,7 @@ async function getTeamDashboard(db, user, req) {
         ),
         db.query(
             `WITH visible_tasks AS (
-                SELECT t.*
+                SELECT t.id
                   FROM tasks t
                  WHERE ${taskWhere}
              )
@@ -185,17 +198,13 @@ async function getTeamDashboard(db, user, req) {
                     r.id AS resource_id,
                     COALESCE(au.name, r.resource_name) AS name,
                     COALESCE(r.weekly_capacity_hrs, 0)::numeric AS capacity_hrs,
-                    COALESCE(SUM(
-                        CASE WHEN vt.resource1_id = r.id THEN COALESCE(vt.r1_estimate_hrs, 0) ELSE 0 END +
-                        CASE WHEN vt.resource2_id = r.id THEN COALESCE(vt.r2_estimate_hrs, 0) ELSE 0 END
-                    ), 0)::numeric AS workload_hrs,
-                    COALESCE(SUM(
-                        CASE WHEN vt.resource1_id = r.id THEN COALESCE(vt.r1_actual_hrs, 0) ELSE 0 END +
-                        CASE WHEN vt.resource2_id = r.id THEN COALESCE(vt.r2_actual_hrs, 0) ELSE 0 END
-                    ), 0)::numeric AS logged_hrs
+                    COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)), 0)::numeric AS workload_hrs,
+                    COALESCE(SUM(COALESCE(tra.actual_hrs, 0)), 0)::numeric AS logged_hrs
                FROM app_user au
                LEFT JOIN resources r ON r.user_id = au.id AND r.deleted_at IS NULL
-               LEFT JOIN visible_tasks vt ON vt.resource1_id = r.id OR vt.resource2_id = r.id
+               LEFT JOIN task_resource_assignment tra
+                      ON tra.resource_id = r.id
+                     AND tra.task_id IN (SELECT id FROM visible_tasks)
               WHERE au.team_id = $${taskFilter.nextIdx}
               GROUP BY au.id, au.name, r.id, r.resource_name, r.weekly_capacity_hrs
               ORDER BY name`,
@@ -307,12 +316,15 @@ async function getSharedWithMe(db, user) {
 async function getMemberDashboard(db, user, req) {
     const resolved = await resolveRole(user, req);
     const taskFilter = await access.buildListFilter(user, 'task', 'view', { ...TASK_FILTER_OPTS, req, startIdx: 2 });
+    // ADR 0009 / #195 — "my tasks" = tasks where I'm any assignee (primary OR
+    // any secondary, incl. 3rd+) via the junction, not just the two cached slots.
     const taskAssignmentWhere = `
         EXISTS (
-            SELECT 1 FROM resources mine
-             WHERE mine.user_id = $1
+            SELECT 1 FROM task_resource_assignment tra
+              JOIN resources mine ON mine.id = tra.resource_id
+             WHERE tra.task_id = t.id
+               AND mine.user_id = $1
                AND mine.deleted_at IS NULL
-               AND (mine.id = t.resource1_id OR mine.id = t.resource2_id)
         )`;
     const myTaskWhere = `${taskAssignmentWhere} AND ${withAccess('t.deleted_at IS NULL', taskFilter)}`;
 
@@ -323,11 +335,16 @@ async function getMemberDashboard(db, user, req) {
                 t.resource2_id, r2.resource_name AS resource2_name,
                 t.parent_user_story_id, t.deadline,
                 (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_est_hrs,
-                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs
+                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
+                my_a.assignment_type AS my_assignment_type,
+                COALESCE(my_a.estimate_hrs, 0) AS my_estimate_hrs,
+                COALESCE(my_a.actual_hrs, 0) AS my_actual_hrs
            FROM tasks t
            LEFT JOIN projects p ON p.id = t.project_id
            LEFT JOIN resources r1 ON r1.id = t.resource1_id
            LEFT JOIN resources r2 ON r2.id = t.resource2_id
+           LEFT JOIN resources mine ON mine.user_id = $1 AND mine.deleted_at IS NULL
+           LEFT JOIN task_resource_assignment my_a ON my_a.task_id = t.id AND my_a.resource_id = mine.id
           WHERE ${myTaskWhere}
           ORDER BY t.deadline NULLS LAST, t.updated_at DESC
           LIMIT 50`,
@@ -346,13 +363,13 @@ async function getMemberDashboard(db, user, req) {
             return due >= new Date(now.toISOString().slice(0, 10)) && due <= week;
         });
 
+    // ADR 0009 / #195 — logged time = the viewer's own actual_hrs across all
+    // their assignments (owning + supporting) on this week's tasks, from the junction.
     const loggedResult = await db.query(
-        `SELECT COALESCE(SUM(
-            CASE WHEN t.resource1_id = r.id THEN COALESCE(t.r1_actual_hrs, 0) ELSE 0 END +
-            CASE WHEN t.resource2_id = r.id THEN COALESCE(t.r2_actual_hrs, 0) ELSE 0 END
-        ), 0) AS hours
+        `SELECT COALESCE(SUM(COALESCE(tra.actual_hrs, 0)), 0) AS hours
            FROM resources r
-           JOIN tasks t ON t.resource1_id = r.id OR t.resource2_id = r.id
+           JOIN task_resource_assignment tra ON tra.resource_id = r.id
+           JOIN tasks t ON t.id = tra.task_id
           WHERE r.user_id = $1
             AND r.deleted_at IS NULL
             AND t.deleted_at IS NULL
