@@ -118,8 +118,8 @@
     "teach": {
       "source": "mattpocock/skills",
       "sourceType": "github",
-      "skillPath": "skills/in-progress/teach/SKILL.md",
-      "computedHash": "86623781d80655132e4b49f6d4a8afa7e1c1f3d3e75b237b10a7a12a3b8bd847"
+      "skillPath": "skills/productivity/teach/SKILL.md",
+      "computedHash": "9b926a37c686fcaa3ec923ee719393d33a075e45a273ccca0c040ea03eb73bf9"
     },
     "to-issues": {
       "source": "mattpocock/skills",
