@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/ui/Pagination';
 import { downloadCSV, downloadXLSX, safeFilename } from '@/lib/exportUtils';
+import { AssignmentRoleBadge, EstimateAccuracyBadge } from '@/components/dashboards/AssignmentBadges';
+import type { EstimateAccuracy } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -51,6 +53,7 @@ interface ResourceAnalytics {
         estimate_hrs: number;
         actual_hrs: number;
         assignment_role: string;
+        estimate_accuracy?: EstimateAccuracy | null;
         start_variance: number | null;
         completion_variance: number | null;
         execution_variance: number | null;
@@ -167,12 +170,19 @@ function getInitials(name: string): string {
     return name.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 }
 
+function resourceRole(role: string) {
+    if (role === 'Primary') return 'owning';
+    if (role === 'Secondary') return 'supporting';
+    return role;
+}
+
 function tasksToRows(tasks: ResourceAnalytics['tasks']) {
     return tasks.map(t => ({
         'Task ID': t.task_id,
         'Task Name': t.task_name,
         'Project': t.project_name ?? '',
         'Status': t.status,
+        'Assignment Role': t.assignment_role === 'Primary' ? 'Owned' : t.assignment_role === 'Secondary' ? 'Supporting' : t.assignment_role,
         'Priority': t.priority ?? '',
         'Health Status': t.health_status ?? '',
         'Start Variance (days)': t.start_variance ?? '',
@@ -180,6 +190,7 @@ function tasksToRows(tasks: ResourceAnalytics['tasks']) {
         'Execution Variance (days)': t.execution_variance ?? '',
         'Estimated Hrs': Number(t.estimate_hrs).toFixed(1),
         'Actual Hrs': Number(t.actual_hrs).toFixed(1),
+        'Estimate Accuracy': t.estimate_accuracy?.label ?? '',
     }));
 }
 
@@ -539,23 +550,28 @@ export default function ResourceDashboardPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table data-testid="tasks-table" className="w-full text-sm" style={{ minWidth: 1100 }}>
+                        <table data-testid="tasks-table" className="w-full text-sm" style={{ minWidth: 1240 }}>
                             <thead>
                                 <tr className="bg-slate-50/60 dark:bg-slate-900/40 text-[10px] uppercase tracking-wider font-bold text-slate-400">
                                     <th className="text-left font-bold py-3 pl-5 pr-3" style={{ minWidth: 280 }}>Task</th>
                                     <th className="text-left font-bold py-3 px-3" style={{ minWidth: 80 }}>Project</th>
+                                    <th className="text-left font-bold py-3 px-3" style={{ minWidth: 110 }}>Role</th>
                                     <th className="text-left font-bold py-3 px-3" style={{ minWidth: 90 }}>Status</th>
                                     <th className="text-left font-bold py-3 px-3" style={{ minWidth: 100 }}>Health</th>
                                     <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Start var.</th>
                                     <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Comp. var.</th>
                                     <th className="text-right font-bold py-3 px-3" style={{ minWidth: 90 }}>Exec. var.</th>
                                     <th className="text-right font-bold py-3 px-3" style={{ minWidth: 75 }}>Est hrs</th>
-                                    <th className="text-right font-bold py-3 pl-3 pr-5" style={{ minWidth: 80 }}>Actual hrs</th>
+                                    <th className="text-right font-bold py-3 px-3" style={{ minWidth: 80 }}>Actual hrs</th>
+                                    <th className="text-left font-bold py-3 pl-3 pr-5" style={{ minWidth: 110 }}>Accuracy</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                                 {tasksPagination.slice(data.tasks).map(task => (
-                                    <tr key={task.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors">
+                                    <tr
+                                        key={task.id}
+                                        className={`${task.assignment_role === 'Secondary' ? 'bg-sky-50/35 dark:bg-sky-950/10' : ''} hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors`}
+                                    >
                                         <td className="py-3.5 pl-5 pr-3">
                                             <div className="flex items-center gap-3">
                                                 <span className="font-mono text-[11px] font-semibold text-violet-600 dark:text-violet-300 flex-shrink-0">
@@ -571,6 +587,9 @@ export default function ResourceDashboardPage() {
                                             </div>
                                         </td>
                                         <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300 font-medium">{task.project_name || '—'}</td>
+                                        <td className="py-3.5 px-3">
+                                            <AssignmentRoleBadge role={resourceRole(task.assignment_role)} />
+                                        </td>
                                         <td className="py-3.5 px-3">
                                             <Pill tone={STATUS_TONE[task.status] ?? FALLBACK_PILL}>{task.status}</Pill>
                                         </td>
@@ -592,8 +611,11 @@ export default function ResourceDashboardPage() {
                                         <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-600 dark:text-slate-300 tabular-nums">
                                             {Number(task.estimate_hrs).toFixed(1)}
                                         </td>
-                                        <td className="py-3.5 pl-3 pr-5 text-right font-mono text-xs text-slate-700 dark:text-slate-200 font-semibold tabular-nums">
+                                        <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-700 dark:text-slate-200 font-semibold tabular-nums">
                                             {Number(task.actual_hrs).toFixed(1)}
+                                        </td>
+                                        <td className="py-3.5 pl-3 pr-5">
+                                            <EstimateAccuracyBadge accuracy={task.estimate_accuracy} />
                                         </td>
                                     </tr>
                                 ))}

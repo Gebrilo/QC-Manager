@@ -6,10 +6,12 @@ import {
     teamManagerDashboardApi,
     tasksApi,
     type DashboardTask,
+    type TaskAssignment,
     type TeamManagerDashboard,
 } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { AssignmentRoleBadge, EstimateAccuracyBadge, formatHours } from '@/components/dashboards/AssignmentBadges';
 
 function Stat({ label, value }: { label: string; value: string | number }) {
     return (
@@ -25,6 +27,59 @@ function statusVariant(status: string) {
     if (status === 'Blocked') return 'danger';
     if (status === 'In Progress') return 'warning';
     return 'secondary';
+}
+
+function taskAssignments(task: DashboardTask): TaskAssignment[] {
+    if (task.assignments?.length) return task.assignments;
+    const legacy: TaskAssignment[] = [];
+    if (task.resource1_id || task.resource1_name) {
+        legacy.push({
+            resource_id: task.resource1_id || 'primary',
+            resource_name: task.resource1_name || 'Primary',
+            assignment_type: 'PRIMARY',
+            estimate_hrs: task.total_est_hrs,
+            actual_hrs: task.total_actual_hrs,
+        });
+    }
+    if (task.resource2_id || task.resource2_name) {
+        legacy.push({
+            resource_id: task.resource2_id || 'secondary',
+            resource_name: task.resource2_name || 'Secondary',
+            assignment_type: 'SECONDARY',
+            estimate_hrs: 0,
+            actual_hrs: 0,
+        });
+    }
+    return legacy;
+}
+
+function ContributorBreakdown({ task }: { task: DashboardTask }) {
+    const assignments = taskAssignments(task);
+    if (assignments.length === 0) {
+        return <span className="text-sm text-slate-400">Unassigned</span>;
+    }
+
+    return (
+        <div className="min-w-[280px] space-y-1.5">
+            {assignments.map(assignment => (
+                <div
+                    key={`${task.id}-${assignment.assignment_type}-${assignment.resource_id}`}
+                    className="grid grid-cols-[minmax(90px,1fr)_72px_96px] items-center gap-2"
+                >
+                    <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {assignment.resource_name || 'Unassigned'}
+                        </div>
+                        <AssignmentRoleBadge role={assignment.assignment_type} />
+                    </div>
+                    <div className="text-right font-mono text-xs text-slate-600 dark:text-slate-300">
+                        {formatHours(assignment.actual_hrs)} / {formatHours(assignment.estimate_hrs)}
+                    </div>
+                    <EstimateAccuracyBadge accuracy={assignment.estimate_accuracy} />
+                </div>
+            ))}
+        </div>
+    );
 }
 
 function TaskRow({
@@ -49,7 +104,10 @@ function TaskRow({
             <td className="px-3 py-2"><Badge variant={statusVariant(task.status) as any}>{task.status}</Badge></td>
             <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">{task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No date'}</td>
             <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">
-                {[task.resource1_name, task.resource2_name].filter(Boolean).join(', ') || 'Unassigned'}
+                <ContributorBreakdown task={task} />
+            </td>
+            <td className="px-3 py-2 text-right font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {formatHours(task.total_actual_hrs)}
             </td>
             <td className="px-3 py-2">
                 {canTakeOver ? (
@@ -110,10 +168,10 @@ export default function TeamManagerDashboardClient() {
     const groupedTasks = useMemo(() => {
         const groups = new Map<string, { label: string; tasks: DashboardTask[] }>();
         for (const task of data?.team_tasks.items || []) {
-            const assignments = [
-                { id: task.resource1_id || 'unassigned', label: task.resource1_name || 'Unassigned' },
-                task.resource2_id ? { id: task.resource2_id, label: task.resource2_name || 'Secondary' } : null,
-            ].filter(Boolean) as Array<{ id: string; label: string }>;
+            const assignments = taskAssignments(task).map(assignment => ({
+                id: assignment.resource_id || 'unassigned',
+                label: assignment.resource_name || 'Unassigned',
+            }));
             for (const assignment of assignments) {
                 if (!groups.has(assignment.id)) groups.set(assignment.id, { label: assignment.label, tasks: [] });
                 groups.get(assignment.id)?.tasks.push(task);
@@ -213,6 +271,16 @@ export default function TeamManagerDashboardClient() {
                         <div className="bg-slate-50 px-4 py-2 text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950">{group.label}</div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-left">
+                                <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950">
+                                    <tr>
+                                        <th className="px-3 py-2">Task</th>
+                                        <th className="px-3 py-2">Status</th>
+                                        <th className="px-3 py-2">Due</th>
+                                        <th className="px-3 py-2">Contributors</th>
+                                        <th className="px-3 py-2 text-right">Total actual</th>
+                                        <th className="px-3 py-2">Action</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {group.tasks.map(task => (
                                         <TaskRow key={`${group.label}-${task.id}`} task={task} members={data.members} onReassign={reassign} />
