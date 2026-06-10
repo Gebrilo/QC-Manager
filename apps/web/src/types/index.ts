@@ -152,7 +152,17 @@ export interface TaskAssignment {
     planned_working_days?: number | null;
     completion_status?: 'Pending' | 'Completed';
     completed_at?: string | null;
+    estimate_accuracy?: EstimateAccuracy | null;
 }
+
+export type EstimateAccuracy = {
+    ratio: number | null;
+    verdict: 'padded' | 'accurate' | 'blew_past' | null;
+    label: string | null;
+    threshold: number;
+    lower_bound: number;
+    upper_bound: number;
+};
 
 export interface TaskComment {
     id: string;

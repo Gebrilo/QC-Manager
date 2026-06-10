@@ -195,6 +195,33 @@ describe('GET /resources/:id/analytics — enhanced response', () => {
         expect(bug.creation_date).toBeDefined();
     });
 
+    test('completed resource task rows include estimate accuracy (#196)', async () => {
+        setupMocks();
+
+        const mockReq = { params: { id: RESOURCE_ID }, user: { role: 'admin', id: 'admin-uuid' } };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn(),
+        };
+        const mockNext = jest.fn();
+
+        await getAnalyticsRoute()(mockReq, mockRes, mockNext);
+
+        if (mockNext.mock.calls.length > 0) {
+            const err = mockNext.mock.calls[0][0];
+            if (err) throw err;
+        }
+
+        const body = mockRes.json.mock.calls[0][0];
+        const doneTask = body.tasks.find(task => task.status === 'Done');
+        expect(doneTask.estimate_accuracy).toEqual(expect.objectContaining({
+            ratio: 1.25,
+            verdict: 'accurate',
+            label: 'Accurate',
+        }));
+    });
+
     test('reads resource effort and task rows through task_resource_assignment (#200)', async () => {
         const sqlCalls = [];
         mockDbQuery

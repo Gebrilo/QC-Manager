@@ -3,6 +3,7 @@
 const access = require('../../access/AccessEngine');
 const { resolve: resolveRole } = require('../../access/RoleResolver');
 const { withAccess } = require('./pmDashboard');
+const { estimateAccuracy, isClosedWorkStatus } = require('../metrics/estimateAccuracy');
 
 const TASK_FILTER_OPTS = {
     tableAlias: 't',
@@ -41,7 +42,9 @@ const TASK_ASSIGNMENT_ROLLUP_CTE = `
                         'resource_name', res.resource_name,
                         'assignment_type', tra.assignment_type,
                         'estimate_hrs', COALESCE(tra.estimate_hrs, 0),
-                        'actual_hrs', COALESCE(tra.actual_hrs, 0)
+                        'actual_hrs', COALESCE(tra.actual_hrs, 0),
+                        'completion_status', tra.completion_status,
+                        'completed_at', tra.completed_at
                     )
                     ORDER BY (tra.assignment_type = 'PRIMARY') DESC, tra.created_at, tra.id
                 ) FILTER (WHERE tra.id IS NOT NULL),
@@ -63,7 +66,17 @@ function assignmentBreakdown(value) {
         assignment_type: row.assignment_type,
         estimate_hrs: number(row.estimate_hrs),
         actual_hrs: number(row.actual_hrs),
+        completion_status: row.completion_status,
+        completed_at: row.completed_at || null,
     }));
+}
+
+function withAssignmentAccuracy(assignment, taskIsClosed) {
+    if (!taskIsClosed && assignment.completion_status !== 'Completed') return assignment;
+    return {
+        ...assignment,
+        estimate_accuracy: estimateAccuracy(assignment.estimate_hrs, assignment.actual_hrs),
+    };
 }
 
 function hasPermission(resolved, key) {
@@ -118,7 +131,9 @@ async function taskCan(user, resolved, task, req) {
 }
 
 function normalizeTask(row, can) {
-    const assignments = assignmentBreakdown(row.assignments);
+    const taskIsClosed = isClosedWorkStatus(row.status);
+    const assignments = assignmentBreakdown(row.assignments)
+        .map(assignment => withAssignmentAccuracy(assignment, taskIsClosed));
     return {
         id: row.id,
         task_id: row.task_id,
@@ -148,6 +163,9 @@ function normalizeTask(row, can) {
                 : null,
             my_estimate_hrs: number(row.my_estimate_hrs),
             my_actual_hrs: number(row.my_actual_hrs),
+            ...((taskIsClosed || row.my_completion_status === 'Completed') ? {
+                my_estimate_accuracy: estimateAccuracy(row.my_estimate_hrs, row.my_actual_hrs),
+            } : {}),
         } : {}),
         _can: can,
     };
@@ -388,7 +406,8 @@ async function getMemberDashboard(db, user, req) {
                 COALESCE(ar.assignments, '[]'::jsonb) AS assignments,
                 my_a.assignment_type AS my_assignment_type,
                 COALESCE(my_a.estimate_hrs, 0) AS my_estimate_hrs,
-                COALESCE(my_a.actual_hrs, 0) AS my_actual_hrs
+                COALESCE(my_a.actual_hrs, 0) AS my_actual_hrs,
+                my_a.completion_status AS my_completion_status
            FROM tasks t
            LEFT JOIN projects p ON p.id = t.project_id
            LEFT JOIN resources r1 ON r1.id = t.resource1_id

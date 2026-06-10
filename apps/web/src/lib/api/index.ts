@@ -449,7 +449,17 @@ export interface TaskAssignment {
     planned_working_days?: number | null;
     completion_status?: 'Pending' | 'Completed';
     completed_at?: string | null;
+    estimate_accuracy?: EstimateAccuracy | null;
 }
+
+export type EstimateAccuracy = {
+    ratio: number | null;
+    verdict: 'padded' | 'accurate' | 'blew_past' | null;
+    label: string | null;
+    threshold: number;
+    lower_bound: number;
+    upper_bound: number;
+};
 
 export interface UserStory {
     id: string;
@@ -662,6 +672,7 @@ export type DashboardTask = {
     assignment_role?: 'owning' | 'supporting' | null;
     my_estimate_hrs?: number;
     my_actual_hrs?: number;
+    my_estimate_accuracy?: EstimateAccuracy;
     _can?: {
         view?: boolean;
         edit?: boolean;

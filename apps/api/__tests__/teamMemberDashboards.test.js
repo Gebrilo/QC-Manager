@@ -172,9 +172,21 @@ describe('GET /api/dashboards/team-manager', () => {
         expect(task.total_estimated_effort).toBe(18);
         expect(task.total_actual_hrs).toBe(21);
         expect(task.assignments).toEqual([
-            { resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY', estimate_hrs: 10, actual_hrs: 9 },
-            { resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 5 },
-            { resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 7 },
+            {
+                resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY',
+                estimate_hrs: 10, actual_hrs: 9, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 0.9, verdict: 'accurate' }),
+            },
+            {
+                resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY',
+                estimate_hrs: 4, actual_hrs: 5, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 1.25, verdict: 'accurate' }),
+            },
+            {
+                resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY',
+                estimate_hrs: 4, actual_hrs: 7, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 1.75, verdict: 'blew_past' }),
+            },
         ]);
         expect(taskItemsSql).toMatch(/task_resource_assignment tra/);
         expect(taskItemsSql).toMatch(/SUM\(COALESCE\(tra\.estimate_hrs, 0\)\)/);
@@ -269,6 +281,34 @@ describe('GET /api/dashboards/member', () => {
         const res = await request(app).get('/api/dashboards/member');
         expect(res.status).toBe(200);
         expect(res.body.my_tasks[0].assignment_role).toBe('owning');
+    });
+
+    test('completed member assignments include the viewer\'s estimate accuracy verdict (#196)', async () => {
+        const app = buildDashboardApp({ user: { id: 'member-1', role: 'member' } });
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: [
+                { id: 'task-done', task_id: 'TSK-DONE', task_name: 'Completed', status: 'Done',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'SECONDARY', my_estimate_hrs: '8', my_actual_hrs: '11',
+                  my_completion_status: 'Completed' },
+            ] },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '11' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        expect(res.body.my_tasks[0].my_estimate_accuracy).toEqual(expect.objectContaining({
+            ratio: 1.375,
+            verdict: 'blew_past',
+            label: 'Under-estimated (blew past)',
+        }));
     });
 });
 

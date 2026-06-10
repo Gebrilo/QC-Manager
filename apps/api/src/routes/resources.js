@@ -8,6 +8,7 @@ const { requireAuth, requirePermission, requireRole, requireStatusScope } = requ
 const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
 const { SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 const { computeTaskTimeline } = require('../utils/workingDays');
+const { estimateAccuracy, isClosedWorkStatus } = require('../services/metrics/estimateAccuracy');
 
 // ========================================
 // Resource Analytics Dashboard
@@ -97,7 +98,9 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
                    t.actual_start_date,
                    t.completed_date,
                    t.deadline,
-                   t.estimate_days
+                   t.estimate_days,
+                   tra.completion_status,
+                   tra.completed_at AS assignment_completed_at
             FROM task_resource_assignment tra
             JOIN tasks t ON t.id = tra.task_id
             LEFT JOIN projects p ON t.project_id = p.id
@@ -152,7 +155,10 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
             if (timeline.health_status && timelineSummary[timeline.health_status] !== undefined) {
                 timelineSummary[timeline.health_status]++;
             }
-            return { ...task, ...timeline };
+            const accuracy = (isClosedWorkStatus(task.status) || task.completion_status === 'Completed')
+                ? { estimate_accuracy: estimateAccuracy(task.estimate_hrs, task.actual_hrs) }
+                : {};
+            return { ...task, ...timeline, ...accuracy };
         });
 
         res.json({
