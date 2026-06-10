@@ -1614,6 +1614,124 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS tuleap_tracker_id INTEGER
         `);
 
+        // =====================================================
+        // ADR 0009 — Normalize task assignment (one Primary + many Secondaries)
+        //   Phase 1: task_resource_assignment junction (source of truth).
+        //   Phase 2: one-time backfill from the legacy tasks.resource1_id /
+        //            resource2_id two-slot model.
+        //   Phase 3: dual-write cache trigger that keeps the legacy
+        //            tasks.resource1_id/resource2_id/r1_*/r2_* columns — still
+        //            read by v_resources_with_utilization, v_dashboard_metrics,
+        //            v_projects_with_metrics and un-ported raw SQL — consistent
+        //            with the junction once new code starts writing it.
+        // The legacy columns stay authoritative for reads until every reader is
+        // ported, after which the columns + this trigger are dropped in a later
+        // migration. See docs/adr/0009-*.md.
+        // =====================================================
+
+        // --- Phase 1: table + constraints + indexes ---------------------------
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS task_resource_assignment (
+                id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id              UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                resource_id          UUID NOT NULL REFERENCES resources(id) ON DELETE RESTRICT,
+                assignment_type      VARCHAR(10) NOT NULL
+                                     CHECK (assignment_type IN ('PRIMARY','SECONDARY')),
+                initial_estimate     NUMERIC(10,2),
+                final_estimate       NUMERIC(10,2),
+                estimate_hrs         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (estimate_hrs >= 0),
+                actual_hrs           NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (actual_hrs >= 0),
+                planned_working_days NUMERIC(10,2),
+                completion_status    VARCHAR(12) NOT NULL DEFAULT 'Pending'
+                                     CHECK (completion_status IN ('Pending','Completed')),
+                completed_at         TIMESTAMP WITH TIME ZONE,
+                created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                updated_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_tra_task_resource UNIQUE (task_id, resource_id)
+            )
+        `);
+        // exactly one PRIMARY assignment per task
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_tra_one_primary
+            ON task_resource_assignment (task_id) WHERE assignment_type = 'PRIMARY'`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_resource ON task_resource_assignment (resource_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_task ON task_resource_assignment (task_id)`);
+
+        // --- Phase 2: one-time backfill (runs only while the junction is empty) ---
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM task_resource_assignment) THEN
+                    -- Primary from tasks.resource1_id
+                    INSERT INTO task_resource_assignment
+                        (task_id, resource_id, assignment_type, initial_estimate, final_estimate,
+                         estimate_hrs, actual_hrs, completion_status, completed_at)
+                    SELECT t.id, t.resource1_id, 'PRIMARY', t.initial_estimate, t.final_estimate,
+                           COALESCE(t.r1_estimate_hrs, 0), COALESCE(t.r1_actual_hrs, 0),
+                           CASE WHEN t.status = 'Done' THEN 'Completed' ELSE 'Pending' END,
+                           CASE WHEN t.status = 'Done'
+                                THEN COALESCE(t.completed_date::timestamptz, t.completed_at, t.updated_at) END
+                    FROM tasks t
+                    WHERE t.resource1_id IS NOT NULL AND t.deleted_at IS NULL
+                    ON CONFLICT (task_id, resource_id) DO NOTHING;
+
+                    -- Secondary from tasks.resource2_id (drop degenerate "same resource in both slots")
+                    INSERT INTO task_resource_assignment
+                        (task_id, resource_id, assignment_type,
+                         estimate_hrs, actual_hrs, completion_status, completed_at)
+                    SELECT t.id, t.resource2_id, 'SECONDARY',
+                           COALESCE(t.r2_estimate_hrs, 0), COALESCE(t.r2_actual_hrs, 0),
+                           CASE WHEN t.status = 'Done' THEN 'Completed' ELSE 'Pending' END,
+                           CASE WHEN t.status = 'Done'
+                                THEN COALESCE(t.completed_date::timestamptz, t.completed_at, t.updated_at) END
+                    FROM tasks t
+                    WHERE t.resource2_id IS NOT NULL
+                      AND t.resource2_id <> t.resource1_id
+                      AND t.deleted_at IS NULL
+                    ON CONFLICT (task_id, resource_id) DO NOTHING;
+                END IF;
+            END $$;
+        `);
+
+        // --- Phase 3: dual-write cache trigger (junction -> legacy tasks columns) ---
+        await client.query(`
+            CREATE OR REPLACE FUNCTION sync_task_assignment_cache() RETURNS trigger AS $fn$
+            DECLARE
+                v_task_id UUID := COALESCE(NEW.task_id, OLD.task_id);
+            BEGIN
+                UPDATE tasks t SET
+                    resource1_id     = (SELECT resource_id FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
+                    r1_estimate_hrs  = COALESCE((SELECT estimate_hrs FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'), 0),
+                    r1_actual_hrs    = COALESCE((SELECT actual_hrs FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'), 0),
+                    initial_estimate = (SELECT initial_estimate FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
+                    final_estimate   = (SELECT final_estimate FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
+                    resource2_id     = (SELECT resource_id FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
+                                          ORDER BY created_at, id LIMIT 1),
+                    r2_estimate_hrs  = COALESCE((SELECT estimate_hrs FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
+                                          ORDER BY created_at, id LIMIT 1), 0),
+                    r2_actual_hrs    = COALESCE((SELECT actual_hrs FROM task_resource_assignment
+                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
+                                          ORDER BY created_at, id LIMIT 1), 0),
+                    actual_effort    = COALESCE((SELECT SUM(COALESCE(actual_hrs, 0))
+                                          FROM task_resource_assignment WHERE task_id = v_task_id), 0)
+                WHERE t.id = v_task_id;
+                RETURN NULL;
+            END;
+            $fn$ LANGUAGE plpgsql
+        `);
+        await client.query(`DROP TRIGGER IF EXISTS trg_sync_task_assignment_cache ON task_resource_assignment`);
+        await client.query(`
+            CREATE TRIGGER trg_sync_task_assignment_cache
+                AFTER INSERT OR UPDATE OR DELETE ON task_resource_assignment
+                FOR EACH ROW EXECUTE FUNCTION sync_task_assignment_cache()
+        `);
+
         await client.query(`
             ALTER TABLE user_stories
                 ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255),

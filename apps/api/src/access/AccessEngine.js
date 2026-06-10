@@ -221,6 +221,12 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         `${tableAlias}.submitted_by_resource_id`,
     ];
     const userExprs = opts.userExprs || [`${tableAlias}.created_by_user_id`];
+    // ADR 0009 — when set, resolve assignees through a normalized junction
+    // (one row per assignee) instead of the fixed resource columns, so the
+    // 3rd+ Secondary Resource — absent from the two cached slots — still
+    // resolves access. Shape: { table, idExpr? } (idExpr defaults to <alias>.id).
+    const assigneeJunction = opts.assigneeJunction || null;
+    const junctionIdExpr = assigneeJunction ? (assigneeJunction.idExpr || `${tableAlias}.id`) : null;
 
     const { effectivePermissions, scope } = await resolveRole(user, opts.req);
 
@@ -260,7 +266,11 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         if (userExprs.length > 0) {
             branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}::uuid`).join(' OR ')})`);
         }
-        if (assigneeResourceExprs.length > 0) {
+        if (assigneeJunction) {
+            branches.push(
+                `EXISTS (SELECT 1 FROM ${assigneeJunction.table} tra JOIN resources r ON r.id = tra.resource_id WHERE tra.task_id = ${junctionIdExpr} AND r.user_id = ${userBind}::uuid AND r.deleted_at IS NULL)`
+            );
+        } else if (assigneeResourceExprs.length > 0) {
             branches.push(
                 `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind}::uuid AND r.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r.id = ${expr}`).join(' OR ')}))`
             );
@@ -268,11 +278,17 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     }
 
     // teammate of assignee (keyAny short-circuited above; only keyTeam reaches here)
-    if (scope.team_id && assigneeResourceExprs.length > 0 && effectivePermissions.has(keyTeam)) {
+    if (scope.team_id && effectivePermissions.has(keyTeam) && (assigneeJunction || assigneeResourceExprs.length > 0)) {
         const teamBind = bind(scope.team_id);
-        branches.push(
-            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
-        );
+        if (assigneeJunction) {
+            branches.push(
+                `EXISTS (SELECT 1 FROM ${assigneeJunction.table} tra JOIN resources r2 ON r2.id = tra.resource_id JOIN app_user au ON au.id = r2.user_id WHERE tra.task_id = ${junctionIdExpr} AND au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL)`
+            );
+        } else {
+            branches.push(
+                `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
+            );
+        }
     }
 
     // artifact_access ACL

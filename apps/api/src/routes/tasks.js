@@ -15,10 +15,23 @@ const { canEditTask, canTakeOverTask } = require('../services/dashboards/teamMem
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 const { appendListFilter, enforceArtifact, decorateRows } = require('../services/access/enforcement');
 const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
+const {
+    assignmentsFromPayload,
+    validateAssignments,
+    replaceTaskAssignments,
+    getTaskAssignments,
+    sumActualHrs,
+    totalActualHrs,
+    primaryOf,
+    firstSecondaryOf,
+} = require('../services/assignments/taskAssignments');
 
 const TASK_FILTER_OPTS = Object.freeze({
     tableAlias: 'v',
-    assigneeResourceExprs: ['v.resource1_id', 'v.resource2_id'],
+    // ADR 0009 — resolve assignees via the task_resource_assignment junction so
+    // every assignee (primary + all secondaries, incl. the 3rd+) is matched,
+    // not just the two cached resource slots.
+    assigneeJunction: { table: 'task_resource_assignment', idExpr: 'v.id' },
     userExprs: ['v.created_by_user_id'],
 });
 
@@ -127,8 +140,12 @@ function validateStatusTransition(currentStatus, newStatus, data) {
         if (!data.completed_date) {
             return { valid: false, error: 'completed_date is required when marking task as Done' };
         }
-        const totalActualHrs = (data.r1_actual_hrs || 0) + (data.r2_actual_hrs || 0);
-        if (totalActualHrs <= 0) {
+        // ADR 0009 — Done requires effort logged by *someone* (sum across all
+        // assignments). Falls back to the legacy r1+r2 slots when no total given.
+        const totalActual = data.totalActualHrs != null
+            ? data.totalActualHrs
+            : (data.r1_actual_hrs || 0) + (data.r2_actual_hrs || 0);
+        if (totalActual <= 0) {
             return { valid: false, error: 'Task must have actual hours recorded before marking as Done' };
         }
     }
@@ -211,17 +228,23 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.tasks.v
 
         const task = result.rows[0];
 
-        // Tasks have two resource slots; pass whichever maps to req.user so
-        // the engine's single assignee_resource_id check (isAssignee) can
-        // grant via the assignee branch.
-        const resourceCandidates = [task.resource1_id, task.resource2_id].filter(Boolean);
-        let assigneeResourceId = resourceCandidates[0] || null;
-        if (req.user?.id && resourceCandidates.length > 0) {
-            const r = await db.query(
-                'SELECT id FROM resources WHERE user_id = $1 AND deleted_at IS NULL AND id = ANY($2::uuid[]) LIMIT 1',
-                [req.user.id, resourceCandidates]
+        // ADR 0009 — resolve access through the task_resource_assignment
+        // junction so any assignee (primary or the 3rd+ secondary, which the
+        // two cached slots cannot hold) grants via the engine's assignee branch.
+        // When the caller is an assignee, pass *their* resource id; otherwise
+        // fall back to a cached slot as a representative assignee for the
+        // teammate-of-assignee branch.
+        let assigneeResourceId = task.resource1_id || task.resource2_id || null;
+        if (req.user?.id) {
+            const mine = await db.query(
+                `SELECT tra.resource_id
+                   FROM task_resource_assignment tra
+                   JOIN resources r ON r.id = tra.resource_id
+                  WHERE tra.task_id = $1 AND r.user_id = $2 AND r.deleted_at IS NULL
+                  LIMIT 1`,
+                [task.id, req.user.id]
             );
-            if (r.rows.length > 0) assigneeResourceId = r.rows[0].id;
+            if (mine.rows.length > 0) assigneeResourceId = mine.rows[0].resource_id;
         }
 
         const enforcement = await enforceArtifact(req, res, 'task', task, 'view', {
@@ -242,6 +265,14 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         const temp_id = req.body.temp_id;
         const data = createTaskSchema.parse(req.body);
 
+        // ADR 0009 — resolve the desired assignment set (explicit array, or the
+        // legacy resource1/resource2 slots) and enforce the assignment rules
+        // (one primary, no duplicate/self) before any write → 400 on violation.
+        const assignments = assignmentsFromPayload(data) || [];
+        validateAssignments(assignments);
+        const primary = primaryOf(assignments);
+        const firstSecondary = firstSecondaryOf(assignments);
+
         // Team-scope validation for managers
         if (isTeamManagerRole(req.user.role)) {
             const teamId = await getManagerTeamId(req.user.id);
@@ -260,29 +291,17 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
                 }
             }
 
-            // Verify resource1 belongs to manager's team (via user_id → app_user.team_id)
-            if (data.resource1_uuid) {
-                const r1Check = await db.query(
+            // Verify every assigned resource (primary + secondaries) belongs to the team
+            for (const a of assignments) {
+                const inTeam = await db.query(
                     `SELECT r.id FROM resources r
                      JOIN app_user u ON r.user_id = u.id
                      WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
-                    [data.resource1_uuid, teamId]
+                    [a.resource_id, teamId]
                 );
-                if (r1Check.rows.length === 0) {
-                    return res.status(403).json({ error: 'Resource 1 does not belong to your team' });
-                }
-            }
-
-            // Verify resource2 belongs to manager's team
-            if (data.resource2_uuid) {
-                const r2Check = await db.query(
-                    `SELECT r.id FROM resources r
-                     JOIN app_user u ON r.user_id = u.id
-                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
-                    [data.resource2_uuid, teamId]
-                );
-                if (r2Check.rows.length === 0) {
-                    return res.status(403).json({ error: 'Resource 2 does not belong to your team' });
+                if (inTeam.rows.length === 0) {
+                    const label = a.assignment_type === 'PRIMARY' ? 'Primary resource' : 'A secondary resource';
+                    return res.status(403).json({ error: `${label} does not belong to your team` });
                 }
             }
         }
@@ -315,10 +334,10 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
 
         const values = [
             data.task_id, data.project_id, data.task_name, data.status, canSetPriority ? data.priority : 'Medium',
-            data.resource1_uuid, data.resource2_uuid || null,
+            primary ? primary.resource_id : null, firstSecondary ? firstSecondary.resource_id : null,
             data.estimate_days,
-            data.r1_estimate_hrs, data.r1_actual_hrs,
-            data.r2_estimate_hrs, data.r2_actual_hrs,
+            primary ? primary.estimate_hrs : 0, primary ? primary.actual_hrs : 0,
+            firstSecondary ? firstSecondary.estimate_hrs : 0, firstSecondary ? firstSecondary.actual_hrs : 0,
             data.deadline, data.tags, notes, data.completed_date,
             data.expected_start_date || null, data.actual_start_date || null,
             accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
@@ -326,6 +345,12 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
 
         const result = await db.query(query, values);
         const task = result.rows[0];
+
+        // ADR 0009 — write the authoritative assignment rows; the dual-write
+        // trigger keeps the legacy resource1/resource2/rN_* columns in sync.
+        if (assignments.length > 0) {
+            await replaceTaskAssignments({ query: db.query.bind(db), taskId: task.id, assignments });
+        }
 
         await materializeAclGrants({
             artifactType: 'task',
@@ -373,7 +398,8 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         }
 
         const viewResult = await db.query('SELECT * FROM v_tasks_with_metrics WHERE id = $1', [task.id]);
-        res.status(201).json(viewResult.rows[0]);
+        const assignmentRows = await getTaskAssignments(db.query.bind(db), task.id);
+        res.status(201).json({ ...viewResult.rows[0], assignments: assignmentRows });
     } catch (err) {
         next(err);
     }
@@ -389,9 +415,28 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         if (originalRes.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
         const original = originalRes.rows[0];
 
-        const assignmentChanged =
-            (Object.prototype.hasOwnProperty.call(data, 'resource1_uuid') && data.resource1_uuid !== original.resource1_id)
-            || (Object.prototype.hasOwnProperty.call(data, 'resource2_uuid') && data.resource2_uuid !== original.resource2_id);
+        // ADR 0009 — desired assignment set (explicit array, or legacy slots
+        // merged onto the original row). null = request does not touch assignments.
+        const desiredAssignments = assignmentsFromPayload(data, { fallbackTo: original });
+        if (desiredAssignments) validateAssignments(desiredAssignments); // 400 on bad set
+
+        // Detect a genuine assignment change to gate the take-over permission.
+        let assignmentChanged = false;
+        if (desiredAssignments) {
+            const currentAssignments = await getTaskAssignments(db.query.bind(db), id);
+            const curPrimary = (currentAssignments.find(a => a.assignment_type === 'PRIMARY') || {}).resource_id
+                || original.resource1_id || null;
+            const curSecondaries = new Set(
+                currentAssignments.filter(a => a.assignment_type === 'SECONDARY').map(a => a.resource_id)
+            );
+            const newPrimary = (primaryOf(desiredAssignments) || {}).resource_id || null;
+            const newSecondaries = new Set(
+                desiredAssignments.filter(a => a.assignment_type === 'SECONDARY').map(a => a.resource_id)
+            );
+            assignmentChanged = newPrimary !== curPrimary
+                || newSecondaries.size !== curSecondaries.size
+                || [...newSecondaries].some(rid => !curSecondaries.has(rid));
+        }
 
         if (assignmentChanged) {
             const resolved = await resolveRole(req.user, req);
@@ -399,16 +444,12 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
                 return res.status(403).json({ error: 'You do not have permission to take over this task' });
             }
             if (!resolved.effectivePermissions.has('*')) {
-                const resourceErrors = [
-                    Object.prototype.hasOwnProperty.call(data, 'resource1_uuid')
-                        ? await ensureResourceInTeam(data.resource1_uuid, resolved.scope.team_id, 'Resource 1')
-                        : null,
-                    Object.prototype.hasOwnProperty.call(data, 'resource2_uuid')
-                        ? await ensureResourceInTeam(data.resource2_uuid, resolved.scope.team_id, 'Resource 2')
-                        : null,
-                ].filter(Boolean);
-                if (resourceErrors.length > 0) {
-                    return res.status(403).json({ error: resourceErrors[0] });
+                for (const a of desiredAssignments) {
+                    const err = await ensureResourceInTeam(
+                        a.resource_id, resolved.scope.team_id,
+                        a.assignment_type === 'PRIMARY' ? 'Primary resource' : 'Secondary resource'
+                    );
+                    if (err) return res.status(403).json({ error: err });
                 }
             }
         } else {
@@ -442,42 +483,36 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
                 }
             }
 
-            // Validate resource1 reassignment
-            if (data.resource1_uuid && data.resource1_uuid !== original.resource1_id) {
-                const r1Check = await db.query(
-                    `SELECT r.id FROM resources r
-                     JOIN app_user u ON r.user_id = u.id
-                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
-                    [data.resource1_uuid, teamId]
-                );
-                if (r1Check.rows.length === 0) {
-                    return res.status(403).json({ error: 'Resource 1 does not belong to your team' });
-                }
-            }
-
-            // Validate resource2 reassignment
-            if (data.resource2_uuid && data.resource2_uuid !== original.resource2_id) {
-                const r2Check = await db.query(
-                    `SELECT r.id FROM resources r
-                     JOIN app_user u ON r.user_id = u.id
-                     WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
-                    [data.resource2_uuid, teamId]
-                );
-                if (r2Check.rows.length === 0) {
-                    return res.status(403).json({ error: 'Resource 2 does not belong to your team' });
+            // Validate every (re)assigned resource belongs to the manager's team
+            if (desiredAssignments) {
+                for (const a of desiredAssignments) {
+                    const chk = await db.query(
+                        `SELECT r.id FROM resources r
+                         JOIN app_user u ON r.user_id = u.id
+                         WHERE r.id = $1 AND u.team_id = $2 AND r.deleted_at IS NULL`,
+                        [a.resource_id, teamId]
+                    );
+                    if (chk.rows.length === 0) {
+                        const label = a.assignment_type === 'PRIMARY' ? 'Primary resource' : 'A secondary resource';
+                        return res.status(403).json({ error: `${label} does not belong to your team` });
+                    }
                 }
             }
         }
 
         // Status transition check
         if (data.status && data.status !== original.status) {
+            // Done-gate total = sum of actual_hrs across the desired assignment set,
+            // or the current junction sum when the patch does not touch assignments.
+            const totalActual = desiredAssignments
+                ? totalActualHrs(desiredAssignments)
+                : await sumActualHrs(db.query.bind(db), id);
             const validation = validateStatusTransition(
                 original.status,
                 data.status,
                 {
                     completed_date: data.completed_date || original.completed_date,
-                    r1_actual_hrs: data.r1_actual_hrs !== undefined ? data.r1_actual_hrs : original.r1_actual_hrs,
-                    r2_actual_hrs: data.r2_actual_hrs !== undefined ? data.r2_actual_hrs : original.r2_actual_hrs
+                    totalActualHrs: totalActual,
                 }
             );
             if (!validation.valid) {
@@ -527,14 +562,28 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             }
         }
 
-        if (fields.length === 0) return res.json(original);
+        if (fields.length === 0 && !desiredAssignments) {
+            const assignmentRows = await getTaskAssignments(db.query.bind(db), id);
+            return res.json({ ...original, assignments: assignmentRows });
+        }
 
-        fields.push(`updated_at = NOW()`);
-        values.push(id);
+        let updated = original;
+        if (fields.length > 0) {
+            fields.push(`updated_at = NOW()`);
+            values.push(id);
+            const updateQuery = `UPDATE tasks SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+            const result = await db.query(updateQuery, values);
+            updated = result.rows[0];
+        }
 
-        const query = `UPDATE tasks SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
-        const result = await db.query(query, values);
-        const updated = result.rows[0];
+        // ADR 0009 — apply the authoritative assignment set; the dual-write
+        // trigger refreshes the legacy resource1/resource2/rN_* columns, so
+        // re-read the task row for the downstream emit + response.
+        if (desiredAssignments) {
+            await replaceTaskAssignments({ query: db.query.bind(db), taskId: id, assignments: desiredAssignments });
+            const refreshed = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+            updated = refreshed.rows[0];
+        }
 
         await auditLog('tasks', id, 'UPDATE', updated, original);
         triggerWorkflow('task-updated', updated);
@@ -581,7 +630,8 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         }
 
         const viewResult = await db.query('SELECT * FROM v_tasks_with_metrics WHERE id = $1', [id]);
-        res.json(viewResult.rows[0]);
+        const assignmentRows = await getTaskAssignments(db.query.bind(db), id);
+        res.json({ ...viewResult.rows[0], assignments: assignmentRows });
     } catch (err) {
         next(err);
     }

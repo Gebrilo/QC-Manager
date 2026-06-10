@@ -97,6 +97,7 @@ async function appendListFilter(req, artifactType, whereClauses, params, opts = 
         ownerTeamExpr: opts.ownerTeamExpr,
         visibilityExpr: opts.visibilityExpr,
         assigneeResourceExprs: opts.assigneeResourceExprs,
+        assigneeJunction: opts.assigneeJunction,
         userExprs: opts.userExprs,
     });
     whereClauses.push(filter.clause);

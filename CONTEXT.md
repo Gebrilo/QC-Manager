@@ -47,9 +47,27 @@ A classification stamped on every **Bug** at ingestion time:
 **Artifact Link**:
 A reference from one **Artifact** to another (e.g. a **Bug** linked to its source **Test Case**, a **Task** linked to its parent **User Story**). On the QC side, links are stored as the linked Artifact's QC UUID — never as Tuleap integer IDs and never as business keys like `"T-123"`. The translation to Tuleap's native integer artifact ID happens only at the Tuleap boundary (inbound resolves on the way in, outbound resolves on the way out).
 
+### Task assignment
+
+**Assignment**:
+A single row of `task_resource_assignment` linking one **Task** to one **Resource**, carrying that person's own planning and effort numbers (`estimate_hrs`, `actual_hrs`, plus estimate/completion fields). The junction is the source of truth for who is on a task; the legacy `tasks.resource1_id`/`resource2_id`/`rN_*` columns are a synced denormalized cache during rollout. See ADR 0009.
+_Avoid_: "slot" (the two fixed columns are the old model we're leaving behind).
+
+**Primary Resource**:
+The single owner of a **Task** — the `Assignment` with `assignment_type = 'PRIMARY'` (at most one per task, enforced by a partial unique index). Maps to Tuleap's single `assigned_to` field; the task-level planning numbers (`initial_estimate`, `final_estimate`, `estimate_days`) are the primary's.
+_Avoid_: "resource 1", "owner" (reserve "owner" for the access/team-ownership concept).
+
+**Secondary Resource**:
+Any supporting contributor on a **Task** — an `Assignment` with `assignment_type = 'SECONDARY'`. A task may have **any number** of secondaries (the model is no longer capped at one). Secondaries are QC-local only — Tuleap's `assigned_to` is single-select, so secondaries never round-trip to Tuleap.
+_Avoid_: "resource 2".
+
+**Estimate Accuracy**:
+A per-`Assignment` verdict on closed work comparing a person's `actual_hrs` to their `estimate_hrs`: `ratio = actual_hrs / estimate_hrs` → **Over-estimated (padded)** `< 0.75` / **Accurate** `0.75–1.25` / **Under-estimated (blew past)** `> 1.25`. The ±25% band is a single configurable constant. Distinct from **utilization**, which is estimate-vs-capacity over open work.
+
 ## Relationships
 
 - A **Tuleap Project** contains many **Trackers**; each **Tracker** holds many **Artifacts**
+- A **Task** has exactly one **Primary Resource** and zero or more **Secondary Resources**, each represented by one **Assignment**; `actual_effort` on the task is the sum of `actual_hrs` across all its Assignments
 - A **QC Project** is connected to one or more **Tuleap Projects** via one **Tracker Config** per (Tracker, QC Project) pair
 - An **Artifact** is mapped to a QC row in exactly one of `bugs`, `tasks`, `user_stories`, `test_cases` — keyed by `tuleap_artifact_id`
 - A **Unified Payload** carries one **Action** for one **Artifact**; the **Tracker Config** tells the transform engine how to map fields and status values
