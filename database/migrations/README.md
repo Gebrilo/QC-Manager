@@ -98,6 +98,28 @@ Run it:
 node database/run-migrations.js
 ```
 
+### Task Assignment Migration Regression Test
+
+The ADR 0009 task-assignment backfill and dual-write trigger have an opt-in
+real-Postgres regression test. Point it at a disposable or staging database,
+never production:
+
+```bash
+cd apps/api
+DATABASE_URL=postgres://user:pass@host:5432/db npm test -- taskAssignmentMigration.postgres.test.js
+```
+
+For a local Postgres instance that does not use SSL:
+
+```bash
+cd apps/api
+DATABASE_SSL=false DATABASE_URL=postgres://user:pass@localhost:5432/db npm test -- taskAssignmentMigration.postgres.test.js
+```
+
+When `DATABASE_URL` / `SUPABASE_DATABASE_URL` is unset, the test is skipped.
+When it runs, it creates and drops an isolated temporary schema on the target
+database.
+
 ## Rollback
 
 Each migration file includes a commented rollback script at the bottom. To rollback:
