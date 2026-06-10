@@ -2,15 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, type FieldErrors } from 'react-hook-form';
+import { useFieldArray, useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Plus, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import { Project, Resource } from '@/types';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
+import { buildTaskAssignmentsPayload, type TaskAssignmentFormRow } from '@/lib/taskAssignments';
 import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -22,6 +24,12 @@ const optionalNumber = (schema: z.ZodNumber) =>
         return Number(value);
     }, schema.optional());
 
+const secondaryAssignmentSchema = z.object({
+    resource_id: z.string().uuid('Select a resource'),
+    estimate_days: optionalNumber(z.number().min(0)),
+    actual_days: optionalNumber(z.number().min(0)),
+});
+
 const schema = z.object({
     task_id: z.string().regex(/^TSK-[0-9]{3}$/, 'Format: TSK-XXX'),
     project_id: z.string().uuid(),
@@ -32,20 +40,36 @@ const schema = z.object({
     team: z.string().optional().default(''),
     blocked_reason: z.string().optional().default(''),
     resource1_uuid: z.string().uuid(),
-    resource2_uuid: z.string().optional().or(z.literal('')),
     initial_estimate: optionalNumber(z.number()),
     final_estimate: optionalNumber(z.number()),
-    actual_effort: optionalNumber(z.number()),
-    estimate_days: optionalNumber(z.number().positive()),
-    r1_estimate_hrs: optionalNumber(z.number().min(0)),
-    r1_actual_hrs: optionalNumber(z.number().min(0)),
-    r2_estimate_hrs: optionalNumber(z.number().min(0)),
-    r2_actual_hrs: optionalNumber(z.number().min(0)),
+    estimate_days: optionalNumber(z.number().min(0)),
+    primary_actual_days: optionalNumber(z.number().min(0)),
+    secondary_assignments: z.array(secondaryAssignmentSchema).default([]),
     expected_start_date: z.string().optional().or(z.literal('')),
     actual_start_date: z.string().optional().or(z.literal('')),
     deadline: z.string().optional().or(z.literal('')),
     completed_date: z.string().optional().or(z.literal('')),
     parent_user_story_id: z.string().uuid().optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+    const seen = new Set<string>();
+    data.secondary_assignments.forEach((assignment, index) => {
+        if (!assignment.resource_id) return;
+        if (assignment.resource_id === data.resource1_uuid) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Secondary cannot match Primary',
+                path: ['secondary_assignments', index, 'resource_id'],
+            });
+        }
+        if (seen.has(assignment.resource_id)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Resource already added',
+                path: ['secondary_assignments', index, 'resource_id'],
+            });
+        }
+        seen.add(assignment.resource_id);
+    });
 });
 
 type FormData = z.infer<typeof schema>;
@@ -54,18 +78,14 @@ type FormField = keyof FormData;
 const SECTION_FIELDS: { sectionId: string; fields: FormField[] }[] = [
     { sectionId: 'task-general', fields: ['task_name', 'project_id', 'task_id', 'status', 'priority', 'team'] },
     { sectionId: 'task-description', fields: ['description', 'blocked_reason'] },
-    { sectionId: 'task-assignment', fields: ['resource1_uuid', 'resource2_uuid'] },
+    { sectionId: 'task-assignment', fields: ['resource1_uuid', 'secondary_assignments'] },
     {
         sectionId: 'task-planning',
         fields: [
             'estimate_days',
-            'actual_effort',
             'initial_estimate',
             'final_estimate',
-            'r1_estimate_hrs',
-            'r1_actual_hrs',
-            'r2_estimate_hrs',
-            'r2_actual_hrs',
+            'primary_actual_days',
         ],
     },
     { sectionId: 'task-dates', fields: ['expected_start_date', 'actual_start_date', 'deadline', 'completed_date'] },
@@ -82,15 +102,11 @@ const FIELD_LABELS: Partial<Record<FormField, string>> = {
     team: 'Team',
     blocked_reason: 'Blocked Reason',
     resource1_uuid: 'Primary Resource',
-    resource2_uuid: 'Secondary Resource',
+    secondary_assignments: 'Secondary Resources',
     initial_estimate: 'Initial Estimate',
     final_estimate: 'Final Estimate',
-    actual_effort: 'Actual Effort',
     estimate_days: 'Estimate Days',
-    r1_estimate_hrs: 'R1 Estimate Hours',
-    r1_actual_hrs: 'R1 Actual Hours',
-    r2_estimate_hrs: 'R2 Estimate Hours',
-    r2_actual_hrs: 'R2 Actual Hours',
+    primary_actual_days: 'Primary Actual Days',
     expected_start_date: 'Expected Start Date',
     actual_start_date: 'Actual Start Date',
     deadline: 'Deadline',
@@ -371,7 +387,7 @@ function CreateForm({
     const [activeSection, setActiveSection] = useState('task-general');
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, control, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         mode: 'onChange',
         defaultValues: {
@@ -384,21 +400,21 @@ function CreateForm({
             team: '',
             blocked_reason: '',
             resource1_uuid: resources.filter(r => r.is_active !== false)[0]?.id || '',
-            resource2_uuid: '',
             initial_estimate: undefined,
             final_estimate: undefined,
-            actual_effort: undefined,
             estimate_days: undefined,
-            r1_estimate_hrs: undefined,
-            r1_actual_hrs: 0,
-            r2_estimate_hrs: 0,
-            r2_actual_hrs: 0,
+            primary_actual_days: 0,
+            secondary_assignments: [],
             expected_start_date: '',
             actual_start_date: '',
             deadline: '',
             completed_date: '',
             parent_user_story_id: '',
         },
+    });
+    const { fields: secondaryFields, append: appendSecondary, remove: removeSecondary } = useFieldArray({
+        control,
+        name: 'secondary_assignments',
     });
 
     useEffect(() => {
@@ -419,10 +435,10 @@ function CreateForm({
 
     const statusValue = watch('status');
     const priorityValue = watch('priority');
-    const resource2Value = watch('resource2_uuid');
     const taskNameValue = watch('task_name');
     const projectIdValue = watch('project_id');
     const resource1Value = watch('resource1_uuid');
+    const secondaryValues = watch('secondary_assignments') || [];
     const missingRequiredFields = [
         !taskNameValue?.trim() ? 'Task Name' : null,
         !projectIdValue ? 'Project' : null,
@@ -434,22 +450,38 @@ function CreateForm({
         setIsSubmitting(true);
         setError(null);
         try {
+            const { assignments, legacy } = buildTaskAssignmentsPayload({
+                primaryResourceId: data.resource1_uuid,
+                primaryEstimateDays: data.estimate_days,
+                primaryActualDays: data.primary_actual_days,
+                primaryInitialEstimate: data.initial_estimate,
+                primaryFinalEstimate: data.final_estimate,
+                secondaryAssignments: data.secondary_assignments as TaskAssignmentFormRow[],
+            });
             const payload = {
-                ...data,
-                resource1_uuid: data.resource1_uuid || undefined,
-                resource2_uuid: data.resource2_uuid || undefined,
+                task_id: data.task_id,
+                project_id: data.project_id,
+                task_name: data.task_name,
+                status: data.status,
+                priority: data.priority,
+                description: data.description,
+                team: data.team,
+                blocked_reason: data.blocked_reason,
+                resource1_uuid: legacy.resource1_uuid,
+                resource2_uuid: legacy.resource2_uuid,
                 expected_start_date: data.expected_start_date || undefined,
                 actual_start_date: data.actual_start_date || undefined,
                 deadline: data.deadline || undefined,
                 completed_date: data.completed_date || undefined,
-                estimate_days: data.estimate_days ? Number(data.estimate_days) : undefined,
-                r1_estimate_hrs: data.r1_estimate_hrs ? Number(data.r1_estimate_hrs) : (data.estimate_days ? Number(data.estimate_days) * 8 : 0),
-                r1_actual_hrs: data.r1_actual_hrs ? Number(data.r1_actual_hrs) : 0,
-                r2_estimate_hrs: data.resource2_uuid && data.r2_estimate_hrs ? Number(data.r2_estimate_hrs) : 0,
-                r2_actual_hrs: data.resource2_uuid && data.r2_actual_hrs ? Number(data.r2_actual_hrs) : 0,
+                estimate_days: legacy.estimate_days,
+                r1_estimate_hrs: legacy.r1_estimate_hrs,
+                r1_actual_hrs: legacy.r1_actual_hrs,
+                r2_estimate_hrs: legacy.r2_estimate_hrs,
+                r2_actual_hrs: legacy.r2_actual_hrs,
                 initial_estimate: data.initial_estimate ?? undefined,
                 final_estimate: data.final_estimate ?? undefined,
-                actual_effort: data.actual_effort ?? undefined,
+                actual_effort: legacy.actual_effort,
+                assignments,
                 parent_user_story_id: data.parent_user_story_id || undefined,
             };
             const result = await fetchApi<any>('/tasks', {
@@ -484,13 +516,25 @@ function CreateForm({
         value: r.id,
         label: `${r.resource_name || r.name || 'Unnamed'}${r.utilization_pct != null ? ` · ${Number(r.utilization_pct).toFixed(0)}% util` : ''}`,
     }));
-    const resource2Options = [
-        { value: '', label: '— None —' },
-        ...activeResources.map(r => ({
-            value: r.id,
-            label: `${r.resource_name || r.name || 'Unnamed'}${r.utilization_pct != null ? ` · ${Number(r.utilization_pct).toFixed(0)}% util` : ''}`,
-        })),
-    ];
+    const resourceLabel = (resourceId: string) => {
+        const resource = activeResources.find(r => r.id === resourceId);
+        return resource?.resource_name || resource?.name || 'Selected resource';
+    };
+    const secondaryOptionsFor = (currentValue?: string) => {
+        const selected = new Set(
+            secondaryValues
+                .map(row => row?.resource_id)
+                .filter((resourceId): resourceId is string => Boolean(resourceId))
+        );
+        if (currentValue) selected.delete(currentValue);
+
+        return activeResources
+            .filter(r => r.id !== resource1Value && !selected.has(r.id))
+            .map(r => ({
+                value: r.id,
+                label: `${r.resource_name || r.name || 'Unnamed'}${r.utilization_pct != null ? ` · ${Number(r.utilization_pct).toFixed(0)}% util` : ''}`,
+            }));
+    };
 
     const SaveButton = ({ size }: { size?: 'sm' }) => (
         <button
@@ -704,13 +748,79 @@ function CreateForm({
                             <FieldError message={errors.resource1_uuid?.message} />
                         </div>
 
-                        <div>
-                            <FieldLabel>Secondary Resource</FieldLabel>
-                            <SelectField {...register('resource2_uuid')}>
-                                {resource2Options.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </SelectField>
+                        <div className="col-span-2 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <FieldLabel>Secondary Resources</FieldLabel>
+                                <button
+                                    type="button"
+                                    onClick={() => appendSecondary({ resource_id: '', estimate_days: undefined, actual_days: 0 })}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Add Secondary
+                                </button>
+                            </div>
+                            {secondaryFields.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                                    No secondary resources
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {secondaryFields.map((field, index) => {
+                                        const currentValue = secondaryValues[index]?.resource_id || '';
+                                        const currentIsPrimary = currentValue !== '' && currentValue === resource1Value;
+                                        return (
+                                            <div key={field.id} className="grid grid-cols-12 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 p-3">
+                                                <div className="col-span-12 md:col-span-6">
+                                                    <FieldLabel>Resource</FieldLabel>
+                                                    <SelectField {...register(`secondary_assignments.${index}.resource_id`)}>
+                                                        <option value="">— Select resource —</option>
+                                                        {currentIsPrimary && (
+                                                            <option value={currentValue}>{resourceLabel(currentValue)} — already Primary</option>
+                                                        )}
+                                                        {secondaryOptionsFor(currentValue).map(opt => (
+                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        ))}
+                                                    </SelectField>
+                                                    <FieldError message={errors.secondary_assignments?.[index]?.resource_id?.message} />
+                                                </div>
+                                                <div className="col-span-6 md:col-span-2">
+                                                    <FieldLabel>Est. Days</FieldLabel>
+                                                    <input
+                                                        type="number"
+                                                        step="0.25"
+                                                        min="0"
+                                                        {...register(`secondary_assignments.${index}.estimate_days`)}
+                                                        className={fieldCls}
+                                                    />
+                                                    <FieldError message={errors.secondary_assignments?.[index]?.estimate_days?.message} />
+                                                </div>
+                                                <div className="col-span-6 md:col-span-2">
+                                                    <FieldLabel>Actual Days</FieldLabel>
+                                                    <input
+                                                        type="number"
+                                                        step="0.25"
+                                                        min="0"
+                                                        {...register(`secondary_assignments.${index}.actual_days`)}
+                                                        className={fieldCls}
+                                                    />
+                                                    <FieldError message={errors.secondary_assignments?.[index]?.actual_days?.message} />
+                                                </div>
+                                                <div className="col-span-12 md:col-span-2 flex items-end justify-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSecondary(index)}
+                                                        aria-label="Remove secondary resource"
+                                                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-rose-900/20"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </SectionCard>
 
@@ -723,49 +833,25 @@ function CreateForm({
                         description="Estimates and actual effort tracking."
                     >
                         <div>
-                            <FieldLabel>Estimate (Days)</FieldLabel>
-                            <input type="number" step="0.5" {...register('estimate_days')} className={fieldCls} />
+                            <FieldLabel>Primary Est. Days</FieldLabel>
+                            <input type="number" step="0.25" min="0" {...register('estimate_days')} className={fieldCls} />
                             <FieldError message={errors.estimate_days?.message} />
                         </div>
                         <div>
-                            <FieldLabel>Actual Effort (hrs)</FieldLabel>
-                            <input type="number" step="0.5" {...register('actual_effort')} placeholder="0" className={fieldCls} />
-                            <FieldError message={errors.actual_effort?.message} />
+                            <FieldLabel>Primary Actual Days</FieldLabel>
+                            <input type="number" step="0.25" min="0" {...register('primary_actual_days')} placeholder="0" className={fieldCls} />
+                            <FieldError message={errors.primary_actual_days?.message} />
                         </div>
                         <div>
-                            <FieldLabel>Initial Est. (hrs)</FieldLabel>
+                            <FieldLabel>Primary Initial Estimate</FieldLabel>
                             <input type="number" step="0.5" {...register('initial_estimate')} placeholder="0" className={fieldCls} />
                             <FieldError message={errors.initial_estimate?.message} />
                         </div>
                         <div>
-                            <FieldLabel>Final Est. (hrs)</FieldLabel>
+                            <FieldLabel>Primary Final Estimate</FieldLabel>
                             <input type="number" step="0.5" {...register('final_estimate')} placeholder="0" className={fieldCls} />
                             <FieldError message={errors.final_estimate?.message} />
                         </div>
-                        <div>
-                            <FieldLabel>R1 Est. (hrs)</FieldLabel>
-                            <input type="number" step="0.5" {...register('r1_estimate_hrs')} placeholder="8 hrs/day" className={fieldCls} />
-                            <FieldError message={errors.r1_estimate_hrs?.message} />
-                        </div>
-                        <div>
-                            <FieldLabel>R1 Actual (hrs)</FieldLabel>
-                            <input type="number" step="0.5" {...register('r1_actual_hrs')} placeholder="0" className={fieldCls} />
-                            <FieldError message={errors.r1_actual_hrs?.message} />
-                        </div>
-                        {resource2Value && (
-                            <>
-                                <div>
-                                    <FieldLabel>R2 Est. (hrs)</FieldLabel>
-                                    <input type="number" step="0.5" {...register('r2_estimate_hrs')} placeholder="0" className={fieldCls} />
-                                    <FieldError message={errors.r2_estimate_hrs?.message} />
-                                </div>
-                                <div>
-                                    <FieldLabel>R2 Actual (hrs)</FieldLabel>
-                                    <input type="number" step="0.5" {...register('r2_actual_hrs')} placeholder="0" className={fieldCls} />
-                                    <FieldError message={errors.r2_actual_hrs?.message} />
-                                </div>
-                            </>
-                        )}
                     </SectionCard>
 
                     {/* Dates */}

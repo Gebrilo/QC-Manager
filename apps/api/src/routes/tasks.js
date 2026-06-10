@@ -245,7 +245,8 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.tasks.v
         });
         if (!enforcement.allowed) return; // enforceArtifact already wrote 403
 
-        res.json(task);
+        const assignmentRows = await getTaskAssignments(db.query.bind(db), task.id);
+        res.json({ ...task, assignments: assignmentRows });
     } catch (err) {
         next(err);
     }

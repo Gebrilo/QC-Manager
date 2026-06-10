@@ -164,7 +164,7 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
     // membership lookup, then AccessEngine.isAssignee. callerResourceId is what
     // the junction returns for this caller (null = not assigned); ownedResources
     // is the set of resource ids the caller's user_id owns.
-    function wireQueries({ callerResourceId, ownedResources }) {
+    function wireQueries({ callerResourceId, ownedResources, assignmentRows = [] }) {
         queryHandler = async (sql, params) => {
             if (/FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) return { rows: [TASK] };
             if (/FROM task_resource_assignment tra[\s\S]*WHERE tra\.task_id = \$1 AND r\.user_id = \$2/.test(sql)) {
@@ -172,6 +172,9 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
             }
             if (/SELECT 1 FROM resources WHERE id = \$1 AND user_id = \$2/.test(sql)) {
                 return { rows: ownedResources.includes(params[0]) ? [{ ok: 1 }] : [] };
+            }
+            if (/SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/.test(sql)) {
+                return { rows: assignmentRows };
             }
             return { rows: [] };
         };
@@ -190,6 +193,22 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
         wireQueries({ callerResourceId: 'res-primary', ownedResources: ['res-primary'] });
         const res = await request(makeApp()).get('/tasks/task-1');
         expect(res.status).toBe(200);
+    });
+
+    test('response includes all assignment rows for edit round-trip', async () => {
+        const assignmentRows = [
+            { resource_id: 'res-primary', resource_name: 'Primary', assignment_type: 'PRIMARY', estimate_hrs: 16, actual_hrs: 8 },
+            { resource_id: 'res-sec1', resource_name: 'Secondary 1', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 2 },
+            { resource_id: 'res-third', resource_name: 'Secondary 2', assignment_type: 'SECONDARY', estimate_hrs: 12, actual_hrs: 10 },
+        ];
+        setRole('tester_own_only');
+        wireQueries({ callerResourceId: 'res-third', ownedResources: ['res-third'], assignmentRows });
+
+        const res = await request(makeApp()).get('/tasks/task-1');
+
+        expect(res.status).toBe(200);
+        expect(res.body.assignments).toEqual(assignmentRows);
+        expect(queries.some(q => /SELECT tra\.\*, res\.resource_name/.test(q.sql))).toBe(true);
     });
 
     test('a non-assignee without team/role scope is denied → 403', async () => {

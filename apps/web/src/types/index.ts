@@ -111,6 +111,10 @@ export interface Task {
     r1_actual_hrs?: number;
     r2_estimate_hrs?: number;
     r2_actual_hrs?: number;
+    assignments?: TaskAssignment[];
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    actual_effort?: number | null;
 
     deadline?: string;
     expected_start_date?: string;
@@ -133,6 +137,21 @@ export interface Task {
     total_actual_hrs?: number;
     overall_completion_pct?: number;
     created_at?: string;
+}
+
+export interface TaskAssignment {
+    id?: string;
+    task_id?: string;
+    resource_id: string;
+    resource_name?: string;
+    assignment_type: 'PRIMARY' | 'SECONDARY';
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    estimate_hrs?: number;
+    actual_hrs?: number;
+    planned_working_days?: number | null;
+    completion_status?: 'Pending' | 'Completed';
+    completed_at?: string | null;
 }
 
 export interface TaskComment {

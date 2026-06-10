@@ -196,6 +196,10 @@ export interface Task {
     r1_actual_hrs?: number;
     r2_estimate_hrs?: number;
     r2_actual_hrs?: number;
+    assignments?: TaskAssignment[];
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    actual_effort?: number | null;
     total_est_hrs?: number;
     total_actual_hrs?: number;
     overall_completion_pct?: number;
@@ -430,6 +434,21 @@ export interface Bug {
     sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
     last_sync_attempted_at?: string | null;
     last_sync_error?: string | null;
+}
+
+export interface TaskAssignment {
+    id?: string;
+    task_id?: string;
+    resource_id: string;
+    resource_name?: string;
+    assignment_type: 'PRIMARY' | 'SECONDARY';
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    estimate_hrs?: number;
+    actual_hrs?: number;
+    planned_working_days?: number | null;
+    completion_status?: 'Pending' | 'Completed';
+    completed_at?: string | null;
 }
 
 export interface UserStory {
