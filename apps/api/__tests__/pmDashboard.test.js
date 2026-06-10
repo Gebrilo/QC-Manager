@@ -182,6 +182,16 @@ describe('pmDashboard service', () => {
         ]);
     });
 
+    test('getResourceUtilization sums per-assignment estimate from the junction so 3rd+ secondaries count (#200)', async () => {
+        db.query.mockResolvedValueOnce({ rows: [] });
+        await svc.getResourceUtilization(db, 'proj-1', { clause: 'TRUE', params: [] });
+        const sql = db.query.mock.calls[0][0];
+        // load comes from each resource's own task_resource_assignment rows, not the two slots
+        expect(sql).toMatch(/JOIN task_resource_assignment tra ON tra\.resource_id = r\.id/);
+        expect(sql).toMatch(/SUM\(COALESCE\(tra\.estimate_hrs, 0\)\)/);
+        expect(sql).not.toMatch(/resource1_id|resource2_id/);
+    });
+
     test('getCrossTeamDependencies groups task→test_case links across team boundaries', async () => {
         db.query.mockResolvedValueOnce({
             rows: [
