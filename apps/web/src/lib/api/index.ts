@@ -656,7 +656,12 @@ export type DashboardTask = {
     parent_user_story_id?: string | null;
     deadline?: string | null;
     total_est_hrs: number;
+    total_estimated_effort?: number;
     total_actual_hrs: number;
+    assignments?: TaskAssignment[];
+    assignment_role?: 'owning' | 'supporting' | null;
+    my_estimate_hrs?: number;
+    my_actual_hrs?: number;
     _can?: {
         view?: boolean;
         edit?: boolean;

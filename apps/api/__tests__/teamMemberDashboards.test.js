@@ -127,6 +127,60 @@ describe('GET /api/dashboards/team-manager', () => {
         expect(res.body.team_tasks.items[0].owner_team_id).toBe('team-dev');
         expect(res.body.team_tasks.items.find(task => task.owner_team_id === 'team-qc')).toBeUndefined();
     });
+
+    test('team task items expose all assignment contributors and summed effort from the junction (#200)', async () => {
+        const app = buildDashboardApp({ user: { id: 'tm-qc', role: 'team_manager' } });
+        let taskItemsSql = '';
+        installSqlRouter([
+            ...roleRoutes({ teamId: 'team-qc', teamType: 'qc', permissions }),
+            { match: 'FROM teams t', rows: [{ id: 'team-qc', name: 'QC', team_type: 'qc' }] },
+            { match: /SELECT COUNT\(\*\)::int AS c FROM tasks t/, rows: [{ c: '1' }] },
+            { match: /SELECT t\.status, COUNT\(\*\)::int AS c FROM tasks t/, rows: [{ status: 'Done', c: '1' }] },
+            { match: /assignments AS/, rows: [{ user_id: 'u-owner', resource_id: 'r-owner', name: 'Owner', total: '1' }] },
+            { match: /weekly_capacity_hrs/, rows: [{ user_id: 'u-owner', resource_id: 'r-owner', name: 'Owner', workload_hrs: '10', capacity_hrs: '40', logged_hrs: '9' }] },
+            { match: /AND t\.status = 'Blocked'/, rows: [] },
+            { match: /deadline IS NOT NULL/, rows: [] },
+            { match: /SELECT t\.id, t\.task_id/, rows: (sql) => {
+                taskItemsSql = sql;
+                return [{
+                    id: 'task-3-plus',
+                    task_id: 'TSK-3PLUS',
+                    task_name: 'Three contributor task',
+                    status: 'Done',
+                    project_id: 'p1',
+                    owner_team_id: 'team-qc',
+                    resource1_id: 'r-owner',
+                    resource1_name: 'Owner',
+                    total_est_hrs: '18',
+                    total_estimated_effort: '18',
+                    total_actual_hrs: '21',
+                    assignments: [
+                        { resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY', estimate_hrs: '10', actual_hrs: '9' },
+                        { resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY', estimate_hrs: '4', actual_hrs: '5' },
+                        { resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY', estimate_hrs: '4', actual_hrs: '7' },
+                    ],
+                }];
+            } },
+            { match: /SELECT COUNT\(\*\)::int AS c FROM bugs b/, rows: [{ c: '0' }] },
+            { match: /SELECT b\.status, COUNT\(\*\)::int AS c FROM bugs b/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/team-manager');
+        expect(res.status).toBe(200);
+        const task = res.body.team_tasks.items[0];
+        expect(task.total_est_hrs).toBe(18);
+        expect(task.total_estimated_effort).toBe(18);
+        expect(task.total_actual_hrs).toBe(21);
+        expect(task.assignments).toEqual([
+            { resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY', estimate_hrs: 10, actual_hrs: 9 },
+            { resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 5 },
+            { resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 7 },
+        ]);
+        expect(taskItemsSql).toMatch(/task_resource_assignment tra/);
+        expect(taskItemsSql).toMatch(/SUM\(COALESCE\(tra\.estimate_hrs, 0\)\)/);
+        expect(taskItemsSql).toMatch(/jsonb_agg/);
+        expect(taskItemsSql).not.toMatch(/COALESCE\(t\.r1_estimate_hrs, 0\) \+ COALESCE\(t\.r2_estimate_hrs, 0\)/);
+    });
 });
 
 describe('GET /api/dashboards/member', () => {

@@ -30,6 +30,7 @@ const IDS = Object.freeze({
     softSecondary: '20000000-0000-4000-8000-000000000006',
     parityPrimary: '20000000-0000-4000-8000-000000000007',
     paritySecondary: '20000000-0000-4000-8000-000000000008',
+    thirdSecondary: '20000000-0000-4000-8000-000000000009',
     taskPrimarySecondary: '30000000-0000-4000-8000-000000000001',
     taskPrimaryOnly: '30000000-0000-4000-8000-000000000002',
     taskDegenerate: '30000000-0000-4000-8000-000000000003',
@@ -75,6 +76,7 @@ async function seedLegacyTasks(pool) {
         [IDS.softSecondary, 'Soft Secondary', 40],
         [IDS.parityPrimary, 'Parity Primary', 40],
         [IDS.paritySecondary, 'Parity Secondary', 40],
+        [IDS.thirdSecondary, 'Third Secondary', 40],
     ];
     for (const resource of resources) {
         await pool.query(`
@@ -211,7 +213,7 @@ async function writeParityTaskThroughJunction(pool) {
 }
 
 describe('ADR 0009 task assignment migration (real Postgres)', () => {
-    itIfDatabaseUrl('backfills legacy slots and preserves view parity through the dual-write trigger', async () => {
+    itIfDatabaseUrl('backfills legacy slots and reports assignment-junction totals', async () => {
         const schemaName = `task_assignment_migration_${Date.now()}_${process.pid}`;
         const adminPool = new Pool(poolConfig(databaseUrl));
         const schemaSql = quoteIdent(schemaName);
@@ -229,7 +231,6 @@ describe('ADR 0009 task assignment migration (real Postgres)', () => {
 
             const pool = migratedDb.pool;
             await seedLegacyTasks(pool);
-            const legacyBackfillSnapshot = await readViewSnapshots(pool);
 
             await migratedDb.runMigrations();
 
@@ -275,10 +276,54 @@ describe('ADR 0009 task assignment migration (real Postgres)', () => {
                 expect.objectContaining({ task_id: IDS.taskDegenerate, assignment_type: 'SECONDARY' }),
             ]));
 
-            expect(await readViewSnapshots(pool)).toEqual(legacyBackfillSnapshot);
+            const backfilledSnapshot = await readViewSnapshots(pool);
+            expect(backfilledSnapshot.dashboard).toEqual(expect.objectContaining({
+                total_tasks: 3,
+                tasks_done: 1,
+                tasks_in_progress: 1,
+                tasks_backlog: 1,
+                tasks_cancelled: 0,
+                overall_completion_rate_pct: '21.43',
+                total_estimated_hrs: '28.00',
+                total_actual_hrs: '9.00',
+                total_hours_variance: '-19.00',
+            }));
+
+            await pool.query(`
+                INSERT INTO task_resource_assignment (
+                    task_id, resource_id, assignment_type, estimate_hrs, actual_hrs, created_at, updated_at
+                ) VALUES (
+                    $1, $2, 'SECONDARY', 3, 4, '2026-01-01T00:00:02Z', '2026-01-01T00:00:02Z'
+                )
+            `, [IDS.taskPrimarySecondary, IDS.thirdSecondary]);
+
+            const thirdSecondaryUtilization = await pool.query(`
+                SELECT current_allocation_hrs::numeric::text AS current_allocation_hrs,
+                       utilization_pct::numeric::text AS utilization_pct,
+                       active_tasks_count::int
+                FROM v_resources_with_utilization
+                WHERE id = $1
+            `, [IDS.thirdSecondary]);
+            expect(thirdSecondaryUtilization.rows[0]).toEqual({
+                current_allocation_hrs: '3.00',
+                utilization_pct: '7.50',
+                active_tasks_count: 1,
+            });
+
+            const threeContributorTask = await pool.query(`
+                SELECT total_estimated_hrs::numeric::text AS total_estimated_hrs,
+                       total_actual_hrs::numeric::text AS total_actual_hrs,
+                       hours_variance::numeric::text AS hours_variance
+                FROM v_tasks_with_metrics
+                WHERE id = $1
+            `, [IDS.taskPrimarySecondary]);
+            expect(threeContributorTask.rows[0]).toEqual({
+                total_estimated_hrs: '15.00',
+                total_actual_hrs: '7.00',
+                hours_variance: '-8.00',
+            });
 
             await insertLegacyParityTask(pool);
-            const legacyParitySnapshot = await readViewSnapshots(pool);
             await clearParityTaskForJunctionWrite(pool);
             await writeParityTaskThroughJunction(pool);
 
@@ -307,7 +352,17 @@ describe('ADR 0009 task assignment migration (real Postgres)', () => {
                 final_estimate: '12.00',
                 actual_effort: '7.00',
             });
-            expect(await readViewSnapshots(pool)).toEqual(legacyParitySnapshot);
+
+            const parityViewTotals = await pool.query(`
+                SELECT total_estimated_hrs::numeric::text AS total_estimated_hrs,
+                       total_actual_hrs::numeric::text AS total_actual_hrs
+                FROM v_tasks_with_metrics
+                WHERE id = $1
+            `, [IDS.taskParity]);
+            expect(parityViewTotals.rows[0]).toEqual({
+                total_estimated_hrs: '20.00',
+                total_actual_hrs: '7.00',
+            });
         } finally {
             if (migratedDb?.pool) await migratedDb.pool.end();
             if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;

@@ -28,6 +28,44 @@ function number(value) {
     return Number(value || 0);
 }
 
+const TASK_ASSIGNMENT_ROLLUP_CTE = `
+    assignment_rollup AS (
+        SELECT
+            tra.task_id,
+            COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)), 0)::numeric AS total_estimated_hrs,
+            COALESCE(SUM(COALESCE(tra.actual_hrs, 0)), 0)::numeric AS total_actual_hrs,
+            COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'resource_id', tra.resource_id,
+                        'resource_name', res.resource_name,
+                        'assignment_type', tra.assignment_type,
+                        'estimate_hrs', COALESCE(tra.estimate_hrs, 0),
+                        'actual_hrs', COALESCE(tra.actual_hrs, 0)
+                    )
+                    ORDER BY (tra.assignment_type = 'PRIMARY') DESC, tra.created_at, tra.id
+                ) FILTER (WHERE tra.id IS NOT NULL),
+                '[]'::jsonb
+            ) AS assignments
+          FROM task_resource_assignment tra
+          JOIN resources res ON res.id = tra.resource_id
+         GROUP BY tra.task_id
+    )
+`;
+
+function assignmentBreakdown(value) {
+    if (!value) return [];
+    const rows = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(rows)) return [];
+    return rows.map(row => ({
+        resource_id: row.resource_id,
+        resource_name: row.resource_name,
+        assignment_type: row.assignment_type,
+        estimate_hrs: number(row.estimate_hrs),
+        actual_hrs: number(row.actual_hrs),
+    }));
+}
+
 function hasPermission(resolved, key) {
     return resolved.effectivePermissions.has('*') || resolved.effectivePermissions.has(key);
 }
@@ -56,7 +94,9 @@ function taskArtifact(task, assigneeResourceId) {
 }
 
 async function canEditTask(user, task, req) {
-    const assigneeIds = [task.resource1_id, task.resource2_id].filter(Boolean);
+    const assigneeIds = (Array.isArray(task.assignments) && task.assignments.length > 0)
+        ? task.assignments.map(a => a.resource_id).filter(Boolean)
+        : [task.resource1_id, task.resource2_id].filter(Boolean);
     if (assigneeIds.length === 0) {
         const result = await access.canPerform(user, taskArtifact(task, null), 'edit', req);
         return result.allowed;
@@ -78,6 +118,7 @@ async function taskCan(user, resolved, task, req) {
 }
 
 function normalizeTask(row, can) {
+    const assignments = assignmentBreakdown(row.assignments);
     return {
         id: row.id,
         task_id: row.task_id,
@@ -94,7 +135,9 @@ function normalizeTask(row, can) {
         parent_user_story_id: row.parent_user_story_id,
         deadline: row.deadline,
         total_est_hrs: number(row.total_est_hrs),
+        total_estimated_effort: number(row.total_estimated_effort ?? row.total_est_hrs),
         total_actual_hrs: number(row.total_actual_hrs),
+        assignments,
         // ADR 0009 / #195 — the viewer's own perspective on this task (present
         // only on the personal dashboard, which joins the viewer's assignment):
         // owning when they're the PRIMARY, supporting when SECONDARY, plus their
@@ -115,17 +158,21 @@ async function getTaskRows(db, user, resolved, req, taskFilter, extraWhere = '',
     const baseWhere = withAccess('t.deleted_at IS NULL', taskFilter);
     const limitPlaceholder = `$${startIdx}`;
     const sql = `
+        WITH ${TASK_ASSIGNMENT_ROLLUP_CTE}
         SELECT t.id, t.task_id, t.task_name, t.status, t.priority, t.project_id,
                p.project_name, t.owner_team_id, t.visibility_scope, t.created_by_user_id,
                t.resource1_id, r1.resource_name AS resource1_name,
                t.resource2_id, r2.resource_name AS resource2_name,
                t.parent_user_story_id, t.deadline,
-               (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_est_hrs,
-               (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs
+               COALESCE(ar.total_estimated_hrs, 0) AS total_est_hrs,
+               COALESCE(ar.total_estimated_hrs, 0) AS total_estimated_effort,
+               COALESCE(ar.total_actual_hrs, 0) AS total_actual_hrs,
+               COALESCE(ar.assignments, '[]'::jsonb) AS assignments
           FROM tasks t
           LEFT JOIN projects p ON p.id = t.project_id
           LEFT JOIN resources r1 ON r1.id = t.resource1_id
           LEFT JOIN resources r2 ON r2.id = t.resource2_id
+          LEFT JOIN assignment_rollup ar ON ar.task_id = t.id
          WHERE ${baseWhere}
            ${extraWhere}
          ORDER BY
@@ -329,13 +376,16 @@ async function getMemberDashboard(db, user, req) {
     const myTaskWhere = `${taskAssignmentWhere} AND ${withAccess('t.deleted_at IS NULL', taskFilter)}`;
 
     const myTasksResult = await db.query(
-        `SELECT t.id, t.task_id, t.task_name, t.status, t.priority, t.project_id,
+        `WITH ${TASK_ASSIGNMENT_ROLLUP_CTE}
+         SELECT t.id, t.task_id, t.task_name, t.status, t.priority, t.project_id,
                 p.project_name, t.owner_team_id, t.visibility_scope, t.created_by_user_id,
                 t.resource1_id, r1.resource_name AS resource1_name,
                 t.resource2_id, r2.resource_name AS resource2_name,
                 t.parent_user_story_id, t.deadline,
-                (COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_est_hrs,
-                (COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
+                COALESCE(ar.total_estimated_hrs, 0) AS total_est_hrs,
+                COALESCE(ar.total_estimated_hrs, 0) AS total_estimated_effort,
+                COALESCE(ar.total_actual_hrs, 0) AS total_actual_hrs,
+                COALESCE(ar.assignments, '[]'::jsonb) AS assignments,
                 my_a.assignment_type AS my_assignment_type,
                 COALESCE(my_a.estimate_hrs, 0) AS my_estimate_hrs,
                 COALESCE(my_a.actual_hrs, 0) AS my_actual_hrs
@@ -345,6 +395,7 @@ async function getMemberDashboard(db, user, req) {
            LEFT JOIN resources r2 ON r2.id = t.resource2_id
            LEFT JOIN resources mine ON mine.user_id = $1 AND mine.deleted_at IS NULL
            LEFT JOIN task_resource_assignment my_a ON my_a.task_id = t.id AND my_a.resource_id = mine.id
+           LEFT JOIN assignment_rollup ar ON ar.task_id = t.id
           WHERE ${myTaskWhere}
           ORDER BY t.deadline NULLS LAST, t.updated_at DESC
           LIMIT 50`,

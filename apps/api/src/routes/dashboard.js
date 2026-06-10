@@ -28,6 +28,14 @@ const EMPTY_METRICS = {
  */
 async function getTeamMetrics(teamId) {
     const result = await db.query(`
+        WITH task_assignment_totals AS (
+            SELECT
+                task_id,
+                COALESCE(SUM(COALESCE(estimate_hrs, 0)), 0) AS total_estimated_hrs,
+                COALESCE(SUM(COALESCE(actual_hrs, 0)), 0) AS total_actual_hrs
+            FROM task_resource_assignment
+            GROUP BY task_id
+        )
         SELECT
             COUNT(DISTINCT t.id) AS total_tasks,
             SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done,
@@ -35,14 +43,14 @@ async function getTeamMetrics(teamId) {
             SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog,
             SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END) AS tasks_cancelled,
             CASE
-                WHEN SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
-                    ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END) /
-                           NULLIF(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) * 100)::NUMERIC, 2)
+                WHEN SUM(COALESCE(tat.total_estimated_hrs, 0)) > 0 THEN
+                    ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END) /
+                           NULLIF(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) * 100)::NUMERIC, 2)
                 ELSE 0
             END AS overall_completion_rate_pct,
-            SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_estimated_hrs,
-            SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
-            SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) - SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_hours_variance,
+            COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_estimated_hrs,
+            COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) AS total_actual_hrs,
+            COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) - COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_hours_variance,
             COUNT(DISTINCT p.id) AS total_projects,
             COUNT(DISTINCT CASE WHEN t.id IS NOT NULL THEN p.id END) AS projects_with_tasks,
             (
@@ -54,6 +62,7 @@ async function getTeamMetrics(teamId) {
             CURRENT_TIMESTAMP AS calculated_at
         FROM projects p
         LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
+        LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
         WHERE p.deleted_at IS NULL AND p.team_id = $1
     `, [teamId]);
 

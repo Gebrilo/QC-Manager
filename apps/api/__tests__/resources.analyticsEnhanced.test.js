@@ -194,4 +194,48 @@ describe('GET /resources/:id/analytics — enhanced response', () => {
         expect(bug.project_name).toBe('Project A');
         expect(bug.creation_date).toBeDefined();
     });
+
+    test('reads resource effort and task rows through task_resource_assignment (#200)', async () => {
+        const sqlCalls = [];
+        mockDbQuery
+            .mockImplementationOnce((sql) => { sqlCalls.push(sql); return Promise.resolve({ rows: [PROFILE_ROW] }); })
+            .mockImplementationOnce((sql) => { sqlCalls.push(sql); return Promise.resolve({ rows: [{ current_week_actual_hrs: '7.0' }] }); })
+            .mockImplementationOnce((sql) => { sqlCalls.push(sql); return Promise.resolve({ rows: [{ backlog_hrs: '13.0' }] }); })
+            .mockImplementationOnce((sql) => { sqlCalls.push(sql); return Promise.resolve({ rows: [
+                {
+                    id: 'task-third-secondary', task_id: 'TSK-003', task_name: 'Third secondary task',
+                    status: 'In Progress', priority: 'high', project_name: 'Project A',
+                    estimate_hrs: 5, actual_hrs: 7, assignment_role: 'Secondary',
+                    expected_start_date: null, actual_start_date: null,
+                    completed_date: null, deadline: null, estimate_days: null,
+                },
+            ] }); })
+            .mockImplementationOnce((sql) => { sqlCalls.push(sql); return Promise.resolve({ rows: [] }); });
+
+        const mockReq = { params: { id: RESOURCE_ID }, user: { role: 'admin', id: 'admin-uuid' } };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn(),
+        };
+        const mockNext = jest.fn();
+
+        await getAnalyticsRoute()(mockReq, mockRes, mockNext);
+
+        if (mockNext.mock.calls.length > 0) {
+            const err = mockNext.mock.calls[0][0];
+            if (err) throw err;
+        }
+
+        expect(sqlCalls[1]).toMatch(/FROM task_resource_assignment tra\s+JOIN tasks t ON t\.id = tra\.task_id/);
+        expect(sqlCalls[2]).toMatch(/FROM task_resource_assignment tra\s+JOIN tasks t ON t\.id = tra\.task_id/);
+        expect(sqlCalls[3]).toMatch(/FROM task_resource_assignment tra\s+JOIN tasks t ON t\.id = tra\.task_id/);
+        expect(sqlCalls.slice(1, 4).join('\n')).not.toMatch(/resource1_id|resource2_id|r1_estimate_hrs|r2_estimate_hrs/);
+
+        const body = mockRes.json.mock.calls[0][0];
+        expect(body.current_week_actual_hrs).toBe(7);
+        expect(body.backlog_hrs).toBe(13);
+        expect(body.tasks[0].id).toBe('task-third-secondary');
+        expect(body.tasks[0].assignment_role).toBe('Secondary');
+    });
 });
