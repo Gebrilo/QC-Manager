@@ -9,7 +9,7 @@
       "source_file": "tests/api/tuleapReconcileDeletes.test.js",
       "source_location": "L1",
       "id": "tuleapreconciledeletes_test",
-      "community": 97
+      "community": 98
     },
     {
       "label": "makePool()",
@@ -17,7 +17,7 @@
       "source_file": "tests/api/tuleapReconcileDeletes.test.js",
       "source_location": "L3",
       "id": "tuleapreconciledeletes_test_makepool",
-      "community": 97
+      "community": 98
     },
     {
       "label": "playwright.config.ts",
@@ -25,7 +25,7 @@
       "source_file": "QC-Manager/apps/web/playwright.config.ts",
       "source_location": "L1",
       "id": "playwright_config",
-      "community": 128
+      "community": 129
     },
     {
       "label": "ProjectPage.ts",
@@ -33,7 +33,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/ProjectPage.ts",
       "source_location": "L1",
       "id": "projectpage",
-      "community": 55
+      "community": 56
     },
     {
       "label": "ProjectPage",
@@ -41,7 +41,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/ProjectPage.ts",
       "source_location": "L3",
       "id": "projectpage_projectpage",
-      "community": 55
+      "community": 56
     },
     {
       "label": ".constructor()",
@@ -49,7 +49,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/ProjectPage.ts",
       "source_location": "L7",
       "id": "projectpage_projectpage_constructor",
-      "community": 55
+      "community": 56
     },
     {
       "label": ".goto()",
@@ -57,7 +57,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/ProjectPage.ts",
       "source_location": "L12",
       "id": "projectpage_projectpage_goto",
-      "community": 55
+      "community": 56
     },
     {
       "label": "LoginPage.ts",
@@ -65,7 +65,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/LoginPage.ts",
       "source_location": "L1",
       "id": "loginpage",
-      "community": 56
+      "community": 57
     },
     {
       "label": "LoginPage",
@@ -73,7 +73,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/LoginPage.ts",
       "source_location": "L3",
       "id": "loginpage_loginpage",
-      "community": 56
+      "community": 57
     },
     {
       "label": ".constructor()",
@@ -81,7 +81,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/LoginPage.ts",
       "source_location": "L7",
       "id": "loginpage_loginpage_constructor",
-      "community": 56
+      "community": 57
     },
     {
       "label": ".goto()",
@@ -89,7 +89,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/LoginPage.ts",
       "source_location": "L12",
       "id": "loginpage_loginpage_goto",
-      "community": 56
+      "community": 57
     },
     {
       "label": "TaskBoard.ts",
@@ -97,7 +97,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/TaskBoard.ts",
       "source_location": "L1",
       "id": "taskboard",
-      "community": 57
+      "community": 58
     },
     {
       "label": "TaskBoard",
@@ -105,7 +105,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/TaskBoard.ts",
       "source_location": "L3",
       "id": "taskboard_taskboard",
-      "community": 57
+      "community": 58
     },
     {
       "label": ".constructor()",
@@ -113,7 +113,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/TaskBoard.ts",
       "source_location": "L7",
       "id": "taskboard_taskboard_constructor",
-      "community": 57
+      "community": 58
     },
     {
       "label": ".goto()",
@@ -121,7 +121,7 @@
       "source_file": "QC-Manager/tests/e2e/pages/TaskBoard.ts",
       "source_location": "L12",
       "id": "taskboard_taskboard_goto",
-      "community": 57
+      "community": 58
     },
     {
       "label": "api.fixture.ts",
@@ -129,7 +129,7 @@
       "source_file": "QC-Manager/tests/e2e/fixtures/api.fixture.ts",
       "source_location": "L1",
       "id": "api_fixture",
-      "community": 129
+      "community": 130
     },
     {
       "label": "auth-login.spec.ts",
@@ -137,7 +137,7 @@
       "source_file": "QC-Manager/tests/e2e/specs/auth-login.spec.ts",
       "source_location": "L1",
       "id": "auth_login_spec",
-      "community": 130
+      "community": 131
     },
     {
       "label": "crud-tasks.spec.ts",
@@ -145,7 +145,7 @@
       "source_file": "QC-Manager/tests/e2e/specs/crud-tasks.spec.ts",
       "source_location": "L1",
       "id": "crud_tasks_spec",
-      "community": 131
+      "community": 132
     },
     {
       "label": "crud-projects.spec.ts",
@@ -153,7 +153,7 @@
       "source_file": "QC-Manager/tests/e2e/specs/crud-projects.spec.ts",
       "source_location": "L1",
       "id": "crud_projects_spec",
-      "community": 132
+      "community": 133
     },
     {
       "label": "run-tests.js",
@@ -161,7 +161,7 @@
       "source_file": "QC-Manager/scripts/run-tests.js",
       "source_location": "L1",
       "id": "run_tests",
-      "community": 58
+      "community": 59
     },
     {
       "label": "parseArgs()",
@@ -169,7 +169,7 @@
       "source_file": "QC-Manager/scripts/run-tests.js",
       "source_location": "L17",
       "id": "run_tests_parseargs",
-      "community": 58
+      "community": 59
     },
     {
       "label": "buildCommand()",
@@ -177,7 +177,7 @@
       "source_file": "QC-Manager/scripts/run-tests.js",
       "source_location": "L46",
       "id": "run_tests_buildcommand",
-      "community": 58
+      "community": 59
     },
     {
       "label": "main()",
@@ -185,7 +185,7 @@
       "source_file": "QC-Manager/scripts/run-tests.js",
       "source_location": "L69",
       "id": "run_tests_main",
-      "community": 58
+      "community": 59
     },
     {
       "label": "validate-setup.js",
@@ -193,7 +193,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L1",
       "id": "validate_setup",
-      "community": 36
+      "community": 37
     },
     {
       "label": "checkDirectory()",
@@ -201,7 +201,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L24",
       "id": "validate_setup_checkdirectory",
-      "community": 36
+      "community": 37
     },
     {
       "label": "checkFile()",
@@ -209,7 +209,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L34",
       "id": "validate_setup_checkfile",
-      "community": 36
+      "community": 37
     },
     {
       "label": "checkDependency()",
@@ -217,7 +217,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L44",
       "id": "validate_setup_checkdependency",
-      "community": 36
+      "community": 37
     },
     {
       "label": "checkDevServer()",
@@ -225,7 +225,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L55",
       "id": "validate_setup_checkdevserver",
-      "community": 36
+      "community": 37
     },
     {
       "label": "main()",
@@ -233,7 +233,7 @@
       "source_file": "QC-Manager/scripts/validate-setup.js",
       "source_location": "L75",
       "id": "validate_setup_main",
-      "community": 36
+      "community": 37
     },
     {
       "label": "init-e2e-structure.js",
@@ -241,7 +241,7 @@
       "source_file": "QC-Manager/scripts/init-e2e-structure.js",
       "source_location": "L1",
       "id": "init_e2e_structure",
-      "community": 59
+      "community": 60
     },
     {
       "label": "createDirectory()",
@@ -249,7 +249,7 @@
       "source_file": "QC-Manager/scripts/init-e2e-structure.js",
       "source_location": "L88",
       "id": "init_e2e_structure_createdirectory",
-      "community": 59
+      "community": 60
     },
     {
       "label": "createFile()",
@@ -257,7 +257,7 @@
       "source_file": "QC-Manager/scripts/init-e2e-structure.js",
       "source_location": "L95",
       "id": "init_e2e_structure_createfile",
-      "community": 59
+      "community": 60
     },
     {
       "label": "main()",
@@ -265,7 +265,7 @@
       "source_file": "QC-Manager/scripts/init-e2e-structure.js",
       "source_location": "L104",
       "id": "init_e2e_structure_main",
-      "community": 59
+      "community": 60
     },
     {
       "label": "generate-test.js",
@@ -353,7 +353,7 @@
       "source_file": "QC-Manager/n8n/render-template.js",
       "source_location": "L1",
       "id": "render_template",
-      "community": 75
+      "community": 76
     },
     {
       "label": "generateProjectSummaryHTML()",
@@ -361,7 +361,7 @@
       "source_file": "QC-Manager/n8n/render-template.js",
       "source_location": "L8",
       "id": "render_template_generateprojectsummaryhtml",
-      "community": 75
+      "community": 76
     },
     {
       "label": "escapeHtml()",
@@ -369,7 +369,7 @@
       "source_file": "QC-Manager/n8n/render-template.js",
       "source_location": "L224",
       "id": "render_template_escapehtml",
-      "community": 75
+      "community": 76
     },
     {
       "label": "validate-workflows.js",
@@ -377,7 +377,7 @@
       "source_file": "QC-Manager/n8n/validate-workflows.js",
       "source_location": "L1",
       "id": "validate_workflows",
-      "community": 76
+      "community": 77
     },
     {
       "label": "log()",
@@ -385,7 +385,7 @@
       "source_file": "QC-Manager/n8n/validate-workflows.js",
       "source_location": "L29",
       "id": "validate_workflows_log",
-      "community": 76
+      "community": 77
     },
     {
       "label": "validateWorkflow()",
@@ -393,7 +393,7 @@
       "source_file": "QC-Manager/n8n/validate-workflows.js",
       "source_location": "L41",
       "id": "validate_workflows_validateworkflow",
-      "community": 76
+      "community": 77
     },
     {
       "label": "catalog.ts",
@@ -497,7 +497,7 @@
       "source_file": "QC-Manager/apps/api/jest.config.js",
       "source_location": "L1",
       "id": "jest_config",
-      "community": 133
+      "community": 134
     },
     {
       "label": "taskAssignmentMigration.postgres.test.js",
@@ -505,7 +505,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentMigration.postgres.test.js",
       "source_location": "L1",
       "id": "taskassignmentmigration_postgres_test",
-      "community": 60
+      "community": 61
     },
     {
       "label": "quoteIdent()",
@@ -513,7 +513,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentMigration.postgres.test.js",
       "source_location": "L21",
       "id": "taskassignmentmigration_postgres_test_quoteident",
-      "community": 60
+      "community": 61
     },
     {
       "label": "poolConfig()",
@@ -521,7 +521,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentMigration.postgres.test.js",
       "source_location": "L25",
       "id": "taskassignmentmigration_postgres_test_poolconfig",
-      "community": 60
+      "community": 61
     },
     {
       "label": "withSearchPath()",
@@ -529,7 +529,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentMigration.postgres.test.js",
       "source_location": "L34",
       "id": "taskassignmentmigration_postgres_test_withsearchpath",
-      "community": 60
+      "community": 61
     },
     {
       "label": "artifactAttachments.test.js",
@@ -537,7 +537,7 @@
       "source_file": "apps/api/__tests__/artifactAttachments.test.js",
       "source_location": "L1",
       "id": "artifactattachments_test",
-      "community": 61
+      "community": 62
     },
     {
       "label": "mockMiddleware()",
@@ -545,7 +545,7 @@
       "source_file": "apps/api/__tests__/artifactAttachments.test.js",
       "source_location": "L25",
       "id": "artifactattachments_test_mockmiddleware",
-      "community": 61
+      "community": 62
     },
     {
       "label": "multerFn()",
@@ -553,7 +553,7 @@
       "source_file": "apps/api/__tests__/artifactAttachments.test.js",
       "source_location": "L42",
       "id": "artifactattachments_test_multerfn",
-      "community": 61
+      "community": 62
     },
     {
       "label": "makeApp()",
@@ -561,7 +561,7 @@
       "source_file": "apps/api/__tests__/artifactAttachments.test.js",
       "source_location": "L51",
       "id": "artifactattachments_test_makeapp",
-      "community": 61
+      "community": 62
     },
     {
       "label": "roleResolver.test.js",
@@ -569,7 +569,7 @@
       "source_file": "apps/api/__tests__/roleResolver.test.js",
       "source_location": "L1",
       "id": "roleresolver_test",
-      "community": 98
+      "community": 99
     },
     {
       "label": "rows()",
@@ -577,7 +577,7 @@
       "source_file": "apps/api/__tests__/roleResolver.test.js",
       "source_location": "L8",
       "id": "roleresolver_test_rows",
-      "community": 98
+      "community": 99
     },
     {
       "label": "requireStatus.test.js",
@@ -585,7 +585,7 @@
       "source_file": "apps/api/__tests__/requireStatus.test.js",
       "source_location": "L1",
       "id": "requirestatus_test",
-      "community": 99
+      "community": 100
     },
     {
       "label": "makeApp()",
@@ -593,7 +593,7 @@
       "source_file": "apps/api/__tests__/requireStatus.test.js",
       "source_location": "L17",
       "id": "requirestatus_test_makeapp",
-      "community": 99
+      "community": 100
     },
     {
       "label": "taskEmitter.test.js",
@@ -601,7 +601,7 @@
       "source_file": "apps/api/__tests__/taskEmitter.test.js",
       "source_location": "L1",
       "id": "taskemitter_test",
-      "community": 134
+      "community": 135
     },
     {
       "label": "taskAssignments.test.js",
@@ -609,7 +609,7 @@
       "source_file": "apps/api/__tests__/taskAssignments.test.js",
       "source_location": "L1",
       "id": "taskassignments_test",
-      "community": 62
+      "community": 63
     },
     {
       "label": "mk()",
@@ -617,7 +617,7 @@
       "source_file": "apps/api/__tests__/taskAssignments.test.js",
       "source_location": "L51",
       "id": "taskassignments_test_mk",
-      "community": 62
+      "community": 63
     },
     {
       "label": "mkRow()",
@@ -625,7 +625,7 @@
       "source_file": "apps/api/__tests__/taskAssignments.test.js",
       "source_location": "L160",
       "id": "taskassignments_test_mkrow",
-      "community": 62
+      "community": 63
     },
     {
       "label": "hasCall()",
@@ -633,7 +633,7 @@
       "source_file": "apps/api/__tests__/taskAssignments.test.js",
       "source_location": "L161",
       "id": "taskassignments_test_hascall",
-      "community": 62
+      "community": 63
     },
     {
       "label": "bugs.create.test.js",
@@ -641,7 +641,7 @@
       "source_file": "apps/api/__tests__/bugs.create.test.js",
       "source_location": "L1",
       "id": "bugs_create_test",
-      "community": 77
+      "community": 78
     },
     {
       "label": "createApp()",
@@ -649,7 +649,7 @@
       "source_file": "apps/api/__tests__/bugs.create.test.js",
       "source_location": "L33",
       "id": "bugs_create_test_createapp",
-      "community": 77
+      "community": 78
     },
     {
       "label": "ok()",
@@ -657,7 +657,7 @@
       "source_file": "apps/api/__tests__/bugs.create.test.js",
       "source_location": "L45",
       "id": "bugs_create_test_ok",
-      "community": 77
+      "community": 78
     },
     {
       "label": "userStories.delete.test.js",
@@ -665,7 +665,7 @@
       "source_file": "apps/api/__tests__/userStories.delete.test.js",
       "source_location": "L1",
       "id": "userstories_delete_test",
-      "community": 100
+      "community": 101
     },
     {
       "label": "buildApp()",
@@ -673,7 +673,7 @@
       "source_file": "apps/api/__tests__/userStories.delete.test.js",
       "source_location": "L32",
       "id": "userstories_delete_test_buildapp",
-      "community": 100
+      "community": 101
     },
     {
       "label": "artifactUpdateSchemas.test.js",
@@ -681,7 +681,7 @@
       "source_file": "apps/api/__tests__/artifactUpdateSchemas.test.js",
       "source_location": "L1",
       "id": "artifactupdateschemas_test",
-      "community": 135
+      "community": 136
     },
     {
       "label": "taskTestCaseLinks.test.js",
@@ -689,7 +689,7 @@
       "source_file": "apps/api/__tests__/taskTestCaseLinks.test.js",
       "source_location": "L1",
       "id": "tasktestcaselinks_test",
-      "community": 136
+      "community": 137
     },
     {
       "label": "list-endpoints.smoke.test.js",
@@ -697,7 +697,7 @@
       "source_file": "apps/api/__tests__/list-endpoints.smoke.test.js",
       "source_location": "L1",
       "id": "list_endpoints_smoke_test",
-      "community": 101
+      "community": 102
     },
     {
       "label": "makeApp()",
@@ -705,7 +705,7 @@
       "source_file": "apps/api/__tests__/list-endpoints.smoke.test.js",
       "source_location": "L87",
       "id": "list_endpoints_smoke_test_makeapp",
-      "community": 101
+      "community": 102
     },
     {
       "label": "accessEngineTypeCasts.test.js",
@@ -713,7 +713,7 @@
       "source_file": "apps/api/__tests__/accessEngineTypeCasts.test.js",
       "source_location": "L1",
       "id": "accessenginetypecasts_test",
-      "community": 102
+      "community": 103
     },
     {
       "label": "resolveWith()",
@@ -721,7 +721,7 @@
       "source_file": "apps/api/__tests__/accessEngineTypeCasts.test.js",
       "source_location": "L16",
       "id": "accessenginetypecasts_test_resolvewith",
-      "community": 102
+      "community": 103
     },
     {
       "label": "tuleapUnifiedPatchSchema.test.js",
@@ -729,7 +729,7 @@
       "source_file": "apps/api/__tests__/tuleapUnifiedPatchSchema.test.js",
       "source_location": "L1",
       "id": "tuleapunifiedpatchschema_test",
-      "community": 137
+      "community": 138
     },
     {
       "label": "userLifecycle.test.js",
@@ -737,7 +737,7 @@
       "source_file": "apps/api/__tests__/userLifecycle.test.js",
       "source_location": "L1",
       "id": "userlifecycle_test",
-      "community": 138
+      "community": 139
     },
     {
       "label": "userStories.create.test.js",
@@ -745,7 +745,7 @@
       "source_file": "apps/api/__tests__/userStories.create.test.js",
       "source_location": "L1",
       "id": "userstories_create_test",
-      "community": 78
+      "community": 79
     },
     {
       "label": "createApp()",
@@ -753,7 +753,7 @@
       "source_file": "apps/api/__tests__/userStories.create.test.js",
       "source_location": "L31",
       "id": "userstories_create_test_createapp",
-      "community": 78
+      "community": 79
     },
     {
       "label": "ok()",
@@ -761,7 +761,7 @@
       "source_file": "apps/api/__tests__/userStories.create.test.js",
       "source_location": "L43",
       "id": "userstories_create_test_ok",
-      "community": 78
+      "community": 79
     },
     {
       "label": "testCaseEmitter.test.js",
@@ -769,7 +769,7 @@
       "source_file": "apps/api/__tests__/testCaseEmitter.test.js",
       "source_location": "L1",
       "id": "testcaseemitter_test",
-      "community": 139
+      "community": 140
     },
     {
       "label": "taskSyncRetry.test.js",
@@ -777,7 +777,7 @@
       "source_file": "apps/api/__tests__/taskSyncRetry.test.js",
       "source_location": "L1",
       "id": "tasksyncretry_test",
-      "community": 140
+      "community": 141
     },
     {
       "label": "estimateAccuracy.test.js",
@@ -785,7 +785,7 @@
       "source_file": "apps/api/__tests__/estimateAccuracy.test.js",
       "source_location": "L1",
       "id": "estimateaccuracy_test",
-      "community": 141
+      "community": 142
     },
     {
       "label": "developmentPlans.onHold.test.js",
@@ -793,7 +793,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.onHold.test.js",
       "source_location": "L1",
       "id": "developmentplans_onhold_test",
-      "community": 103
+      "community": 104
     },
     {
       "label": "makeApp()",
@@ -801,7 +801,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.onHold.test.js",
       "source_location": "L26",
       "id": "developmentplans_onhold_test_makeapp",
-      "community": 103
+      "community": 104
     },
     {
       "label": "testExecutions.upload.test.js",
@@ -809,7 +809,7 @@
       "source_file": "QC-Manager/apps/api/__tests__/testExecutions.upload.test.js",
       "source_location": "L1",
       "id": "testexecutions_upload_test",
-      "community": 142
+      "community": 143
     },
     {
       "label": "developmentPlans.attachments.test.js",
@@ -817,7 +817,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.attachments.test.js",
       "source_location": "L1",
       "id": "developmentplans_attachments_test",
-      "community": 42
+      "community": 43
     },
     {
       "label": "mockMiddleware()",
@@ -825,7 +825,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.attachments.test.js",
       "source_location": "L31",
       "id": "developmentplans_attachments_test_mockmiddleware",
-      "community": 42
+      "community": 43
     },
     {
       "label": "multerFn()",
@@ -833,7 +833,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.attachments.test.js",
       "source_location": "L40",
       "id": "developmentplans_attachments_test_multerfn",
-      "community": 42
+      "community": 43
     },
     {
       "label": "makeUserApp()",
@@ -841,7 +841,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.attachments.test.js",
       "source_location": "L50",
       "id": "developmentplans_attachments_test_makeuserapp",
-      "community": 42
+      "community": 43
     },
     {
       "label": "makeManagerApp()",
@@ -849,7 +849,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.attachments.test.js",
       "source_location": "L58",
       "id": "developmentplans_attachments_test_makemanagerapp",
-      "community": 42
+      "community": 43
     },
     {
       "label": "teamMemberDashboards.test.js",
@@ -857,7 +857,7 @@
       "source_file": "apps/api/__tests__/teamMemberDashboards.test.js",
       "source_location": "L1",
       "id": "teammemberdashboards_test",
-      "community": 43
+      "community": 44
     },
     {
       "label": "buildDashboardApp()",
@@ -865,7 +865,7 @@
       "source_file": "apps/api/__tests__/teamMemberDashboards.test.js",
       "source_location": "L20",
       "id": "teammemberdashboards_test_builddashboardapp",
-      "community": 43
+      "community": 44
     },
     {
       "label": "buildTasksApp()",
@@ -873,7 +873,7 @@
       "source_file": "apps/api/__tests__/teamMemberDashboards.test.js",
       "source_location": "L35",
       "id": "teammemberdashboards_test_buildtasksapp",
-      "community": 43
+      "community": 44
     },
     {
       "label": "installSqlRouter()",
@@ -881,7 +881,7 @@
       "source_file": "apps/api/__tests__/teamMemberDashboards.test.js",
       "source_location": "L51",
       "id": "teammemberdashboards_test_installsqlrouter",
-      "community": 43
+      "community": 44
     },
     {
       "label": "roleRoutes()",
@@ -889,7 +889,7 @@
       "source_file": "apps/api/__tests__/teamMemberDashboards.test.js",
       "source_location": "L64",
       "id": "teammemberdashboards_test_roleroutes",
-      "community": 43
+      "community": 44
     },
     {
       "label": "bugLinking.test.js",
@@ -897,7 +897,7 @@
       "source_file": "apps/api/__tests__/bugLinking.test.js",
       "source_location": "L1",
       "id": "buglinking_test",
-      "community": 143
+      "community": 144
     },
     {
       "label": "coverageLinks.test.js",
@@ -905,7 +905,7 @@
       "source_file": "apps/api/__tests__/coverageLinks.test.js",
       "source_location": "L1",
       "id": "coveragelinks_test",
-      "community": 144
+      "community": 145
     },
     {
       "label": "artifactVisibilityDefaulter.test.js",
@@ -913,7 +913,7 @@
       "source_file": "apps/api/__tests__/artifactVisibilityDefaulter.test.js",
       "source_location": "L1",
       "id": "artifactvisibilitydefaulter_test",
-      "community": 145
+      "community": 146
     },
     {
       "label": "developmentPlans.comments.test.js",
@@ -921,7 +921,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.comments.test.js",
       "source_location": "L1",
       "id": "developmentplans_comments_test",
-      "community": 79
+      "community": 80
     },
     {
       "label": "makeUserApp()",
@@ -929,7 +929,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.comments.test.js",
       "source_location": "L27",
       "id": "developmentplans_comments_test_makeuserapp",
-      "community": 79
+      "community": 80
     },
     {
       "label": "makeManagerApp()",
@@ -937,7 +937,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.comments.test.js",
       "source_location": "L35",
       "id": "developmentplans_comments_test_makemanagerapp",
-      "community": 79
+      "community": 80
     },
     {
       "label": "suiteRuns.workflow.test.js",
@@ -945,7 +945,7 @@
       "source_file": "apps/api/__tests__/suiteRuns.workflow.test.js",
       "source_location": "L1",
       "id": "suiteruns_workflow_test",
-      "community": 146
+      "community": 147
     },
     {
       "label": "tuleapAttachment.test.js",
@@ -953,7 +953,7 @@
       "source_file": "apps/api/__tests__/tuleapAttachment.test.js",
       "source_location": "L1",
       "id": "tuleapattachment_test",
-      "community": 147
+      "community": 148
     },
     {
       "label": "taskPersister.test.js",
@@ -961,7 +961,7 @@
       "source_file": "apps/api/__tests__/taskPersister.test.js",
       "source_location": "L1",
       "id": "taskpersister_test",
-      "community": 148
+      "community": 149
     },
     {
       "label": "pmDashboard.test.js",
@@ -969,7 +969,7 @@
       "source_file": "apps/api/__tests__/pmDashboard.test.js",
       "source_location": "L1",
       "id": "pmdashboard_test",
-      "community": 63
+      "community": 64
     },
     {
       "label": "buildApp()",
@@ -977,7 +977,7 @@
       "source_file": "apps/api/__tests__/pmDashboard.test.js",
       "source_location": "L34",
       "id": "pmdashboard_test_buildapp",
-      "community": 63
+      "community": 64
     },
     {
       "label": "installSqlRouter()",
@@ -985,7 +985,7 @@
       "source_file": "apps/api/__tests__/pmDashboard.test.js",
       "source_location": "L68",
       "id": "pmdashboard_test_installsqlrouter",
-      "community": 63
+      "community": 64
     },
     {
       "label": "buildPerProjectRoutes()",
@@ -993,7 +993,7 @@
       "source_file": "apps/api/__tests__/pmDashboard.test.js",
       "source_location": "L250",
       "id": "pmdashboard_test_buildperprojectroutes",
-      "community": 63
+      "community": 64
     },
     {
       "label": "testExecutions.access.test.js",
@@ -1001,7 +1001,7 @@
       "source_file": "apps/api/__tests__/testExecutions.access.test.js",
       "source_location": "L1",
       "id": "testexecutions_access_test",
-      "community": 44
+      "community": 45
     },
     {
       "label": "queryHandler()",
@@ -1009,7 +1009,7 @@
       "source_file": "apps/api/__tests__/testExecutions.access.test.js",
       "source_location": "L8",
       "id": "testexecutions_access_test_queryhandler",
-      "community": 44
+      "community": 45
     },
     {
       "label": "makeApp()",
@@ -1017,7 +1017,7 @@
       "source_file": "apps/api/__tests__/testExecutions.access.test.js",
       "source_location": "L43",
       "id": "testexecutions_access_test_makeapp",
-      "community": 44
+      "community": 45
     },
     {
       "label": "setRole()",
@@ -1025,7 +1025,7 @@
       "source_file": "apps/api/__tests__/testExecutions.access.test.js",
       "source_location": "L94",
       "id": "testexecutions_access_test_setrole",
-      "community": 44
+      "community": 45
     },
     {
       "label": "findTestRunsDataQuery()",
@@ -1033,7 +1033,7 @@
       "source_file": "apps/api/__tests__/testExecutions.access.test.js",
       "source_location": "L99",
       "id": "testexecutions_access_test_findtestrunsdataquery",
-      "community": 44
+      "community": 45
     },
     {
       "label": "resources.analyticsEnhanced.test.js",
@@ -1041,7 +1041,7 @@
       "source_file": "apps/api/__tests__/resources.analyticsEnhanced.test.js",
       "source_location": "L1",
       "id": "resources_analyticsenhanced_test",
-      "community": 80
+      "community": 81
     },
     {
       "label": "setupMocks()",
@@ -1049,7 +1049,7 @@
       "source_file": "apps/api/__tests__/resources.analyticsEnhanced.test.js",
       "source_location": "L87",
       "id": "resources_analyticsenhanced_test_setupmocks",
-      "community": 80
+      "community": 81
     },
     {
       "label": "getAnalyticsRoute()",
@@ -1057,7 +1057,7 @@
       "source_file": "apps/api/__tests__/resources.analyticsEnhanced.test.js",
       "source_location": "L96",
       "id": "resources_analyticsenhanced_test_getanalyticsroute",
-      "community": 80
+      "community": 81
     },
     {
       "label": "tasks.access.test.js",
@@ -1065,7 +1065,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L1",
       "id": "tasks_access_test",
-      "community": 37
+      "community": 38
     },
     {
       "label": "queryHandler()",
@@ -1073,7 +1073,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L15",
       "id": "tasks_access_test_queryhandler",
-      "community": 37
+      "community": 38
     },
     {
       "label": "makeApp()",
@@ -1081,7 +1081,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L65",
       "id": "tasks_access_test_makeapp",
-      "community": 37
+      "community": 38
     },
     {
       "label": "setRole()",
@@ -1089,7 +1089,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L87",
       "id": "tasks_access_test_setrole",
-      "community": 37
+      "community": 38
     },
     {
       "label": "findListQuery()",
@@ -1097,7 +1097,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L92",
       "id": "tasks_access_test_findlistquery",
-      "community": 37
+      "community": 38
     },
     {
       "label": "wireQueries()",
@@ -1105,7 +1105,7 @@
       "source_file": "apps/api/__tests__/tasks.access.test.js",
       "source_location": "L168",
       "id": "tasks_access_test_wirequeries",
-      "community": 37
+      "community": 38
     },
     {
       "label": "userStoryEmitter.test.js",
@@ -1113,7 +1113,7 @@
       "source_file": "apps/api/__tests__/userStoryEmitter.test.js",
       "source_location": "L1",
       "id": "userstoryemitter_test",
-      "community": 149
+      "community": 150
     },
     {
       "label": "reports.download.test.js",
@@ -1121,7 +1121,7 @@
       "source_file": "apps/api/__tests__/reports.download.test.js",
       "source_location": "L1",
       "id": "reports_download_test",
-      "community": 104
+      "community": 105
     },
     {
       "label": "makeApp()",
@@ -1129,7 +1129,7 @@
       "source_file": "apps/api/__tests__/reports.download.test.js",
       "source_location": "L24",
       "id": "reports_download_test_makeapp",
-      "community": 104
+      "community": 105
     },
     {
       "label": "developmentPlans.editing.test.js",
@@ -1137,7 +1137,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.editing.test.js",
       "source_location": "L1",
       "id": "developmentplans_editing_test",
-      "community": 105
+      "community": 106
     },
     {
       "label": "makeApp()",
@@ -1145,7 +1145,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.editing.test.js",
       "source_location": "L27",
       "id": "developmentplans_editing_test_makeapp",
-      "community": 105
+      "community": 106
     },
     {
       "label": "rbacCatalog.test.js",
@@ -1153,7 +1153,7 @@
       "source_file": "apps/api/__tests__/rbacCatalog.test.js",
       "source_location": "L1",
       "id": "rbaccatalog_test",
-      "community": 150
+      "community": 151
     },
     {
       "label": "bugs.summary.test.js",
@@ -1161,7 +1161,7 @@
       "source_file": "apps/api/__tests__/bugs.summary.test.js",
       "source_location": "L1",
       "id": "bugs_summary_test",
-      "community": 151
+      "community": 152
     },
     {
       "label": "testCaseSyncRetry.test.js",
@@ -1169,7 +1169,7 @@
       "source_file": "apps/api/__tests__/testCaseSyncRetry.test.js",
       "source_location": "L1",
       "id": "testcasesyncretry_test",
-      "community": 152
+      "community": 153
     },
     {
       "label": "bugNormalizer.test.js",
@@ -1177,7 +1177,7 @@
       "source_file": "apps/api/__tests__/bugNormalizer.test.js",
       "source_location": "L1",
       "id": "bugnormalizer_test",
-      "community": 153
+      "community": 154
     },
     {
       "label": "bugPersister.test.js",
@@ -1185,7 +1185,7 @@
       "source_file": "apps/api/__tests__/bugPersister.test.js",
       "source_location": "L1",
       "id": "bugpersister_test",
-      "community": 154
+      "community": 155
     },
     {
       "label": "tuleapValueNormalizer.test.js",
@@ -1193,7 +1193,7 @@
       "source_file": "apps/api/__tests__/tuleapValueNormalizer.test.js",
       "source_location": "L1",
       "id": "tuleapvaluenormalizer_test",
-      "community": 155
+      "community": 156
     },
     {
       "label": "developmentPlans.lateCompleted.test.js",
@@ -1201,7 +1201,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.lateCompleted.test.js",
       "source_location": "L1",
       "id": "developmentplans_latecompleted_test",
-      "community": 64
+      "community": 65
     },
     {
       "label": "makeUserApp()",
@@ -1209,7 +1209,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.lateCompleted.test.js",
       "source_location": "L26",
       "id": "developmentplans_latecompleted_test_makeuserapp",
-      "community": 64
+      "community": 65
     },
     {
       "label": "stubIDPFixture()",
@@ -1217,7 +1217,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.lateCompleted.test.js",
       "source_location": "L36",
       "id": "developmentplans_latecompleted_test_stubidpfixture",
-      "community": 64
+      "community": 65
     },
     {
       "label": "firstPlan()",
@@ -1225,7 +1225,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.lateCompleted.test.js",
       "source_location": "L48",
       "id": "developmentplans_latecompleted_test_firstplan",
-      "community": 64
+      "community": 65
     },
     {
       "label": "taskAssignmentReportingViews.test.js",
@@ -1233,7 +1233,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentReportingViews.test.js",
       "source_location": "L1",
       "id": "taskassignmentreportingviews_test",
-      "community": 106
+      "community": 107
     },
     {
       "label": "sourceAfter()",
@@ -1241,7 +1241,7 @@
       "source_file": "apps/api/__tests__/taskAssignmentReportingViews.test.js",
       "source_location": "L8",
       "id": "taskassignmentreportingviews_test_sourceafter",
-      "community": 106
+      "community": 107
     },
     {
       "label": "search.routes.test.js",
@@ -1249,7 +1249,7 @@
       "source_file": "apps/api/__tests__/search.routes.test.js",
       "source_location": "L1",
       "id": "search_routes_test",
-      "community": 156
+      "community": 157
     },
     {
       "label": "rbacMiddlewareCatalog.test.js",
@@ -1257,7 +1257,7 @@
       "source_file": "apps/api/__tests__/rbacMiddlewareCatalog.test.js",
       "source_location": "L1",
       "id": "rbacmiddlewarecatalog_test",
-      "community": 81
+      "community": 82
     },
     {
       "label": "makeRes()",
@@ -1265,7 +1265,7 @@
       "source_file": "apps/api/__tests__/rbacMiddlewareCatalog.test.js",
       "source_location": "L13",
       "id": "rbacmiddlewarecatalog_test_makeres",
-      "community": 81
+      "community": 82
     },
     {
       "label": "runMiddleware()",
@@ -1273,7 +1273,7 @@
       "source_file": "apps/api/__tests__/rbacMiddlewareCatalog.test.js",
       "source_location": "L20",
       "id": "rbacmiddlewarecatalog_test_runmiddleware",
-      "community": 81
+      "community": 82
     },
     {
       "label": "developmentPlans.links.test.js",
@@ -1281,7 +1281,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.links.test.js",
       "source_location": "L1",
       "id": "developmentplans_links_test",
-      "community": 82
+      "community": 83
     },
     {
       "label": "makeUserApp()",
@@ -1289,7 +1289,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.links.test.js",
       "source_location": "L27",
       "id": "developmentplans_links_test_makeuserapp",
-      "community": 82
+      "community": 83
     },
     {
       "label": "makeManagerApp()",
@@ -1297,7 +1297,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.links.test.js",
       "source_location": "L35",
       "id": "developmentplans_links_test_makemanagerapp",
-      "community": 82
+      "community": 83
     },
     {
       "label": "tuleapLinkResolver.test.js",
@@ -1305,7 +1305,7 @@
       "source_file": "apps/api/__tests__/tuleapLinkResolver.test.js",
       "source_location": "L1",
       "id": "tuleaplinkresolver_test",
-      "community": 157
+      "community": 158
     },
     {
       "label": "userStories.access.test.js",
@@ -1313,7 +1313,7 @@
       "source_file": "apps/api/__tests__/userStories.access.test.js",
       "source_location": "L1",
       "id": "userstories_access_test",
-      "community": 45
+      "community": 46
     },
     {
       "label": "queryHandler()",
@@ -1321,7 +1321,7 @@
       "source_file": "apps/api/__tests__/userStories.access.test.js",
       "source_location": "L9",
       "id": "userstories_access_test_queryhandler",
-      "community": 45
+      "community": 46
     },
     {
       "label": "makeApp()",
@@ -1329,7 +1329,7 @@
       "source_file": "apps/api/__tests__/userStories.access.test.js",
       "source_location": "L43",
       "id": "userstories_access_test_makeapp",
-      "community": 45
+      "community": 46
     },
     {
       "label": "setRole()",
@@ -1337,7 +1337,7 @@
       "source_file": "apps/api/__tests__/userStories.access.test.js",
       "source_location": "L96",
       "id": "userstories_access_test_setrole",
-      "community": 45
+      "community": 46
     },
     {
       "label": "findDataQuery()",
@@ -1345,7 +1345,7 @@
       "source_file": "apps/api/__tests__/userStories.access.test.js",
       "source_location": "L101",
       "id": "userstories_access_test_finddataquery",
-      "community": 45
+      "community": 46
     },
     {
       "label": "developmentPlans.test.js",
@@ -1353,7 +1353,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.test.js",
       "source_location": "L1",
       "id": "developmentplans_test",
-      "community": 83
+      "community": 84
     },
     {
       "label": "makeApp()",
@@ -1361,7 +1361,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.test.js",
       "source_location": "L27",
       "id": "developmentplans_test_makeapp",
-      "community": 83
+      "community": 84
     },
     {
       "label": "makeUserApp()",
@@ -1369,7 +1369,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.test.js",
       "source_location": "L298",
       "id": "developmentplans_test_makeuserapp",
-      "community": 83
+      "community": 84
     },
     {
       "label": "tuleapUnifiedWebhook.test.js",
@@ -1377,7 +1377,7 @@
       "source_file": "apps/api/__tests__/tuleapUnifiedWebhook.test.js",
       "source_location": "L1",
       "id": "tuleapunifiedwebhook_test",
-      "community": 158
+      "community": 159
     },
     {
       "label": "testExecutions.delete.test.js",
@@ -1385,7 +1385,7 @@
       "source_file": "apps/api/__tests__/testExecutions.delete.test.js",
       "source_location": "L1",
       "id": "testexecutions_delete_test",
-      "community": 159
+      "community": 160
     },
     {
       "label": "teamAccess.test.js",
@@ -1393,7 +1393,7 @@
       "source_file": "apps/api/__tests__/teamAccess.test.js",
       "source_location": "L1",
       "id": "teamaccess_test",
-      "community": 107
+      "community": 108
     },
     {
       "label": "makeRes()",
@@ -1401,7 +1401,7 @@
       "source_file": "apps/api/__tests__/teamAccess.test.js",
       "source_location": "L12",
       "id": "teamaccess_test_makeres",
-      "community": 107
+      "community": 108
     },
     {
       "label": "permissionMatrix.test.js",
@@ -1409,7 +1409,7 @@
       "source_file": "apps/api/__tests__/permissionMatrix.test.js",
       "source_location": "L1",
       "id": "permissionmatrix_test",
-      "community": 65
+      "community": 66
     },
     {
       "label": "permissions()",
@@ -1417,7 +1417,7 @@
       "source_file": "apps/api/__tests__/permissionMatrix.test.js",
       "source_location": "L23",
       "id": "permissionmatrix_test_permissions",
-      "community": 65
+      "community": 66
     },
     {
       "label": "artifactFor()",
@@ -1425,7 +1425,7 @@
       "source_file": "apps/api/__tests__/permissionMatrix.test.js",
       "source_location": "L27",
       "id": "permissionmatrix_test_artifactfor",
-      "community": 65
+      "community": 66
     },
     {
       "label": "roleFixture()",
@@ -1433,7 +1433,7 @@
       "source_file": "apps/api/__tests__/permissionMatrix.test.js",
       "source_location": "L39",
       "id": "permissionmatrix_test_rolefixture",
-      "community": 65
+      "community": 66
     },
     {
       "label": "tuleapFieldRegistry.test.js",
@@ -1441,7 +1441,7 @@
       "source_file": "apps/api/__tests__/tuleapFieldRegistry.test.js",
       "source_location": "L1",
       "id": "tuleapfieldregistry_test",
-      "community": 160
+      "community": 161
     },
     {
       "label": "bugEmitter.test.js",
@@ -1449,7 +1449,7 @@
       "source_file": "apps/api/__tests__/bugEmitter.test.js",
       "source_location": "L1",
       "id": "bugemitter_test",
-      "community": 161
+      "community": 162
     },
     {
       "label": "tuleapTransformEngine.test.js",
@@ -1457,7 +1457,7 @@
       "source_file": "apps/api/__tests__/tuleapTransformEngine.test.js",
       "source_location": "L1",
       "id": "tuleaptransformengine_test",
-      "community": 162
+      "community": 163
     },
     {
       "label": "governance.qualityMetrics.test.js",
@@ -1465,7 +1465,7 @@
       "source_file": "apps/api/__tests__/governance.qualityMetrics.test.js",
       "source_location": "L1",
       "id": "governance_qualitymetrics_test",
-      "community": 163
+      "community": 164
     },
     {
       "label": "developmentPlans.history.test.js",
@@ -1473,7 +1473,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.history.test.js",
       "source_location": "L1",
       "id": "developmentplans_history_test",
-      "community": 108
+      "community": 109
     },
     {
       "label": "makeApp()",
@@ -1481,7 +1481,7 @@
       "source_file": "apps/api/__tests__/developmentPlans.history.test.js",
       "source_location": "L26",
       "id": "developmentplans_history_test_makeapp",
-      "community": 108
+      "community": 109
     },
     {
       "label": "tuleapArtifacts.routes.test.js",
@@ -1489,7 +1489,7 @@
       "source_file": "apps/api/__tests__/tuleapArtifacts.routes.test.js",
       "source_location": "L1",
       "id": "tuleapartifacts_routes_test",
-      "community": 164
+      "community": 165
     },
     {
       "label": "userStoryPersister.test.js",
@@ -1497,7 +1497,7 @@
       "source_file": "apps/api/__tests__/userStoryPersister.test.js",
       "source_location": "L1",
       "id": "userstorypersister_test",
-      "community": 165
+      "community": 166
     },
     {
       "label": "meDashboard.test.js",
@@ -1505,7 +1505,7 @@
       "source_file": "apps/api/__tests__/meDashboard.test.js",
       "source_location": "L1",
       "id": "medashboard_test",
-      "community": 84
+      "community": 85
     },
     {
       "label": "makeReq()",
@@ -1513,7 +1513,7 @@
       "source_file": "apps/api/__tests__/meDashboard.test.js",
       "source_location": "L18",
       "id": "medashboard_test_makereq",
-      "community": 84
+      "community": 85
     },
     {
       "label": "makeRes()",
@@ -1521,7 +1521,7 @@
       "source_file": "apps/api/__tests__/meDashboard.test.js",
       "source_location": "L22",
       "id": "medashboard_test_makeres",
-      "community": 84
+      "community": 85
     },
     {
       "label": "accessEngineSliceTwo.test.js",
@@ -1529,7 +1529,7 @@
       "source_file": "apps/api/__tests__/accessEngineSliceTwo.test.js",
       "source_location": "L1",
       "id": "accessengineslicetwo_test",
-      "community": 109
+      "community": 110
     },
     {
       "label": "makeQueryStub()",
@@ -1537,7 +1537,7 @@
       "source_file": "apps/api/__tests__/accessEngineSliceTwo.test.js",
       "source_location": "L16",
       "id": "accessengineslicetwo_test_makequerystub",
-      "community": 109
+      "community": 110
     },
     {
       "label": "tuleapUnified.integration.test.js",
@@ -1545,7 +1545,7 @@
       "source_file": "apps/api/__tests__/tuleapUnified.integration.test.js",
       "source_location": "L1",
       "id": "tuleapunified_integration_test",
-      "community": 166
+      "community": 167
     },
     {
       "label": "authMe.accessShape.test.js",
@@ -1553,7 +1553,7 @@
       "source_file": "apps/api/__tests__/authMe.accessShape.test.js",
       "source_location": "L1",
       "id": "authme_accessshape_test",
-      "community": 167
+      "community": 168
     },
     {
       "label": "tuleapClient.test.js",
@@ -1561,7 +1561,7 @@
       "source_file": "apps/api/__tests__/tuleapClient.test.js",
       "source_location": "L1",
       "id": "tuleapclient_test",
-      "community": 168
+      "community": 169
     },
     {
       "label": "testSuites.access.test.js",
@@ -1569,7 +1569,7 @@
       "source_file": "apps/api/__tests__/testSuites.access.test.js",
       "source_location": "L1",
       "id": "testsuites_access_test",
-      "community": 46
+      "community": 47
     },
     {
       "label": "queryHandler()",
@@ -1577,7 +1577,7 @@
       "source_file": "apps/api/__tests__/testSuites.access.test.js",
       "source_location": "L8",
       "id": "testsuites_access_test_queryhandler",
-      "community": 46
+      "community": 47
     },
     {
       "label": "makeApp()",
@@ -1585,7 +1585,7 @@
       "source_file": "apps/api/__tests__/testSuites.access.test.js",
       "source_location": "L43",
       "id": "testsuites_access_test_makeapp",
-      "community": 46
+      "community": 47
     },
     {
       "label": "setRole()",
@@ -1593,7 +1593,7 @@
       "source_file": "apps/api/__tests__/testSuites.access.test.js",
       "source_location": "L91",
       "id": "testsuites_access_test_setrole",
-      "community": 46
+      "community": 47
     },
     {
       "label": "findDataQuery()",
@@ -1601,7 +1601,7 @@
       "source_file": "apps/api/__tests__/testSuites.access.test.js",
       "source_location": "L96",
       "id": "testsuites_access_test_finddataquery",
-      "community": 46
+      "community": 47
     },
     {
       "label": "tuleapWebhook.config.test.js",
@@ -1609,7 +1609,7 @@
       "source_file": "apps/api/__tests__/tuleapWebhook.config.test.js",
       "source_location": "L1",
       "id": "tuleapwebhook_config_test",
-      "community": 169
+      "community": 170
     },
     {
       "label": "db-connection.test.js",
@@ -1617,7 +1617,7 @@
       "source_file": "apps/api/__tests__/db-connection.test.js",
       "source_location": "L1",
       "id": "db_connection_test",
-      "community": 170
+      "community": 171
     },
     {
       "label": "avatar.upload.test.js",
@@ -1625,7 +1625,7 @@
       "source_file": "apps/api/__tests__/avatar.upload.test.js",
       "source_location": "L1",
       "id": "avatar_upload_test",
-      "community": 171
+      "community": 172
     },
     {
       "label": "access.test.js",
@@ -1633,7 +1633,7 @@
       "source_file": "apps/api/__tests__/access.test.js",
       "source_location": "L1",
       "id": "access_test",
-      "community": 110
+      "community": 111
     },
     {
       "label": "rows()",
@@ -1641,7 +1641,7 @@
       "source_file": "apps/api/__tests__/access.test.js",
       "source_location": "L14",
       "id": "access_test_rows",
-      "community": 110
+      "community": 111
     },
     {
       "label": "tuleapPayloadBuilder.test.js",
@@ -1649,7 +1649,7 @@
       "source_file": "apps/api/__tests__/tuleapPayloadBuilder.test.js",
       "source_location": "L1",
       "id": "tuleappayloadbuilder_test",
-      "community": 85
+      "community": 86
     },
     {
       "label": "makeRegistry()",
@@ -1657,7 +1657,7 @@
       "source_file": "apps/api/__tests__/tuleapPayloadBuilder.test.js",
       "source_location": "L3",
       "id": "tuleappayloadbuilder_test_makeregistry",
-      "community": 85
+      "community": 86
     },
     {
       "label": "find()",
@@ -1665,7 +1665,7 @@
       "source_file": "apps/api/__tests__/tuleapPayloadBuilder.test.js",
       "source_location": "L31",
       "id": "tuleappayloadbuilder_test_find",
-      "community": 85
+      "community": 86
     },
     {
       "label": "testCasePersister.test.js",
@@ -1673,7 +1673,7 @@
       "source_file": "apps/api/__tests__/testCasePersister.test.js",
       "source_location": "L1",
       "id": "testcasepersister_test",
-      "community": 172
+      "community": 173
     },
     {
       "label": "adminAccess.test.js",
@@ -1681,7 +1681,7 @@
       "source_file": "apps/api/__tests__/adminAccess.test.js",
       "source_location": "L1",
       "id": "adminaccess_test",
-      "community": 111
+      "community": 112
     },
     {
       "label": "makeApp()",
@@ -1689,7 +1689,7 @@
       "source_file": "apps/api/__tests__/adminAccess.test.js",
       "source_location": "L17",
       "id": "adminaccess_test_makeapp",
-      "community": 111
+      "community": 112
     },
     {
       "label": "dbMock.js",
@@ -1697,7 +1697,7 @@
       "source_file": "QC-Manager/apps/api/__tests__/helpers/dbMock.js",
       "source_location": "L1",
       "id": "dbmock",
-      "community": 66
+      "community": 67
     },
     {
       "label": "createMockPool()",
@@ -1705,7 +1705,7 @@
       "source_file": "QC-Manager/apps/api/__tests__/helpers/dbMock.js",
       "source_location": "L6",
       "id": "dbmock_createmockpool",
-      "community": 66
+      "community": 67
     },
     {
       "label": "createMockAuditLog()",
@@ -1713,7 +1713,7 @@
       "source_file": "QC-Manager/apps/api/__tests__/helpers/dbMock.js",
       "source_location": "L14",
       "id": "dbmock_createmockauditlog",
-      "community": 66
+      "community": 67
     },
     {
       "label": "setupTestApp()",
@@ -1721,7 +1721,7 @@
       "source_file": "QC-Manager/apps/api/__tests__/helpers/dbMock.js",
       "source_location": "L20",
       "id": "dbmock_setuptestapp",
-      "community": 66
+      "community": 67
     },
     {
       "label": "testApp.js",
@@ -1729,7 +1729,7 @@
       "source_file": "apps/api/__tests__/helpers/testApp.js",
       "source_location": "L1",
       "id": "testapp",
-      "community": 112
+      "community": 113
     },
     {
       "label": "createTestApp()",
@@ -1737,7 +1737,7 @@
       "source_file": "apps/api/__tests__/helpers/testApp.js",
       "source_location": "L3",
       "id": "testapp_createtestapp",
-      "community": 112
+      "community": 113
     },
     {
       "label": "mockPool.js",
@@ -1745,7 +1745,7 @@
       "source_file": "apps/api/__tests__/helpers/mockPool.js",
       "source_location": "L1",
       "id": "mockpool",
-      "community": 173
+      "community": 174
     },
     {
       "label": "tuleapPayloads.js",
@@ -1753,7 +1753,7 @@
       "source_file": "apps/api/__tests__/fixtures/tuleapPayloads.js",
       "source_location": "L1",
       "id": "tuleappayloads",
-      "community": 174
+      "community": 175
     },
     {
       "label": "tuleapSmokeTest.js",
@@ -1761,7 +1761,7 @@
       "source_file": "apps/api/scripts/tuleapSmokeTest.js",
       "source_location": "L1",
       "id": "tuleapsmoketest",
-      "community": 113
+      "community": 114
     },
     {
       "label": "smoke()",
@@ -1769,7 +1769,7 @@
       "source_file": "apps/api/scripts/tuleapSmokeTest.js",
       "source_location": "L6",
       "id": "tuleapsmoketest_smoke",
-      "community": 113
+      "community": 114
     },
     {
       "label": "init_phase3.js",
@@ -1777,7 +1777,7 @@
       "source_file": "QC-Manager/apps/api/scripts/init_phase3.js",
       "source_location": "L1",
       "id": "init_phase3",
-      "community": 114
+      "community": 115
     },
     {
       "label": "initPhase3()",
@@ -1785,7 +1785,7 @@
       "source_file": "QC-Manager/apps/api/scripts/init_phase3.js",
       "source_location": "L3",
       "id": "init_phase3_initphase3",
-      "community": 114
+      "community": 115
     },
     {
       "label": "index.ts",
@@ -1793,7 +1793,7 @@
       "source_file": "apps/web/src/types/index.ts",
       "source_location": "L1",
       "id": "index",
-      "community": 35
+      "community": 36
     },
     {
       "label": "testsprite.js",
@@ -1801,7 +1801,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L1",
       "id": "testsprite",
-      "community": 38
+      "community": 39
     },
     {
       "label": "parseTestSpriteResults()",
@@ -1809,7 +1809,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L21",
       "id": "testsprite_parsetestspriteresults",
-      "community": 38
+      "community": 39
     },
     {
       "label": "mapTestSpriteStatus()",
@@ -1817,7 +1817,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L64",
       "id": "testsprite_maptestspritestatus",
-      "community": 38
+      "community": 39
     },
     {
       "label": "buildNotes()",
@@ -1825,7 +1825,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L88",
       "id": "testsprite_buildnotes",
-      "community": 38
+      "community": 39
     },
     {
       "label": "uploadTestSpriteResults()",
@@ -1833,7 +1833,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L117",
       "id": "testsprite_uploadtestspriteresults",
-      "community": 38
+      "community": 39
     },
     {
       "label": "handleTestSpriteWebhook()",
@@ -1841,7 +1841,7 @@
       "source_file": "QC-Manager/apps/api/src/integrations/testsprite.js",
       "source_location": "L263",
       "id": "testsprite_handletestspritewebhook",
-      "community": 38
+      "community": 39
     },
     {
       "label": "accessDefaults.js",
@@ -1849,7 +1849,7 @@
       "source_file": "apps/api/src/services/accessDefaults.js",
       "source_location": "L1",
       "id": "accessdefaults",
-      "community": 47
+      "community": 48
     },
     {
       "label": "resolveTuleapCreator()",
@@ -1857,7 +1857,7 @@
       "source_file": "apps/api/src/services/accessDefaults.js",
       "source_location": "L9",
       "id": "accessdefaults_resolvetuleapcreator",
-      "community": 47
+      "community": 48
     },
     {
       "label": "resolveEmailCreator()",
@@ -1865,7 +1865,7 @@
       "source_file": "apps/api/src/services/accessDefaults.js",
       "source_location": "L20",
       "id": "accessdefaults_resolveemailcreator",
-      "community": 47
+      "community": 48
     },
     {
       "label": "buildAccessDefaults()",
@@ -1873,7 +1873,7 @@
       "source_file": "apps/api/src/services/accessDefaults.js",
       "source_location": "L33",
       "id": "accessdefaults_buildaccessdefaults",
-      "community": 47
+      "community": 48
     },
     {
       "label": "materializeAclGrants()",
@@ -1881,7 +1881,7 @@
       "source_file": "apps/api/src/services/accessDefaults.js",
       "source_location": "L53",
       "id": "accessdefaults_materializeaclgrants",
-      "community": 47
+      "community": 48
     },
     {
       "label": "tuleapPayloadBuilder.js",
@@ -1889,7 +1889,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L1",
       "id": "tuleappayloadbuilder",
-      "community": 29
+      "community": 30
     },
     {
       "label": "toTuleapSeverity()",
@@ -1897,7 +1897,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L8",
       "id": "tuleappayloadbuilder_totuleapseverity",
-      "community": 29
+      "community": 30
     },
     {
       "label": "required()",
@@ -1905,7 +1905,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L12",
       "id": "tuleappayloadbuilder_required",
-      "community": 29
+      "community": 30
     },
     {
       "label": "buildUserStoryPayload()",
@@ -1913,7 +1913,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L19",
       "id": "tuleappayloadbuilder_builduserstorypayload",
-      "community": 29
+      "community": 30
     },
     {
       "label": "buildTestCasePayload()",
@@ -1921,7 +1921,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L48",
       "id": "tuleappayloadbuilder_buildtestcasepayload",
-      "community": 29
+      "community": 30
     },
     {
       "label": "buildTaskPayload()",
@@ -1929,7 +1929,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L84",
       "id": "tuleappayloadbuilder_buildtaskpayload",
-      "community": 29
+      "community": 30
     },
     {
       "label": "buildBugPayload()",
@@ -1937,7 +1937,7 @@
       "source_file": "apps/api/src/services/tuleapPayloadBuilder.js",
       "source_location": "L114",
       "id": "tuleappayloadbuilder_buildbugpayload",
-      "community": 29
+      "community": 30
     },
     {
       "label": "tuleapValueNormalizer.js",
@@ -1945,7 +1945,7 @@
       "source_file": "apps/api/src/services/tuleapValueNormalizer.js",
       "source_location": "L1",
       "id": "tuleapvaluenormalizer",
-      "community": 48
+      "community": 49
     },
     {
       "label": "getKey()",
@@ -1953,7 +1953,7 @@
       "source_file": "apps/api/src/services/tuleapValueNormalizer.js",
       "source_location": "L1",
       "id": "tuleapvaluenormalizer_getkey",
-      "community": 48
+      "community": 49
     },
     {
       "label": "valueFromInlineValues()",
@@ -1961,7 +1961,7 @@
       "source_file": "apps/api/src/services/tuleapValueNormalizer.js",
       "source_location": "L15",
       "id": "tuleapvaluenormalizer_valuefrominlinevalues",
-      "community": 48
+      "community": 49
     },
     {
       "label": "valueFromBindIds()",
@@ -1969,7 +1969,7 @@
       "source_file": "apps/api/src/services/tuleapValueNormalizer.js",
       "source_location": "L27",
       "id": "tuleapvaluenormalizer_valuefrombindids",
-      "community": 48
+      "community": 49
     },
     {
       "label": "normalize()",
@@ -1977,7 +1977,7 @@
       "source_file": "apps/api/src/services/tuleapValueNormalizer.js",
       "source_location": "L43",
       "id": "tuleapvaluenormalizer_normalize",
-      "community": 48
+      "community": 49
     },
     {
       "label": "tuleapClient.js",
@@ -1985,7 +1985,7 @@
       "source_file": "apps/api/src/services/tuleapClient.js",
       "source_location": "L1",
       "id": "tuleapclient",
-      "community": 67
+      "community": 68
     },
     {
       "label": "normaliseError()",
@@ -1993,7 +1993,7 @@
       "source_file": "apps/api/src/services/tuleapClient.js",
       "source_location": "L11",
       "id": "tuleapclient_normaliseerror",
-      "community": 67
+      "community": 68
     },
     {
       "label": "createTuleapClient()",
@@ -2001,7 +2001,7 @@
       "source_file": "apps/api/src/services/tuleapClient.js",
       "source_location": "L28",
       "id": "tuleapclient_createtuleapclient",
-      "community": 67
+      "community": 68
     },
     {
       "label": "get()",
@@ -2009,7 +2009,7 @@
       "source_file": "apps/api/src/services/tuleapClient.js",
       "source_location": "L75",
       "id": "tuleapclient_get",
-      "community": 67
+      "community": 68
     },
     {
       "label": "rolePermissions.js",
@@ -2017,7 +2017,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L1",
       "id": "rolepermissions",
-      "community": 12
+      "community": 11
     },
     {
       "label": "isBuiltInRole()",
@@ -2025,7 +2025,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L14",
       "id": "rolepermissions_isbuiltinrole",
-      "community": 12
+      "community": 11
     },
     {
       "label": "normalizeRoleName()",
@@ -2033,7 +2033,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L18",
       "id": "rolepermissions_normalizerolename",
-      "community": 12
+      "community": 11
     },
     {
       "label": "validateRoleName()",
@@ -2041,7 +2041,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L22",
       "id": "rolepermissions_validaterolename",
-      "community": 12
+      "community": 11
     },
     {
       "label": "validatePermissionList()",
@@ -2049,7 +2049,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L31",
       "id": "rolepermissions_validatepermissionlist",
-      "community": 12
+      "community": 11
     },
     {
       "label": "aliasesForCanonical()",
@@ -2057,7 +2057,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L36",
       "id": "rolepermissions_aliasesforcanonical",
-      "community": 12
+      "community": 11
     },
     {
       "label": "roleStorageNames()",
@@ -2065,7 +2065,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L40",
       "id": "rolepermissions_rolestoragenames",
-      "community": 12
+      "community": 11
     },
     {
       "label": "defaultsForRole()",
@@ -2073,7 +2073,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L48",
       "id": "rolepermissions_defaultsforrole",
-      "community": 12
+      "community": 11
     },
     {
       "label": "customRoleExists()",
@@ -2081,7 +2081,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L54",
       "id": "rolepermissions_customroleexists",
-      "community": 12
+      "community": 11
     },
     {
       "label": "roleExists()",
@@ -2089,7 +2089,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L59",
       "id": "rolepermissions_roleexists",
-      "community": 12
+      "community": 11
     },
     {
       "label": "getRolePermissionSet()",
@@ -2097,7 +2097,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L64",
       "id": "rolepermissions_getrolepermissionset",
-      "community": 12
+      "community": 11
     },
     {
       "label": "listRoles()",
@@ -2105,7 +2105,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L83",
       "id": "rolepermissions_listroles",
-      "community": 12
+      "community": 11
     },
     {
       "label": "syncRolePermissions()",
@@ -2113,7 +2113,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L119",
       "id": "rolepermissions_syncrolepermissions",
-      "community": 12
+      "community": 11
     },
     {
       "label": "auditRolePermissionChange()",
@@ -2121,7 +2121,7 @@
       "source_file": "apps/api/src/services/rolePermissions.js",
       "source_location": "L162",
       "id": "rolepermissions_auditrolepermissionchange",
-      "community": 12
+      "community": 11
     },
     {
       "label": "tuleapFieldRegistry.js",
@@ -2129,7 +2129,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L1",
       "id": "tuleapfieldregistry",
-      "community": 30
+      "community": 31
     },
     {
       "label": "FieldRegistry",
@@ -2137,7 +2137,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L5",
       "id": "tuleapfieldregistry_fieldregistry",
-      "community": 30
+      "community": 31
     },
     {
       "label": ".constructor()",
@@ -2145,7 +2145,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L6",
       "id": "tuleapfieldregistry_fieldregistry_constructor",
-      "community": 30
+      "community": 31
     },
     {
       "label": "._load()",
@@ -2153,7 +2153,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L11",
       "id": "tuleapfieldregistry_fieldregistry_load",
-      "community": 30
+      "community": 31
     },
     {
       "label": ".getField()",
@@ -2161,7 +2161,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L21",
       "id": "tuleapfieldregistry_fieldregistry_getfield",
-      "community": 30
+      "community": 31
     },
     {
       "label": ".getFieldId()",
@@ -2169,7 +2169,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L28",
       "id": "tuleapfieldregistry_fieldregistry_getfieldid",
-      "community": 30
+      "community": 31
     },
     {
       "label": ".resolveBindValue()",
@@ -2177,7 +2177,7 @@
       "source_file": "apps/api/src/services/tuleapFieldRegistry.js",
       "source_location": "L32",
       "id": "tuleapfieldregistry_fieldregistry_resolvebindvalue",
-      "community": 30
+      "community": 31
     },
     {
       "label": "tuleapReconcileDeletes.js",
@@ -2185,7 +2185,7 @@
       "source_file": "apps/api/src/services/tuleapReconcileDeletes.js",
       "source_location": "L1",
       "id": "tuleapreconciledeletes",
-      "community": 115
+      "community": 116
     },
     {
       "label": "reconcileDeletes()",
@@ -2193,7 +2193,7 @@
       "source_file": "apps/api/src/services/tuleapReconcileDeletes.js",
       "source_location": "L8",
       "id": "tuleapreconciledeletes_reconciledeletes",
-      "community": 115
+      "community": 116
     },
     {
       "label": "tuleapLinkResolver.js",
@@ -2201,7 +2201,7 @@
       "source_file": "apps/api/src/services/tuleapLinkResolver.js",
       "source_location": "L1",
       "id": "tuleaplinkresolver",
-      "community": 86
+      "community": 87
     },
     {
       "label": "resolveLinks()",
@@ -2209,7 +2209,7 @@
       "source_file": "apps/api/src/services/tuleapLinkResolver.js",
       "source_location": "L14",
       "id": "tuleaplinkresolver_resolvelinks",
-      "community": 86
+      "community": 87
     },
     {
       "label": "drainPending()",
@@ -2217,7 +2217,7 @@
       "source_file": "apps/api/src/services/tuleapLinkResolver.js",
       "source_location": "L39",
       "id": "tuleaplinkresolver_drainpending",
-      "community": 86
+      "community": 87
     },
     {
       "label": "tuleapTransformEngine.js",
@@ -2225,7 +2225,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L1",
       "id": "tuleaptransformengine",
-      "community": 31
+      "community": 32
     },
     {
       "label": "getEffectiveMapping()",
@@ -2233,7 +2233,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L66",
       "id": "tuleaptransformengine_geteffectivemapping",
-      "community": 31
+      "community": 32
     },
     {
       "label": "applyFieldMappings()",
@@ -2241,7 +2241,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L72",
       "id": "tuleaptransformengine_applyfieldmappings",
-      "community": 31
+      "community": 32
     },
     {
       "label": "applyStatusMap()",
@@ -2249,7 +2249,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L83",
       "id": "tuleaptransformengine_applystatusmap",
-      "community": 31
+      "community": 32
     },
     {
       "label": "reverseStatusMap()",
@@ -2257,7 +2257,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L90",
       "id": "tuleaptransformengine_reversestatusmap",
-      "community": 31
+      "community": 32
     },
     {
       "label": "fromTuleap()",
@@ -2265,7 +2265,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L101",
       "id": "tuleaptransformengine_fromtuleap",
-      "community": 31
+      "community": 32
     },
     {
       "label": "toTuleap()",
@@ -2273,7 +2273,7 @@
       "source_file": "apps/api/src/services/tuleapTransformEngine.js",
       "source_location": "L133",
       "id": "tuleaptransformengine_totuleap",
-      "community": 31
+      "community": 32
     },
     {
       "label": "userLifecycle.js",
@@ -2281,7 +2281,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L1",
       "id": "userlifecycle",
-      "community": 32
+      "community": 33
     },
     {
       "label": "lifecycleError()",
@@ -2289,7 +2289,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L6",
       "id": "userlifecycle_lifecycleerror",
-      "community": 32
+      "community": 33
     },
     {
       "label": "activateUser()",
@@ -2297,7 +2297,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L12",
       "id": "userlifecycle_activateuser",
-      "community": 32
+      "community": 33
     },
     {
       "label": "rollbackUser()",
@@ -2305,7 +2305,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L67",
       "id": "userlifecycle_rollbackuser",
-      "community": 32
+      "community": 33
     },
     {
       "label": "markReadyForActivation()",
@@ -2313,7 +2313,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L99",
       "id": "userlifecycle_markreadyforactivation",
-      "community": 32
+      "community": 33
     },
     {
       "label": "suspendUser()",
@@ -2321,7 +2321,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L126",
       "id": "userlifecycle_suspenduser",
-      "community": 32
+      "community": 33
     },
     {
       "label": "archiveUser()",
@@ -2329,7 +2329,7 @@
       "source_file": "apps/api/src/services/userLifecycle.js",
       "source_location": "L130",
       "id": "userlifecycle_archiveuser",
-      "community": 32
+      "community": 33
     },
     {
       "label": "tuleapAttachment.js",
@@ -2337,7 +2337,7 @@
       "source_file": "apps/api/src/services/tuleapAttachment.js",
       "source_location": "L1",
       "id": "tuleapattachment",
-      "community": 87
+      "community": 88
     },
     {
       "label": "uploadFile()",
@@ -2345,7 +2345,7 @@
       "source_file": "apps/api/src/services/tuleapAttachment.js",
       "source_location": "L4",
       "id": "tuleapattachment_uploadfile",
-      "community": 87
+      "community": 88
     },
     {
       "label": "attachFilesToArtifact()",
@@ -2353,7 +2353,7 @@
       "source_file": "apps/api/src/services/tuleapAttachment.js",
       "source_location": "L20",
       "id": "tuleapattachment_attachfilestoartifact",
-      "community": 87
+      "community": 88
     },
     {
       "label": "estimateAccuracy.js",
@@ -2361,7 +2361,7 @@
       "source_file": "apps/api/src/services/metrics/estimateAccuracy.js",
       "source_location": "L1",
       "id": "estimateaccuracy",
-      "community": 68
+      "community": 69
     },
     {
       "label": "finiteNumber()",
@@ -2369,7 +2369,7 @@
       "source_file": "apps/api/src/services/metrics/estimateAccuracy.js",
       "source_location": "L17",
       "id": "estimateaccuracy_finitenumber",
-      "community": 68
+      "community": 69
     },
     {
       "label": "estimateAccuracy()",
@@ -2377,7 +2377,7 @@
       "source_file": "apps/api/src/services/metrics/estimateAccuracy.js",
       "source_location": "L23",
       "id": "estimateaccuracy_estimateaccuracy",
-      "community": 68
+      "community": 69
     },
     {
       "label": "isClosedWorkStatus()",
@@ -2385,7 +2385,7 @@
       "source_file": "apps/api/src/services/metrics/estimateAccuracy.js",
       "source_location": "L57",
       "id": "estimateaccuracy_isclosedworkstatus",
-      "community": 68
+      "community": 69
     },
     {
       "label": "task.js",
@@ -2393,7 +2393,7 @@
       "source_file": "apps/api/src/schemas/task.js",
       "source_location": "L1",
       "id": "task",
-      "community": 13
+      "community": 12
     },
     {
       "label": "applyValueMap()",
@@ -2401,7 +2401,7 @@
       "source_file": "apps/api/src/services/emitters/task.js",
       "source_location": "L6",
       "id": "task_applyvaluemap",
-      "community": 13
+      "community": 12
     },
     {
       "label": "buildTuleapValues()",
@@ -2409,7 +2409,7 @@
       "source_file": "apps/api/src/services/emitters/task.js",
       "source_location": "L11",
       "id": "task_buildtuleapvalues",
-      "community": 13
+      "community": 12
     },
     {
       "label": "buildTaskEmitUnified()",
@@ -2417,7 +2417,7 @@
       "source_file": "apps/api/src/services/emitters/task.js",
       "source_location": "L56",
       "id": "task_buildtaskemitunified",
-      "community": 13
+      "community": 12
     },
     {
       "label": "emitToTuleap()",
@@ -2425,7 +2425,7 @@
       "source_file": "apps/api/src/services/emitters/task.js",
       "source_location": "L74",
       "id": "task_emittotuleap",
-      "community": 13
+      "community": 12
     },
     {
       "label": "test_case.js",
@@ -2505,7 +2505,7 @@
       "source_file": "apps/api/src/services/persisters/user_story.js",
       "source_location": "L1",
       "id": "user_story",
-      "community": 27
+      "community": 28
     },
     {
       "label": "applyValueMap()",
@@ -2513,7 +2513,7 @@
       "source_file": "apps/api/src/services/emitters/user_story.js",
       "source_location": "L6",
       "id": "user_story_applyvaluemap",
-      "community": 27
+      "community": 28
     },
     {
       "label": "buildTuleapValues()",
@@ -2521,7 +2521,7 @@
       "source_file": "apps/api/src/services/emitters/user_story.js",
       "source_location": "L11",
       "id": "user_story_buildtuleapvalues",
-      "community": 27
+      "community": 28
     },
     {
       "label": "emitToTuleap()",
@@ -2529,7 +2529,7 @@
       "source_file": "apps/api/src/services/emitters/user_story.js",
       "source_location": "L81",
       "id": "user_story_emittotuleap",
-      "community": 27
+      "community": 28
     },
     {
       "label": "normalizeBugStatus()",
@@ -2793,7 +2793,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L11",
       "id": "task_demoteonreassign",
-      "community": 13
+      "community": 12
     },
     {
       "label": "normalizeTaskStatus()",
@@ -2801,7 +2801,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L22",
       "id": "task_normalizetaskstatus",
-      "community": 13
+      "community": 12
     },
     {
       "label": "generateTaskId()",
@@ -2809,7 +2809,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L27",
       "id": "task_generatetaskid",
-      "community": 13
+      "community": 12
     },
     {
       "label": "dispatchAction()",
@@ -2817,7 +2817,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L44",
       "id": "task_dispatchaction",
-      "community": 13
+      "community": 12
     },
     {
       "label": "handleReject()",
@@ -2825,7 +2825,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L76",
       "id": "task_handlereject",
-      "community": 13
+      "community": 12
     },
     {
       "label": "handleDelete()",
@@ -2833,7 +2833,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L101",
       "id": "task_handledelete",
-      "community": 13
+      "community": 12
     },
     {
       "label": "handleArchive()",
@@ -2841,7 +2841,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L139",
       "id": "task_handlearchive",
-      "community": 13
+      "community": 12
     },
     {
       "label": "handleSync()",
@@ -2849,7 +2849,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L180",
       "id": "task_handlesync",
-      "community": 13
+      "community": 12
     },
     {
       "label": "resolveResourceByName()",
@@ -2857,7 +2857,7 @@
       "source_file": "apps/api/src/services/persisters/task.js",
       "source_location": "L358",
       "id": "task_resolveresourcebyname",
-      "community": 13
+      "community": 12
     },
     {
       "label": "generateTestCaseId()",
@@ -2945,7 +2945,7 @@
       "source_file": "apps/api/src/services/persisters/user_story.js",
       "source_location": "L10",
       "id": "user_story_dispatchaction",
-      "community": 27
+      "community": 28
     },
     {
       "label": "handleDelete()",
@@ -2953,7 +2953,7 @@
       "source_file": "apps/api/src/services/persisters/user_story.js",
       "source_location": "L34",
       "id": "user_story_handledelete",
-      "community": 27
+      "community": 28
     },
     {
       "label": "handleSync()",
@@ -2961,7 +2961,7 @@
       "source_file": "apps/api/src/services/persisters/user_story.js",
       "source_location": "L52",
       "id": "user_story_handlesync",
-      "community": 27
+      "community": 28
     },
     {
       "label": "updateUserStory()",
@@ -2969,7 +2969,7 @@
       "source_file": "apps/api/src/services/persisters/user_story.js",
       "source_location": "L190",
       "id": "user_story_updateuserstory",
-      "community": 27
+      "community": 28
     },
     {
       "label": "taskAssignments.ts",
@@ -3281,7 +3281,7 @@
       "source_file": "QC-Manager/apps/api/src/middleware/audit.js",
       "source_location": "L1",
       "id": "audit",
-      "community": 88
+      "community": 89
     },
     {
       "label": "auditLog()",
@@ -3289,7 +3289,7 @@
       "source_file": "QC-Manager/apps/api/src/middleware/audit.js",
       "source_location": "L12",
       "id": "audit_auditlog",
-      "community": 88
+      "community": 89
     },
     {
       "label": "auditMiddleware()",
@@ -3297,7 +3297,7 @@
       "source_file": "QC-Manager/apps/api/src/middleware/audit.js",
       "source_location": "L49",
       "id": "audit_auditmiddleware",
-      "community": 88
+      "community": 89
     },
     {
       "label": "error.js",
@@ -3305,7 +3305,7 @@
       "source_file": "QC-Manager/apps/api/src/middleware/error.js",
       "source_location": "L1",
       "id": "error",
-      "community": 116
+      "community": 117
     },
     {
       "label": "errorHandler()",
@@ -3313,7 +3313,7 @@
       "source_file": "QC-Manager/apps/api/src/middleware/error.js",
       "source_location": "L1",
       "id": "error_errorhandler",
-      "community": 116
+      "community": 117
     },
     {
       "label": "teamAccess.js",
@@ -3425,7 +3425,7 @@
       "source_file": "apps/api/src/utils/n8n.js",
       "source_location": "L1",
       "id": "n8n",
-      "community": 117
+      "community": 118
     },
     {
       "label": "triggerWorkflow()",
@@ -3433,7 +3433,7 @@
       "source_file": "apps/api/src/utils/n8n.js",
       "source_location": "L5",
       "id": "n8n_triggerworkflow",
-      "community": 117
+      "community": 118
     },
     {
       "label": "workingDays.js",
@@ -3441,7 +3441,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L1",
       "id": "workingdays",
-      "community": 33
+      "community": 34
     },
     {
       "label": "isWorkingDay()",
@@ -3449,7 +3449,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L21",
       "id": "workingdays_isworkingday",
-      "community": 33
+      "community": 34
     },
     {
       "label": "countWorkingDays()",
@@ -3457,7 +3457,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L39",
       "id": "workingdays_countworkingdays",
-      "community": 33
+      "community": 34
     },
     {
       "label": "addWorkingDays()",
@@ -3465,7 +3465,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L67",
       "id": "workingdays_addworkingdays",
-      "community": 33
+      "community": 34
     },
     {
       "label": "normalizeDate()",
@@ -3473,7 +3473,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L84",
       "id": "workingdays_normalizedate",
-      "community": 33
+      "community": 34
     },
     {
       "label": "getTaskHealth()",
@@ -3481,7 +3481,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L101",
       "id": "workingdays_gettaskhealth",
-      "community": 33
+      "community": 34
     },
     {
       "label": "computeTaskTimeline()",
@@ -3489,7 +3489,7 @@
       "source_file": "QC-Manager/apps/api/src/utils/workingDays.js",
       "source_location": "L138",
       "id": "workingdays_computetasktimeline",
-      "community": 33
+      "community": 34
     },
     {
       "label": "supabase.ts",
@@ -3505,7 +3505,7 @@
       "source_file": "apps/api/src/config/db.js",
       "source_location": "L1",
       "id": "db",
-      "community": 118
+      "community": 119
     },
     {
       "label": "runMigrations()",
@@ -3513,7 +3513,7 @@
       "source_file": "apps/api/src/config/db.js",
       "source_location": "L27",
       "id": "db_runmigrations",
-      "community": 118
+      "community": 119
     },
     {
       "label": "storage.js",
@@ -3625,7 +3625,7 @@
       "source_file": "apps/api/src/rbac/validatePermissionCatalog.js",
       "source_location": "L1",
       "id": "validatepermissioncatalog",
-      "community": 69
+      "community": 70
     },
     {
       "label": "walkJavaScriptFiles()",
@@ -3633,7 +3633,7 @@
       "source_file": "apps/api/src/rbac/validatePermissionCatalog.js",
       "source_location": "L9",
       "id": "validatepermissioncatalog_walkjavascriptfiles",
-      "community": 69
+      "community": 70
     },
     {
       "label": "extractPermissionReferences()",
@@ -3641,7 +3641,7 @@
       "source_file": "apps/api/src/rbac/validatePermissionCatalog.js",
       "source_location": "L19",
       "id": "validatepermissioncatalog_extractpermissionreferences",
-      "community": 69
+      "community": 70
     },
     {
       "label": "validatePermissionCatalog()",
@@ -3649,7 +3649,7 @@
       "source_file": "apps/api/src/rbac/validatePermissionCatalog.js",
       "source_location": "L36",
       "id": "validatepermissioncatalog_validatepermissioncatalog",
-      "community": 69
+      "community": 70
     },
     {
       "label": "AccessEngine.js",
@@ -3737,7 +3737,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L1",
       "id": "artifactvisibilitydefaulter",
-      "community": 39
+      "community": 40
     },
     {
       "label": "resolveQuery()",
@@ -3745,7 +3745,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L5",
       "id": "artifactvisibilitydefaulter_resolvequery",
-      "community": 39
+      "community": 40
     },
     {
       "label": "lookupHumanCreatorTeam()",
@@ -3753,7 +3753,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L9",
       "id": "artifactvisibilitydefaulter_lookuphumancreatorteam",
-      "community": 39
+      "community": 40
     },
     {
       "label": "lookupTuleapCreatorTeam()",
@@ -3761,7 +3761,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L23",
       "id": "artifactvisibilitydefaulter_lookuptuleapcreatorteam",
-      "community": 39
+      "community": 40
     },
     {
       "label": "loadDefaultRow()",
@@ -3769,7 +3769,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L36",
       "id": "artifactvisibilitydefaulter_loaddefaultrow",
-      "community": 39
+      "community": 40
     },
     {
       "label": "defaultsFor()",
@@ -3777,7 +3777,7 @@
       "source_file": "apps/api/src/access/ArtifactVisibilityDefaulter.js",
       "source_location": "L48",
       "id": "artifactvisibilitydefaulter_defaultsfor",
-      "community": 39
+      "community": 40
     },
     {
       "label": "RoleResolver.js",
@@ -3785,7 +3785,7 @@
       "source_file": "apps/api/src/access/RoleResolver.js",
       "source_location": "L1",
       "id": "roleresolver",
-      "community": 49
+      "community": 50
     },
     {
       "label": "loadRolePermissions()",
@@ -3793,7 +3793,7 @@
       "source_file": "apps/api/src/access/RoleResolver.js",
       "source_location": "L10",
       "id": "roleresolver_loadrolepermissions",
-      "community": 49
+      "community": 50
     },
     {
       "label": "loadUserPermissions()",
@@ -3801,7 +3801,7 @@
       "source_file": "apps/api/src/access/RoleResolver.js",
       "source_location": "L28",
       "id": "roleresolver_loaduserpermissions",
-      "community": 49
+      "community": 50
     },
     {
       "label": "loadScope()",
@@ -3809,7 +3809,7 @@
       "source_file": "apps/api/src/access/RoleResolver.js",
       "source_location": "L36",
       "id": "roleresolver_loadscope",
-      "community": 49
+      "community": 50
     },
     {
       "label": "resolve()",
@@ -3817,7 +3817,7 @@
       "source_file": "apps/api/src/access/RoleResolver.js",
       "source_location": "L58",
       "id": "roleresolver_resolve",
-      "community": 49
+      "community": 50
     },
     {
       "label": "project.js",
@@ -3825,7 +3825,7 @@
       "source_file": "QC-Manager/apps/api/src/schemas/project.js",
       "source_location": "L1",
       "id": "project",
-      "community": 175
+      "community": 176
     },
     {
       "label": "tuleapConfig.js",
@@ -3833,7 +3833,7 @@
       "source_file": "apps/api/src/schemas/tuleapConfig.js",
       "source_location": "L1",
       "id": "tuleapconfig",
-      "community": 176
+      "community": 177
     },
     {
       "label": "resource.js",
@@ -3841,7 +3841,7 @@
       "source_file": "apps/api/src/schemas/resource.js",
       "source_location": "L1",
       "id": "resource",
-      "community": 177
+      "community": 178
     },
     {
       "label": "userStory.js",
@@ -3849,7 +3849,7 @@
       "source_file": "apps/api/src/schemas/userStory.js",
       "source_location": "L1",
       "id": "userstory",
-      "community": 178
+      "community": 179
     },
     {
       "label": "tuleapUnified.js",
@@ -3857,7 +3857,7 @@
       "source_file": "apps/api/src/schemas/tuleapUnified.js",
       "source_location": "L1",
       "id": "tuleapunified",
-      "community": 179
+      "community": 180
     },
     {
       "label": "journey.js",
@@ -3865,7 +3865,7 @@
       "source_file": "QC-Manager/apps/api/src/schemas/journey.js",
       "source_location": "L1",
       "id": "journey",
-      "community": 180
+      "community": 181
     },
     {
       "label": "search.js",
@@ -3873,7 +3873,7 @@
       "source_file": "apps/api/src/routes/search.js",
       "source_location": "L1",
       "id": "search",
-      "community": 70
+      "community": 71
     },
     {
       "label": "getAllowedTypes()",
@@ -3881,7 +3881,7 @@
       "source_file": "apps/api/src/routes/search.js",
       "source_location": "L14",
       "id": "search_getallowedtypes",
-      "community": 70
+      "community": 71
     },
     {
       "label": "parseTypes()",
@@ -3889,7 +3889,7 @@
       "source_file": "apps/api/src/routes/search.js",
       "source_location": "L36",
       "id": "search_parsetypes",
-      "community": 70
+      "community": 71
     },
     {
       "label": "buildSearchQuery()",
@@ -3897,7 +3897,7 @@
       "source_file": "apps/api/src/routes/search.js",
       "source_location": "L44",
       "id": "search_buildsearchquery",
-      "community": 70
+      "community": 71
     },
     {
       "label": "projects.js",
@@ -3905,7 +3905,7 @@
       "source_file": "apps/api/src/routes/projects.js",
       "source_location": "L1",
       "id": "projects",
-      "community": 119
+      "community": 120
     },
     {
       "label": "buildTeamFilter()",
@@ -3913,7 +3913,7 @@
       "source_file": "apps/api/src/routes/projects.js",
       "source_location": "L16",
       "id": "projects_buildteamfilter",
-      "community": 119
+      "community": 120
     },
     {
       "label": "tuleapArtifacts.js",
@@ -3921,7 +3921,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L1",
       "id": "tuleapartifacts",
-      "community": 34
+      "community": 35
     },
     {
       "label": "resolveConfig()",
@@ -3929,7 +3929,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L27",
       "id": "tuleapartifacts_resolveconfig",
-      "community": 34
+      "community": 35
     },
     {
       "label": "resolveTrackerId()",
@@ -3937,7 +3937,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L37",
       "id": "tuleapartifacts_resolvetrackerid",
-      "community": 34
+      "community": 35
     },
     {
       "label": "handleTaskCreate()",
@@ -3945,7 +3945,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L202",
       "id": "tuleapartifacts_handletaskcreate",
-      "community": 34
+      "community": 35
     },
     {
       "label": "handleBugCreate()",
@@ -3953,7 +3953,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L257",
       "id": "tuleapartifacts_handlebugcreate",
-      "community": 34
+      "community": 35
     },
     {
       "label": "handleUserStoryCreate()",
@@ -3961,7 +3961,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L358",
       "id": "tuleapartifacts_handleuserstorycreate",
-      "community": 34
+      "community": 35
     },
     {
       "label": "handleTestCaseCreate()",
@@ -3969,7 +3969,7 @@
       "source_file": "apps/api/src/routes/tuleapArtifacts.js",
       "source_location": "L449",
       "id": "tuleapartifacts_handletestcasecreate",
-      "community": 34
+      "community": 35
     },
     {
       "label": "dashboard.js",
@@ -3977,7 +3977,7 @@
       "source_file": "apps/api/src/routes/dashboard.js",
       "source_location": "L1",
       "id": "dashboard",
-      "community": 120
+      "community": 121
     },
     {
       "label": "getTeamMetrics()",
@@ -3985,7 +3985,7 @@
       "source_file": "apps/api/src/routes/dashboard.js",
       "source_location": "L29",
       "id": "dashboard_getteammetrics",
-      "community": 120
+      "community": 121
     },
     {
       "label": "adminAccess.js",
@@ -3993,7 +3993,7 @@
       "source_file": "apps/api/src/routes/adminAccess.js",
       "source_location": "L1",
       "id": "adminaccess",
-      "community": 50
+      "community": 51
     },
     {
       "label": "permissionAction()",
@@ -4001,7 +4001,7 @@
       "source_file": "apps/api/src/routes/adminAccess.js",
       "source_location": "L30",
       "id": "adminaccess_permissionaction",
-      "community": 50
+      "community": 51
     },
     {
       "label": "formatPermissionLabel()",
@@ -4009,7 +4009,7 @@
       "source_file": "apps/api/src/routes/adminAccess.js",
       "source_location": "L34",
       "id": "adminaccess_formatpermissionlabel",
-      "community": 50
+      "community": 51
     },
     {
       "label": "permissionBelongsToTab()",
@@ -4017,7 +4017,7 @@
       "source_file": "apps/api/src/routes/adminAccess.js",
       "source_location": "L40",
       "id": "adminaccess_permissionbelongstotab",
-      "community": 50
+      "community": 51
     },
     {
       "label": "permissionsForArtifact()",
@@ -4025,7 +4025,7 @@
       "source_file": "apps/api/src/routes/adminAccess.js",
       "source_location": "L44",
       "id": "adminaccess_permissionsforartifact",
-      "community": 50
+      "community": 51
     },
     {
       "label": "testExecutions.js",
@@ -4033,7 +4033,7 @@
       "source_file": "apps/api/src/routes/testExecutions.js",
       "source_location": "L1",
       "id": "testexecutions",
-      "community": 89
+      "community": 90
     },
     {
       "label": "shouldStampExecution()",
@@ -4041,7 +4041,7 @@
       "source_file": "apps/api/src/routes/testExecutions.js",
       "source_location": "L65",
       "id": "testexecutions_shouldstampexecution",
-      "community": 89
+      "community": 90
     },
     {
       "label": "validateExecutionDate()",
@@ -4049,7 +4049,7 @@
       "source_file": "apps/api/src/routes/testExecutions.js",
       "source_location": "L931",
       "id": "testexecutions_validateexecutiondate",
-      "community": 89
+      "community": 90
     },
     {
       "label": "tuleapWebhook.js",
@@ -4057,7 +4057,7 @@
       "source_file": "apps/api/src/routes/tuleapWebhook.js",
       "source_location": "L1",
       "id": "tuleapwebhook",
-      "community": 71
+      "community": 72
     },
     {
       "label": "findDuplicateValues()",
@@ -4065,7 +4065,7 @@
       "source_file": "apps/api/src/routes/tuleapWebhook.js",
       "source_location": "L14",
       "id": "tuleapwebhook_findduplicatevalues",
-      "community": 71
+      "community": 72
     },
     {
       "label": "provisionTuleapProject()",
@@ -4073,7 +4073,7 @@
       "source_file": "apps/api/src/routes/tuleapWebhook.js",
       "source_location": "L41",
       "id": "tuleapwebhook_provisiontuleapproject",
-      "community": 71
+      "community": 72
     },
     {
       "label": "logWebhook()",
@@ -4081,7 +4081,7 @@
       "source_file": "apps/api/src/routes/tuleapWebhook.js",
       "source_location": "L142",
       "id": "tuleapwebhook_logwebhook",
-      "community": 71
+      "community": 72
     },
     {
       "label": "managerView.js",
@@ -4089,7 +4089,7 @@
       "source_file": "apps/api/src/routes/managerView.js",
       "source_location": "L1",
       "id": "managerview",
-      "community": 181
+      "community": 182
     },
     {
       "label": "users.js",
@@ -4097,7 +4097,7 @@
       "source_file": "apps/api/src/routes/users.js",
       "source_location": "L1",
       "id": "users",
-      "community": 182
+      "community": 183
     },
     {
       "label": "governance.ts",
@@ -4113,7 +4113,7 @@
       "source_file": "apps/api/src/routes/auth.js",
       "source_location": "L1",
       "id": "auth",
-      "community": 90
+      "community": 91
     },
     {
       "label": "setDefaultPermissions()",
@@ -4121,7 +4121,7 @@
       "source_file": "apps/api/src/routes/auth.js",
       "source_location": "L85",
       "id": "auth_setdefaultpermissions",
-      "community": 90
+      "community": 91
     },
     {
       "label": "setInactivePermissions()",
@@ -4129,7 +4129,7 @@
       "source_file": "apps/api/src/routes/auth.js",
       "source_location": "L127",
       "id": "auth_setinactivepermissions",
-      "community": 90
+      "community": 91
     },
     {
       "label": "me.js",
@@ -4137,7 +4137,7 @@
       "source_file": "apps/api/src/routes/me.js",
       "source_location": "L1",
       "id": "me",
-      "community": 121
+      "community": 122
     },
     {
       "label": "dashboardHandler()",
@@ -4145,7 +4145,7 @@
       "source_file": "apps/api/src/routes/me.js",
       "source_location": "L6",
       "id": "me_dashboardhandler",
-      "community": 121
+      "community": 122
     },
     {
       "label": "notifications.js",
@@ -4153,7 +4153,7 @@
       "source_file": "QC-Manager/apps/api/src/routes/notifications.js",
       "source_location": "L1",
       "id": "notifications",
-      "community": 91
+      "community": 92
     },
     {
       "label": "createNotification()",
@@ -4161,7 +4161,7 @@
       "source_file": "QC-Manager/apps/api/src/routes/notifications.js",
       "source_location": "L92",
       "id": "notifications_createnotification",
-      "community": 91
+      "community": 92
     },
     {
       "label": "notifyAdmins()",
@@ -4169,7 +4169,7 @@
       "source_file": "QC-Manager/apps/api/src/routes/notifications.js",
       "source_location": "L105",
       "id": "notifications_notifyadmins",
-      "community": 91
+      "community": 92
     },
     {
       "label": "personalTasks.js",
@@ -4177,7 +4177,7 @@
       "source_file": "apps/api/src/routes/personalTasks.js",
       "source_location": "L1",
       "id": "personaltasks",
-      "community": 183
+      "community": 184
     },
     {
       "label": "reports.js",
@@ -4257,7 +4257,7 @@
       "source_file": "apps/api/src/routes/userStories.js",
       "source_location": "L1",
       "id": "userstories",
-      "community": 72
+      "community": 73
     },
     {
       "label": "parseCsvParam()",
@@ -4265,7 +4265,7 @@
       "source_file": "apps/api/src/routes/userStories.js",
       "source_location": "L18",
       "id": "userstories_parsecsvparam",
-      "community": 72
+      "community": 73
     },
     {
       "label": "resolveUserStorySyncConfig()",
@@ -4273,7 +4273,7 @@
       "source_file": "apps/api/src/routes/userStories.js",
       "source_location": "L23",
       "id": "userstories_resolveuserstorysyncconfig",
-      "community": 72
+      "community": 73
     },
     {
       "label": "tryEmitAndWriteback()",
@@ -4281,7 +4281,7 @@
       "source_file": "apps/api/src/routes/userStories.js",
       "source_location": "L31",
       "id": "userstories_tryemitandwriteback",
-      "community": 72
+      "community": 73
     },
     {
       "label": "roles.js",
@@ -4289,7 +4289,7 @@
       "source_file": "apps/api/src/routes/roles.js",
       "source_location": "L1",
       "id": "roles",
-      "community": 92
+      "community": 93
     },
     {
       "label": "catalogPermissionsFor()",
@@ -4297,7 +4297,7 @@
       "source_file": "apps/api/src/routes/roles.js",
       "source_location": "L19",
       "id": "roles_catalogpermissionsfor",
-      "community": 92
+      "community": 93
     },
     {
       "label": "loadRolePermissionMap()",
@@ -4305,7 +4305,7 @@
       "source_file": "apps/api/src/routes/roles.js",
       "source_location": "L25",
       "id": "roles_loadrolepermissionmap",
-      "community": 92
+      "community": 93
     },
     {
       "label": "avatar.js",
@@ -4313,7 +4313,7 @@
       "source_file": "apps/api/src/routes/avatar.js",
       "source_location": "L1",
       "id": "avatar",
-      "community": 93
+      "community": 94
     },
     {
       "label": "ensureAvatarsDir()",
@@ -4321,7 +4321,7 @@
       "source_file": "apps/api/src/routes/avatar.js",
       "source_location": "L11",
       "id": "avatar_ensureavatarsdir",
-      "community": 93
+      "community": 94
     },
     {
       "label": "fileFilter()",
@@ -4329,7 +4329,7 @@
       "source_file": "apps/api/src/routes/avatar.js",
       "source_location": "L34",
       "id": "avatar_filefilter",
-      "community": 93
+      "community": 94
     },
     {
       "label": "testCaseTasks.js",
@@ -4337,7 +4337,7 @@
       "source_file": "apps/api/src/routes/testCaseTasks.js",
       "source_location": "L1",
       "id": "testcasetasks",
-      "community": 184
+      "community": 185
     },
     {
       "label": "tasks.js",
@@ -4345,7 +4345,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L1",
       "id": "tasks",
-      "community": 28
+      "community": 29
     },
     {
       "label": "getUserResourceId()",
@@ -4353,7 +4353,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L41",
       "id": "tasks_getuserresourceid",
-      "community": 28
+      "community": 29
     },
     {
       "label": "resolveTaskSyncConfig()",
@@ -4361,7 +4361,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L49",
       "id": "tasks_resolvetasksyncconfig",
-      "community": 28
+      "community": 29
     },
     {
       "label": "resolveTaskAccessAssigneeResourceId()",
@@ -4369,7 +4369,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L57",
       "id": "tasks_resolvetaskaccessassigneeresourceid",
-      "community": 28
+      "community": 29
     },
     {
       "label": "tryEmitAndWriteback()",
@@ -4377,7 +4377,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L84",
       "id": "tasks_tryemitandwriteback",
-      "community": 28
+      "community": 29
     },
     {
       "label": "ensureResourceInTeam()",
@@ -4385,7 +4385,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L117",
       "id": "tasks_ensureresourceinteam",
-      "community": 28
+      "community": 29
     },
     {
       "label": "validateStatusTransition()",
@@ -4393,7 +4393,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L141",
       "id": "tasks_validatestatustransition",
-      "community": 28
+      "community": 29
     },
     {
       "label": "buildTaskTeamFilter()",
@@ -4401,7 +4401,7 @@
       "source_file": "apps/api/src/routes/tasks.js",
       "source_location": "L170",
       "id": "tasks_buildtaskteamfilter",
-      "community": 28
+      "community": 29
     },
     {
       "label": "coverageLinks.js",
@@ -4409,7 +4409,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L1",
       "id": "coveragelinks",
-      "community": 40
+      "community": 41
     },
     {
       "label": "displayExpr()",
@@ -4417,7 +4417,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L22",
       "id": "coveragelinks_displayexpr",
-      "community": 40
+      "community": 41
     },
     {
       "label": "fields()",
@@ -4425,7 +4425,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L27",
       "id": "coveragelinks_fields",
-      "community": 40
+      "community": 41
     },
     {
       "label": "pluralPath()",
@@ -4433,7 +4433,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L44",
       "id": "coveragelinks_pluralpath",
-      "community": 40
+      "community": 41
     },
     {
       "label": "getArtifact()",
@@ -4441,7 +4441,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L49",
       "id": "coveragelinks_getartifact",
-      "community": 40
+      "community": 41
     },
     {
       "label": "addRoutes()",
@@ -4449,7 +4449,7 @@
       "source_file": "apps/api/src/routes/coverageLinks.js",
       "source_location": "L56",
       "id": "coveragelinks_addroutes",
-      "community": 40
+      "community": 41
     },
     {
       "label": "myJourneys.js",
@@ -4457,7 +4457,7 @@
       "source_file": "apps/api/src/routes/myJourneys.js",
       "source_location": "L1",
       "id": "myjourneys",
-      "community": 94
+      "community": 95
     },
     {
       "label": "computeChapterLocking()",
@@ -4465,7 +4465,7 @@
       "source_file": "apps/api/src/routes/myJourneys.js",
       "source_location": "L39",
       "id": "myjourneys_computechapterlocking",
-      "community": 94
+      "community": 95
     },
     {
       "label": "computeEarnedXp()",
@@ -4473,7 +4473,7 @@
       "source_file": "apps/api/src/routes/myJourneys.js",
       "source_location": "L54",
       "id": "myjourneys_computeearnedxp",
-      "community": 94
+      "community": 95
     },
     {
       "label": "testResults.js",
@@ -4481,7 +4481,7 @@
       "source_file": "apps/api/src/routes/testResults.js",
       "source_location": "L1",
       "id": "testresults",
-      "community": 185
+      "community": 186
     },
     {
       "label": "artifactAttachments.js",
@@ -4489,7 +4489,7 @@
       "source_file": "apps/api/src/routes/artifactAttachments.js",
       "source_location": "L1",
       "id": "artifactattachments",
-      "community": 122
+      "community": 123
     },
     {
       "label": "adoptStagedAttachments()",
@@ -4497,7 +4497,7 @@
       "source_file": "apps/api/src/routes/artifactAttachments.js",
       "source_location": "L141",
       "id": "artifactattachments_adoptstagedattachments",
-      "community": 122
+      "community": 123
     },
     {
       "label": "testspriteWebhook.js",
@@ -4505,7 +4505,7 @@
       "source_file": "QC-Manager/apps/api/src/routes/testspriteWebhook.js",
       "source_location": "L1",
       "id": "testspritewebhook",
-      "community": 186
+      "community": 187
     },
     {
       "label": "resources.js",
@@ -4513,7 +4513,7 @@
       "source_file": "apps/api/src/routes/resources.js",
       "source_location": "L1",
       "id": "resources",
-      "community": 187
+      "community": 188
     },
     {
       "label": "dashboards.js",
@@ -4521,7 +4521,7 @@
       "source_file": "apps/api/src/routes/dashboards.js",
       "source_location": "L1",
       "id": "dashboards",
-      "community": 95
+      "community": 96
     },
     {
       "label": "listPmProjects()",
@@ -4529,7 +4529,7 @@
       "source_file": "apps/api/src/routes/dashboards.js",
       "source_location": "L32",
       "id": "dashboards_listpmprojects",
-      "community": 95
+      "community": 96
     },
     {
       "label": "buildFilterMap()",
@@ -4537,7 +4537,7 @@
       "source_file": "apps/api/src/routes/dashboards.js",
       "source_location": "L45",
       "id": "dashboards_buildfiltermap",
-      "community": 95
+      "community": 96
     },
     {
       "label": "developmentPlans.js",
@@ -4633,7 +4633,7 @@
       "source_file": "apps/api/src/routes/testCases.js",
       "source_location": "L1",
       "id": "testcases",
-      "community": 51
+      "community": 52
     },
     {
       "label": "resolveTestCaseSyncConfig()",
@@ -4641,7 +4641,7 @@
       "source_file": "apps/api/src/routes/testCases.js",
       "source_location": "L14",
       "id": "testcases_resolvetestcasesyncconfig",
-      "community": 51
+      "community": 52
     },
     {
       "label": "tryEmitAndWriteback()",
@@ -4649,7 +4649,7 @@
       "source_file": "apps/api/src/routes/testCases.js",
       "source_location": "L22",
       "id": "testcases_tryemitandwriteback",
-      "community": 51
+      "community": 52
     },
     {
       "label": "resolveAssignedToUserId()",
@@ -4657,7 +4657,7 @@
       "source_file": "apps/api/src/routes/testCases.js",
       "source_location": "L89",
       "id": "testcases_resolveassignedtouserid",
-      "community": 51
+      "community": 52
     },
     {
       "label": "logTestCaseHistory()",
@@ -4665,7 +4665,7 @@
       "source_file": "apps/api/src/routes/testCases.js",
       "source_location": "L102",
       "id": "testcases_logtestcasehistory",
-      "community": 51
+      "community": 52
     },
     {
       "label": "bugs.js",
@@ -4673,7 +4673,7 @@
       "source_file": "apps/api/src/routes/bugs.js",
       "source_location": "L1",
       "id": "bugs",
-      "community": 52
+      "community": 53
     },
     {
       "label": "validUUID()",
@@ -4681,7 +4681,7 @@
       "source_file": "apps/api/src/routes/bugs.js",
       "source_location": "L15",
       "id": "bugs_validuuid",
-      "community": 52
+      "community": 53
     },
     {
       "label": "replaceBugLinks()",
@@ -4689,7 +4689,7 @@
       "source_file": "apps/api/src/routes/bugs.js",
       "source_location": "L17",
       "id": "bugs_replacebuglinks",
-      "community": 52
+      "community": 53
     },
     {
       "label": "resolveBugSyncConfig()",
@@ -4697,7 +4697,7 @@
       "source_file": "apps/api/src/routes/bugs.js",
       "source_location": "L43",
       "id": "bugs_resolvebugsyncconfig",
-      "community": 52
+      "community": 53
     },
     {
       "label": "tryEmitAndWriteback()",
@@ -4705,7 +4705,7 @@
       "source_file": "apps/api/src/routes/bugs.js",
       "source_location": "L51",
       "id": "bugs_tryemitandwriteback",
-      "community": 52
+      "community": 53
     },
     {
       "label": "teams.js",
@@ -4713,7 +4713,7 @@
       "source_file": "apps/api/src/routes/teams.js",
       "source_location": "L1",
       "id": "teams",
-      "community": 188
+      "community": 189
     },
     {
       "label": "testSuites.js",
@@ -4721,7 +4721,7 @@
       "source_file": "apps/api/src/routes/testSuites.js",
       "source_location": "L1",
       "id": "testsuites",
-      "community": 123
+      "community": 124
     },
     {
       "label": "validateSuiteTestCases()",
@@ -4729,7 +4729,7 @@
       "source_file": "apps/api/src/routes/testSuites.js",
       "source_location": "L32",
       "id": "testsuites_validatesuitetestcases",
-      "community": 123
+      "community": 124
     },
     {
       "label": "journeys.js",
@@ -4737,7 +4737,7 @@
       "source_file": "apps/api/src/routes/journeys.js",
       "source_location": "L1",
       "id": "journeys",
-      "community": 189
+      "community": 190
     },
     {
       "label": "taskTestCases.js",
@@ -4745,7 +4745,7 @@
       "source_file": "apps/api/src/routes/taskTestCases.js",
       "source_location": "L1",
       "id": "tasktestcases",
-      "community": 190
+      "community": 191
     },
     {
       "label": "next.config.js",
@@ -4753,7 +4753,7 @@
       "source_file": "apps/web/next.config.js",
       "source_location": "L1",
       "id": "next_config",
-      "community": 191
+      "community": 192
     },
     {
       "label": "postcss.config.js",
@@ -4761,7 +4761,7 @@
       "source_file": "QC-Manager/apps/web/postcss.config.js",
       "source_location": "L1",
       "id": "postcss_config",
-      "community": 192
+      "community": 193
     },
     {
       "label": "tailwind.config.js",
@@ -4769,7 +4769,7 @@
       "source_file": "QC-Manager/apps/web/tailwind.config.js",
       "source_location": "L1",
       "id": "tailwind_config",
-      "community": 193
+      "community": 194
     },
     {
       "label": "next-env.d.ts",
@@ -4777,7 +4777,7 @@
       "source_file": "QC-Manager/apps/web/next-env.d.ts",
       "source_location": "L1",
       "id": "next_env_d",
-      "community": 194
+      "community": 195
     },
     {
       "label": "TaskModal.js",
@@ -4785,7 +4785,7 @@
       "source_file": "QC-Manager/apps/web/components/TaskModal.js",
       "source_location": "L1",
       "id": "taskmodal",
-      "community": 124
+      "community": 125
     },
     {
       "label": "TaskModal()",
@@ -4793,7 +4793,7 @@
       "source_file": "QC-Manager/apps/web/components/TaskModal.js",
       "source_location": "L5",
       "id": "taskmodal_taskmodal",
-      "community": 124
+      "community": 125
     },
     {
       "label": "Navbar.js",
@@ -4801,7 +4801,7 @@
       "source_file": "QC-Manager/apps/web/components/Navbar.js",
       "source_location": "L1",
       "id": "navbar",
-      "community": 125
+      "community": 126
     },
     {
       "label": "Navbar()",
@@ -4809,7 +4809,7 @@
       "source_file": "QC-Manager/apps/web/components/Navbar.js",
       "source_location": "L1",
       "id": "navbar_navbar",
-      "community": 125
+      "community": 126
     },
     {
       "label": "page.tsx",
@@ -5257,7 +5257,7 @@
       "source_file": "apps/web/app/me/dashboard/my-dashboard-client.tsx",
       "source_location": "L1",
       "id": "my_dashboard_client",
-      "community": 6
+      "community": 5
     },
     {
       "label": "lateSuffix()",
@@ -5409,7 +5409,7 @@
       "source_file": "apps/web/app/admin/integrations/tuleap/NewMappingModal.tsx",
       "source_location": "L1",
       "id": "newmappingmodal",
-      "community": 73
+      "community": 74
     },
     {
       "label": "Ico()",
@@ -5417,7 +5417,7 @@
       "source_file": "apps/web/app/admin/integrations/tuleap/NewMappingModal.tsx",
       "source_location": "L24",
       "id": "newmappingmodal_ico",
-      "community": 73
+      "community": 74
     },
     {
       "label": "handleVerify()",
@@ -5425,7 +5425,7 @@
       "source_file": "apps/web/app/admin/integrations/tuleap/NewMappingModal.tsx",
       "source_location": "L76",
       "id": "newmappingmodal_handleverify",
-      "community": 73
+      "community": 74
     },
     {
       "label": "handleCreate()",
@@ -5433,7 +5433,7 @@
       "source_file": "apps/web/app/admin/integrations/tuleap/NewMappingModal.tsx",
       "source_location": "L102",
       "id": "newmappingmodal_handlecreate",
-      "community": 73
+      "community": 74
     },
     {
       "label": "TrackerConfigDrawer.tsx",
@@ -6001,7 +6001,7 @@
       "source_file": "QC-Manager/apps/web/app/auth/callback/route.ts",
       "source_location": "L1",
       "id": "route",
-      "community": 96
+      "community": 97
     },
     {
       "label": "getOrigin()",
@@ -6009,7 +6009,7 @@
       "source_file": "QC-Manager/apps/web/app/auth/callback/route.ts",
       "source_location": "L3",
       "id": "route_getorigin",
-      "community": 96
+      "community": 97
     },
     {
       "label": "GET()",
@@ -6017,7 +6017,7 @@
       "source_file": "QC-Manager/apps/web/app/auth/callback/route.ts",
       "source_location": "L20",
       "id": "route_get",
-      "community": 96
+      "community": 97
     },
     {
       "label": "MemberDashboardPage()",
@@ -6033,7 +6033,7 @@
       "source_file": "apps/web/app/dashboards/member/MemberDashboardClient.tsx",
       "source_location": "L1",
       "id": "memberdashboardclient",
-      "community": 11
+      "community": 27
     },
     {
       "label": "statusVariant()",
@@ -6041,7 +6041,7 @@
       "source_file": "apps/web/app/dashboards/member/MemberDashboardClient.tsx",
       "source_location": "L10",
       "id": "memberdashboardclient_statusvariant",
-      "community": 11
+      "community": 27
     },
     {
       "label": "Stat()",
@@ -6049,7 +6049,7 @@
       "source_file": "apps/web/app/dashboards/member/MemberDashboardClient.tsx",
       "source_location": "L17",
       "id": "memberdashboardclient_stat",
-      "community": 11
+      "community": 27
     },
     {
       "label": "TaskTable()",
@@ -6057,7 +6057,7 @@
       "source_file": "apps/web/app/dashboards/member/MemberDashboardClient.tsx",
       "source_location": "L26",
       "id": "memberdashboardclient_tasktable",
-      "community": 11
+      "community": 27
     },
     {
       "label": "TeamManagerDashboardPage()",
@@ -6073,63 +6073,63 @@
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
       "source_location": "L1",
       "id": "teammanagerdashboardclient",
-      "community": 11
+      "community": 3
     },
     {
-      "label": "Stat()",
+      "label": "toneFor()",
       "file_type": "code",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L16",
-      "id": "teammanagerdashboardclient_stat",
-      "community": 11
+      "source_location": "L30",
+      "id": "teammanagerdashboardclient_tonefor",
+      "community": 3
     },
     {
-      "label": "statusVariant()",
+      "label": "initialsFor()",
       "file_type": "code",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L25",
-      "id": "teammanagerdashboardclient_statusvariant",
-      "community": 11
+      "source_location": "L36",
+      "id": "teammanagerdashboardclient_initialsfor",
+      "community": 3
+    },
+    {
+      "label": "capState()",
+      "file_type": "code",
+      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
+      "source_location": "L50",
+      "id": "teammanagerdashboardclient_capstate",
+      "community": 3
+    },
+    {
+      "label": "statusBadgeVariant()",
+      "file_type": "code",
+      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
+      "source_location": "L61",
+      "id": "teammanagerdashboardclient_statusbadgevariant",
+      "community": 3
+    },
+    {
+      "label": "formatDue()",
+      "file_type": "code",
+      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
+      "source_location": "L68",
+      "id": "teammanagerdashboardclient_formatdue",
+      "community": 3
     },
     {
       "label": "taskAssignments()",
       "file_type": "code",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L32",
+      "source_location": "L75",
       "id": "teammanagerdashboardclient_taskassignments",
-      "community": 11
+      "community": 3
     },
     {
-      "label": "ContributorBreakdown()",
+      "label": "firstName()",
       "file_type": "code",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L37",
-      "id": "teammanagerdashboardclient_contributorbreakdown",
-      "community": 11
-    },
-    {
-      "label": "async()",
-      "file_type": "code",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L113",
-      "id": "teammanagerdashboardclient_async",
-      "community": 11
-    },
-    {
-      "label": "load()",
-      "file_type": "code",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L138",
-      "id": "teammanagerdashboardclient_load",
-      "community": 11
-    },
-    {
-      "label": "reassign()",
-      "file_type": "code",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L164",
-      "id": "teammanagerdashboardclient_reassign",
-      "community": 11
+      "source_location": "L79",
+      "id": "teammanagerdashboardclient_firstname",
+      "community": 3
     },
     {
       "label": "PMDashboardPage()",
@@ -6785,7 +6785,7 @@
       "source_file": "QC-Manager/apps/web/e2e/auth.spec.ts",
       "source_location": "L1",
       "id": "auth_spec",
-      "community": 195
+      "community": 196
     },
     {
       "label": "smoke-navigation.spec.ts",
@@ -6881,7 +6881,7 @@
       "source_file": "apps/web/e2e/redirects.spec.ts",
       "source_location": "L1",
       "id": "redirects_spec",
-      "community": 196
+      "community": 197
     },
     {
       "label": "idp-manager-cleanup.spec.ts",
@@ -7169,7 +7169,7 @@
       "source_file": "QC-Manager/apps/web/src/components/BugsBySourceChart.tsx",
       "source_location": "L1",
       "id": "bugsbysourcechart",
-      "community": 197
+      "community": 198
     },
     {
       "label": "TrendAnalysisWidget.tsx",
@@ -7241,7 +7241,7 @@
       "source_file": "apps/web/src/components/governance/TestCoveragePanel.tsx",
       "source_location": "L1",
       "id": "testcoveragepanel",
-      "community": 4
+      "community": 3
     },
     {
       "label": "load()",
@@ -7249,7 +7249,7 @@
       "source_file": "apps/web/src/components/governance/TestCoveragePanel.tsx",
       "source_location": "L18",
       "id": "testcoveragepanel_load",
-      "community": 4
+      "community": 3
     },
     {
       "label": "ProjectHealthHeatmap.tsx",
@@ -7305,7 +7305,7 @@
       "source_file": "apps/web/src/components/governance/BugSummaryWidget.tsx",
       "source_location": "L1",
       "id": "bugsummarywidget",
-      "community": 6
+      "community": 4
     },
     {
       "label": "loadData()",
@@ -7313,7 +7313,7 @@
       "source_file": "apps/web/src/components/governance/BugSummaryWidget.tsx",
       "source_location": "L27",
       "id": "bugsummarywidget_loaddata",
-      "community": 6
+      "community": 4
     },
     {
       "label": "GrossNetProgressWidget.tsx",
@@ -7377,7 +7377,7 @@
       "source_file": "apps/web/src/components/governance/ReleaseControl.tsx",
       "source_location": "L1",
       "id": "releasecontrol",
-      "community": 3
+      "community": 1
     },
     {
       "label": "loadData()",
@@ -7385,7 +7385,7 @@
       "source_file": "apps/web/src/components/governance/ReleaseControl.tsx",
       "source_location": "L35",
       "id": "releasecontrol_loaddata",
-      "community": 3
+      "community": 1
     },
     {
       "label": "evaluateGate()",
@@ -7393,7 +7393,7 @@
       "source_file": "apps/web/src/components/governance/ReleaseControl.tsx",
       "source_location": "L51",
       "id": "releasecontrol_evaluategate",
-      "community": 3
+      "community": 1
     },
     {
       "label": "handleSubmit()",
@@ -7401,7 +7401,7 @@
       "source_file": "apps/web/src/components/governance/ReleaseControl.tsx",
       "source_location": "L64",
       "id": "releasecontrol_handlesubmit",
-      "community": 3
+      "community": 1
     },
     {
       "label": "ReleaseReadinessBadge.tsx",
@@ -7449,7 +7449,7 @@
       "source_file": "apps/web/src/components/governance/TestExecutionSummaryWidget.tsx",
       "source_location": "L1",
       "id": "testexecutionsummarywidget",
-      "community": 6
+      "community": 4
     },
     {
       "label": "loadData()",
@@ -7457,7 +7457,7 @@
       "source_file": "apps/web/src/components/governance/TestExecutionSummaryWidget.tsx",
       "source_location": "L43",
       "id": "testexecutionsummarywidget_loaddata",
-      "community": 6
+      "community": 4
     },
     {
       "label": "Breadcrumb.tsx",
@@ -7569,7 +7569,7 @@
       "source_file": "apps/web/src/components/reports/ReportCharts.tsx",
       "source_location": "L1",
       "id": "reportcharts",
-      "community": 5
+      "community": 6
     },
     {
       "label": "gaugeColor()",
@@ -7577,7 +7577,7 @@
       "source_file": "apps/web/src/components/reports/ReportCharts.tsx",
       "source_location": "L7",
       "id": "reportcharts_gaugecolor",
-      "community": 5
+      "community": 6
     },
     {
       "label": "Gauge()",
@@ -7585,7 +7585,7 @@
       "source_file": "apps/web/src/components/reports/ReportCharts.tsx",
       "source_location": "L14",
       "id": "reportcharts_gauge",
-      "community": 5
+      "community": 6
     },
     {
       "label": "Sparkline()",
@@ -7593,7 +7593,7 @@
       "source_file": "apps/web/src/components/reports/ReportCharts.tsx",
       "source_location": "L40",
       "id": "reportcharts_sparkline",
-      "community": 5
+      "community": 6
     },
     {
       "label": "RecentScheduledPanel.tsx",
@@ -7601,7 +7601,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L1",
       "id": "recentscheduledpanel",
-      "community": 5
+      "community": 6
     },
     {
       "label": "formatWhen()",
@@ -7609,7 +7609,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L22",
       "id": "recentscheduledpanel_formatwhen",
-      "community": 5
+      "community": 6
     },
     {
       "label": "saveBlobToDevice()",
@@ -7617,7 +7617,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L34",
       "id": "recentscheduledpanel_saveblobtodevice",
-      "community": 5
+      "community": 6
     },
     {
       "label": "StatusBadge()",
@@ -7625,7 +7625,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L55",
       "id": "recentscheduledpanel_statusbadge",
-      "community": 5
+      "community": 6
     },
     {
       "label": "fmtIcon()",
@@ -7633,7 +7633,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L67",
       "id": "recentscheduledpanel_fmticon",
-      "community": 5
+      "community": 6
     },
     {
       "label": "fmtTint()",
@@ -7641,7 +7641,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L68",
       "id": "recentscheduledpanel_fmttint",
-      "community": 5
+      "community": 6
     },
     {
       "label": "handleDownload()",
@@ -7649,7 +7649,7 @@
       "source_file": "apps/web/src/components/reports/RecentScheduledPanel.tsx",
       "source_location": "L111",
       "id": "recentscheduledpanel_handledownload",
-      "community": 5
+      "community": 6
     },
     {
       "label": "ReportGenerator.tsx",
@@ -7689,7 +7689,7 @@
       "source_file": "apps/web/src/components/reports/ReportModals.tsx",
       "source_location": "L1",
       "id": "reportmodals",
-      "community": 5
+      "community": 6
     },
     {
       "label": "h()",
@@ -7697,7 +7697,7 @@
       "source_file": "apps/web/src/components/reports/ReportModals.tsx",
       "source_location": "L15",
       "id": "reportmodals_h",
-      "community": 5
+      "community": 6
     },
     {
       "label": "add()",
@@ -7705,7 +7705,7 @@
       "source_file": "apps/web/src/components/reports/ReportModals.tsx",
       "source_location": "L91",
       "id": "reportmodals_add",
-      "community": 5
+      "community": 6
     },
     {
       "label": "copyLink()",
@@ -7713,7 +7713,7 @@
       "source_file": "apps/web/src/components/reports/ReportModals.tsx",
       "source_location": "L108",
       "id": "reportmodals_copylink",
-      "community": 5
+      "community": 6
     },
     {
       "label": "send()",
@@ -7721,7 +7721,7 @@
       "source_file": "apps/web/src/components/reports/ReportModals.tsx",
       "source_location": "L117",
       "id": "reportmodals_send",
-      "community": 5
+      "community": 6
     },
     {
       "label": "reportTypes.ts",
@@ -7729,7 +7729,7 @@
       "source_file": "apps/web/src/components/reports/reportTypes.ts",
       "source_location": "L1",
       "id": "reporttypes",
-      "community": 5
+      "community": 6
     },
     {
       "label": "cn()",
@@ -7737,7 +7737,7 @@
       "source_file": "apps/web/src/components/reports/reportTypes.ts",
       "source_location": "L4",
       "id": "reporttypes_cn",
-      "community": 5
+      "community": 6
     },
     {
       "label": "DocumentPreview.tsx",
@@ -7745,7 +7745,7 @@
       "source_file": "apps/web/src/components/reports/DocumentPreview.tsx",
       "source_location": "L1",
       "id": "documentpreview",
-      "community": 5
+      "community": 6
     },
     {
       "label": "StatusBadge()",
@@ -7753,7 +7753,7 @@
       "source_file": "apps/web/src/components/reports/DocumentPreview.tsx",
       "source_location": "L13",
       "id": "documentpreview_statusbadge",
-      "community": 5
+      "community": 6
     },
     {
       "label": "RateBar()",
@@ -7761,7 +7761,7 @@
       "source_file": "apps/web/src/components/reports/DocumentPreview.tsx",
       "source_location": "L25",
       "id": "documentpreview_ratebar",
-      "community": 5
+      "community": 6
     },
     {
       "label": "LibraryRail.tsx",
@@ -7769,7 +7769,7 @@
       "source_file": "apps/web/src/components/reports/LibraryRail.tsx",
       "source_location": "L1",
       "id": "libraryrail",
-      "community": 5
+      "community": 6
     },
     {
       "label": "useReportData.ts",
@@ -7777,7 +7777,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L1",
       "id": "usereportdata",
-      "community": 5
+      "community": 13
     },
     {
       "label": "toStatus()",
@@ -7785,7 +7785,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L25",
       "id": "usereportdata_tostatus",
-      "community": 5
+      "community": 13
     },
     {
       "label": "readinessToStatus()",
@@ -7793,7 +7793,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L32",
       "id": "usereportdata_readinesstostatus",
-      "community": 5
+      "community": 13
     },
     {
       "label": "p()",
@@ -7801,7 +7801,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L39",
       "id": "usereportdata_p",
-      "community": 5
+      "community": 13
     },
     {
       "label": "inDateRange()",
@@ -7809,7 +7809,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L44",
       "id": "usereportdata_indaterange",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchReadiness()",
@@ -7817,7 +7817,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L55",
       "id": "usereportdata_fetchreadiness",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchQualityHealth()",
@@ -7825,7 +7825,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L95",
       "id": "usereportdata_fetchqualityhealth",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchCoverage()",
@@ -7833,7 +7833,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L133",
       "id": "usereportdata_fetchcoverage",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchProjectStatus()",
@@ -7841,7 +7841,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L178",
       "id": "usereportdata_fetchprojectstatus",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchBugDistribution()",
@@ -7849,7 +7849,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L225",
       "id": "usereportdata_fetchbugdistribution",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchTestExecution()",
@@ -7857,7 +7857,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L286",
       "id": "usereportdata_fetchtestexecution",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchResourceUtilization()",
@@ -7865,7 +7865,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L350",
       "id": "usereportdata_fetchresourceutilization",
-      "community": 5
+      "community": 13
     },
     {
       "label": "fetchQualityTrend()",
@@ -7873,7 +7873,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L404",
       "id": "usereportdata_fetchqualitytrend",
-      "community": 5
+      "community": 13
     },
     {
       "label": "useReportData()",
@@ -7881,7 +7881,7 @@
       "source_file": "apps/web/src/components/reports/useReportData.ts",
       "source_location": "L479",
       "id": "usereportdata_usereportdata",
-      "community": 5
+      "community": 13
     },
     {
       "label": "ReportIcons.tsx",
@@ -7889,7 +7889,7 @@
       "source_file": "apps/web/src/components/reports/ReportIcons.tsx",
       "source_location": "L1",
       "id": "reporticons",
-      "community": 5
+      "community": 6
     },
     {
       "label": "Ico()",
@@ -7897,7 +7897,7 @@
       "source_file": "apps/web/src/components/reports/ReportIcons.tsx",
       "source_location": "L38",
       "id": "reporticons_ico",
-      "community": 5
+      "community": 6
     },
     {
       "label": "ActionBar.tsx",
@@ -7905,7 +7905,7 @@
       "source_file": "apps/web/src/components/reports/ActionBar.tsx",
       "source_location": "L1",
       "id": "actionbar",
-      "community": 5
+      "community": 6
     },
     {
       "label": "h()",
@@ -7913,7 +7913,7 @@
       "source_file": "apps/web/src/components/reports/ActionBar.tsx",
       "source_location": "L17",
       "id": "actionbar_h",
-      "community": 5
+      "community": 6
     },
     {
       "label": "LinkedTasksPanel.tsx",
@@ -7961,7 +7961,7 @@
       "source_file": "apps/web/src/components/shared/QuickNavCards.tsx",
       "source_location": "L1",
       "id": "quicknavcards",
-      "community": 6
+      "community": 5
     },
     {
       "label": "LinkedArtifactsSection.tsx",
@@ -7993,7 +7993,7 @@
       "source_file": "apps/web/src/components/shared/SyncBadge.tsx",
       "source_location": "L1",
       "id": "syncbadge",
-      "community": 6
+      "community": 5
     },
     {
       "label": "relativeTime()",
@@ -8001,7 +8001,7 @@
       "source_file": "apps/web/src/components/shared/SyncBadge.tsx",
       "source_location": "L9",
       "id": "syncbadge_relativetime",
-      "community": 6
+      "community": 5
     },
     {
       "label": "SyncBadge()",
@@ -8009,7 +8009,7 @@
       "source_file": "apps/web/src/components/shared/SyncBadge.tsx",
       "source_location": "L22",
       "id": "syncbadge_syncbadge",
-      "community": 6
+      "community": 5
     },
     {
       "label": "ArtifactPicker.tsx",
@@ -8209,7 +8209,7 @@
       "source_file": "apps/web/src/components/my-dashboard/MyBugsTable.tsx",
       "source_location": "L1",
       "id": "mybugstable",
-      "community": 6
+      "community": 5
     },
     {
       "label": "DashboardTaskSection.tsx",
@@ -8217,7 +8217,7 @@
       "source_file": "apps/web/src/components/my-dashboard/DashboardTaskSection.tsx",
       "source_location": "L1",
       "id": "dashboardtasksection",
-      "community": 6
+      "community": 5
     },
     {
       "label": "getMonthFromDate()",
@@ -8225,7 +8225,7 @@
       "source_file": "apps/web/src/components/my-dashboard/DashboardTaskSection.tsx",
       "source_location": "L13",
       "id": "dashboardtasksection_getmonthfromdate",
-      "community": 6
+      "community": 5
     },
     {
       "label": "ManagerDashboardView.tsx",
@@ -8233,7 +8233,7 @@
       "source_file": "apps/web/src/components/my-dashboard/ManagerDashboardView.tsx",
       "source_location": "L1",
       "id": "managerdashboardview",
-      "community": 6
+      "community": 5
     },
     {
       "label": "AdminDashboardView.tsx",
@@ -8241,7 +8241,7 @@
       "source_file": "apps/web/src/components/my-dashboard/AdminDashboardView.tsx",
       "source_location": "L1",
       "id": "admindashboardview",
-      "community": 6
+      "community": 5
     },
     {
       "label": "TasksByProjectTable.tsx",
@@ -8249,7 +8249,7 @@
       "source_file": "apps/web/src/components/my-dashboard/TasksByProjectTable.tsx",
       "source_location": "L1",
       "id": "tasksbyprojecttable",
-      "community": 6
+      "community": 5
     },
     {
       "label": "TaskDistributionChart.tsx",
@@ -8257,7 +8257,7 @@
       "source_file": "apps/web/src/components/my-dashboard/TaskDistributionChart.tsx",
       "source_location": "L1",
       "id": "taskdistributionchart",
-      "community": 6
+      "community": 5
     },
     {
       "label": "TaskDistributionChart()",
@@ -8265,7 +8265,7 @@
       "source_file": "apps/web/src/components/my-dashboard/TaskDistributionChart.tsx",
       "source_location": "L19",
       "id": "taskdistributionchart_taskdistributionchart",
-      "community": 6
+      "community": 5
     },
     {
       "label": "MyStatCards.tsx",
@@ -8273,7 +8273,7 @@
       "source_file": "apps/web/src/components/my-dashboard/MyStatCards.tsx",
       "source_location": "L1",
       "id": "mystatcards",
-      "community": 6
+      "community": 5
     },
     {
       "label": "MyStatCards()",
@@ -8281,7 +8281,7 @@
       "source_file": "apps/web/src/components/my-dashboard/MyStatCards.tsx",
       "source_location": "L8",
       "id": "mystatcards_mystatcards",
-      "community": 6
+      "community": 5
     },
     {
       "label": "ThemeProvider.tsx",
@@ -8409,7 +8409,7 @@
       "source_file": "QC-Manager/apps/web/src/components/dashboard/ResourceUtilizationChart.tsx",
       "source_location": "L1",
       "id": "resourceutilizationchart",
-      "community": 6
+      "community": 5
     },
     {
       "label": "getMonthFromDate()",
@@ -8417,7 +8417,7 @@
       "source_file": "QC-Manager/apps/web/src/components/dashboard/ResourceUtilizationChart.tsx",
       "source_location": "L14",
       "id": "resourceutilizationchart_getmonthfromdate",
-      "community": 6
+      "community": 5
     },
     {
       "label": "ChartComponents.tsx",
@@ -8425,7 +8425,7 @@
       "source_file": "QC-Manager/apps/web/src/components/dashboard/ChartComponents.tsx",
       "source_location": "L1",
       "id": "chartcomponents",
-      "community": 6
+      "community": 4
     },
     {
       "label": "ResourceStats.tsx",
@@ -8433,7 +8433,7 @@
       "source_file": "QC-Manager/apps/web/src/components/dashboard/ResourceStats.tsx",
       "source_location": "L1",
       "id": "resourcestats",
-      "community": 6
+      "community": 5
     },
     {
       "label": "getMonthFromDate()",
@@ -8441,7 +8441,7 @@
       "source_file": "QC-Manager/apps/web/src/components/dashboard/ResourceStats.tsx",
       "source_location": "L13",
       "id": "resourcestats_getmonthfromdate",
-      "community": 6
+      "community": 5
     },
     {
       "label": "PassRateTrendChart.tsx",
@@ -8449,7 +8449,7 @@
       "source_file": "apps/web/src/components/quality/PassRateTrendChart.tsx",
       "source_location": "L1",
       "id": "passratetrendchart",
-      "community": 126
+      "community": 127
     },
     {
       "label": "toLocaleDateString()",
@@ -8457,7 +8457,7 @@
       "source_file": "apps/web/src/components/quality/PassRateTrendChart.tsx",
       "source_location": "L125",
       "id": "passratetrendchart_tolocaledatestring",
-      "community": 126
+      "community": 127
     },
     {
       "label": "QualityMetricsDashboard.tsx",
@@ -8785,7 +8785,7 @@
       "source_file": "apps/web/src/components/idp/TaskAttachments.tsx",
       "source_location": "L1",
       "id": "taskattachments",
-      "community": 53
+      "community": 54
     },
     {
       "label": "formatFileSize()",
@@ -8793,7 +8793,7 @@
       "source_file": "apps/web/src/components/idp/TaskAttachments.tsx",
       "source_location": "L6",
       "id": "taskattachments_formatfilesize",
-      "community": 53
+      "community": 54
     },
     {
       "label": "handleFileSelect()",
@@ -8801,7 +8801,7 @@
       "source_file": "apps/web/src/components/idp/TaskAttachments.tsx",
       "source_location": "L25",
       "id": "taskattachments_handlefileselect",
-      "community": 53
+      "community": 54
     },
     {
       "label": "handleDownload()",
@@ -8809,7 +8809,7 @@
       "source_file": "apps/web/src/components/idp/TaskAttachments.tsx",
       "source_location": "L37",
       "id": "taskattachments_handledownload",
-      "community": 53
+      "community": 54
     },
     {
       "label": "canDelete()",
@@ -8817,7 +8817,7 @@
       "source_file": "apps/web/src/components/idp/TaskAttachments.tsx",
       "source_location": "L47",
       "id": "taskattachments_candelete",
-      "community": 53
+      "community": 54
     },
     {
       "label": "TaskStatusBadge.tsx",
@@ -8825,7 +8825,7 @@
       "source_file": "apps/web/src/components/tasks/TaskStatusBadge.tsx",
       "source_location": "L1",
       "id": "taskstatusbadge",
-      "community": 6
+      "community": 3
     },
     {
       "label": "iconCheck()",
@@ -8833,7 +8833,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L26",
       "id": "taskstatusbadge_iconcheck",
-      "community": 6
+      "community": 3
     },
     {
       "label": "iconPause()",
@@ -8841,7 +8841,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L34",
       "id": "taskstatusbadge_iconpause",
-      "community": 6
+      "community": 3
     },
     {
       "label": "iconClock()",
@@ -8849,7 +8849,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L43",
       "id": "taskstatusbadge_iconclock",
-      "community": 6
+      "community": 3
     },
     {
       "label": "iconHalf()",
@@ -8857,7 +8857,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L52",
       "id": "taskstatusbadge_iconhalf",
-      "community": 6
+      "community": 3
     },
     {
       "label": "iconCircle()",
@@ -8865,7 +8865,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L61",
       "id": "taskstatusbadge_iconcircle",
-      "community": 6
+      "community": 3
     },
     {
       "label": "TaskStatusBadge()",
@@ -8873,7 +8873,7 @@
       "source_file": "apps/web/src/components/tasks/TaskStatusBadge.tsx",
       "source_location": "L7",
       "id": "taskstatusbadge_taskstatusbadge",
-      "community": 6
+      "community": 3
     },
     {
       "label": "inferBadgeKind()",
@@ -8881,7 +8881,7 @@
       "source_file": "apps/web/src/components/idp/TaskStatusBadge.tsx",
       "source_location": "L116",
       "id": "taskstatusbadge_inferbadgekind",
-      "community": 6
+      "community": 3
     },
     {
       "label": "PermissionGate.tsx",
@@ -8945,7 +8945,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanCard.tsx",
       "source_location": "L1",
       "id": "taskkanbancard",
-      "community": 41
+      "community": 42
     },
     {
       "label": "isOverdue()",
@@ -8953,7 +8953,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanCard.tsx",
       "source_location": "L40",
       "id": "taskkanbancard_isoverdue",
-      "community": 41
+      "community": 42
     },
     {
       "label": "handleDragStart()",
@@ -8961,7 +8961,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanCard.tsx",
       "source_location": "L49",
       "id": "taskkanbancard_handledragstart",
-      "community": 41
+      "community": 42
     },
     {
       "label": "TaskKanbanBoard.tsx",
@@ -8969,7 +8969,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanBoard.tsx",
       "source_location": "L1",
       "id": "taskkanbanboard",
-      "community": 41
+      "community": 42
     },
     {
       "label": "handleDragOver()",
@@ -8977,7 +8977,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanBoard.tsx",
       "source_location": "L69",
       "id": "taskkanbanboard_handledragover",
-      "community": 41
+      "community": 42
     },
     {
       "label": "handleDrop()",
@@ -8985,7 +8985,7 @@
       "source_file": "apps/web/src/components/tasks/TaskKanbanBoard.tsx",
       "source_location": "L74",
       "id": "taskkanbanboard_handledrop",
-      "community": 41
+      "community": 42
     },
     {
       "label": "TaskTable.tsx",
@@ -8993,7 +8993,7 @@
       "source_file": "apps/web/src/components/tasks/TaskTable.tsx",
       "source_location": "L1",
       "id": "tasktable",
-      "community": 6
+      "community": 5
     },
     {
       "label": "buildTaskTooltip()",
@@ -9001,7 +9001,7 @@
       "source_file": "apps/web/src/components/tasks/TaskTable.tsx",
       "source_location": "L41",
       "id": "tasktable_buildtasktooltip",
-      "community": 6
+      "community": 5
     },
     {
       "label": "TaskCommentSection.tsx",
@@ -9009,7 +9009,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L1",
       "id": "taskcommentsection",
-      "community": 3
+      "community": 2
     },
     {
       "label": "loadComments()",
@@ -9017,7 +9017,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L27",
       "id": "taskcommentsection_loadcomments",
-      "community": 3
+      "community": 2
     },
     {
       "label": "handleSubmit()",
@@ -9025,7 +9025,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L38",
       "id": "taskcommentsection_handlesubmit",
-      "community": 3
+      "community": 2
     },
     {
       "label": "handleDelete()",
@@ -9033,7 +9033,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L55",
       "id": "taskcommentsection_handledelete",
-      "community": 3
+      "community": 2
     },
     {
       "label": "formatDate()",
@@ -9041,7 +9041,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L73",
       "id": "taskcommentsection_formatdate",
-      "community": 3
+      "community": 2
     },
     {
       "label": "getInitials()",
@@ -9049,7 +9049,7 @@
       "source_file": "apps/web/src/components/tasks/TaskCommentSection.tsx",
       "source_location": "L90",
       "id": "taskcommentsection_getinitials",
-      "community": 3
+      "community": 2
     },
     {
       "label": "TaskDetailModal.tsx",
@@ -9057,7 +9057,7 @@
       "source_file": "apps/web/src/components/tasks/TaskDetailModal.tsx",
       "source_location": "L1",
       "id": "taskdetailmodal",
-      "community": 74
+      "community": 75
     },
     {
       "label": "handler()",
@@ -9065,7 +9065,7 @@
       "source_file": "apps/web/src/components/tasks/TaskDetailModal.tsx",
       "source_location": "L59",
       "id": "taskdetailmodal_handler",
-      "community": 74
+      "community": 75
     },
     {
       "label": "handleSave()",
@@ -9073,7 +9073,7 @@
       "source_file": "apps/web/src/components/tasks/TaskDetailModal.tsx",
       "source_location": "L64",
       "id": "taskdetailmodal_handlesave",
-      "community": 74
+      "community": 75
     },
     {
       "label": "handleDelete()",
@@ -9081,7 +9081,7 @@
       "source_file": "apps/web/src/components/tasks/TaskDetailModal.tsx",
       "source_location": "L77",
       "id": "taskdetailmodal_handledelete",
-      "community": 74
+      "community": 75
     },
     {
       "label": "TaskForm.tsx",
@@ -9095,7 +9095,7 @@
       "label": "optionalNumber()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L18",
+      "source_location": "L19",
       "id": "taskform_optionalnumber",
       "community": 2
     },
@@ -9103,7 +9103,7 @@
       "label": "errorLabels()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L80",
+      "source_location": "L81",
       "id": "taskform_errorlabels",
       "community": 2
     },
@@ -9111,7 +9111,7 @@
       "label": "normalizePriority()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L93",
+      "source_location": "L94",
       "id": "taskform_normalizepriority",
       "community": 2
     },
@@ -9119,7 +9119,7 @@
       "label": "onSubmit()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L147",
+      "source_location": "L148",
       "id": "taskform_onsubmit",
       "community": 2
     },
@@ -9127,7 +9127,7 @@
       "label": "onInvalid()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L206",
+      "source_location": "L207",
       "id": "taskform_oninvalid",
       "community": 2
     },
@@ -9137,7 +9137,7 @@
       "source_file": "apps/web/src/components/dashboards/AssignmentBadges.tsx",
       "source_location": "L1",
       "id": "assignmentbadges",
-      "community": 11
+      "community": 27
     },
     {
       "label": "cx()",
@@ -9145,7 +9145,7 @@
       "source_file": "apps/web/src/components/dashboards/AssignmentBadges.tsx",
       "source_location": "L3",
       "id": "assignmentbadges_cx",
-      "community": 11
+      "community": 27
     },
     {
       "label": "formatHours()",
@@ -9153,7 +9153,7 @@
       "source_file": "apps/web/src/components/dashboards/AssignmentBadges.tsx",
       "source_location": "L7",
       "id": "assignmentbadges_formathours",
-      "community": 11
+      "community": 27
     },
     {
       "label": "AssignmentRoleBadge()",
@@ -9161,7 +9161,7 @@
       "source_file": "apps/web/src/components/dashboards/AssignmentBadges.tsx",
       "source_location": "L12",
       "id": "assignmentbadges_assignmentrolebadge",
-      "community": 11
+      "community": 27
     },
     {
       "label": "EstimateAccuracyBadge()",
@@ -9169,7 +9169,7 @@
       "source_file": "apps/web/src/components/dashboards/AssignmentBadges.tsx",
       "source_location": "L36",
       "id": "assignmentbadges_estimateaccuracybadge",
-      "community": 11
+      "community": 27
     },
     {
       "label": "StatusBreakdownChart.tsx",
@@ -9337,7 +9337,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Tooltip.tsx",
       "source_location": "L1",
       "id": "tooltip",
-      "community": 6
+      "community": 5
     },
     {
       "label": "TooltipContent()",
@@ -9345,7 +9345,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Tooltip.tsx",
       "source_location": "L33",
       "id": "tooltip_tooltipcontent",
-      "community": 6
+      "community": 5
     },
     {
       "label": "SimpleTooltip()",
@@ -9353,7 +9353,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Tooltip.tsx",
       "source_location": "L81",
       "id": "tooltip_simpletooltip",
-      "community": 6
+      "community": 5
     },
     {
       "label": "InfoTooltip()",
@@ -9361,7 +9361,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Tooltip.tsx",
       "source_location": "L104",
       "id": "tooltip_infotooltip",
-      "community": 6
+      "community": 5
     },
     {
       "label": "ErrorBoundary.tsx",
@@ -9433,7 +9433,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L1",
       "id": "card",
-      "community": 3
+      "community": 5
     },
     {
       "label": "cn()",
@@ -9441,7 +9441,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L5",
       "id": "card_cn",
-      "community": 3
+      "community": 5
     },
     {
       "label": "Card()",
@@ -9449,7 +9449,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L14",
       "id": "card_card",
-      "community": 3
+      "community": 5
     },
     {
       "label": "CardHeader()",
@@ -9457,7 +9457,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L27",
       "id": "card_cardheader",
-      "community": 3
+      "community": 5
     },
     {
       "label": "CardTitle()",
@@ -9465,7 +9465,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L36",
       "id": "card_cardtitle",
-      "community": 3
+      "community": 5
     },
     {
       "label": "CardDescription()",
@@ -9473,7 +9473,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L45",
       "id": "card_carddescription",
-      "community": 3
+      "community": 5
     },
     {
       "label": "CardContent()",
@@ -9481,7 +9481,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L54",
       "id": "card_cardcontent",
-      "community": 3
+      "community": 5
     },
     {
       "label": "CardFooter()",
@@ -9489,7 +9489,7 @@
       "source_file": "QC-Manager/apps/web/src/components/ui/Card.tsx",
       "source_location": "L60",
       "id": "card_cardfooter",
-      "community": 3
+      "community": 5
     },
     {
       "label": "FilterBar.tsx",
@@ -9585,7 +9585,7 @@
       "source_file": "apps/web/src/components/ui/Skeleton.tsx",
       "source_location": "L1",
       "id": "skeleton",
-      "community": 6
+      "community": 5
     },
     {
       "label": "Skeleton()",
@@ -9593,7 +9593,7 @@
       "source_file": "apps/web/src/components/ui/Skeleton.tsx",
       "source_location": "L1",
       "id": "skeleton_skeleton",
-      "community": 6
+      "community": 5
     },
     {
       "label": "StatCard.tsx",
@@ -9601,7 +9601,7 @@
       "source_file": "apps/web/src/components/ui/StatCard.tsx",
       "source_location": "L1",
       "id": "statcard",
-      "community": 6
+      "community": 5
     },
     {
       "label": "Input.tsx",
@@ -9625,7 +9625,7 @@
       "source_file": "apps/web/src/components/ui/KeyboardShortcuts.tsx",
       "source_location": "L1",
       "id": "keyboardshortcuts",
-      "community": 127
+      "community": 128
     },
     {
       "label": "KeyboardShortcuts()",
@@ -9633,7 +9633,7 @@
       "source_file": "apps/web/src/components/ui/KeyboardShortcuts.tsx",
       "source_location": "L6",
       "id": "keyboardshortcuts_keyboardshortcuts",
-      "community": 127
+      "community": 128
     },
     {
       "label": "ProgressBar.tsx",
@@ -9729,7 +9729,7 @@
       "source_file": "apps/web/src/lib/reportPdfDocument.tsx",
       "source_location": "L1",
       "id": "reportpdfdocument",
-      "community": 5
+      "community": 6
     },
     {
       "label": "gaugeColor()",
@@ -9737,7 +9737,7 @@
       "source_file": "apps/web/src/lib/reportPdfDocument.tsx",
       "source_location": "L143",
       "id": "reportpdfdocument_gaugecolor",
-      "community": 5
+      "community": 6
     },
     {
       "label": "gaugeArcPath()",
@@ -9745,7 +9745,7 @@
       "source_file": "apps/web/src/lib/reportPdfDocument.tsx",
       "source_location": "L150",
       "id": "reportpdfdocument_gaugearcpath",
-      "community": 5
+      "community": 6
     },
     {
       "label": "stripHtml.ts",
@@ -9769,7 +9769,7 @@
       "source_file": "apps/web/src/lib/reportPdf.ts",
       "source_location": "L1",
       "id": "reportpdf",
-      "community": 5
+      "community": 6
     },
     {
       "label": "safeFilename()",
@@ -9777,7 +9777,7 @@
       "source_file": "apps/web/src/lib/reportPdf.ts",
       "source_location": "L5",
       "id": "reportpdf_safefilename",
-      "community": 5
+      "community": 6
     },
     {
       "label": "createReportPdfBlob()",
@@ -9785,7 +9785,7 @@
       "source_file": "apps/web/src/lib/reportPdf.ts",
       "source_location": "L13",
       "id": "reportpdf_createreportpdfblob",
-      "community": 5
+      "community": 6
     },
     {
       "label": "downloadReportAsPdf()",
@@ -9793,7 +9793,7 @@
       "source_file": "apps/web/src/lib/reportPdf.ts",
       "source_location": "L22",
       "id": "reportpdf_downloadreportaspdf",
-      "community": 5
+      "community": 6
     },
     {
       "label": "pert.ts",
@@ -9873,7 +9873,7 @@
       "source_file": "QC-Manager/apps/web/src/lib/exportUtils.ts",
       "source_location": "L1",
       "id": "exportutils",
-      "community": 54
+      "community": 55
     },
     {
       "label": "safeFilename()",
@@ -9881,7 +9881,7 @@
       "source_file": "QC-Manager/apps/web/src/lib/exportUtils.ts",
       "source_location": "L5",
       "id": "exportutils_safefilename",
-      "community": 54
+      "community": 55
     },
     {
       "label": "downloadCSV()",
@@ -9889,7 +9889,7 @@
       "source_file": "QC-Manager/apps/web/src/lib/exportUtils.ts",
       "source_location": "L9",
       "id": "exportutils_downloadcsv",
-      "community": 54
+      "community": 55
     },
     {
       "label": "downloadXLSX()",
@@ -9897,7 +9897,7 @@
       "source_file": "QC-Manager/apps/web/src/lib/exportUtils.ts",
       "source_location": "L16",
       "id": "exportutils_downloadxlsx",
-      "community": 54
+      "community": 55
     },
     {
       "label": "triggerBlobDownload()",
@@ -9905,7 +9905,7 @@
       "source_file": "QC-Manager/apps/web/src/lib/exportUtils.ts",
       "source_location": "L23",
       "id": "exportutils_triggerblobdownload",
-      "community": 54
+      "community": 55
     },
     {
       "label": "integration.ts",
@@ -9913,7 +9913,7 @@
       "source_file": "apps/web/src/lib/api/integration.ts",
       "source_location": "L1",
       "id": "integration",
-      "community": 198
+      "community": 199
     },
     {
       "label": "work.ts",
@@ -9921,7 +9921,7 @@
       "source_file": "apps/web/src/lib/api/work.ts",
       "source_location": "L1",
       "id": "work",
-      "community": 199
+      "community": 200
     },
     {
       "label": "testing.ts",
@@ -9929,7 +9929,7 @@
       "source_file": "apps/web/src/lib/api/testing.ts",
       "source_location": "L1",
       "id": "testing",
-      "community": 200
+      "community": 201
     },
     {
       "label": "identity.ts",
@@ -9937,7 +9937,7 @@
       "source_file": "apps/web/src/lib/api/identity.ts",
       "source_location": "L1",
       "id": "identity",
-      "community": 201
+      "community": 202
     },
     {
       "label": "quality.ts",
@@ -9945,7 +9945,7 @@
       "source_file": "apps/web/src/lib/api/quality.ts",
       "source_location": "L1",
       "id": "quality",
-      "community": 202
+      "community": 203
     },
     {
       "label": "lifecycle.ts",
@@ -9953,7 +9953,7 @@
       "source_file": "apps/web/src/lib/api/lifecycle.ts",
       "source_location": "L1",
       "id": "lifecycle",
-      "community": 203
+      "community": 204
     },
     {
       "label": "onApiError()",
@@ -9961,7 +9961,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L8",
       "id": "index_onapierror",
-      "community": 35
+      "community": 36
     },
     {
       "label": "emitApiError()",
@@ -9969,7 +9969,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L12",
       "id": "index_emitapierror",
-      "community": 35
+      "community": 36
     },
     {
       "label": "fetchApi()",
@@ -9977,7 +9977,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L19",
       "id": "index_fetchapi",
-      "community": 35
+      "community": 36
     },
     {
       "label": "parseContentDispositionFileName()",
@@ -9985,7 +9985,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L91",
       "id": "index_parsecontentdispositionfilename",
-      "community": 35
+      "community": 36
     },
     {
       "label": "fetchApiBlob()",
@@ -9993,7 +9993,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L110",
       "id": "index_fetchapiblob",
-      "community": 35
+      "community": 36
     },
     {
       "label": "uploadFormData()",
@@ -10001,7 +10001,7 @@
       "source_file": "apps/web/src/lib/api/index.ts",
       "source_location": "L2168",
       "id": "index_uploadformdata",
-      "community": 35
+      "community": 36
     },
     {
       "label": "routes.ts",
@@ -14879,6 +14879,18 @@
       "_tgt": "taskassignments",
       "source": "taskassignments",
       "target": "page",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "taskform",
+      "_tgt": "taskassignments",
+      "source": "taskassignments",
+      "target": "taskform",
       "confidence_score": 1.0
     },
     {
@@ -22214,58 +22226,70 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports_from",
+      "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L13",
+      "source_location": "L30",
       "weight": 1.0,
       "_src": "teammanagerdashboardclient",
-      "_tgt": "button",
+      "_tgt": "teammanagerdashboardclient_tonefor",
       "source": "teammanagerdashboardclient",
-      "target": "button",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports_from",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L14",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient",
-      "_tgt": "assignmentbadges",
-      "source": "teammanagerdashboardclient",
-      "target": "assignmentbadges",
+      "target": "teammanagerdashboardclient_tonefor",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L16",
+      "source_location": "L36",
       "weight": 1.0,
       "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_stat",
+      "_tgt": "teammanagerdashboardclient_initialsfor",
       "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_stat",
+      "target": "teammanagerdashboardclient_initialsfor",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L25",
+      "source_location": "L50",
       "weight": 1.0,
       "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_statusvariant",
+      "_tgt": "teammanagerdashboardclient_capstate",
       "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_statusvariant",
+      "target": "teammanagerdashboardclient_capstate",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L32",
+      "source_location": "L61",
+      "weight": 1.0,
+      "_src": "teammanagerdashboardclient",
+      "_tgt": "teammanagerdashboardclient_statusbadgevariant",
+      "source": "teammanagerdashboardclient",
+      "target": "teammanagerdashboardclient_statusbadgevariant",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
+      "source_location": "L68",
+      "weight": 1.0,
+      "_src": "teammanagerdashboardclient",
+      "_tgt": "teammanagerdashboardclient_formatdue",
+      "source": "teammanagerdashboardclient",
+      "target": "teammanagerdashboardclient_formatdue",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
+      "source_location": "L75",
       "weight": 1.0,
       "_src": "teammanagerdashboardclient",
       "_tgt": "teammanagerdashboardclient_taskassignments",
@@ -22277,72 +22301,12 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L37",
+      "source_location": "L79",
       "weight": 1.0,
       "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_contributorbreakdown",
+      "_tgt": "teammanagerdashboardclient_firstname",
       "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_contributorbreakdown",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L113",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_async",
-      "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_async",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L138",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_load",
-      "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_load",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L164",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient",
-      "_tgt": "teammanagerdashboardclient_reassign",
-      "source": "teammanagerdashboardclient",
-      "target": "teammanagerdashboardclient_reassign",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L38",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient_contributorbreakdown",
-      "_tgt": "teammanagerdashboardclient_taskassignments",
-      "source": "teammanagerdashboardclient_taskassignments",
-      "target": "teammanagerdashboardclient_contributorbreakdown",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/dashboards/team-manager/TeamManagerDashboardClient.tsx",
-      "source_location": "L168",
-      "weight": 1.0,
-      "_src": "teammanagerdashboardclient_reassign",
-      "_tgt": "teammanagerdashboardclient_load",
-      "source": "teammanagerdashboardclient_load",
-      "target": "teammanagerdashboardclient_reassign",
+      "target": "teammanagerdashboardclient_firstname",
       "confidence_score": 1.0
     },
     {
@@ -26993,7 +26957,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L18",
+      "source_location": "L19",
       "weight": 1.0,
       "_src": "taskform",
       "_tgt": "taskform_optionalnumber",
@@ -27005,7 +26969,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L80",
+      "source_location": "L81",
       "weight": 1.0,
       "_src": "taskform",
       "_tgt": "taskform_errorlabels",
@@ -27017,7 +26981,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L93",
+      "source_location": "L94",
       "weight": 1.0,
       "_src": "taskform",
       "_tgt": "taskform_normalizepriority",
@@ -27029,7 +26993,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L147",
+      "source_location": "L148",
       "weight": 1.0,
       "_src": "taskform",
       "_tgt": "taskform_onsubmit",
@@ -27041,7 +27005,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L206",
+      "source_location": "L207",
       "weight": 1.0,
       "_src": "taskform",
       "_tgt": "taskform_oninvalid",
@@ -27053,7 +27017,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L214",
+      "source_location": "L215",
       "weight": 1.0,
       "_src": "taskform_oninvalid",
       "_tgt": "taskform_errorlabels",
