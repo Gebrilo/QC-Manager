@@ -14,6 +14,7 @@ import { Project, Resource, Task } from '@/types';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import type { TaskAssignmentInput } from '@/lib/taskAssignments';
 
 const optionalNumber = (schema: z.ZodNumber) =>
     z.preprocess((value) => {
@@ -148,7 +149,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
         setIsSubmitting(true);
         setError(null);
         try {
-            const assignments = [];
+            const assignments: TaskAssignmentInput[] = [];
             if (data.resource1_uuid) {
                 assignments.push({
                     resource_id: data.resource1_uuid,
