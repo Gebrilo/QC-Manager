@@ -106,7 +106,8 @@
       "Bash(xxd /tmp/design_raw.bin)",
       "Bash(gh label *)",
       "Bash(python3 -c \"import json,sys; issues=json.load\\(sys.stdin\\); [print\\(f'#{i[\\\\\"number\\\\\"]} [{','.join\\(l[\\\\\"name\\\\\"] for l in i[\\\\\"labels\\\\\"]\\)}] {i[\\\\\"title\\\\\"]}'\\) for i in issues]\")",
-      "Bash(awk '{print $1}')"
+      "Bash(awk '{print $1}')",
+      "Bash(python3 -c \"import json,sys; issues=json.load\\(sys.stdin\\); [print\\(f'#{i[\\\\\"number\\\\\"]} [{len\\(i[\\\\\"labels\\\\\"]\\)} labels] {i[\\\\\"title\\\\\"]}'\\) for i in issues]\")"
     ]
   }
 }
