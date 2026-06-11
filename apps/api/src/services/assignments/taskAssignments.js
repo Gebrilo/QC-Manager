@@ -3,16 +3,8 @@
 /**
  * ADR 0009 — task_resource_assignment write service.
  *
- * Single source of truth for who is on a Task and each person's effort. The
- * Phase-1 dual-write trigger (sync_task_assignment_cache) mirrors the PRIMARY
- * assignment and the earliest SECONDARY back onto the legacy two-slot columns
- * (resource1_id/resource2_id, their r1_/r2_ hour columns, plus the task-level
- * initial_estimate/final_estimate/actual_effort), so callers writing through
- * this service do not have to maintain those columns themselves.
- *
- * Backward compatibility: callers may still send the legacy
- * resource1_uuid/resource2_uuid + rN_* fields; assignmentsFromPayload() maps
- * them to a canonical assignment list. New callers send an `assignments` array.
+ * Single source of truth for who is on a Task and each person's effort.
+ * Callers mutate assignments by sending a canonical `assignments` array.
  */
 
 const ASSIGNMENT_TYPES = ['PRIMARY', 'SECONDARY'];
@@ -38,14 +30,6 @@ function nullableNum(value) {
     return Number.isFinite(n) ? n : null;
 }
 
-function has(obj, key) {
-    return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
-}
-
-function pick(data, key, fallback) {
-    return has(data, key) ? data[key] : fallback;
-}
-
 function normalizeAssignment(a) {
     return {
         resource_id: a.resource_id,
@@ -63,50 +47,14 @@ function normalizeAssignment(a) {
 /**
  * Build the canonical assignment list from a task payload.
  *
- * - If `data.assignments` is an array, it is the desired full set.
- * - Otherwise, if any legacy resource/hours field is present, derive a 1–2
- *   element list from resource1_uuid/resource2_uuid + rN_* (with `fallbackTo`,
- *   typically the original task row, supplying values for slots not in the patch).
- * - Otherwise return `null` — the caller should leave assignments untouched.
+ * If `data.assignments` is an array, it is the desired full set.
+ * Otherwise return `null` — the caller should leave assignments untouched.
  */
-function assignmentsFromPayload(data, { fallbackTo = null } = {}) {
+function assignmentsFromPayload(data) {
     if (Array.isArray(data.assignments)) {
         return data.assignments.map(normalizeAssignment);
     }
-
-    const LEGACY_KEYS = [
-        'resource1_uuid', 'resource2_uuid',
-        'r1_estimate_hrs', 'r1_actual_hrs', 'r2_estimate_hrs', 'r2_actual_hrs',
-        'initial_estimate', 'final_estimate',
-    ];
-    if (!LEGACY_KEYS.some(k => has(data, k))) return null;
-
-    const base = fallbackTo || {};
-    const list = [];
-
-    const primaryResource = pick(data, 'resource1_uuid', base.resource1_id);
-    if (primaryResource) {
-        list.push(normalizeAssignment({
-            resource_id: primaryResource,
-            assignment_type: 'PRIMARY',
-            estimate_hrs: pick(data, 'r1_estimate_hrs', base.r1_estimate_hrs),
-            actual_hrs: pick(data, 'r1_actual_hrs', base.r1_actual_hrs),
-            initial_estimate: pick(data, 'initial_estimate', base.initial_estimate),
-            final_estimate: pick(data, 'final_estimate', base.final_estimate),
-        }));
-    }
-
-    const secondaryResource = pick(data, 'resource2_uuid', base.resource2_id);
-    if (secondaryResource) {
-        list.push(normalizeAssignment({
-            resource_id: secondaryResource,
-            assignment_type: 'SECONDARY',
-            estimate_hrs: pick(data, 'r2_estimate_hrs', base.r2_estimate_hrs),
-            actual_hrs: pick(data, 'r2_actual_hrs', base.r2_actual_hrs),
-        }));
-    }
-
-    return list;
+    return null;
 }
 
 /**
@@ -150,7 +98,7 @@ function validateAssignments(list) {
     return list;
 }
 
-/** PRIMARY first, then SECONDARY in input order (drives the deterministic legacy r2_ slot). */
+/** PRIMARY first, then SECONDARY in input order for deterministic displays. */
 function orderAssignments(list) {
     return [
         ...list.filter(a => a.assignment_type === 'PRIMARY'),
@@ -162,11 +110,14 @@ function totalActualHrs(list) {
     return (list || []).reduce((sum, a) => sum + num(a.actual_hrs), 0);
 }
 
+function totalEstimateHrs(list) {
+    return (list || []).reduce((sum, a) => sum + num(a.estimate_hrs), 0);
+}
+
 /**
  * Replace the full set of assignments for a task. Validates first (so a bad set
  * never mutates), deletes the existing rows, then inserts the new set with
- * monotonically increasing created_at so the first listed SECONDARY is the
- * earliest (matching the legacy r2_ slot the cache trigger fills).
+ * monotonically increasing created_at for stable ordering.
  *
  * `query` is the injected db query function; callers in production pass the
  * pooled query. (Transaction hardening — wrapping delete+insert in a single
@@ -213,6 +164,20 @@ async function getTaskAssignments(query, taskId) {
     return r.rows;
 }
 
+async function getTaskAssignmentSummary(query, taskId) {
+    const assignments = await getTaskAssignments(query, taskId);
+    const primary = primaryOf(assignments);
+    return {
+        assignments,
+        primary,
+        primary_resource_id: primary?.resource_id || null,
+        primary_resource_name: primary?.resource_name || null,
+        total_estimated_hrs: totalEstimateHrs(assignments),
+        total_actual_hrs: totalActualHrs(assignments),
+        primary_final_estimate: primary?.final_estimate ?? null,
+    };
+}
+
 /** Sum of actual_hrs across a task's assignments (Done-gate total). */
 async function sumActualHrs(query, taskId) {
     const r = await query(
@@ -236,9 +201,8 @@ async function sumActualHrs(query, taskId) {
  *   - W is promoted from its existing SECONDARY row if present, else inserted
  *     fresh with zero effort.
  *
- * The dual-write trigger reconciles the legacy resource1_id / r1_* columns from
- * the resulting rows, which is what fixes the misattribution bug in the old
- * `resource1_id = COALESCE(...)` update path.
+ * The resulting assignment rows remain the source of truth for task ownership
+ * and effort.
  */
 async function applyTuleapPrimary({ query, taskId, resourceId, demoteWhenEffort = true }) {
     if (!resourceId) return { action: 'noop' };
@@ -300,6 +264,8 @@ module.exports = {
     getTaskAssignments,
     sumActualHrs,
     totalActualHrs,
+    totalEstimateHrs,
+    getTaskAssignmentSummary,
     primaryOf,
     firstSecondaryOf,
     orderAssignments,

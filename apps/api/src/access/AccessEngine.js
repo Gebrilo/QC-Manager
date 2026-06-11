@@ -200,12 +200,8 @@ async function canPerform(user, artifact, verb, req) {
  * in canPerform. Returns { clause, params, nextIdx } for the caller to
  * bolt onto an existing WHERE.
  *
- * NOTE (Phase-1 follow-up): the assignee + teammate branches reference
- * columns by name (resource1_id / resource2_id / owner_resource_id /
- * submitted_by_resource_id) that exist on some artifact tables but not
- * others (e.g. test_cases has no resource1_id). This is fine while the
- * engine is dormant; the first slice that wires this into a real route
- * needs a per-artifact-type column map.
+ * The assignee + teammate branches use either an explicit normalized junction
+ * or caller-provided resource-owner columns.
  */
 async function buildListFilter(user, artifactType, verb, opts = {}) {
     const startIdx = opts.startIdx || 1;
@@ -215,8 +211,6 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     const ownerTeamExpr = opts.ownerTeamExpr === undefined ? `${tableAlias}.owner_team_id` : opts.ownerTeamExpr;
     const visibilityExpr = opts.visibilityExpr === undefined ? `${tableAlias}.visibility_scope` : opts.visibilityExpr;
     const assigneeResourceExprs = opts.assigneeResourceExprs || [
-        `${tableAlias}.resource1_id`,
-        `${tableAlias}.resource2_id`,
         `${tableAlias}.owner_resource_id`,
         `${tableAlias}.submitted_by_resource_id`,
     ];

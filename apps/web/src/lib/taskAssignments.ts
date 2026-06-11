@@ -29,17 +29,9 @@ interface AssignmentSource {
     final_estimate?: number | string | null;
 }
 
-interface LegacyTaskSource {
+interface TaskAssignmentSource {
     assignments?: AssignmentSource[];
-    resource1_uuid?: string | null;
-    resource2_uuid?: string | null;
-    resource1_id?: string | null;
-    resource2_id?: string | null;
     estimate_days?: number | string | null;
-    r1_estimate_hrs?: number | string | null;
-    r1_actual_hrs?: number | string | null;
-    r2_estimate_hrs?: number | string | null;
-    r2_actual_hrs?: number | string | null;
     initial_estimate?: number | string | null;
     final_estimate?: number | string | null;
 }
@@ -66,34 +58,24 @@ export function daysToHours(value: unknown): number {
     return Number((days * TASK_HOURS_PER_DAY).toFixed(4));
 }
 
-export function getTaskAssignmentDefaults(task: LegacyTaskSource) {
+export function getTaskAssignmentDefaults(task: TaskAssignmentSource) {
     const assignments = Array.isArray(task.assignments) ? task.assignments : [];
     const primary = assignments.find(a => a.assignment_type === 'PRIMARY');
     const secondaries = assignments.filter(a => a.assignment_type === 'SECONDARY' && a.resource_id);
 
-    const primaryResourceId = primary?.resource_id || task.resource1_uuid || task.resource1_id || '';
+    const primaryResourceId = primary?.resource_id || '';
     const primaryEstimateDays =
         hoursToDays(primary?.estimate_hrs)
-        ?? hoursToDays(task.r1_estimate_hrs)
         ?? numberOrUndefined(task.estimate_days);
     const primaryActualDays =
         hoursToDays(primary?.actual_hrs)
-        ?? hoursToDays(task.r1_actual_hrs)
         ?? 0;
 
-    const secondaryRows = secondaries.length > 0
-        ? secondaries.map(a => ({
-            resource_id: a.resource_id || '',
-            estimate_days: hoursToDays(a.estimate_hrs),
-            actual_days: hoursToDays(a.actual_hrs) ?? 0,
-        }))
-        : (task.resource2_uuid || task.resource2_id)
-            ? [{
-                resource_id: task.resource2_uuid || task.resource2_id || '',
-                estimate_days: hoursToDays(task.r2_estimate_hrs),
-                actual_days: hoursToDays(task.r2_actual_hrs) ?? 0,
-            }]
-            : [];
+    const secondaryRows = secondaries.map(a => ({
+        resource_id: a.resource_id || '',
+        estimate_days: hoursToDays(a.estimate_hrs),
+        actual_days: hoursToDays(a.actual_hrs) ?? 0,
+    }));
 
     return {
         primaryResourceId,
@@ -147,21 +129,12 @@ export function buildTaskAssignmentsPayload({
         });
     }
 
-    const firstSecondary = assignments.find(a => a.assignment_type === 'SECONDARY');
     const totalActualHrs = assignments.reduce((sum, a) => sum + a.actual_hrs, 0);
     const taskEstimateDays = numberOrUndefined(primaryEstimateDays);
 
     return {
         assignments,
-        legacy: {
-            resource1_uuid: primaryResourceId || undefined,
-            resource2_uuid: firstSecondary?.resource_id || undefined,
-            estimate_days: taskEstimateDays && taskEstimateDays > 0 ? taskEstimateDays : undefined,
-            r1_estimate_hrs: primaryEstimateHrs,
-            r1_actual_hrs: primaryActualHrs,
-            r2_estimate_hrs: firstSecondary?.estimate_hrs ?? 0,
-            r2_actual_hrs: firstSecondary?.actual_hrs ?? 0,
-            actual_effort: totalActualHrs,
-        },
+        estimate_days: taskEstimateDays && taskEstimateDays > 0 ? taskEstimateDays : undefined,
+        total_actual_hrs: totalActualHrs,
     };
 }

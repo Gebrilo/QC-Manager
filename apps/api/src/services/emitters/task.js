@@ -49,9 +49,9 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
 /**
  * ADR 0009 §3 — build the outbound unified payload for a task. `assignedTo` is
  * the PRIMARY resource's Tuleap username (Tuleap's assigned_to is single-select).
- * `actual_effort` is the task total (SUM of all assignments' actual_hrs, kept on
- * tasks.actual_effort by the dual-write trigger); `final_estimate` is the
- * primary's. Both are omitted when absent so toTuleap skips them.
+ * `actual_effort` is the task total from assignments; `final_estimate` is the
+ * primary assignment's final estimate. Both are omitted when absent so toTuleap
+ * skips them.
  */
 function buildTaskEmitUnified(task, assignedTo) {
   return {

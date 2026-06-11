@@ -7,8 +7,8 @@ const { estimateAccuracy, isClosedWorkStatus } = require('../metrics/estimateAcc
 
 const TASK_FILTER_OPTS = {
     tableAlias: 't',
-    // ADR 0009 / #195 — resolve assignees via the junction so a 3rd+ secondary's
-    // tasks surface on their dashboard, not just the two cached resource slots.
+    // ADR 0009 / #195 — resolve assignees via the junction so every secondary's
+    // tasks surface on their dashboard.
     assigneeJunction: { table: 'task_resource_assignment', idExpr: 't.id' },
     userExprs: ['t.created_by_user_id'],
 };
@@ -107,9 +107,9 @@ function taskArtifact(task, assigneeResourceId) {
 }
 
 async function canEditTask(user, task, req) {
-    const assigneeIds = (Array.isArray(task.assignments) && task.assignments.length > 0)
-        ? task.assignments.map(a => a.resource_id).filter(Boolean)
-        : [task.resource1_id, task.resource2_id].filter(Boolean);
+    const assigneeIds = (Array.isArray(task.assignments) ? task.assignments : [])
+        .map(a => a.resource_id)
+        .filter(Boolean);
     if (assigneeIds.length === 0) {
         const result = await access.canPerform(user, taskArtifact(task, null), 'edit', req);
         return result.allowed;
@@ -143,10 +143,6 @@ function normalizeTask(row, can) {
         project_id: row.project_id,
         project_name: row.project_name,
         owner_team_id: row.owner_team_id,
-        resource1_id: row.resource1_id,
-        resource1_name: row.resource1_name,
-        resource2_id: row.resource2_id,
-        resource2_name: row.resource2_name,
         parent_user_story_id: row.parent_user_story_id,
         deadline: row.deadline,
         total_est_hrs: number(row.total_est_hrs),
@@ -179,8 +175,6 @@ async function getTaskRows(db, user, resolved, req, taskFilter, extraWhere = '',
         WITH ${TASK_ASSIGNMENT_ROLLUP_CTE}
         SELECT t.id, t.task_id, t.task_name, t.status, t.priority, t.project_id,
                p.project_name, t.owner_team_id, t.visibility_scope, t.created_by_user_id,
-               t.resource1_id, r1.resource_name AS resource1_name,
-               t.resource2_id, r2.resource_name AS resource2_name,
                t.parent_user_story_id, t.deadline,
                COALESCE(ar.total_estimated_hrs, 0) AS total_est_hrs,
                COALESCE(ar.total_estimated_hrs, 0) AS total_estimated_effort,
@@ -188,8 +182,6 @@ async function getTaskRows(db, user, resolved, req, taskFilter, extraWhere = '',
                COALESCE(ar.assignments, '[]'::jsonb) AS assignments
           FROM tasks t
           LEFT JOIN projects p ON p.id = t.project_id
-          LEFT JOIN resources r1 ON r1.id = t.resource1_id
-          LEFT JOIN resources r2 ON r2.id = t.resource2_id
           LEFT JOIN assignment_rollup ar ON ar.task_id = t.id
          WHERE ${baseWhere}
            ${extraWhere}
@@ -397,8 +389,6 @@ async function getMemberDashboard(db, user, req) {
         `WITH ${TASK_ASSIGNMENT_ROLLUP_CTE}
          SELECT t.id, t.task_id, t.task_name, t.status, t.priority, t.project_id,
                 p.project_name, t.owner_team_id, t.visibility_scope, t.created_by_user_id,
-                t.resource1_id, r1.resource_name AS resource1_name,
-                t.resource2_id, r2.resource_name AS resource2_name,
                 t.parent_user_story_id, t.deadline,
                 COALESCE(ar.total_estimated_hrs, 0) AS total_est_hrs,
                 COALESCE(ar.total_estimated_hrs, 0) AS total_estimated_effort,
@@ -410,8 +400,6 @@ async function getMemberDashboard(db, user, req) {
                 my_a.completion_status AS my_completion_status
            FROM tasks t
            LEFT JOIN projects p ON p.id = t.project_id
-           LEFT JOIN resources r1 ON r1.id = t.resource1_id
-           LEFT JOIN resources r2 ON r2.id = t.resource2_id
            LEFT JOIN resources mine ON mine.user_id = $1 AND mine.deleted_at IS NULL
            LEFT JOIN task_resource_assignment my_a ON my_a.task_id = t.id AND my_a.resource_id = mine.id
            LEFT JOIN assignment_rollup ar ON ar.task_id = t.id

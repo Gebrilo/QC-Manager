@@ -2,8 +2,7 @@ const { z } = require('zod');
 
 // ADR 0009 — a single per-resource assignment. The route maps these onto
 // task_resource_assignment rows. Cross-row rules (exactly one primary, no
-// duplicate resource) are enforced by services/assignments/taskAssignments.js
-// so the array path and the legacy resource1/resource2 path share the checks.
+// duplicate resource) are enforced by services/assignments/taskAssignments.js.
 const assignmentInputSchema = z.object({
     resource_id: z.string().uuid(),
     assignment_type: z.enum(['PRIMARY', 'SECONDARY']),
@@ -24,12 +23,7 @@ const baseTaskSchema = z.object({
     status: z.enum(['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled']).default('Todo'),
     priority: z.enum(['High', 'Medium', 'Low']).default('Medium'),
 
-    // Resources & Hours — legacy two-slot fields (still accepted; mapped to assignments)
-    resource1_uuid: z.string().uuid().nullable().optional(),
-    resource2_uuid: z.string().uuid().nullable().optional(),
-
-    // ADR 0009 — full assignment set (one primary + many secondaries). When
-    // present, supersedes the legacy resource1/resource2 fields.
+    // ADR 0009 — full assignment set (one primary + many secondaries).
     assignments: z.array(assignmentInputSchema).optional(),
 
     estimate_days: z.number().positive().optional(),
@@ -37,13 +31,7 @@ const baseTaskSchema = z.object({
     expected_start_date: z.string().date().optional(),
     actual_start_date: z.string().date().optional(),
 
-    // Hours (usually 0 on create, but allow setting)
-    r1_estimate_hrs: z.number().min(0).default(0),
-    r1_actual_hrs: z.number().min(0).default(0),
-    r2_estimate_hrs: z.number().min(0).default(0),
-    r2_actual_hrs: z.number().min(0).default(0),
-
-    // Per-primary planning numbers (mirror onto tasks via the assignment cache)
+    // Per-primary planning numbers are also carried on assignment inputs.
     initial_estimate: z.number().nullable().optional(),
     final_estimate: z.number().nullable().optional(),
 

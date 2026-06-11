@@ -20,17 +20,16 @@ const {
     validateAssignments,
     replaceTaskAssignments,
     getTaskAssignments,
+    getTaskAssignmentSummary,
     sumActualHrs,
     totalActualHrs,
     primaryOf,
-    firstSecondaryOf,
 } = require('../services/assignments/taskAssignments');
 
 const TASK_FILTER_OPTS = Object.freeze({
     tableAlias: 'v',
     // ADR 0009 — resolve assignees via the task_resource_assignment junction so
-    // every assignee (primary + all secondaries, incl. the 3rd+) is matched,
-    // not just the two cached resource slots.
+    // every assignee (primary + all secondaries, incl. the 3rd+) is matched.
     assigneeJunction: { table: 'task_resource_assignment', idExpr: 'v.id' },
     userExprs: ['v.created_by_user_id'],
 });
@@ -55,18 +54,40 @@ async function resolveTaskSyncConfig(projectId) {
     return result.rows[0] || null;
 }
 
-async function tryEmitAndWriteback(task, config, mode) {
-    // Resolve assigned_to name from primary resource
-    let assignedTo = null;
-    if (task.resource1_id) {
-        const r = await db.query('SELECT resource_name FROM resources WHERE id = $1', [task.resource1_id]);
-        if (r.rows.length > 0) assignedTo = r.rows[0].resource_name;
+async function resolveTaskAccessAssigneeResourceId(taskId, user, req) {
+    const result = await db.query(
+        `SELECT tra.resource_id, r.user_id, au.team_id
+           FROM task_resource_assignment tra
+           JOIN resources r ON r.id = tra.resource_id
+           LEFT JOIN app_user au ON au.id = r.user_id
+          WHERE tra.task_id = $1 AND r.deleted_at IS NULL
+          ORDER BY (tra.assignment_type = 'PRIMARY') DESC, tra.created_at, tra.id`,
+        [taskId]
+    );
+    const rows = result.rows || [];
+    if (rows.length === 0) return null;
+
+    if (user?.id) {
+        const mine = rows.find(row => row.user_id === user.id);
+        if (mine) return mine.resource_id;
+
+        const resolved = await resolveRole(user, req);
+        if (resolved.scope.team_id) {
+            const teammate = rows.find(row => row.team_id === resolved.scope.team_id);
+            if (teammate) return teammate.resource_id;
+        }
     }
 
-    // ADR 0009 §3 — assigned_to = PRIMARY (task.resource1_id is the primary,
-    // kept in sync by the dual-write trigger); actual_effort = task total
-    // (SUM of all assignments' actual_hrs); final_estimate = primary's.
-    const unified = buildTaskEmitUnified(task, assignedTo);
+    return rows[0].resource_id;
+}
+
+async function tryEmitAndWriteback(task, config, mode) {
+    const summary = await getTaskAssignmentSummary(db.query.bind(db), task.id);
+    const unified = buildTaskEmitUnified({
+        ...task,
+        actual_effort: summary.total_actual_hrs,
+        final_estimate: summary.primary_final_estimate,
+    }, summary.primary_resource_name);
 
     const emitDeps = { client: defaultClient, registry: defaultRegistry, query: db.query.bind(db) };
 
@@ -132,11 +153,7 @@ function validateStatusTransition(currentStatus, newStatus, data) {
         if (!data.completed_date) {
             return { valid: false, error: 'completed_date is required when marking task as Done' };
         }
-        // ADR 0009 — Done requires effort logged by *someone* (sum across all
-        // assignments). Falls back to the legacy r1+r2 slots when no total given.
-        const totalActual = data.totalActualHrs != null
-            ? data.totalActualHrs
-            : (data.r1_actual_hrs || 0) + (data.r2_actual_hrs || 0);
+        const totalActual = data.totalActualHrs || 0;
         if (totalActual <= 0) {
             return { valid: false, error: 'Task must have actual hours recorded before marking as Done' };
         }
@@ -195,7 +212,7 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.tasks.view
         if (!access.enabled) {
             // No actor / engine disabled — admin wildcard short-circuits to TRUE
             // via buildListFilter, so reaching this branch means a non-authed
-            // path. Return the legacy unfiltered view.
+            // path. Return the existing unfiltered view.
             const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
             return res.json(result.rows);
         }
@@ -220,24 +237,8 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.tasks.v
 
         const task = result.rows[0];
 
-        // ADR 0009 — resolve access through the task_resource_assignment
-        // junction so any assignee (primary or the 3rd+ secondary, which the
-        // two cached slots cannot hold) grants via the engine's assignee branch.
-        // When the caller is an assignee, pass *their* resource id; otherwise
-        // fall back to a cached slot as a representative assignee for the
-        // teammate-of-assignee branch.
-        let assigneeResourceId = task.resource1_id || task.resource2_id || null;
-        if (req.user?.id) {
-            const mine = await db.query(
-                `SELECT tra.resource_id
-                   FROM task_resource_assignment tra
-                   JOIN resources r ON r.id = tra.resource_id
-                  WHERE tra.task_id = $1 AND r.user_id = $2 AND r.deleted_at IS NULL
-                  LIMIT 1`,
-                [task.id, req.user.id]
-            );
-            if (mine.rows.length > 0) assigneeResourceId = mine.rows[0].resource_id;
-        }
+        const assignmentRows = await getTaskAssignments(db.query.bind(db), task.id);
+        const assigneeResourceId = await resolveTaskAccessAssigneeResourceId(task.id, req.user, req);
 
         const enforcement = await enforceArtifact(req, res, 'task', task, 'view', {
             route: 'GET /tasks/:id',
@@ -245,7 +246,6 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.tasks.v
         });
         if (!enforcement.allowed) return; // enforceArtifact already wrote 403
 
-        const assignmentRows = await getTaskAssignments(db.query.bind(db), task.id);
         res.json({ ...task, assignments: assignmentRows });
     } catch (err) {
         next(err);
@@ -258,13 +258,10 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         const temp_id = req.body.temp_id;
         const data = createTaskSchema.parse(req.body);
 
-        // ADR 0009 — resolve the desired assignment set (explicit array, or the
-        // legacy resource1/resource2 slots) and enforce the assignment rules
-        // (one primary, no duplicate/self) before any write → 400 on violation.
+        // ADR 0009 — resolve the desired assignment set and enforce the
+        // assignment rules before any write.
         const assignments = assignmentsFromPayload(data) || [];
         validateAssignments(assignments);
-        const primary = primaryOf(assignments);
-        const firstSecondary = firstSecondaryOf(assignments);
 
         // Team-scope validation for managers
         if (isTeamManagerRole(req.user.role)) {
@@ -312,25 +309,19 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         const query = `
             INSERT INTO tasks (
                 task_id, project_id, task_name, status, priority,
-                resource1_id, resource2_id,
                 estimate_days,
-                r1_estimate_hrs, r1_actual_hrs,
-                r2_estimate_hrs, r2_actual_hrs,
                 deadline, tags, notes, completed_date,
                 expected_start_date, actual_start_date,
                 owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                $18, $19, $20, $21
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                $12, $13, $14, $15
             ) RETURNING *
         `;
 
         const values = [
             data.task_id, data.project_id, data.task_name, data.status, canSetPriority ? data.priority : 'Medium',
-            primary ? primary.resource_id : null, firstSecondary ? firstSecondary.resource_id : null,
             data.estimate_days,
-            primary ? primary.estimate_hrs : 0, primary ? primary.actual_hrs : 0,
-            firstSecondary ? firstSecondary.estimate_hrs : 0, firstSecondary ? firstSecondary.actual_hrs : 0,
             data.deadline, data.tags, notes, data.completed_date,
             data.expected_start_date || null, data.actual_start_date || null,
             accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
@@ -339,8 +330,6 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
         const result = await db.query(query, values);
         const task = result.rows[0];
 
-        // ADR 0009 — write the authoritative assignment rows; the dual-write
-        // trigger keeps the legacy resource1/resource2/rN_* columns in sync.
         if (assignments.length > 0) {
             await replaceTaskAssignments({ query: db.query.bind(db), taskId: task.id, assignments });
         }
@@ -408,17 +397,15 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         if (originalRes.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
         const original = originalRes.rows[0];
 
-        // ADR 0009 — desired assignment set (explicit array, or legacy slots
-        // merged onto the original row). null = request does not touch assignments.
-        const desiredAssignments = assignmentsFromPayload(data, { fallbackTo: original });
+        // ADR 0009 — null means this request does not touch assignments.
+        const desiredAssignments = assignmentsFromPayload(data);
         if (desiredAssignments) validateAssignments(desiredAssignments); // 400 on bad set
 
         // Detect a genuine assignment change to gate the take-over permission.
         let assignmentChanged = false;
         if (desiredAssignments) {
             const currentAssignments = await getTaskAssignments(db.query.bind(db), id);
-            const curPrimary = (currentAssignments.find(a => a.assignment_type === 'PRIMARY') || {}).resource_id
-                || original.resource1_id || null;
+            const curPrimary = (currentAssignments.find(a => a.assignment_type === 'PRIMARY') || {}).resource_id || null;
             const curSecondaries = new Set(
                 currentAssignments.filter(a => a.assignment_type === 'SECONDARY').map(a => a.resource_id)
             );
@@ -446,7 +433,8 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
                 }
             }
         } else {
-            const canEdit = await canEditTask(req.user, original, req);
+            const originalAssignments = await getTaskAssignments(db.query.bind(db), id);
+            const canEdit = await canEditTask(req.user, { ...original, assignments: originalAssignments }, req);
             if (!canEdit) {
                 return res.status(403).json({ error: 'You do not have permission to edit this task' });
             }
@@ -529,13 +517,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             task_name: 'task_name',
             status: 'status',
             priority: 'priority',
-            resource1_uuid: 'resource1_id',
-            resource2_uuid: 'resource2_id',
             estimate_days: 'estimate_days',
-            r1_estimate_hrs: 'r1_estimate_hrs',
-            r1_actual_hrs: 'r1_actual_hrs',
-            r2_estimate_hrs: 'r2_estimate_hrs',
-            r2_actual_hrs: 'r2_actual_hrs',
             deadline: 'deadline',
             tags: 'tags',
             notes: 'notes',
@@ -569,13 +551,8 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             updated = result.rows[0];
         }
 
-        // ADR 0009 — apply the authoritative assignment set; the dual-write
-        // trigger refreshes the legacy resource1/resource2/rN_* columns, so
-        // re-read the task row for the downstream emit + response.
         if (desiredAssignments) {
             await replaceTaskAssignments({ query: db.query.bind(db), taskId: id, assignments: desiredAssignments });
-            const refreshed = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
-            updated = refreshed.rows[0];
         }
 
         await auditLog('tasks', id, 'UPDATE', updated, original);

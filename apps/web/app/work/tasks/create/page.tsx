@@ -39,7 +39,7 @@ const schema = z.object({
     description: z.string().optional().default(''),
     team: z.string().optional().default(''),
     blocked_reason: z.string().optional().default(''),
-    resource1_uuid: z.string().uuid(),
+    primary_resource_id: z.string().uuid(),
     initial_estimate: optionalNumber(z.number()),
     final_estimate: optionalNumber(z.number()),
     estimate_days: optionalNumber(z.number().min(0)),
@@ -54,7 +54,7 @@ const schema = z.object({
     const seen = new Set<string>();
     data.secondary_assignments.forEach((assignment, index) => {
         if (!assignment.resource_id) return;
-        if (assignment.resource_id === data.resource1_uuid) {
+        if (assignment.resource_id === data.primary_resource_id) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'Secondary cannot match Primary',
@@ -78,7 +78,7 @@ type FormField = keyof FormData;
 const SECTION_FIELDS: { sectionId: string; fields: FormField[] }[] = [
     { sectionId: 'task-general', fields: ['task_name', 'project_id', 'task_id', 'status', 'priority', 'team'] },
     { sectionId: 'task-description', fields: ['description', 'blocked_reason'] },
-    { sectionId: 'task-assignment', fields: ['resource1_uuid', 'secondary_assignments'] },
+    { sectionId: 'task-assignment', fields: ['primary_resource_id', 'secondary_assignments'] },
     {
         sectionId: 'task-planning',
         fields: [
@@ -101,7 +101,7 @@ const FIELD_LABELS: Partial<Record<FormField, string>> = {
     description: 'Description',
     team: 'Team',
     blocked_reason: 'Blocked Reason',
-    resource1_uuid: 'Primary Resource',
+    primary_resource_id: 'Primary Resource',
     secondary_assignments: 'Secondary Resources',
     initial_estimate: 'Initial Estimate',
     final_estimate: 'Final Estimate',
@@ -399,7 +399,7 @@ function CreateForm({
             description: '',
             team: '',
             blocked_reason: '',
-            resource1_uuid: resources.filter(r => r.is_active !== false)[0]?.id || '',
+            primary_resource_id: resources.filter(r => r.is_active !== false)[0]?.id || '',
             initial_estimate: undefined,
             final_estimate: undefined,
             estimate_days: undefined,
@@ -437,12 +437,12 @@ function CreateForm({
     const priorityValue = watch('priority');
     const taskNameValue = watch('task_name');
     const projectIdValue = watch('project_id');
-    const resource1Value = watch('resource1_uuid');
+    const primaryResourceValue = watch('primary_resource_id');
     const secondaryValues = watch('secondary_assignments') || [];
     const missingRequiredFields = [
         !taskNameValue?.trim() ? 'Task Name' : null,
         !projectIdValue ? 'Project' : null,
-        !resource1Value ? 'Primary Resource' : null,
+        !primaryResourceValue ? 'Primary Resource' : null,
     ].filter(Boolean) as string[];
     const hasValidationErrors = Object.keys(errors).length > 0;
 
@@ -450,8 +450,8 @@ function CreateForm({
         setIsSubmitting(true);
         setError(null);
         try {
-            const { assignments, legacy } = buildTaskAssignmentsPayload({
-                primaryResourceId: data.resource1_uuid,
+            const { assignments, estimate_days } = buildTaskAssignmentsPayload({
+                primaryResourceId: data.primary_resource_id,
                 primaryEstimateDays: data.estimate_days,
                 primaryActualDays: data.primary_actual_days,
                 primaryInitialEstimate: data.initial_estimate,
@@ -467,20 +467,11 @@ function CreateForm({
                 description: data.description,
                 team: data.team,
                 blocked_reason: data.blocked_reason,
-                resource1_uuid: legacy.resource1_uuid,
-                resource2_uuid: legacy.resource2_uuid,
                 expected_start_date: data.expected_start_date || undefined,
                 actual_start_date: data.actual_start_date || undefined,
                 deadline: data.deadline || undefined,
                 completed_date: data.completed_date || undefined,
-                estimate_days: legacy.estimate_days,
-                r1_estimate_hrs: legacy.r1_estimate_hrs,
-                r1_actual_hrs: legacy.r1_actual_hrs,
-                r2_estimate_hrs: legacy.r2_estimate_hrs,
-                r2_actual_hrs: legacy.r2_actual_hrs,
-                initial_estimate: data.initial_estimate ?? undefined,
-                final_estimate: data.final_estimate ?? undefined,
-                actual_effort: legacy.actual_effort,
+                estimate_days,
                 assignments,
                 parent_user_story_id: data.parent_user_story_id || undefined,
             };
@@ -529,7 +520,7 @@ function CreateForm({
         if (currentValue) selected.delete(currentValue);
 
         return activeResources
-            .filter(r => r.id !== resource1Value && !selected.has(r.id))
+            .filter(r => r.id !== primaryResourceValue && !selected.has(r.id))
             .map(r => ({
                 value: r.id,
                 label: `${r.resource_name || r.name || 'Unnamed'}${r.utilization_pct != null ? ` · ${Number(r.utilization_pct).toFixed(0)}% util` : ''}`,
@@ -739,13 +730,13 @@ function CreateForm({
                     >
                         <div>
                             <FieldLabel required>Primary Resource</FieldLabel>
-                            <SelectField {...register('resource1_uuid')}>
+                            <SelectField {...register('primary_resource_id')}>
                                 <option value="">— Select resource —</option>
                                 {resource1Options.map(opt => (
                                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                                 ))}
                             </SelectField>
-                            <FieldError message={errors.resource1_uuid?.message} />
+                            <FieldError message={errors.primary_resource_id?.message} />
                         </div>
 
                         <div className="col-span-2 space-y-3">
@@ -768,7 +759,7 @@ function CreateForm({
                                 <div className="space-y-3">
                                     {secondaryFields.map((field, index) => {
                                         const currentValue = secondaryValues[index]?.resource_id || '';
-                                        const currentIsPrimary = currentValue !== '' && currentValue === resource1Value;
+                                        const currentIsPrimary = currentValue !== '' && currentValue === primaryResourceValue;
                                         return (
                                             <div key={field.id} className="grid grid-cols-12 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 p-3">
                                                 <div className="col-span-12 md:col-span-6">

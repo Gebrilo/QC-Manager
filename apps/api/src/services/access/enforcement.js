@@ -23,7 +23,7 @@ function normalizeArtifact(artifactType, row, overrides = {}) {
         visibility_scope: row.visibility_scope,
         owner_user_id: row.created_by_user_id || row.created_by || row.executed_by,
         assignee_user_id: row.assigned_to,
-        assignee_resource_id: row.resource1_id || row.resource2_id || row.owner_resource_id || row.submitted_by_resource_id,
+        assignee_resource_id: row.owner_resource_id || row.submitted_by_resource_id,
         ...overrides,
     };
 }

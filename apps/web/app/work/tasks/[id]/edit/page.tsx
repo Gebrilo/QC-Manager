@@ -42,7 +42,7 @@ const schema = z.object({
     description: z.string().optional().default(''),
     team: z.string().optional().default(''),
     blocked_reason: z.string().optional().default(''),
-    resource1_uuid: z.string().uuid(),
+    primary_resource_id: z.string().uuid(),
     initial_estimate: optionalNumber(z.number()),
     final_estimate: optionalNumber(z.number()),
     estimate_days: optionalNumber(z.number().min(0)),
@@ -57,7 +57,7 @@ const schema = z.object({
     const seen = new Set<string>();
     data.secondary_assignments.forEach((assignment, index) => {
         if (!assignment.resource_id) return;
-        if (assignment.resource_id === data.resource1_uuid) {
+        if (assignment.resource_id === data.primary_resource_id) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'Secondary cannot match Primary',
@@ -405,7 +405,7 @@ function EditForm({
             description: task.notes || (task as any).description || '',
             team: (task as any).team || '',
             blocked_reason: (task as any).blocked_reason || '',
-            resource1_uuid: assignmentDefaults.primaryResourceId,
+            primary_resource_id: assignmentDefaults.primaryResourceId,
             initial_estimate: assignmentDefaults.primaryInitialEstimate ?? undefined,
             final_estimate: assignmentDefaults.primaryFinalEstimate ?? undefined,
             estimate_days: assignmentDefaults.primaryEstimateDays,
@@ -441,15 +441,15 @@ function EditForm({
 
     const statusValue = watch('status');
     const priorityValue = watch('priority');
-    const resource1Value = watch('resource1_uuid');
+    const primaryResourceValue = watch('primary_resource_id');
     const secondaryValues = watch('secondary_assignments') || [];
 
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         setError(null);
         try {
-            const { assignments, legacy } = buildTaskAssignmentsPayload({
-                primaryResourceId: data.resource1_uuid,
+            const { assignments, estimate_days } = buildTaskAssignmentsPayload({
+                primaryResourceId: data.primary_resource_id,
                 primaryEstimateDays: data.estimate_days,
                 primaryActualDays: data.primary_actual_days,
                 primaryInitialEstimate: data.initial_estimate,
@@ -464,20 +464,11 @@ function EditForm({
                 description: data.description,
                 team: data.team,
                 blocked_reason: data.blocked_reason,
-                resource1_uuid: legacy.resource1_uuid,
-                resource2_uuid: legacy.resource2_uuid,
                 expected_start_date: data.expected_start_date || undefined,
                 actual_start_date: data.actual_start_date || undefined,
                 deadline: data.deadline || undefined,
                 completed_date: data.completed_date || undefined,
-                estimate_days: legacy.estimate_days,
-                r1_estimate_hrs: legacy.r1_estimate_hrs,
-                r1_actual_hrs: legacy.r1_actual_hrs,
-                r2_estimate_hrs: legacy.r2_estimate_hrs,
-                r2_actual_hrs: legacy.r2_actual_hrs,
-                initial_estimate: data.initial_estimate ?? undefined,
-                final_estimate: data.final_estimate ?? undefined,
-                actual_effort: legacy.actual_effort,
+                estimate_days,
                 assignments,
                 parent_user_story_id: data.parent_user_story_id || undefined,
             };
@@ -512,7 +503,7 @@ function EditForm({
         if (currentValue) selected.delete(currentValue);
 
         return activeResources
-            .filter(r => r.id !== resource1Value && !selected.has(r.id))
+            .filter(r => r.id !== primaryResourceValue && !selected.has(r.id))
             .map(r => ({
                 value: r.id,
                 label: `${r.resource_name || r.name || 'Unnamed'}${r.utilization_pct != null ? ` · ${Number(r.utilization_pct).toFixed(0)}% util` : ''}`,
@@ -520,7 +511,7 @@ function EditForm({
     };
 
     const projectName = projects.find(p => p.id === task.project_id)?.project_name;
-    const r1Name = activeResources.find(r => r.id === resource1Value)?.resource_name;
+    const primaryResourceName = activeResources.find(r => r.id === primaryResourceValue)?.resource_name;
     const taskDisplayId = getTaskDisplayId(task);
     const deadlineDisplay = task.deadline ? new Date(task.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
     const createdAt = (task as any).created_at ? new Date((task as any).created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
@@ -738,12 +729,12 @@ function EditForm({
 
                         <div>
                             <FieldLabel required>Primary Resource</FieldLabel>
-                            <SelectField {...register('resource1_uuid')}>
+                            <SelectField {...register('primary_resource_id')}>
                                 {resource1Options.map(opt => (
                                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                                 ))}
                             </SelectField>
-                            <FieldError message={errors.resource1_uuid?.message} />
+                            <FieldError message={errors.primary_resource_id?.message} />
                         </div>
 
                         <div className="col-span-2 space-y-3">
@@ -766,7 +757,7 @@ function EditForm({
                                 <div className="space-y-3">
                                     {secondaryFields.map((field, index) => {
                                         const currentValue = secondaryValues[index]?.resource_id || '';
-                                        const currentIsPrimary = currentValue !== '' && currentValue === resource1Value;
+                                        const currentIsPrimary = currentValue !== '' && currentValue === primaryResourceValue;
                                         return (
                                             <div key={field.id} className="grid grid-cols-12 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 p-3">
                                                 <div className="col-span-12 md:col-span-6">
@@ -917,7 +908,7 @@ function EditForm({
                         <MetaCard title="At a glance">
                             <MetaRow label="Task ID" value={taskDisplayId} mono />
                             <MetaRow label="Project" value={projectName} />
-                            <MetaRow label="Primary Resource" value={r1Name} />
+                            <MetaRow label="Primary Resource" value={primaryResourceName} />
                             <MetaRow label="Deadline" value={deadlineDisplay} />
                             <MetaRow label="Created" value={createdAt} />
                             <MetaRow label="Updated" value={updatedAt} />
