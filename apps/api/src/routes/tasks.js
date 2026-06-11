@@ -83,11 +83,22 @@ async function resolveTaskAccessAssigneeResourceId(taskId, user, req) {
 
 async function tryEmitAndWriteback(task, config, mode) {
     const summary = await getTaskAssignmentSummary(db.query.bind(db), task.id);
+    // Tuleap's assigned_to bind expects the username (e.g. 'belal.z'), NOT the
+    // display name. Sending the display name makes Tuleap reject the artifact
+    // with "Bind value '<name>' not found". When the primary resource has no
+    // Tuleap username, emit nothing for assigned_to (toTuleap drops null) so the
+    // rest of the sync still goes through.
+    if (summary.primary_resource_id && !summary.primary_tuleap_username) {
+        console.warn(
+            `[route:tasks:emit] primary resource '${summary.primary_resource_name}' ` +
+            `(task ${task.id}) has no tuleap_username — assignee will not be synced to Tuleap`
+        );
+    }
     const unified = buildTaskEmitUnified({
         ...task,
         actual_effort: summary.total_actual_hrs,
         final_estimate: summary.primary_final_estimate,
-    }, summary.primary_resource_name);
+    }, summary.primary_tuleap_username);
 
     const emitDeps = { client: defaultClient, registry: defaultRegistry, query: db.query.bind(db) };
 
