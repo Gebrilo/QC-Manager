@@ -544,6 +544,36 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_tuleap_artifact ON tasks(tuleap_artifact_id) WHERE tuleap_artifact_id IS NOT NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_tasks_synced_from_tuleap ON tasks(synced_from_tuleap) WHERE synced_from_tuleap = TRUE`);
 
+        // ADR 0009 — the task_resource_assignment junction MUST be created before
+        // the views below, which read from it (v_projects_with_metrics,
+        // v_resources_with_utilization, v_dashboard_metrics). Creating it later in
+        // the bootstrap left a fresh DB's view-recreate referencing a table that
+        // did not exist yet, aborting the bootstrap. (See incident 2026-06-11.)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS task_resource_assignment (
+                id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id              UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                resource_id          UUID NOT NULL REFERENCES resources(id) ON DELETE RESTRICT,
+                assignment_type      VARCHAR(10) NOT NULL
+                                     CHECK (assignment_type IN ('PRIMARY','SECONDARY')),
+                initial_estimate     NUMERIC(10,2),
+                final_estimate       NUMERIC(10,2),
+                estimate_hrs         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (estimate_hrs >= 0),
+                actual_hrs           NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (actual_hrs >= 0),
+                planned_working_days NUMERIC(10,2),
+                completion_status    VARCHAR(12) NOT NULL DEFAULT 'Pending'
+                                     CHECK (completion_status IN ('Pending','Completed')),
+                completed_at         TIMESTAMP WITH TIME ZONE,
+                created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                updated_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_tra_task_resource UNIQUE (task_id, resource_id)
+            )
+        `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_tra_one_primary
+            ON task_resource_assignment (task_id) WHERE assignment_type = 'PRIMARY'`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_resource ON task_resource_assignment (resource_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_task ON task_resource_assignment (task_id)`);
+
         await client.query(`DROP VIEW IF EXISTS v_dashboard_metrics CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_resources_with_utilization CASCADE`);
         await client.query(`DROP VIEW IF EXISTS v_projects_with_metrics CASCADE`);
@@ -1664,30 +1694,9 @@ const runMigrations = async () => {
         // =====================================================
 
         // --- Phase 1: table + constraints + indexes ---------------------------
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS task_resource_assignment (
-                id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                task_id              UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                resource_id          UUID NOT NULL REFERENCES resources(id) ON DELETE RESTRICT,
-                assignment_type      VARCHAR(10) NOT NULL
-                                     CHECK (assignment_type IN ('PRIMARY','SECONDARY')),
-                initial_estimate     NUMERIC(10,2),
-                final_estimate       NUMERIC(10,2),
-                estimate_hrs         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (estimate_hrs >= 0),
-                actual_hrs           NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (actual_hrs >= 0),
-                planned_working_days NUMERIC(10,2),
-                completion_status    VARCHAR(12) NOT NULL DEFAULT 'Pending'
-                                     CHECK (completion_status IN ('Pending','Completed')),
-                completed_at         TIMESTAMP WITH TIME ZONE,
-                created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                updated_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                CONSTRAINT uq_tra_task_resource UNIQUE (task_id, resource_id)
-            )
-        `);
-        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_tra_one_primary
-            ON task_resource_assignment (task_id) WHERE assignment_type = 'PRIMARY'`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_resource ON task_resource_assignment (resource_id)`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_task ON task_resource_assignment (task_id)`);
+        // The task_resource_assignment table + indexes are now created earlier
+        // (just before the v_*_with_metrics view block), because those views read
+        // the junction and must not reference a not-yet-created table.
 
         // --- Phase 5: drop dual-write trigger + function + legacy columns -------
         await client.query(`DROP TRIGGER IF EXISTS trg_sync_task_assignment_cache ON task_resource_assignment`);
