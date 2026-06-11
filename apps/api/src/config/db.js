@@ -94,13 +94,7 @@ const runMigrations = async () => {
                 priority VARCHAR(20) DEFAULT 'medium',
                 tags TEXT[],
                 notes TEXT,
-                resource1_id UUID,
-                resource2_id UUID,
                 estimate_days NUMERIC,
-                r1_estimate_hrs NUMERIC DEFAULT 0,
-                r1_actual_hrs NUMERIC DEFAULT 0,
-                r2_estimate_hrs NUMERIC DEFAULT 0,
-                r2_actual_hrs NUMERIC DEFAULT 0,
                 due_date DATE,
                 deadline DATE,
                 completed_date DATE,
@@ -582,6 +576,14 @@ const runMigrations = async () => {
 
         await client.query(`
             CREATE OR REPLACE VIEW v_projects_with_metrics AS
+            WITH task_assignment_totals AS (
+                SELECT
+                    task_id,
+                    COALESCE(SUM(COALESCE(estimate_hrs, 0)), 0) AS total_estimated_hrs,
+                    COALESCE(SUM(COALESCE(actual_hrs, 0)), 0) AS total_actual_hrs
+                FROM task_resource_assignment
+                GROUP BY task_id
+            )
             SELECT
                 p.id,
                 p.project_id,
@@ -595,9 +597,9 @@ const runMigrations = async () => {
                 p.start_date,
                 p.target_date,
                 CASE WHEN p.target_date IS NOT NULL THEN p.target_date - CURRENT_DATE ELSE NULL END AS days_until_target,
-                COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) AS task_hrs_est,
-                COALESCE(SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)), 0) AS task_hrs_actual,
-                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END), 0) AS task_hrs_done,
+                COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS task_hrs_est,
+                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) AS task_hrs_actual,
+                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END), 0) AS task_hrs_done,
                 COUNT(t.id) AS tasks_total_count,
                 SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done_count,
                 SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress_count,
@@ -609,9 +611,9 @@ const runMigrations = async () => {
                     ELSE 0
                 END AS overall_completion_pct,
                 CASE
-                    WHEN COALESCE(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) > 0
-                    THEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END)::NUMERIC /
-                         NULLIF(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0)::NUMERIC) * 100, 2)
+                    WHEN COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) > 0
+                    THEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END)::NUMERIC /
+                         NULLIF(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0)::NUMERIC) * 100, 2)
                     ELSE NULL
                 END AS effort_completion_pct,
                 CASE
@@ -626,12 +628,26 @@ const runMigrations = async () => {
                 p.deleted_at
             FROM projects p
             LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
+            LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
             WHERE p.deleted_at IS NULL
             GROUP BY p.id
         `);
 
         await client.query(`
             CREATE OR REPLACE VIEW v_resources_with_utilization AS
+            WITH resource_load AS (
+                SELECT
+                    tra.resource_id,
+                    COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)) FILTER (
+                        WHERE t.status NOT IN ('Done', 'Canceled', 'Cancelled')
+                    ), 0) AS current_allocation_hrs,
+                    COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'In Progress') AS active_tasks_count,
+                    COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('Todo', 'Backlog')) AS backlog_tasks_count
+                FROM task_resource_assignment tra
+                JOIN tasks t ON t.id = tra.task_id
+                WHERE t.deleted_at IS NULL
+                GROUP BY tra.resource_id
+            )
             SELECT
                 r.id,
                 r.resource_name,
@@ -641,55 +657,73 @@ const runMigrations = async () => {
                 r.email,
                 r.department,
                 r.role,
-                COALESCE(
-                    (SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')),
-                    0
-                ) + COALESCE(
-                    (SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')),
-                    0
-                ) AS current_allocation_hrs,
-                CASE 
+                COALESCE(rl.current_allocation_hrs, 0) AS current_allocation_hrs,
+                CASE
                     WHEN r.weekly_capacity_hrs > 0 THEN
-                        ROUND((
-                            (COALESCE((SELECT SUM(COALESCE(t.r1_estimate_hrs, 0)) FROM tasks t WHERE t.resource1_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')), 0) +
-                             COALESCE((SELECT SUM(COALESCE(t.r2_estimate_hrs, 0)) FROM tasks t WHERE t.resource2_id = r.id AND t.deleted_at IS NULL AND t.status NOT IN ('Done', 'Canceled')), 0)
-                            ) / r.weekly_capacity_hrs * 100
-                        )::NUMERIC, 2)
+                        ROUND((COALESCE(rl.current_allocation_hrs, 0) / r.weekly_capacity_hrs * 100)::NUMERIC, 2)
                     ELSE 0
                 END AS utilization_pct,
-                (SELECT COUNT(*) FROM tasks t WHERE (t.resource1_id = r.id OR t.resource2_id = r.id) AND t.deleted_at IS NULL AND t.status = 'In Progress') AS active_tasks_count,
-                (SELECT COUNT(*) FROM tasks t WHERE (t.resource1_id = r.id OR t.resource2_id = r.id) AND t.deleted_at IS NULL AND t.status = 'Todo') AS backlog_tasks_count,
+                COALESCE(rl.active_tasks_count, 0) AS active_tasks_count,
+                COALESCE(rl.backlog_tasks_count, 0) AS backlog_tasks_count,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at
             FROM resources r
+            LEFT JOIN resource_load rl ON rl.resource_id = r.id
             WHERE r.deleted_at IS NULL
         `);
 
         await client.query(`
             CREATE OR REPLACE VIEW v_dashboard_metrics AS
+            WITH task_assignment_totals AS (
+                SELECT
+                    task_id,
+                    COALESCE(SUM(COALESCE(estimate_hrs, 0)), 0) AS total_estimated_hrs,
+                    COALESCE(SUM(COALESCE(actual_hrs, 0)), 0) AS total_actual_hrs
+                FROM task_resource_assignment
+                GROUP BY task_id
+            ),
+            resource_load AS (
+                SELECT
+                    r.id,
+                    r.weekly_capacity_hrs,
+                    COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)) FILTER (
+                        WHERE t.status NOT IN ('Done', 'Canceled', 'Cancelled')
+                    ), 0) AS current_allocation_hrs
+                FROM resources r
+                LEFT JOIN task_resource_assignment tra ON tra.resource_id = r.id
+                LEFT JOIN tasks t ON t.id = tra.task_id AND t.deleted_at IS NULL
+                WHERE r.deleted_at IS NULL AND r.is_active = TRUE
+                GROUP BY r.id, r.weekly_capacity_hrs
+            )
             SELECT
                 COUNT(DISTINCT t.id) AS total_tasks,
-                SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done,
-                SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress,
-                SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog,
-                SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END) AS tasks_cancelled,
-                CASE 
-                    WHEN SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) > 0 THEN
-                        ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0) ELSE 0 END) / 
-                               NULLIF(SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)), 0) * 100)::NUMERIC, 2)
+                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END), 0) AS tasks_done,
+                COALESCE(SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END), 0) AS tasks_in_progress,
+                COALESCE(SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END), 0) AS tasks_backlog,
+                COALESCE(SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END), 0) AS tasks_cancelled,
+                CASE
+                    WHEN COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) > 0 THEN
+                        ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END) /
+                               NULLIF(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) * 100)::NUMERIC, 2)
                     ELSE 0
                 END AS overall_completion_rate_pct,
-                SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_estimated_hrs,
-                SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) AS total_actual_hrs,
-                SUM(COALESCE(t.r1_actual_hrs, 0) + COALESCE(t.r2_actual_hrs, 0)) - SUM(COALESCE(t.r1_estimate_hrs, 0) + COALESCE(t.r2_estimate_hrs, 0)) AS total_hours_variance,
+                COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_estimated_hrs,
+                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) AS total_actual_hrs,
+                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) - COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_hours_variance,
                 COUNT(DISTINCT p.id) AS total_projects,
                 COUNT(DISTINCT CASE WHEN t.id IS NOT NULL THEN p.id END) AS projects_with_tasks,
                 (SELECT COUNT(*) FROM resources WHERE is_active = TRUE AND deleted_at IS NULL) AS active_resources,
-                0 AS overallocated_resources,
+                (
+                    SELECT COUNT(*)
+                    FROM resource_load
+                    WHERE weekly_capacity_hrs > 0
+                      AND current_allocation_hrs > weekly_capacity_hrs
+                )::int AS overallocated_resources,
                 CURRENT_TIMESTAMP AS calculated_at
             FROM projects p
             LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
+            LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
             WHERE p.deleted_at IS NULL
         `);
 
@@ -1625,14 +1659,8 @@ const runMigrations = async () => {
         // =====================================================
         // ADR 0009 — Normalize task assignment (one Primary + many Secondaries)
         //   Phase 1: task_resource_assignment junction (source of truth).
-        //   Phase 2: one-time backfill from the legacy tasks.resource1_id /
-        //            resource2_id two-slot model.
-        //   Phase 3: dual-write cache trigger that keeps the legacy
-        //            tasks.resource1_id/resource2_id/r1_*/r2_* columns for
-        //            backward-compatible raw SQL while the main reporting views
-        //            read the junction directly. The legacy columns + this
-        //            trigger are dropped in a later migration. See
-        //            docs/adr/0009-*.md.
+        //   Phases 2-3 (backfill + dual-write trigger) have been completed
+        //   and removed. The junction is now the sole source of truth.
         // =====================================================
 
         // --- Phase 1: table + constraints + indexes ---------------------------
@@ -1656,243 +1684,20 @@ const runMigrations = async () => {
                 CONSTRAINT uq_tra_task_resource UNIQUE (task_id, resource_id)
             )
         `);
-        // exactly one PRIMARY assignment per task
         await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_tra_one_primary
             ON task_resource_assignment (task_id) WHERE assignment_type = 'PRIMARY'`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_resource ON task_resource_assignment (resource_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_tra_task ON task_resource_assignment (task_id)`);
 
-        // --- Phase 2: one-time backfill (runs only while the junction is empty) ---
-        await client.query(`
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM task_resource_assignment) THEN
-                    -- Primary from tasks.resource1_id
-                    INSERT INTO task_resource_assignment
-                        (task_id, resource_id, assignment_type, initial_estimate, final_estimate,
-                         estimate_hrs, actual_hrs, completion_status, completed_at)
-                    SELECT t.id, t.resource1_id, 'PRIMARY', t.initial_estimate, t.final_estimate,
-                           COALESCE(t.r1_estimate_hrs, 0), COALESCE(t.r1_actual_hrs, 0),
-                           CASE WHEN t.status = 'Done' THEN 'Completed' ELSE 'Pending' END,
-                           CASE WHEN t.status = 'Done'
-                                THEN COALESCE(t.completed_date::timestamptz, t.completed_at, t.updated_at) END
-                    FROM tasks t
-                    WHERE t.resource1_id IS NOT NULL AND t.deleted_at IS NULL
-                    ON CONFLICT (task_id, resource_id) DO NOTHING;
-
-                    -- Secondary from tasks.resource2_id (drop degenerate "same resource in both slots")
-                    INSERT INTO task_resource_assignment
-                        (task_id, resource_id, assignment_type,
-                         estimate_hrs, actual_hrs, completion_status, completed_at)
-                    SELECT t.id, t.resource2_id, 'SECONDARY',
-                           COALESCE(t.r2_estimate_hrs, 0), COALESCE(t.r2_actual_hrs, 0),
-                           CASE WHEN t.status = 'Done' THEN 'Completed' ELSE 'Pending' END,
-                           CASE WHEN t.status = 'Done'
-                                THEN COALESCE(t.completed_date::timestamptz, t.completed_at, t.updated_at) END
-                    FROM tasks t
-                    WHERE t.resource2_id IS NOT NULL
-                      AND t.resource2_id <> t.resource1_id
-                      AND t.deleted_at IS NULL
-                    ON CONFLICT (task_id, resource_id) DO NOTHING;
-                END IF;
-            END $$;
-        `);
-
-        // --- Phase 3: dual-write cache trigger (junction -> legacy tasks columns) ---
-        await client.query(`
-            CREATE OR REPLACE FUNCTION sync_task_assignment_cache() RETURNS trigger AS $fn$
-            DECLARE
-                v_task_id UUID := COALESCE(NEW.task_id, OLD.task_id);
-            BEGIN
-                UPDATE tasks t SET
-                    resource1_id     = (SELECT resource_id FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
-                    r1_estimate_hrs  = COALESCE((SELECT estimate_hrs FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'), 0),
-                    r1_actual_hrs    = COALESCE((SELECT actual_hrs FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'), 0),
-                    initial_estimate = (SELECT initial_estimate FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
-                    final_estimate   = (SELECT final_estimate FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'PRIMARY'),
-                    resource2_id     = (SELECT resource_id FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
-                                          ORDER BY created_at, id LIMIT 1),
-                    r2_estimate_hrs  = COALESCE((SELECT estimate_hrs FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
-                                          ORDER BY created_at, id LIMIT 1), 0),
-                    r2_actual_hrs    = COALESCE((SELECT actual_hrs FROM task_resource_assignment
-                                          WHERE task_id = v_task_id AND assignment_type = 'SECONDARY'
-                                          ORDER BY created_at, id LIMIT 1), 0),
-                    actual_effort    = COALESCE((SELECT SUM(COALESCE(actual_hrs, 0))
-                                          FROM task_resource_assignment WHERE task_id = v_task_id), 0)
-                WHERE t.id = v_task_id;
-                RETURN NULL;
-            END;
-            $fn$ LANGUAGE plpgsql
-        `);
+        // --- Phase 5: drop dual-write trigger + function + legacy columns -------
         await client.query(`DROP TRIGGER IF EXISTS trg_sync_task_assignment_cache ON task_resource_assignment`);
-        await client.query(`
-            CREATE TRIGGER trg_sync_task_assignment_cache
-                AFTER INSERT OR UPDATE OR DELETE ON task_resource_assignment
-                FOR EACH ROW EXECUTE FUNCTION sync_task_assignment_cache()
-        `);
-
-        // ADR 0009 / #200: after the assignment junction exists and legacy
-        // rows have been backfilled, reporting views read assignment totals
-        // from task_resource_assignment so every secondary contributor counts.
-        await client.query(`
-            CREATE OR REPLACE VIEW v_projects_with_metrics AS
-            WITH task_assignment_totals AS (
-                SELECT
-                    task_id,
-                    COALESCE(SUM(COALESCE(estimate_hrs, 0)), 0) AS total_estimated_hrs,
-                    COALESCE(SUM(COALESCE(actual_hrs, 0)), 0) AS total_actual_hrs
-                FROM task_resource_assignment
-                GROUP BY task_id
-            )
-            SELECT
-                p.id,
-                p.project_id,
-                p.project_name,
-                p.team_id,
-                p.owner,
-                p.total_weight,
-                p.priority,
-                p.status AS project_status_field,
-                p.description,
-                p.start_date,
-                p.target_date,
-                CASE WHEN p.target_date IS NOT NULL THEN p.target_date - CURRENT_DATE ELSE NULL END AS days_until_target,
-                COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS task_hrs_est,
-                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) AS task_hrs_actual,
-                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END), 0) AS task_hrs_done,
-                COUNT(t.id) AS tasks_total_count,
-                SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) AS tasks_done_count,
-                SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS tasks_in_progress_count,
-                SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END) AS tasks_backlog_count,
-                CASE WHEN COUNT(t.id) = 0 THEN 'No Tasks' WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete' ELSE 'Active' END AS status,
-                CASE
-                    WHEN COUNT(t.id) > 0
-                    THEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END)::NUMERIC / COUNT(t.id)) * 100, 2)
-                    ELSE 0
-                END AS overall_completion_pct,
-                CASE
-                    WHEN COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) > 0
-                    THEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END)::NUMERIC /
-                         NULLIF(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0)::NUMERIC) * 100, 2)
-                    ELSE NULL
-                END AS effort_completion_pct,
-                CASE
-                    WHEN COUNT(t.id) = 0 THEN 'No Tasks'
-                    WHEN COUNT(t.id) = SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) THEN 'Complete'
-                    WHEN ROUND((SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END)::NUMERIC / COUNT(t.id)) * 100, 2) >= 70
-                    THEN 'On Track'
-                    ELSE 'At Risk'
-                END AS dynamic_status,
-                p.created_at,
-                p.updated_at,
-                p.deleted_at
-            FROM projects p
-            LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
-            LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
-            WHERE p.deleted_at IS NULL
-            GROUP BY p.id
-        `);
-
-        await client.query(`
-            CREATE OR REPLACE VIEW v_resources_with_utilization AS
-            WITH resource_load AS (
-                SELECT
-                    tra.resource_id,
-                    COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)) FILTER (
-                        WHERE t.status NOT IN ('Done', 'Canceled', 'Cancelled')
-                    ), 0) AS current_allocation_hrs,
-                    COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'In Progress') AS active_tasks_count,
-                    COUNT(DISTINCT t.id) FILTER (WHERE t.status IN ('Todo', 'Backlog')) AS backlog_tasks_count
-                FROM task_resource_assignment tra
-                JOIN tasks t ON t.id = tra.task_id
-                WHERE t.deleted_at IS NULL
-                GROUP BY tra.resource_id
-            )
-            SELECT
-                r.id,
-                r.resource_name,
-                r.user_id,
-                r.weekly_capacity_hrs,
-                r.is_active,
-                r.email,
-                r.department,
-                r.role,
-                COALESCE(rl.current_allocation_hrs, 0) AS current_allocation_hrs,
-                CASE
-                    WHEN r.weekly_capacity_hrs > 0 THEN
-                        ROUND((COALESCE(rl.current_allocation_hrs, 0) / r.weekly_capacity_hrs * 100)::NUMERIC, 2)
-                    ELSE 0
-                END AS utilization_pct,
-                COALESCE(rl.active_tasks_count, 0) AS active_tasks_count,
-                COALESCE(rl.backlog_tasks_count, 0) AS backlog_tasks_count,
-                r.created_at,
-                r.updated_at,
-                r.deleted_at
-            FROM resources r
-            LEFT JOIN resource_load rl ON rl.resource_id = r.id
-            WHERE r.deleted_at IS NULL
-        `);
-
-        await client.query(`
-            CREATE OR REPLACE VIEW v_dashboard_metrics AS
-            WITH task_assignment_totals AS (
-                SELECT
-                    task_id,
-                    COALESCE(SUM(COALESCE(estimate_hrs, 0)), 0) AS total_estimated_hrs,
-                    COALESCE(SUM(COALESCE(actual_hrs, 0)), 0) AS total_actual_hrs
-                FROM task_resource_assignment
-                GROUP BY task_id
-            ),
-            resource_load AS (
-                SELECT
-                    r.id,
-                    r.weekly_capacity_hrs,
-                    COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)) FILTER (
-                        WHERE t.status NOT IN ('Done', 'Canceled', 'Cancelled')
-                    ), 0) AS current_allocation_hrs
-                FROM resources r
-                LEFT JOIN task_resource_assignment tra ON tra.resource_id = r.id
-                LEFT JOIN tasks t ON t.id = tra.task_id AND t.deleted_at IS NULL
-                WHERE r.deleted_at IS NULL AND r.is_active = TRUE
-                GROUP BY r.id, r.weekly_capacity_hrs
-            )
-            SELECT
-                COUNT(DISTINCT t.id) AS total_tasks,
-                COALESCE(SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END), 0) AS tasks_done,
-                COALESCE(SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END), 0) AS tasks_in_progress,
-                COALESCE(SUM(CASE WHEN t.status = 'Todo' THEN 1 ELSE 0 END), 0) AS tasks_backlog,
-                COALESCE(SUM(CASE WHEN t.status = 'Canceled' THEN 1 ELSE 0 END), 0) AS tasks_cancelled,
-                CASE
-                    WHEN COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) > 0 THEN
-                        ROUND((SUM(CASE WHEN t.status = 'Done' THEN COALESCE(tat.total_actual_hrs, 0) ELSE 0 END) /
-                               NULLIF(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) * 100)::NUMERIC, 2)
-                    ELSE 0
-                END AS overall_completion_rate_pct,
-                COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_estimated_hrs,
-                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) AS total_actual_hrs,
-                COALESCE(SUM(COALESCE(tat.total_actual_hrs, 0)), 0) - COALESCE(SUM(COALESCE(tat.total_estimated_hrs, 0)), 0) AS total_hours_variance,
-                COUNT(DISTINCT p.id) AS total_projects,
-                COUNT(DISTINCT CASE WHEN t.id IS NOT NULL THEN p.id END) AS projects_with_tasks,
-                (SELECT COUNT(*) FROM resources WHERE is_active = TRUE AND deleted_at IS NULL) AS active_resources,
-                (
-                    SELECT COUNT(*)
-                    FROM resource_load
-                    WHERE weekly_capacity_hrs > 0
-                      AND current_allocation_hrs > weekly_capacity_hrs
-                )::int AS overallocated_resources,
-                CURRENT_TIMESTAMP AS calculated_at
-            FROM projects p
-            LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
-            LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
-            WHERE p.deleted_at IS NULL
-        `);
+        await client.query(`DROP FUNCTION IF EXISTS sync_task_assignment_cache()`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource1_id`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource2_id`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_estimate_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_actual_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_estimate_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_actual_hrs`);
 
         await client.query(`
             ALTER TABLE user_stories
@@ -2321,15 +2126,15 @@ const runMigrations = async () => {
                 t.priority,
                 t.tags,
                 t.notes,
-                t.resource1_id,
-                t.resource2_id,
-                t.resource1_id AS resource1_uuid,
-                t.resource2_id AS resource2_uuid,
+                pri.resource_id AS resource1_id,
+                sec.resource_id AS resource2_id,
+                pri.resource_id AS resource1_uuid,
+                sec.resource_id AS resource2_uuid,
                 t.estimate_days,
-                t.r1_estimate_hrs,
-                t.r1_actual_hrs,
-                t.r2_estimate_hrs,
-                t.r2_actual_hrs,
+                COALESCE(pri.estimate_hrs, 0) AS r1_estimate_hrs,
+                COALESCE(pri.actual_hrs, 0) AS r1_actual_hrs,
+                COALESCE(sec.estimate_hrs, 0) AS r2_estimate_hrs,
+                COALESCE(sec.actual_hrs, 0) AS r2_actual_hrs,
                 t.due_date,
                 t.deadline,
                 t.expected_start_date,
@@ -2353,8 +2158,8 @@ const runMigrations = async () => {
                 t.last_sync_attempted_at,
                 t.last_sync_error,
                 t.parent_user_story_id,
-                r1.resource_name AS resource1_name,
-                r2.resource_name AS resource2_name,
+                pri.resource_name AS resource1_name,
+                sec.resource_name AS resource2_name,
                 p.project_name,
                 COALESCE(tat.total_estimated_hrs, 0) AS total_estimated_hrs,
                 COALESCE(tat.total_estimated_hrs, 0) AS total_est_hrs,
@@ -2367,8 +2172,20 @@ const runMigrations = async () => {
                     ELSE 0
                 END AS overall_completion_pct
             FROM tasks t
-            LEFT JOIN resources r1 ON t.resource1_id = r1.id
-            LEFT JOIN resources r2 ON t.resource2_id = r2.id
+            LEFT JOIN LATERAL (
+                SELECT tra.resource_id, res.resource_name, tra.estimate_hrs, tra.actual_hrs
+                FROM task_resource_assignment tra
+                JOIN resources res ON res.id = tra.resource_id
+                WHERE tra.task_id = t.id AND tra.assignment_type = 'PRIMARY'
+                LIMIT 1
+            ) pri ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT tra.resource_id, res.resource_name, tra.estimate_hrs, tra.actual_hrs
+                FROM task_resource_assignment tra
+                JOIN resources res ON res.id = tra.resource_id
+                WHERE tra.task_id = t.id AND tra.assignment_type = 'SECONDARY'
+                ORDER BY tra.created_at, tra.id LIMIT 1
+            ) sec ON TRUE
             LEFT JOIN projects p ON t.project_id = p.id
             LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
             WHERE t.deleted_at IS NULL
@@ -3175,7 +2992,8 @@ const runMigrations = async () => {
         await client.query(`
             UPDATE tasks t SET created_by_user_id = r.user_id
             FROM resources r
-            WHERE t.created_by_user_id IS NULL AND t.resource1_id = r.id AND r.user_id IS NOT NULL
+            JOIN task_resource_assignment tra ON tra.resource_id = r.id AND tra.assignment_type = 'PRIMARY'
+            WHERE t.created_by_user_id IS NULL AND tra.task_id = t.id AND r.user_id IS NOT NULL
         `);
 
         await client.query(`

@@ -160,21 +160,29 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
         assigned_to: null,
     });
 
-    // Routes the query sequence GET /:id issues: the view fetch, the junction
-    // membership lookup, then AccessEngine.isAssignee. callerResourceId is what
-    // the junction returns for this caller (null = not assigned); ownedResources
-    // is the set of resource ids the caller's user_id owns.
+    // Routes the query sequence GET /:id issues: the view fetch,
+    // getTaskAssignments, resolveTaskAccessAssigneeResourceId, then
+    // AccessEngine.isAssignee. callerResourceId is what the junction returns
+    // for this caller (null = not assigned); ownedResources is the set of
+    // resource ids the caller's user_id owns.
     function wireQueries({ callerResourceId, ownedResources, assignmentRows = [] }) {
         queryHandler = async (sql, params) => {
             if (/FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) return { rows: [TASK] };
-            if (/FROM task_resource_assignment tra[\s\S]*WHERE tra\.task_id = \$1 AND r\.user_id = \$2/.test(sql)) {
-                return { rows: callerResourceId ? [{ resource_id: callerResourceId }] : [] };
+            if (/SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/.test(sql)) {
+                return { rows: assignmentRows };
+            }
+            if (/SELECT tra\.resource_id, r\.user_id, au\.team_id/.test(sql)) {
+                if (!callerResourceId) {
+                    return { rows: [
+                        { resource_id: TASK.resource1_id, user_id: 'other-user', team_id: 'other-team' },
+                    ] };
+                }
+                return { rows: [
+                    { resource_id: callerResourceId, user_id: 'u-tester', team_id: 'team-x' },
+                ] };
             }
             if (/SELECT 1 FROM resources WHERE id = \$1 AND user_id = \$2/.test(sql)) {
                 return { rows: ownedResources.includes(params[0]) ? [{ ok: 1 }] : [] };
-            }
-            if (/SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/.test(sql)) {
-                return { rows: assignmentRows };
             }
             return { rows: [] };
         };

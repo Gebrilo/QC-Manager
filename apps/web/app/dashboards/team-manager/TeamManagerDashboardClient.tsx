@@ -31,26 +31,7 @@ function statusVariant(status: string) {
 
 function taskAssignments(task: DashboardTask): TaskAssignment[] {
     if (task.assignments?.length) return task.assignments;
-    const legacy: TaskAssignment[] = [];
-    if (task.resource1_id || task.resource1_name) {
-        legacy.push({
-            resource_id: task.resource1_id || 'primary',
-            resource_name: task.resource1_name || 'Primary',
-            assignment_type: 'PRIMARY',
-            estimate_hrs: task.total_est_hrs,
-            actual_hrs: task.total_actual_hrs,
-        });
-    }
-    if (task.resource2_id || task.resource2_name) {
-        legacy.push({
-            resource_id: task.resource2_id || 'secondary',
-            resource_name: task.resource2_name || 'Secondary',
-            assignment_type: 'SECONDARY',
-            estimate_hrs: 0,
-            actual_hrs: 0,
-        });
-    }
-    return legacy;
+    return [];
 }
 
 function ContributorBreakdown({ task }: { task: DashboardTask }) {
@@ -181,7 +162,9 @@ export default function TeamManagerDashboardClient() {
     }, [data]);
 
     async function reassign(taskId: string, resourceId: string) {
-        await tasksApi.update(taskId, { resource1_uuid: resourceId } as any);
+        await tasksApi.update(taskId, {
+            assignments: [{ resource_id: resourceId, assignment_type: 'PRIMARY' as const, estimate_hrs: 0, actual_hrs: 0 }],
+        } as any);
         await load();
     }
 

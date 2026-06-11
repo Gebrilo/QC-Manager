@@ -323,10 +323,11 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
                 status: 'In Progress',
                 project_id: 'p-dev',
                 owner_team_id: 'team-dev',
-                resource1_id: 'r-dev',
-                resource2_id: null,
                 visibility_scope: 'team',
             }] },
+            { match: /SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/, rows: [
+                { resource_id: 'r-dev', resource_name: 'Dev Resource', assignment_type: 'PRIMARY', estimate_hrs: 8, actual_hrs: 4 },
+            ] },
             ...roleRoutes({
                 teamId: 'team-qc',
                 permissions: [
@@ -340,7 +341,9 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
 
         const res = await request(app)
             .patch('/api/tasks/task-dev')
-            .send({ resource1_uuid: '00000000-0000-0000-0000-000000000123' });
+            .send({ assignments: [
+                { resource_id: '00000000-0000-0000-0000-000000000123', assignment_type: 'PRIMARY', estimate_hrs: 0, actual_hrs: 0 },
+            ] });
 
         expect(res.status).toBe(403);
         expect(res.body.error).toMatch(/take over/);

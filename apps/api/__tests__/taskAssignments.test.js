@@ -34,39 +34,16 @@ describe('assignmentsFromPayload', () => {
         expect(totalActualHrs(list)).toBe(24);
     });
 
-    it('derives a primary + secondary from the legacy two-slot fields', () => {
-        const list = assignmentsFromPayload({
-            resource1_uuid: 'rA', resource2_uuid: 'rB',
-            r1_estimate_hrs: 10, r1_actual_hrs: 3, r2_estimate_hrs: 4, r2_actual_hrs: 0,
-        });
-        expect(list.map(a => [a.assignment_type, a.resource_id, a.estimate_hrs, a.actual_hrs])).toEqual([
-            ['PRIMARY', 'rA', 10, 3],
-            ['SECONDARY', 'rB', 4, 0],
-        ]);
-    });
-
     it('returns null when the payload does not touch assignments', () => {
         expect(assignmentsFromPayload({ status: 'Done', task_name: 'x' })).toBeNull();
     });
 
-    it('merges legacy slots onto the original row (fallbackTo) for partial patches', () => {
-        // patch only logs primary hours; secondary slot preserved from original
-        const list = assignmentsFromPayload(
-            { r1_actual_hrs: 5 },
-            { fallbackTo: { resource1_id: 'rA', resource2_id: 'rB', r1_estimate_hrs: 10, r2_estimate_hrs: 4, r2_actual_hrs: 1 } }
-        );
-        expect(list).toEqual([
-            expect.objectContaining({ assignment_type: 'PRIMARY', resource_id: 'rA', estimate_hrs: 10, actual_hrs: 5 }),
-            expect.objectContaining({ assignment_type: 'SECONDARY', resource_id: 'rB', estimate_hrs: 4, actual_hrs: 1 }),
-        ]);
-    });
-
-    it('drops the secondary slot when the patch clears resource2_uuid', () => {
-        const list = assignmentsFromPayload(
-            { resource2_uuid: null },
-            { fallbackTo: { resource1_id: 'rA', resource2_id: 'rB' } }
-        );
-        expect(list).toEqual([expect.objectContaining({ assignment_type: 'PRIMARY', resource_id: 'rA' })]);
+    it('ignores legacy two-slot fields — only assignments[] is canonical', () => {
+        const list = assignmentsFromPayload({
+            resource1_uuid: 'rA', resource2_uuid: 'rB',
+            r1_estimate_hrs: 10, r1_actual_hrs: 3, r2_estimate_hrs: 4, r2_actual_hrs: 0,
+        });
+        expect(list).toBeNull();
     });
 });
 

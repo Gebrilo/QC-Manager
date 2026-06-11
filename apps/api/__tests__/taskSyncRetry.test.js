@@ -71,6 +71,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
       .mockResolvedValueOnce({ rows: [{ id: 't1', project_id: 'p1', task_name: 'T', status: 'Backlog', deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 5, tuleap_base_url: 'https://tuleap.example.com' }] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'synced', tuleap_artifact_id: 88888 }] });
 
     emitTask.mockResolvedValueOnce({ tuleap_artifact_id: 88888, tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=88888' });
@@ -86,6 +87,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
       .mockResolvedValueOnce({ rows: [{ id: 't1', project_id: 'p1', task_name: 'T', status: 'Backlog', deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 5, tuleap_base_url: 'https://tuleap.example.com' }] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'failed', last_sync_error: 'Connection refused' }] });
 
     emitTask.mockRejectedValueOnce(new Error('Connection refused'));
@@ -100,6 +102,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
       .mockResolvedValueOnce({ rows: [{ id: 't1', project_id: 'p1', task_name: 'T', status: 'Backlog', tuleap_artifact_id: 12345, deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 5, tuleap_base_url: 'https://tuleap.example.com' }] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'synced', tuleap_artifact_id: 12345 }] });
 
     emitTask.mockResolvedValueOnce({ tuleap_artifact_id: 12345 });

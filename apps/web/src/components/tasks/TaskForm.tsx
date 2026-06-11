@@ -148,22 +148,38 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
         setIsSubmitting(true);
         setError(null);
         try {
+            const assignments = [];
+            if (data.resource1_uuid) {
+                assignments.push({
+                    resource_id: data.resource1_uuid,
+                    assignment_type: 'PRIMARY' as const,
+                    estimate_hrs: data.r1_estimate_hrs ? Number(data.r1_estimate_hrs) : (data.estimate_days ? Number(data.estimate_days) * 8 : 0),
+                    actual_hrs: data.r1_actual_hrs ? Number(data.r1_actual_hrs) : 0,
+                    initial_estimate: data.initial_estimate ?? null,
+                    final_estimate: data.final_estimate ?? null,
+                });
+            }
+            if (data.resource2_uuid) {
+                assignments.push({
+                    resource_id: data.resource2_uuid,
+                    assignment_type: 'SECONDARY' as const,
+                    estimate_hrs: data.r2_estimate_hrs ? Number(data.r2_estimate_hrs) : 0,
+                    actual_hrs: data.r2_actual_hrs ? Number(data.r2_actual_hrs) : 0,
+                });
+            }
             const payload = {
-                ...data,
-                resource1_uuid: data.resource1_uuid || undefined,
-                resource2_uuid: data.resource2_uuid || undefined,
+                task_id: data.task_id,
+                project_id: data.project_id,
+                task_name: data.task_name,
+                status: data.status,
+                priority: data.priority,
+                description: data.description || undefined,
+                estimate_days: data.estimate_days ? Number(data.estimate_days) : undefined,
+                assignments,
                 expected_start_date: data.expected_start_date || undefined,
                 actual_start_date: data.actual_start_date || undefined,
                 deadline: data.deadline || undefined,
                 completed_date: data.completed_date || undefined,
-                estimate_days: data.estimate_days ? Number(data.estimate_days) : undefined,
-                r1_estimate_hrs: data.r1_estimate_hrs ? Number(data.r1_estimate_hrs) : (data.estimate_days ? Number(data.estimate_days) * 8 : 0),
-                r1_actual_hrs: data.r1_actual_hrs ? Number(data.r1_actual_hrs) : 0,
-                r2_estimate_hrs: data.resource2_uuid && data.r2_estimate_hrs ? Number(data.r2_estimate_hrs) : 0,
-                r2_actual_hrs: data.resource2_uuid && data.r2_actual_hrs ? Number(data.r2_actual_hrs) : 0,
-                initial_estimate: data.initial_estimate ?? undefined,
-                final_estimate: data.final_estimate ?? undefined,
-                actual_effort: data.actual_effort ?? undefined,
                 parent_user_story_id: data.parent_user_story_id || undefined,
             };
 
