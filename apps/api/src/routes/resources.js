@@ -297,8 +297,8 @@ router.post('/', requireAuth, requirePermission('qc.resources.create'), async (r
 
         const result = await db.query(
             `INSERT INTO resources (
-                resource_name, weekly_capacity_hrs, email, department, role, is_active, user_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                resource_name, weekly_capacity_hrs, email, department, role, is_active, user_id, tuleap_username
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *`,
             [
                 data.resource_name,
@@ -307,7 +307,11 @@ router.post('/', requireAuth, requirePermission('qc.resources.create'), async (r
                 data.department || null,
                 data.role || null,
                 data.is_active,
-                linkedUserId
+                linkedUserId,
+                // Persist the Tuleap username on create so every account keeps its
+                // assigned_to mapping. Previously dropped here even though the
+                // schema and ResourceForm supply it → tasks failed to sync.
+                data.tuleap_username || null
             ]
         );
 

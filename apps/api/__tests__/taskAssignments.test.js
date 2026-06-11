@@ -12,6 +12,7 @@ const {
     validateAssignments,
     replaceTaskAssignments,
     getTaskAssignments,
+    getTaskAssignmentSummary,
     sumActualHrs,
     totalActualHrs,
     primaryOf,
@@ -151,6 +152,40 @@ describe('sumActualHrs / getTaskAssignments', () => {
         expect(query.mock.calls[0][0]).toMatch(/JOIN resources res/);
         expect(query.mock.calls[0][0]).toMatch(/assignment_type = 'PRIMARY'\) DESC/);
         expect(query.mock.calls[0][1]).toEqual(['t1']);
+    });
+
+    // The Tuleap assigned_to bind expects the username (e.g. 'belal.z'), not the
+    // display name. getTaskAssignments must surface tuleap_username so the emit
+    // path can send it. Regression for: "Bind value 'Belal Abdalaziz' not found".
+    it('selects the resource tuleap_username for outbound assignee mapping', async () => {
+        const query = jest.fn().mockResolvedValueOnce({ rows: [] });
+        await getTaskAssignments(query, 't1');
+        expect(query.mock.calls[0][0]).toMatch(/tuleap_username/);
+    });
+});
+
+describe('getTaskAssignmentSummary — outbound assignee mapping', () => {
+    it('exposes the primary resource tuleap_username (not the display name) for Tuleap emit', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [
+                { resource_id: 'rB', assignment_type: 'PRIMARY', resource_name: 'Belal Abdalaziz', tuleap_username: 'belal.z', actual_hrs: 4, final_estimate: 3 },
+                { resource_id: 'rH', assignment_type: 'SECONDARY', resource_name: 'Hany El-Taweel', tuleap_username: 'hany.t', actual_hrs: 2, final_estimate: null },
+            ],
+        });
+        const summary = await getTaskAssignmentSummary(query, 't1');
+        expect(summary.primary_tuleap_username).toBe('belal.z');
+        expect(summary.primary_resource_name).toBe('Belal Abdalaziz');
+        expect(summary.primary_resource_id).toBe('rB');
+    });
+
+    it('returns a null tuleap_username when the primary resource has no Tuleap mapping', async () => {
+        const query = jest.fn().mockResolvedValueOnce({
+            rows: [
+                { resource_id: 'rX', assignment_type: 'PRIMARY', resource_name: 'No Tuleap', tuleap_username: null, actual_hrs: 0 },
+            ],
+        });
+        const summary = await getTaskAssignmentSummary(query, 't1');
+        expect(summary.primary_tuleap_username).toBeNull();
     });
 });
 

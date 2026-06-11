@@ -151,10 +151,16 @@ async function replaceTaskAssignments({ query, taskId, assignments }) {
     return inserted;
 }
 
-/** Fetch a task's assignments (PRIMARY first), joined to resource names for display. */
+/**
+ * Fetch a task's assignments (PRIMARY first), joined to the resource's display
+ * name and its Tuleap username. `tuleap_username` is the Tuleap `assigned_to`
+ * bind label (e.g. 'belal.z'); the emit path must send it rather than the
+ * display name, otherwise Tuleap rejects the artifact with
+ * "Bind value '<display name>' not found".
+ */
 async function getTaskAssignments(query, taskId) {
     const r = await query(
-        `SELECT tra.*, res.resource_name
+        `SELECT tra.*, res.resource_name, res.tuleap_username
            FROM task_resource_assignment tra
            JOIN resources res ON res.id = tra.resource_id
           WHERE tra.task_id = $1
@@ -172,6 +178,10 @@ async function getTaskAssignmentSummary(query, taskId) {
         primary,
         primary_resource_id: primary?.resource_id || null,
         primary_resource_name: primary?.resource_name || null,
+        // Tuleap assigned_to bind label for the primary (e.g. 'belal.z'). Null
+        // when the resource has no Tuleap mapping — the emit path then omits
+        // assigned_to so the sync still succeeds without touching the assignee.
+        primary_tuleap_username: primary?.tuleap_username || null,
         total_estimated_hrs: totalEstimateHrs(assignments),
         total_actual_hrs: totalActualHrs(assignments),
         primary_final_estimate: primary?.final_estimate ?? null,
