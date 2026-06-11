@@ -1698,15 +1698,14 @@ const runMigrations = async () => {
         // (just before the v_*_with_metrics view block), because those views read
         // the junction and must not reference a not-yet-created table.
 
-        // --- Phase 5: drop dual-write trigger + function + legacy columns -------
+        // --- Phase 5: drop dual-write trigger + function -----------------------
         await client.query(`DROP TRIGGER IF EXISTS trg_sync_task_assignment_cache ON task_resource_assignment`);
         await client.query(`DROP FUNCTION IF EXISTS sync_task_assignment_cache()`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource1_id`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource2_id`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_estimate_hrs`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_actual_hrs`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_estimate_hrs`);
-        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_actual_hrs`);
+        // NOTE: the legacy tasks.resource1_id/resource2_id/rN_* columns are dropped
+        // further below, AFTER v_tasks_with_metrics is recreated junction-based. The
+        // old view depends on those columns, so dropping them here fails with
+        // "cannot drop column ... because other objects depend on it" on any DB
+        // where the columns still exist (incident 2026-06-11).
 
         await client.query(`
             ALTER TABLE user_stories
@@ -2199,6 +2198,16 @@ const runMigrations = async () => {
             LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
             WHERE t.deleted_at IS NULL
         `);
+
+        // --- Phase 5 (cont.): now that v_tasks_with_metrics (just above) is
+        // junction-based, the legacy two-slot columns have no dependents and can
+        // be dropped safely. ---------------------------------------------------
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource1_id`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS resource2_id`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_estimate_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r1_actual_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_estimate_hrs`);
+        await client.query(`ALTER TABLE tasks DROP COLUMN IF EXISTS r2_actual_hrs`);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS test_run_suite_cases (
