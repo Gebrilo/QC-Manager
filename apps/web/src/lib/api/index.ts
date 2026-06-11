@@ -196,6 +196,10 @@ export interface Task {
     r1_actual_hrs?: number;
     r2_estimate_hrs?: number;
     r2_actual_hrs?: number;
+    assignments?: TaskAssignment[];
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    actual_effort?: number | null;
     total_est_hrs?: number;
     total_actual_hrs?: number;
     overall_completion_pct?: number;
@@ -432,6 +436,31 @@ export interface Bug {
     last_sync_error?: string | null;
 }
 
+export interface TaskAssignment {
+    id?: string;
+    task_id?: string;
+    resource_id: string;
+    resource_name?: string;
+    assignment_type: 'PRIMARY' | 'SECONDARY';
+    initial_estimate?: number | null;
+    final_estimate?: number | null;
+    estimate_hrs?: number;
+    actual_hrs?: number;
+    planned_working_days?: number | null;
+    completion_status?: 'Pending' | 'Completed';
+    completed_at?: string | null;
+    estimate_accuracy?: EstimateAccuracy | null;
+}
+
+export type EstimateAccuracy = {
+    ratio: number | null;
+    verdict: 'padded' | 'accurate' | 'blew_past' | null;
+    label: string | null;
+    threshold: number;
+    lower_bound: number;
+    upper_bound: number;
+};
+
 export interface UserStory {
     id: string;
     tuleap_artifact_id?: number;
@@ -637,7 +666,13 @@ export type DashboardTask = {
     parent_user_story_id?: string | null;
     deadline?: string | null;
     total_est_hrs: number;
+    total_estimated_effort?: number;
     total_actual_hrs: number;
+    assignments?: TaskAssignment[];
+    assignment_role?: 'owning' | 'supporting' | null;
+    my_estimate_hrs?: number;
+    my_actual_hrs?: number;
+    my_estimate_accuracy?: EstimateAccuracy;
     _can?: {
         view?: boolean;
         edit?: boolean;

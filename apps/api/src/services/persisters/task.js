@@ -4,6 +4,13 @@ const {
   buildAccessDefaults,
   materializeAclGrants,
 } = require('../accessDefaults');
+const { applyTuleapPrimary, getTaskAssignmentSummary } = require('../assignments/taskAssignments');
+
+// ADR 0009 §3 — Tracker Config setting: on reassignment, demote the previous
+// primary to SECONDARY when it logged effort (default), else remove it.
+function demoteOnReassign(config) {
+  return config?.demote_previous_primary !== false;
+}
 
 const VALID_TASK_ACTIONS = new Set(['sync', 'delete', 'reject', 'archive']);
 
@@ -102,11 +109,7 @@ async function handleDelete(unified, config, { query }) {
   if (existing.rows.length > 0) {
     const task = existing.rows[0];
 
-    let previousResourceName = null;
-    if (task.resource1_id) {
-      const resRes = await query('SELECT resource_name FROM resources WHERE id = $1', [task.resource1_id]);
-      if (resRes.rows.length > 0) previousResourceName = resRes.rows[0].resource_name;
-    }
+    const assignmentSummary = await getTaskAssignmentSummary(query, task.id);
 
     await query(`
       INSERT INTO tuleap_task_history (
@@ -118,7 +121,7 @@ async function handleDelete(unified, config, { query }) {
     `, [
       task.id, tuleapArtifactId, unified.tuleap?.url || null,
       task.task_name, task.notes, task.status, task.project_id,
-      task.resource1_id, previousResourceName,
+      assignmentSummary.primary_resource_id, assignmentSummary.primary_resource_name,
       '', 'deleted_from_tuleap',
       `Artifact ${tuleapArtifactId} was deleted in Tuleap`,
       JSON.stringify(unified.raw_payload || unified),
@@ -145,11 +148,7 @@ async function handleArchive(unified, config, { query }) {
   if (existing.rows.length > 0) {
     const task = existing.rows[0];
 
-    let previousResourceName = null;
-    if (task.resource1_id) {
-      const resRes = await query('SELECT resource_name FROM resources WHERE id = $1', [task.resource1_id]);
-      if (resRes.rows.length > 0) previousResourceName = resRes.rows[0].resource_name;
-    }
+    const assignmentSummary = await getTaskAssignmentSummary(query, task.id);
 
     await query(`
       INSERT INTO tuleap_task_history (
@@ -161,7 +160,7 @@ async function handleArchive(unified, config, { query }) {
     `, [
       task.id, tuleapArtifactId, unified.tuleap?.url || null,
       task.task_name, task.notes, task.status, task.project_id,
-      task.resource1_id, previousResourceName,
+      assignmentSummary.primary_resource_id, assignmentSummary.primary_resource_name,
       fields.new_assignee_name || null, 'reassigned_out',
       fields.action_reason || null,
       JSON.stringify(unified.raw_payload || unified),
@@ -204,33 +203,41 @@ async function handleSync(unified, config, { query }) {
   if (existing.rows.length > 0) {
     const task = existing.rows[0];
 
+    const assignedResourceId = common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null;
+
     const result = await query(`
       UPDATE tasks SET
         task_name = COALESCE($1, task_name),
         notes = COALESCE($2, notes),
         status = COALESCE($3, status),
-        resource1_id = COALESCE($4, resource1_id),
-        tuleap_url = COALESCE($5, tuleap_url),
-        parent_story_id = CASE WHEN $6::integer IS NOT NULL THEN $6 ELSE parent_story_id END,
-        parent_story_tuleap_artifact_id = CASE WHEN $6::integer IS NOT NULL THEN $6 ELSE parent_story_tuleap_artifact_id END,
-        parent_user_story_id = CASE WHEN $7::uuid IS NOT NULL THEN $7 ELSE parent_user_story_id END,
+        tuleap_url = COALESCE($4, tuleap_url),
+        parent_story_id = CASE WHEN $5::integer IS NOT NULL THEN $5 ELSE parent_story_id END,
+        parent_story_tuleap_artifact_id = CASE WHEN $5::integer IS NOT NULL THEN $5 ELSE parent_story_tuleap_artifact_id END,
+        parent_user_story_id = CASE WHEN $6::uuid IS NOT NULL THEN $6 ELSE parent_user_story_id END,
         last_tuleap_sync = NOW(),
         sync_status = 'synced',
         last_sync_attempted_at = NOW(),
         last_sync_error = NULL,
         updated_at = NOW()
-      WHERE id = $8
+      WHERE id = $7
       RETURNING *
     `, [
       common.title || null,
       common.description || null,
       common.status ? normalizeTaskStatus(common.status) : null,
-      common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null,
       tuleapUrl,
       parentStoryTuleapArtifactId,
       parentUserStoryId,
       task.id,
     ]);
+
+    // ADR 0009 §3 — map assigned_to onto the PRIMARY assignment via the junction.
+    await applyTuleapPrimary({
+      query,
+      taskId: result.rows[0].id,
+      resourceId: assignedResourceId,
+      demoteWhenEffort: demoteOnReassign(config),
+    });
 
     return { action: 'updated', id: result.rows[0].id, data: result.rows[0] };
   }
@@ -251,20 +258,27 @@ async function handleSync(unified, config, { query }) {
         status = $1,
         task_name = $2,
         notes = $3,
-        resource1_id = $4,
-        tuleap_url = $5,
-        parent_story_id = $6,
-        parent_story_tuleap_artifact_id = $6,
-        parent_user_story_id = $7,
+        tuleap_url = $4,
+        parent_story_id = $5,
+        parent_story_tuleap_artifact_id = $5,
+        parent_user_story_id = $6,
         last_tuleap_sync = NOW(),
         sync_status = 'synced',
         last_sync_attempted_at = NOW(),
         last_sync_error = NULL,
         updated_at = NOW()
-      WHERE id = $8
+      WHERE id = $7
       RETURNING *
-    `, [normalizeTaskStatus(common.status), common.title, common.description, resourceId, tuleapUrl,
+    `, [normalizeTaskStatus(common.status), common.title, common.description, tuleapUrl,
       parentStoryTuleapArtifactId, parentUserStoryId, task.id]);
+
+    // ADR 0009 §3 — assigned_to → PRIMARY assignment (junction is source of truth).
+    await applyTuleapPrimary({
+      query,
+      taskId: result.rows[0].id,
+      resourceId,
+      demoteWhenEffort: demoteOnReassign(config),
+    });
 
     if (resolved.length > 0) {
       await drainPending({
@@ -296,16 +310,16 @@ async function handleSync(unified, config, { query }) {
   const result = await query(`
     INSERT INTO tasks (
       task_id, task_name, notes, status,
-      project_id, resource1_id,
+      project_id,
       tuleap_artifact_id, tuleap_url, synced_from_tuleap, last_tuleap_sync,
       parent_story_id, parent_story_tuleap_artifact_id, parent_user_story_id,
       sync_status, last_sync_attempted_at, last_sync_error,
       owner_team_id, visibility_scope, created_by_user_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), $9, $9, $10, 'synced', NOW(), NULL, $11, $12, $13)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, NOW(), $8, $8, $9, 'synced', NOW(), NULL, $10, $11, $12)
     RETURNING *
   `, [
     task_id, common.title, common.description || '', normalizeTaskStatus(common.status),
-    projectId, resourceId,
+    projectId,
     tuleapArtifactId, tuleapUrl, parentStoryTuleapArtifactId, parentUserStoryId,
     accessDefaults.owner_team_id,
     accessDefaults.visibility_scope,
@@ -318,6 +332,14 @@ async function handleSync(unified, config, { query }) {
     grants: accessDefaults.default_acl_grants,
     grantedBy: createdByUserId,
     query,
+  });
+
+  // ADR 0009 §3 — assigned_to → PRIMARY assignment (junction is source of truth).
+  await applyTuleapPrimary({
+    query,
+    taskId: result.rows[0].id,
+    resourceId,
+    demoteWhenEffort: demoteOnReassign(config),
   });
 
   if (resolved.length > 0) {

@@ -200,12 +200,8 @@ async function canPerform(user, artifact, verb, req) {
  * in canPerform. Returns { clause, params, nextIdx } for the caller to
  * bolt onto an existing WHERE.
  *
- * NOTE (Phase-1 follow-up): the assignee + teammate branches reference
- * columns by name (resource1_id / resource2_id / owner_resource_id /
- * submitted_by_resource_id) that exist on some artifact tables but not
- * others (e.g. test_cases has no resource1_id). This is fine while the
- * engine is dormant; the first slice that wires this into a real route
- * needs a per-artifact-type column map.
+ * The assignee + teammate branches use either an explicit normalized junction
+ * or caller-provided resource-owner columns.
  */
 async function buildListFilter(user, artifactType, verb, opts = {}) {
     const startIdx = opts.startIdx || 1;
@@ -215,12 +211,16 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     const ownerTeamExpr = opts.ownerTeamExpr === undefined ? `${tableAlias}.owner_team_id` : opts.ownerTeamExpr;
     const visibilityExpr = opts.visibilityExpr === undefined ? `${tableAlias}.visibility_scope` : opts.visibilityExpr;
     const assigneeResourceExprs = opts.assigneeResourceExprs || [
-        `${tableAlias}.resource1_id`,
-        `${tableAlias}.resource2_id`,
         `${tableAlias}.owner_resource_id`,
         `${tableAlias}.submitted_by_resource_id`,
     ];
     const userExprs = opts.userExprs || [`${tableAlias}.created_by_user_id`];
+    // ADR 0009 — when set, resolve assignees through a normalized junction
+    // (one row per assignee) instead of the fixed resource columns, so the
+    // 3rd+ Secondary Resource — absent from the two cached slots — still
+    // resolves access. Shape: { table, idExpr? } (idExpr defaults to <alias>.id).
+    const assigneeJunction = opts.assigneeJunction || null;
+    const junctionIdExpr = assigneeJunction ? (assigneeJunction.idExpr || `${tableAlias}.id`) : null;
 
     const { effectivePermissions, scope } = await resolveRole(user, opts.req);
 
@@ -260,7 +260,11 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
         if (userExprs.length > 0) {
             branches.push(`(${userExprs.map(expr => `${expr} = ${userBind}::uuid`).join(' OR ')})`);
         }
-        if (assigneeResourceExprs.length > 0) {
+        if (assigneeJunction) {
+            branches.push(
+                `EXISTS (SELECT 1 FROM ${assigneeJunction.table} tra JOIN resources r ON r.id = tra.resource_id WHERE tra.task_id = ${junctionIdExpr} AND r.user_id = ${userBind}::uuid AND r.deleted_at IS NULL)`
+            );
+        } else if (assigneeResourceExprs.length > 0) {
             branches.push(
                 `EXISTS (SELECT 1 FROM resources r WHERE r.user_id = ${userBind}::uuid AND r.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r.id = ${expr}`).join(' OR ')}))`
             );
@@ -268,11 +272,17 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     }
 
     // teammate of assignee (keyAny short-circuited above; only keyTeam reaches here)
-    if (scope.team_id && assigneeResourceExprs.length > 0 && effectivePermissions.has(keyTeam)) {
+    if (scope.team_id && effectivePermissions.has(keyTeam) && (assigneeJunction || assigneeResourceExprs.length > 0)) {
         const teamBind = bind(scope.team_id);
-        branches.push(
-            `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
-        );
+        if (assigneeJunction) {
+            branches.push(
+                `EXISTS (SELECT 1 FROM ${assigneeJunction.table} tra JOIN resources r2 ON r2.id = tra.resource_id JOIN app_user au ON au.id = r2.user_id WHERE tra.task_id = ${junctionIdExpr} AND au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL)`
+            );
+        } else {
+            branches.push(
+                `EXISTS (SELECT 1 FROM resources r2 JOIN app_user au ON au.id = r2.user_id WHERE au.team_id = ${teamBind}::uuid AND r2.deleted_at IS NULL AND (${assigneeResourceExprs.map(expr => `r2.id = ${expr}`).join(' OR ')}))`
+            );
+        }
     }
 
     // artifact_access ACL

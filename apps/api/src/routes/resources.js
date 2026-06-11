@@ -8,6 +8,7 @@ const { requireAuth, requirePermission, requireRole, requireStatusScope } = requ
 const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
 const { SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 const { computeTaskTimeline } = require('../utils/workingDays');
+const { estimateAccuracy, isClosedWorkStatus } = require('../services/metrics/estimateAccuracy');
 
 // ========================================
 // Resource Analytics Dashboard
@@ -65,12 +66,10 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
         // 2. Current week actuals (Monday–Sunday ISO week)
         const weekActualsResult = await db.query(`
             SELECT
-                COALESCE(SUM(
-                    CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_actual_hrs, 0) ELSE 0 END +
-                    CASE WHEN t.resource2_id = $1 THEN COALESCE(t.r2_actual_hrs, 0) ELSE 0 END
-                ), 0) AS current_week_actual_hrs
-            FROM tasks t
-            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+                COALESCE(SUM(COALESCE(tra.actual_hrs, 0)), 0) AS current_week_actual_hrs
+            FROM task_resource_assignment tra
+            JOIN tasks t ON t.id = tra.task_id
+            WHERE tra.resource_id = $1
               AND t.deleted_at IS NULL
               AND t.status IN ('In Progress', 'Done')
               AND t.updated_at >= date_trunc('week', CURRENT_DATE)
@@ -80,12 +79,10 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
         // 3. Backlog: total estimated hours for incomplete tasks
         const backlogResult = await db.query(`
             SELECT
-                COALESCE(SUM(
-                    CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_estimate_hrs, 0) ELSE 0 END +
-                    CASE WHEN t.resource2_id = $1 THEN COALESCE(t.r2_estimate_hrs, 0) ELSE 0 END
-                ), 0) AS backlog_hrs
-            FROM tasks t
-            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+                COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)), 0) AS backlog_hrs
+            FROM task_resource_assignment tra
+            JOIN tasks t ON t.id = tra.task_id
+            WHERE tra.resource_id = $1
               AND t.deleted_at IS NULL
               AND t.status IN ('Backlog', 'In Progress')
         `, [id]);
@@ -94,17 +91,20 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
         const tasksResult = await db.query(`
             SELECT t.id, t.task_id, t.task_name, t.status, t.priority,
                    p.project_name,
-                   CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_estimate_hrs, 0) ELSE COALESCE(t.r2_estimate_hrs, 0) END AS estimate_hrs,
-                   CASE WHEN t.resource1_id = $1 THEN COALESCE(t.r1_actual_hrs, 0) ELSE COALESCE(t.r2_actual_hrs, 0) END AS actual_hrs,
-                   CASE WHEN t.resource1_id = $1 THEN 'Primary' ELSE 'Secondary' END AS assignment_role,
+                   COALESCE(tra.estimate_hrs, 0) AS estimate_hrs,
+                   COALESCE(tra.actual_hrs, 0) AS actual_hrs,
+                   CASE WHEN tra.assignment_type = 'PRIMARY' THEN 'Primary' ELSE 'Secondary' END AS assignment_role,
                    t.expected_start_date,
                    t.actual_start_date,
                    t.completed_date,
                    t.deadline,
-                   t.estimate_days
-            FROM tasks t
+                   t.estimate_days,
+                   tra.completion_status,
+                   tra.completed_at AS assignment_completed_at
+            FROM task_resource_assignment tra
+            JOIN tasks t ON t.id = tra.task_id
             LEFT JOIN projects p ON t.project_id = p.id
-            WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
+            WHERE tra.resource_id = $1
               AND t.deleted_at IS NULL
             ORDER BY 
                 CASE t.status WHEN 'In Progress' THEN 1 WHEN 'Backlog' THEN 2 WHEN 'Done' THEN 3 ELSE 4 END,
@@ -155,7 +155,10 @@ router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), 
             if (timeline.health_status && timelineSummary[timeline.health_status] !== undefined) {
                 timelineSummary[timeline.health_status]++;
             }
-            return { ...task, ...timeline };
+            const accuracy = (isClosedWorkStatus(task.status) || task.completion_status === 'Completed')
+                ? { estimate_accuracy: estimateAccuracy(task.estimate_hrs, task.actual_hrs) }
+                : {};
+            return { ...task, ...timeline, ...accuracy };
         });
 
         res.json({

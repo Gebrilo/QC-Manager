@@ -122,6 +122,21 @@ describe('GET /me/dashboard', () => {
     );
   });
 
+  test('reads the viewer\'s own per-assignment hours from the junction (#195)', async () => {
+    let tasksSql = '';
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 'res-abc', resource_name: 'Alice', department: 'QA' }] })
+      .mockImplementationOnce((sql) => { tasksSql = sql; return Promise.resolve({ rows: [] }); })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = makeReq();
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(tasksSql).toMatch(/JOIN task_resource_assignment tra ON tra\.task_id = t\.id AND tra\.resource_id = \$1/);
+    expect(tasksSql).not.toMatch(/resource1_id|resource2_id/);
+  });
+
   test('includes submitted_bugs in response', async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [{ id: 'res-abc', resource_name: 'Alice', department: 'QA' }] })

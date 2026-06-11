@@ -262,6 +262,32 @@ describe('AccessEngine.buildListFilter', () => {
         expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM resources r WHERE r\.user_id = \$/);
     });
 
+    test('task junction (ADR 0009): own + teammate branches resolve every assignee via task_resource_assignment EXISTS', async () => {
+        // #192 — a 3rd+ Secondary Resource is not in the two cached slots, so
+        // access must resolve through the junction. When opts.assigneeJunction
+        // is set the assignee branches query task_resource_assignment instead of
+        // the fixed resource1_id/resource2_id columns.
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.tasks.view_own', 'qc.tasks.view_team']),
+            scope: { team_id: 't-1', team_type: 'qc', pm_of_projects: [] },
+        });
+        const f = await buildListFilter({ id: 'u-1', role: 'member' }, 'task', 'view', {
+            tableAlias: 'v',
+            assigneeJunction: { table: 'task_resource_assignment', idExpr: 'v.id' },
+            userExprs: ['v.created_by_user_id'],
+        });
+        // own-scope assignee branch: any assignee (primary or Nth secondary)
+        expect(f.clause).toMatch(
+            /EXISTS \(SELECT 1 FROM task_resource_assignment tra JOIN resources r ON r\.id = tra\.resource_id WHERE tra\.task_id = v\.id AND r\.user_id = \$\d+::uuid AND r\.deleted_at IS NULL\)/
+        );
+        // teammate-of-assignee branch: same junction, team-scoped
+        expect(f.clause).toMatch(
+            /EXISTS \(SELECT 1 FROM task_resource_assignment tra JOIN resources r2 ON r2\.id = tra\.resource_id JOIN app_user au ON au\.id = r2\.user_id WHERE tra\.task_id = v\.id AND au\.team_id = \$\d+::uuid AND r2\.deleted_at IS NULL\)/
+        );
+        // no longer references the two fixed slots
+        expect(f.clause).not.toMatch(/resource1_id|resource2_id/);
+    });
+
     test('unknown artifact type throws', async () => {
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set([]),

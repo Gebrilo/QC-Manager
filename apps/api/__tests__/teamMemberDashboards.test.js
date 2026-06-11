@@ -127,6 +127,72 @@ describe('GET /api/dashboards/team-manager', () => {
         expect(res.body.team_tasks.items[0].owner_team_id).toBe('team-dev');
         expect(res.body.team_tasks.items.find(task => task.owner_team_id === 'team-qc')).toBeUndefined();
     });
+
+    test('team task items expose all assignment contributors and summed effort from the junction (#200)', async () => {
+        const app = buildDashboardApp({ user: { id: 'tm-qc', role: 'team_manager' } });
+        let taskItemsSql = '';
+        installSqlRouter([
+            ...roleRoutes({ teamId: 'team-qc', teamType: 'qc', permissions }),
+            { match: 'FROM teams t', rows: [{ id: 'team-qc', name: 'QC', team_type: 'qc' }] },
+            { match: /SELECT COUNT\(\*\)::int AS c FROM tasks t/, rows: [{ c: '1' }] },
+            { match: /SELECT t\.status, COUNT\(\*\)::int AS c FROM tasks t/, rows: [{ status: 'Done', c: '1' }] },
+            { match: /assignments AS/, rows: [{ user_id: 'u-owner', resource_id: 'r-owner', name: 'Owner', total: '1' }] },
+            { match: /weekly_capacity_hrs/, rows: [{ user_id: 'u-owner', resource_id: 'r-owner', name: 'Owner', workload_hrs: '10', capacity_hrs: '40', logged_hrs: '9' }] },
+            { match: /AND t\.status = 'Blocked'/, rows: [] },
+            { match: /deadline IS NOT NULL/, rows: [] },
+            { match: /SELECT t\.id, t\.task_id/, rows: (sql) => {
+                taskItemsSql = sql;
+                return [{
+                    id: 'task-3-plus',
+                    task_id: 'TSK-3PLUS',
+                    task_name: 'Three contributor task',
+                    status: 'Done',
+                    project_id: 'p1',
+                    owner_team_id: 'team-qc',
+                    resource1_id: 'r-owner',
+                    resource1_name: 'Owner',
+                    total_est_hrs: '18',
+                    total_estimated_effort: '18',
+                    total_actual_hrs: '21',
+                    assignments: [
+                        { resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY', estimate_hrs: '10', actual_hrs: '9' },
+                        { resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY', estimate_hrs: '4', actual_hrs: '5' },
+                        { resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY', estimate_hrs: '4', actual_hrs: '7' },
+                    ],
+                }];
+            } },
+            { match: /SELECT COUNT\(\*\)::int AS c FROM bugs b/, rows: [{ c: '0' }] },
+            { match: /SELECT b\.status, COUNT\(\*\)::int AS c FROM bugs b/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/team-manager');
+        expect(res.status).toBe(200);
+        const task = res.body.team_tasks.items[0];
+        expect(task.total_est_hrs).toBe(18);
+        expect(task.total_estimated_effort).toBe(18);
+        expect(task.total_actual_hrs).toBe(21);
+        expect(task.assignments).toEqual([
+            {
+                resource_id: 'r-owner', resource_name: 'Owner', assignment_type: 'PRIMARY',
+                estimate_hrs: 10, actual_hrs: 9, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 0.9, verdict: 'accurate' }),
+            },
+            {
+                resource_id: 'r-support-1', resource_name: 'Support 1', assignment_type: 'SECONDARY',
+                estimate_hrs: 4, actual_hrs: 5, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 1.25, verdict: 'accurate' }),
+            },
+            {
+                resource_id: 'r-support-2', resource_name: 'Support 2', assignment_type: 'SECONDARY',
+                estimate_hrs: 4, actual_hrs: 7, completed_at: null,
+                estimate_accuracy: expect.objectContaining({ ratio: 1.75, verdict: 'blew_past' }),
+            },
+        ]);
+        expect(taskItemsSql).toMatch(/task_resource_assignment tra/);
+        expect(taskItemsSql).toMatch(/SUM\(COALESCE\(tra\.estimate_hrs, 0\)\)/);
+        expect(taskItemsSql).toMatch(/jsonb_agg/);
+        expect(taskItemsSql).not.toMatch(/COALESCE\(t\.r1_estimate_hrs, 0\) \+ COALESCE\(t\.r2_estimate_hrs, 0\)/);
+    });
 });
 
 describe('GET /api/dashboards/member', () => {
@@ -160,6 +226,90 @@ describe('GET /api/dashboards/member', () => {
         expect(res.body.my_bugs).toHaveLength(1);
         expect(res.body.my_bugs[0].id).toBe('bug-mine');
     });
+
+    test('a secondary contribution shows as a supporting task with the viewer\'s own per-assignment hours (#195)', async () => {
+        const app = buildDashboardApp({ user: { id: 'member-1', role: 'member' } });
+        let myTasksSql = '';
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: (sql) => { myTasksSql = sql; return [
+                { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'SECONDARY', my_estimate_hrs: '8', my_actual_hrs: '16',
+                  total_est_hrs: '24', total_actual_hrs: '24' },
+            ]; } },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '16' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        const task = res.body.my_tasks[0];
+        expect(task.assignment_role).toBe('supporting');     // SECONDARY → supporting, not owning
+        expect(task.my_estimate_hrs).toBe(8);                // viewer's own per-assignment values
+        expect(task.my_actual_hrs).toBe(16);
+        // my_tasks resolves via the junction and exposes the viewer's own assignment
+        expect(myTasksSql).toMatch(/JOIN task_resource_assignment/);
+        expect(myTasksSql).toMatch(/my_a\.assignment_type AS my_assignment_type/);
+        // logged time includes the secondary contribution (summed from the junction)
+        expect(res.body.logged_time_this_week).toBe(16);
+    });
+
+    test('the primary sees the same task as owning (#195)', async () => {
+        const app = buildDashboardApp({ user: { id: 'owner-1', role: 'member' } });
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: [
+                { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'PRIMARY', my_estimate_hrs: '16', my_actual_hrs: '8' },
+            ] },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '8' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        expect(res.body.my_tasks[0].assignment_role).toBe('owning');
+    });
+
+    test('completed member assignments include the viewer\'s estimate accuracy verdict (#196)', async () => {
+        const app = buildDashboardApp({ user: { id: 'member-1', role: 'member' } });
+        installSqlRouter([
+            ...roleRoutes({
+                teamId: 'team-qc',
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+            }),
+            { match: /SELECT t\.id, t\.task_id/, rows: [
+                { id: 'task-done', task_id: 'TSK-DONE', task_name: 'Completed', status: 'Done',
+                  project_id: 'p1', owner_team_id: 'team-qc', resource1_id: 'r-owner',
+                  my_assignment_type: 'SECONDARY', my_estimate_hrs: '8', my_actual_hrs: '11',
+                  my_completion_status: 'Completed' },
+            ] },
+            { match: /SELECT COALESCE\(SUM/, rows: [{ hours: '11' }] },
+            { match: /SELECT b\.id, b\.bug_id/, rows: [] },
+            { match: /FROM user_stories us/, rows: [] },
+            { match: /FROM artifact_access aa/, rows: [] },
+        ]);
+
+        const res = await request(app).get('/api/dashboards/member');
+        expect(res.status).toBe(200);
+        expect(res.body.my_tasks[0].my_estimate_accuracy).toEqual(expect.objectContaining({
+            ratio: 1.375,
+            verdict: 'blew_past',
+            label: 'Under-estimated (blew past)',
+        }));
+    });
 });
 
 describe('PATCH /api/tasks/:id task take-over enforcement', () => {
@@ -173,10 +323,11 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
                 status: 'In Progress',
                 project_id: 'p-dev',
                 owner_team_id: 'team-dev',
-                resource1_id: 'r-dev',
-                resource2_id: null,
                 visibility_scope: 'team',
             }] },
+            { match: /SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/, rows: [
+                { resource_id: 'r-dev', resource_name: 'Dev Resource', assignment_type: 'PRIMARY', estimate_hrs: 8, actual_hrs: 4 },
+            ] },
             ...roleRoutes({
                 teamId: 'team-qc',
                 permissions: [
@@ -190,7 +341,9 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
 
         const res = await request(app)
             .patch('/api/tasks/task-dev')
-            .send({ resource1_uuid: '00000000-0000-0000-0000-000000000123' });
+            .send({ assignments: [
+                { resource_id: '00000000-0000-0000-0000-000000000123', assignment_type: 'PRIMARY', estimate_hrs: 0, actual_hrs: 0 },
+            ] });
 
         expect(res.status).toBe(403);
         expect(res.body.error).toMatch(/take over/);

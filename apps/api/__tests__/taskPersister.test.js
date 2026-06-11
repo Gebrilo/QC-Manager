@@ -75,6 +75,35 @@ describe('task persister — dispatchAction', () => {
     expect(result.id).toBe('existing-uuid');
   });
 
+  it('reassignment Y→W installs W as PRIMARY via the junction and preserves Y when it logged effort (#199)', async () => {
+    const unified = {
+      artifact_type: 'task',
+      action: 'sync',
+      project_id: 'proj-1',
+      common: { title: 'Reassigned task', status: 'In Progress', assigned_to: 'walter' },
+      fields: {},
+      tuleap: { artifact_id: 777 },
+    };
+
+    resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 'task-uuid', tuleap_artifact_id: 777, resource1_id: 'rY', deleted_at: null }] }) // SELECT live
+      .mockResolvedValueOnce({ rows: [{ id: 'rW' }] })                                       // resolveResourceByName('walter')
+      .mockResolvedValueOnce({ rows: [{ id: 'task-uuid', task_name: 'Reassigned task' }] })  // UPDATE tasks
+      .mockResolvedValueOnce({ rows: [{ id: 'pY', resource_id: 'rY', assignment_type: 'PRIMARY', actual_hrs: 4 }] }) // applyTuleapPrimary SELECT
+      .mockResolvedValueOnce({ rows: [] })   // demote Y → SECONDARY
+      .mockResolvedValueOnce({ rows: [] });  // INSERT W as PRIMARY
+
+    const result = await dispatchAction(unified, config, { query });
+    expect(result.action).toBe('updated');
+
+    // W is installed as PRIMARY through the junction (not just resource1_id)
+    expect(query.mock.calls.some(c => /INSERT INTO task_resource_assignment/.test(c[0]) && (c[1] || [])[1] === 'rW')).toBe(true);
+    // Y had effort → demoted to SECONDARY, never deleted; its hours stay on Y, not W
+    expect(query.mock.calls.some(c => /SET assignment_type = 'SECONDARY'/.test(c[0]) && (c[1] || [])[0] === 'pY')).toBe(true);
+    expect(query.mock.calls.some(c => /DELETE FROM task_resource_assignment/.test(c[0]))).toBe(false);
+  });
+
   it('soft-deletes a task on delete action', async () => {
     const unified = {
       artifact_type: 'task',

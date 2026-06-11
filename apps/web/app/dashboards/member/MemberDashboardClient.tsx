@@ -5,6 +5,7 @@ import { Clock, Share2 } from 'lucide-react';
 import { memberDashboardApi, type DashboardTask, type MemberDashboard } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { AssignmentRoleBadge, EstimateAccuracyBadge, formatHours } from '@/components/dashboards/AssignmentBadges';
 
 function statusVariant(status: string) {
     if (status === 'Done' || status === 'Closed') return 'success';
@@ -33,25 +34,46 @@ function TaskTable({ tasks }: { tasks: DashboardTask[] }) {
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950">
                     <tr>
                         <th className="px-3 py-2">Task</th>
+                        <th className="px-3 py-2">Role</th>
                         <th className="px-3 py-2">Status</th>
                         <th className="px-3 py-2">Project</th>
                         <th className="px-3 py-2">Due</th>
-                        <th className="px-3 py-2">Hours</th>
+                        <th className="px-3 py-2">My hours</th>
+                        <th className="px-3 py-2">Task actual</th>
+                        <th className="px-3 py-2">Accuracy</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {tasks.map(task => (
-                        <tr key={task.id} className="border-t border-slate-200 dark:border-slate-800">
+                    {tasks.map(task => {
+                        const supporting = task.assignment_role === 'supporting';
+                        const estimate = task.my_estimate_hrs ?? task.total_est_hrs;
+                        const actual = task.my_actual_hrs ?? task.total_actual_hrs;
+                        return (
+                        <tr
+                            key={task.id}
+                            className={`border-t border-slate-200 dark:border-slate-800 ${supporting ? 'bg-sky-50/35 dark:bg-sky-950/10' : ''}`}
+                        >
                             <td className="px-3 py-2">
                                 <div className="font-medium text-slate-900 dark:text-white">{task.task_name}</div>
                                 <div className="text-xs text-slate-500">{task.task_id || 'Task'}</div>
                             </td>
+                            <td className="px-3 py-2">
+                                <AssignmentRoleBadge role={task.assignment_role} />
+                            </td>
                             <td className="px-3 py-2"><Badge variant={statusVariant(task.status) as any}>{task.status}</Badge></td>
                             <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">{task.project_name || 'Unassigned'}</td>
                             <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">{task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No date'}</td>
-                            <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">{task.total_actual_hrs}/{task.total_est_hrs}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-300">
+                                {formatHours(actual)} / {formatHours(estimate)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                {formatHours(task.total_actual_hrs)}
+                            </td>
+                            <td className="px-3 py-2">
+                                <EstimateAccuracyBadge accuracy={task.my_estimate_accuracy} />
+                            </td>
                         </tr>
-                    ))}
+                    );})}
                 </tbody>
             </table>
         </div>

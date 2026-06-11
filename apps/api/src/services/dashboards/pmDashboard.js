@@ -112,20 +112,19 @@ async function getOverdueCount(db, projectId, access) {
 }
 
 async function getResourceUtilization(db, projectId, access) {
-    // For each resource appearing on any non-terminal task in the project,
-    // sum the estimate hours that resource is responsible for (r1 or r2 slot).
+    // ADR 0009 / #200 — for each resource on any non-terminal task in the
+    // project, sum the estimate hours of *their own* assignments from the
+    // task_resource_assignment junction. This counts every allocation (primary
+    // and the 2nd, 3rd, Nth secondary), which the two-slot cache cannot hold.
     const base = `
         WITH resource_load AS (
             SELECT r.id AS resource_id,
                    r.resource_name AS name,
                    COALESCE(r.weekly_capacity_hrs, 0)::int AS capacity_hrs,
-                   COALESCE(SUM(
-                       CASE WHEN t.resource1_id = r.id THEN COALESCE(t.r1_estimate_hrs, 0) ELSE 0 END
-                     + CASE WHEN t.resource2_id = r.id THEN COALESCE(t.r2_estimate_hrs, 0) ELSE 0 END
-                   ), 0)::int AS allocated_hrs
+                   COALESCE(SUM(COALESCE(tra.estimate_hrs, 0)), 0)::int AS allocated_hrs
               FROM resources r
-              JOIN tasks t
-                ON (t.resource1_id = r.id OR t.resource2_id = r.id)
+              JOIN task_resource_assignment tra ON tra.resource_id = r.id
+              JOIN tasks t ON t.id = tra.task_id
              WHERE t.project_id = $1
                AND t.status NOT IN ('Done','Cancelled')
                AND r.deleted_at IS NULL`;

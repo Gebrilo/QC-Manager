@@ -100,7 +100,10 @@ beforeEach(() => {
 });
 
 describe('GET /tasks — list filter wiring', () => {
-    test('tester with view_own emits user-exprs + resource-bridge branches against view columns', async () => {
+    test('tester with view_own emits user-exprs + junction assignee branch against view columns', async () => {
+        // ADR 0009 / #192 — the list resolves assignees through the
+        // task_resource_assignment junction (any assignee, incl. the 3rd+
+        // secondary) rather than the two cached resource slots.
         setRole('tester_own_only');
         const res = await request(makeApp()).get('/tasks');
         expect(res.status).toBe(200);
@@ -108,8 +111,10 @@ describe('GET /tasks — list filter wiring', () => {
         const dq = findListQuery();
         expect(dq).toBeDefined();
         expect(dq.sql).toMatch(/v\.created_by_user_id\s*=\s*\$/);
-        expect(dq.sql).toMatch(/r\.id\s*=\s*v\.resource1_id/);
-        expect(dq.sql).toMatch(/r\.id\s*=\s*v\.resource2_id/);
+        expect(dq.sql).toMatch(
+            /FROM task_resource_assignment tra JOIN resources r ON r\.id = tra\.resource_id WHERE tra\.task_id = v\.id/
+        );
+        expect(dq.sql).not.toMatch(/r\.id\s*=\s*v\.resource1_id/);
         expect(dq.params).toContain('u-tester');
     });
 
@@ -134,5 +139,90 @@ describe('GET /tasks — list filter wiring', () => {
         }
         const unknown = [...referenced].filter(col => !VIEW_REFERENCED_COLUMNS.includes(col) && col !== '*');
         expect(unknown).toEqual([]);
+    });
+});
+
+describe('GET /tasks/:id — single-item enforcement via junction', () => {
+    // ADR 0009 / #192 — single-item access resolves through
+    // task_resource_assignment so any assignee (primary OR the 3rd+ secondary,
+    // which the two cached slots cannot hold) gets the assignee branch.
+
+    // task owned by a different team, created by someone else, private — so the
+    // ONLY branch that can grant is the resource assignee branch.
+    const TASK = Object.freeze({
+        id: 'task-1',
+        project_id: 'p-1',
+        resource1_id: 'res-primary',
+        resource2_id: 'res-sec1',
+        owner_team_id: 'other-team',
+        visibility_scope: 'private',
+        created_by_user_id: 'someone-else',
+        assigned_to: null,
+    });
+
+    // Routes the query sequence GET /:id issues: the view fetch,
+    // getTaskAssignments, resolveTaskAccessAssigneeResourceId, then
+    // AccessEngine.isAssignee. callerResourceId is what the junction returns
+    // for this caller (null = not assigned); ownedResources is the set of
+    // resource ids the caller's user_id owns.
+    function wireQueries({ callerResourceId, ownedResources, assignmentRows = [] }) {
+        queryHandler = async (sql, params) => {
+            if (/FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) return { rows: [TASK] };
+            if (/SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/.test(sql)) {
+                return { rows: assignmentRows };
+            }
+            if (/SELECT tra\.resource_id, r\.user_id, au\.team_id/.test(sql)) {
+                if (!callerResourceId) {
+                    return { rows: [
+                        { resource_id: TASK.resource1_id, user_id: 'other-user', team_id: 'other-team' },
+                    ] };
+                }
+                return { rows: [
+                    { resource_id: callerResourceId, user_id: 'u-tester', team_id: 'team-x' },
+                ] };
+            }
+            if (/SELECT 1 FROM resources WHERE id = \$1 AND user_id = \$2/.test(sql)) {
+                return { rows: ownedResources.includes(params[0]) ? [{ ok: 1 }] : [] };
+            }
+            return { rows: [] };
+        };
+    }
+
+    test('a 3rd+ secondary (absent from both cached slots) resolves view → 200', async () => {
+        setRole('tester_own_only');
+        wireQueries({ callerResourceId: 'res-third', ownedResources: ['res-third'] });
+        const res = await request(makeApp()).get('/tasks/task-1');
+        expect(res.status).toBe(200);
+        expect(res.body.id).toBe('task-1');
+    });
+
+    test('the primary still resolves view → 200', async () => {
+        setRole('tester_own_only');
+        wireQueries({ callerResourceId: 'res-primary', ownedResources: ['res-primary'] });
+        const res = await request(makeApp()).get('/tasks/task-1');
+        expect(res.status).toBe(200);
+    });
+
+    test('response includes all assignment rows for edit round-trip', async () => {
+        const assignmentRows = [
+            { resource_id: 'res-primary', resource_name: 'Primary', assignment_type: 'PRIMARY', estimate_hrs: 16, actual_hrs: 8 },
+            { resource_id: 'res-sec1', resource_name: 'Secondary 1', assignment_type: 'SECONDARY', estimate_hrs: 4, actual_hrs: 2 },
+            { resource_id: 'res-third', resource_name: 'Secondary 2', assignment_type: 'SECONDARY', estimate_hrs: 12, actual_hrs: 10 },
+        ];
+        setRole('tester_own_only');
+        wireQueries({ callerResourceId: 'res-third', ownedResources: ['res-third'], assignmentRows });
+
+        const res = await request(makeApp()).get('/tasks/task-1');
+
+        expect(res.status).toBe(200);
+        expect(res.body.assignments).toEqual(assignmentRows);
+        expect(queries.some(q => /SELECT tra\.\*, res\.resource_name/.test(q.sql))).toBe(true);
+    });
+
+    test('a non-assignee without team/role scope is denied → 403', async () => {
+        setRole('tester_own_only');
+        wireQueries({ callerResourceId: null, ownedResources: [] });
+        const res = await request(makeApp()).get('/tasks/task-1');
+        expect(res.status).toBe(403);
     });
 });

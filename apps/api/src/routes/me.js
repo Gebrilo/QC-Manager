@@ -20,23 +20,20 @@ async function dashboardHandler(req, res) {
         const resource = resourceRes.rows[0];
         const resourceId = resource.id;
 
+        // ADR 0009 / #195 — read the viewer's own per-assignment estimate/actual
+        // from the junction for every task they're on (primary or any secondary,
+        // incl. the 3rd+), instead of the two cached resource slots.
         const tasksRes = await pool.query(
             `SELECT
                 t.status,
                 t.project_id,
                 p.project_name,
-                CASE WHEN t.resource1_id = $1
-                     THEN COALESCE(t.r1_estimate_hrs, 0)
-                     ELSE COALESCE(t.r2_estimate_hrs, 0)
-                END AS estimate_hrs,
-                CASE WHEN t.resource1_id = $1
-                     THEN COALESCE(t.r1_actual_hrs, 0)
-                     ELSE COALESCE(t.r2_actual_hrs, 0)
-                END AS actual_hrs
+                COALESCE(tra.estimate_hrs, 0) AS estimate_hrs,
+                COALESCE(tra.actual_hrs, 0) AS actual_hrs
              FROM tasks t
+             JOIN task_resource_assignment tra ON tra.task_id = t.id AND tra.resource_id = $1
              LEFT JOIN projects p ON t.project_id = p.id
-             WHERE (t.resource1_id = $1 OR t.resource2_id = $1)
-               AND t.deleted_at IS NULL`,
+             WHERE t.deleted_at IS NULL`,
             [resourceId]
         );
 
