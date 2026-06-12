@@ -181,6 +181,10 @@ async function logWebhook(data) {
 // =====================================================
 async function emitTuleapSyncNotification({ status, error, tuleapTrackerId, trackerType, tuleapArtifactId, action }) {
     try {
+        // Per-artifact success fires on every ~2-min sync → notification storm.
+        // Only surface FAILURES to admins; success is silent.
+        if (status === 'succeeded') return;
+
         const admins = await pool.query(
             `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
         );
