@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
@@ -22,7 +23,7 @@ interface Notification {
     action?: string | null;
 }
 
-const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
+export const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     user_registered: { icon: '👤', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
     user_activated: { icon: '✅', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
     user_deactivated: { icon: '🚫', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
@@ -322,6 +323,17 @@ export function NotificationBell() {
                             })
                         )}
                     </div>
+
+                    {/* Footer: View all */}
+                    {notifications.length > 0 && (
+                        <Link
+                            href="/notifications"
+                            onClick={() => setIsOpen(false)}
+                            className="block px-4 py-2.5 text-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 border-t border-slate-200 dark:border-slate-700 transition-colors"
+                        >
+                            View all notifications →
+                        </Link>
+                    )}
                 </div>
             )}
         </div>

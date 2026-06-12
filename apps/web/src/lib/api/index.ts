@@ -934,13 +934,40 @@ export interface AppNotification {
     read: boolean;
     metadata: Record<string, any>;
     created_at: string;
+    entity_type?: string | null;
+    entity_id?: string | null;
+    action?: string | null;
+    actor_id?: string | null;
+}
+
+export interface NotificationsListResponse {
+    notifications: AppNotification[];
+    unread_count: number;
+    total: number;
+    page: number;
+    limit: number;
+    total_pages: number;
 }
 
 export const notificationsApi = {
-    list: (unreadOnly = false, limit = 20) =>
-        fetchApi<{ notifications: AppNotification[]; unread_count: number }>(
-            `/notifications?unread_only=${unreadOnly}&limit=${limit}`
-        ),
+    list: (params?: {
+        page?: number;
+        limit?: number;
+        unread_only?: boolean;
+        entity_type?: string;
+        type?: string;
+    }) => {
+        const clean: Record<string, string> = {};
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v === undefined || v === null || v === '') continue;
+                if (k === 'unread_only' && v === false) continue;
+                clean[k] = String(v);
+            }
+        }
+        const query = new URLSearchParams(clean).toString();
+        return fetchApi<NotificationsListResponse>(`/notifications${query ? `?${query}` : ''}`);
+    },
 
     markRead: (id: string) =>
         fetchApi<AppNotification>(`/notifications/${id}/read`, { method: 'PATCH' }),

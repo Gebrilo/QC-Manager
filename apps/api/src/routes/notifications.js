@@ -9,37 +9,76 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 router.use(requireAuth);
 
-// List notifications for the current user
+// List notifications for the current user.
+// Supports:
+//   ?page=1&limit=20            — pagination
+//   ?entity_type=bug            — filter by entity_type
+//   ?type=bug_created           — filter by notification type
+//   ?unread_only=true           — filter unread
+// Response shape:
+//   { notifications, unread_count, total, page, limit, total_pages }
 router.get('/', async (req, res, next) => {
     try {
-        const { unread_only, limit = 50 } = req.query;
+        const {
+            unread_only,
+            page = 1,
+            limit = 20,
+            entity_type,
+            type,
+        } = req.query;
 
-        let query = `
-            SELECT id, type, title, message, read, metadata, created_at,
-                   entity_type, entity_id, action, actor_id
-            FROM notification
-            WHERE user_id = $1
-        `;
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+        const offset = (pageNum - 1) * limitNum;
+
+        const where = ['user_id = $1'];
         const params = [req.user.id];
+        let pn = 2;
 
         if (unread_only === 'true') {
-            query += ' AND read = false';
+            where.push('read = false');
+        }
+        if (entity_type) {
+            where.push(`entity_type = $${pn++}`);
+            params.push(entity_type);
+        }
+        if (type) {
+            where.push(`type = $${pn++}`);
+            params.push(type);
         }
 
-        query += ' ORDER BY created_at DESC LIMIT $2';
-        params.push(parseInt(limit));
+        const whereSql = where.join(' AND ');
 
-        const result = await db.query(query, params);
+        // Unread count is independent of filters so the bell badge stays correct.
+        const [result, countResult, unreadResult] = await Promise.all([
+            db.query(
+                `SELECT id, type, title, message, read, metadata, created_at,
+                        entity_type, entity_id, action, actor_id
+                 FROM notification
+                 WHERE ${whereSql}
+                 ORDER BY created_at DESC
+                 LIMIT $${pn++} OFFSET $${pn++}`,
+                [...params, limitNum, offset]
+            ),
+            db.query(
+                `SELECT COUNT(*) as count FROM notification WHERE ${whereSql}`,
+                params
+            ),
+            db.query(
+                'SELECT COUNT(*) as count FROM notification WHERE user_id = $1 AND read = false',
+                [req.user.id]
+            ),
+        ]);
 
-        // Also get unread count
-        const countResult = await db.query(
-            'SELECT COUNT(*) as count FROM notification WHERE user_id = $1 AND read = false',
-            [req.user.id]
-        );
+        const total = parseInt(countResult.rows[0].count, 10);
 
         res.json({
             notifications: result.rows,
-            unread_count: parseInt(countResult.rows[0].count),
+            unread_count: parseInt(unreadResult.rows[0].count, 10),
+            total,
+            page: pageNum,
+            limit: limitNum,
+            total_pages: Math.max(1, Math.ceil(total / limitNum)),
         });
     } catch (err) {
         next(err);
