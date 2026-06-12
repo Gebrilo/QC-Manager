@@ -1001,6 +1001,13 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_notification_user_id ON notification(user_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_notification_user_unread ON notification(user_id, read) WHERE read = false`);
 
+        // Navigation + provenance columns (added in-place; deploys don't run migrations)
+        await client.query(`ALTER TABLE notification ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50)`);
+        await client.query(`ALTER TABLE notification ADD COLUMN IF NOT EXISTS entity_id UUID`);
+        await client.query(`ALTER TABLE notification ADD COLUMN IF NOT EXISTS action VARCHAR(30)`);
+        await client.query(`ALTER TABLE notification ADD COLUMN IF NOT EXISTS actor_id UUID`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_notification_entity ON notification(entity_type, entity_id)`);
+
         // =====================================================
         // EMPLOYEE JOURNEYS / ONBOARDING QUEST SYSTEM
         // =====================================================
