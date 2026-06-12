@@ -415,6 +415,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
 
         // Detect a genuine assignment change to gate the take-over permission.
         let assignmentChanged = false;
+        let addedResourceIds = [];
         if (desiredAssignments) {
             const currentAssignments = await getTaskAssignments(db.query.bind(db), id);
             const curPrimary = (currentAssignments.find(a => a.assignment_type === 'PRIMARY') || {}).resource_id || null;
@@ -428,6 +429,11 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             assignmentChanged = newPrimary !== curPrimary
                 || newSecondaries.size !== curSecondaries.size
                 || [...newSecondaries].some(rid => !curSecondaries.has(rid));
+
+            const currentResourceIds = new Set(currentAssignments.map(a => a.resource_id));
+            addedResourceIds = desiredAssignments
+                .map(a => a.resource_id)
+                .filter(rid => rid && !currentResourceIds.has(rid));
         }
 
         if (assignmentChanged) {
@@ -568,8 +574,8 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         }
 
         await auditLog('tasks', id, 'UPDATE', updated, original, req.user?.email || 'system');
-        if (assignmentChanged) {
-            dispatchTaskAssignment(id, req.user?.email || 'system')
+        if (assignmentChanged && addedResourceIds.length > 0) {
+            dispatchTaskAssignment(id, req.user?.email || 'system', addedResourceIds)
                 .catch(err => console.error('Task assignment notification error:', err.message));
         }
         triggerWorkflow('task-updated', updated);

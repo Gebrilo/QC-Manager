@@ -5,6 +5,8 @@ const { requireAuth } = require('../middleware/authMiddleware');
 const { resolveNotificationTarget } = require('../services/notifications/open');
 const { insertNotification } = require('../services/notifications/dispatcher');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.use(requireAuth);
 
 // List notifications for the current user
@@ -48,6 +50,9 @@ router.get('/', async (req, res, next) => {
 router.get('/:id/open', async (req, res, next) => {
     try {
         const { id } = req.params;
+        if (!UUID_RE.test(id)) {
+            return res.status(404).json({ error: 'Notification not found' });
+        }
         const result = await db.query(
             'SELECT entity_type, entity_id FROM notification WHERE id = $1 AND user_id = $2',
             [id, req.user.id]

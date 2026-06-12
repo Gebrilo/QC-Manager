@@ -67,26 +67,32 @@ async function dispatchFromAudit({ entityType, entityId, action, before, after, 
 
 // Explicit (non-CRUD-shaped) event: a task's assignment set changed via PATCH.
 // Reassignment lives in the junction, so it never appears in the audit diff.
-async function dispatchTaskAssignment(taskId, actorEmail) {
+async function dispatchTaskAssignment(taskId, actorEmail, addedResourceIds = []) {
     try {
-        const t = await db.query(
-            'SELECT id, task_name, project_id, created_by_user_id FROM tasks WHERE id = $1',
-            [taskId]
-        );
-        if (t.rows.length === 0) return;
-        const after = t.rows[0];
+        // Only the people newly assigned get pinged — creator/PM/existing
+        // assignees are already covered by the create + field-change paths,
+        // so this avoids the firehose and the double-notify on a combined edit.
+        if (!addedResourceIds || addedResourceIds.length === 0) return;
 
-        const policy = NOTIFICATION_POLICIES.tasks;
+        const t = await db.query('SELECT id, task_name FROM tasks WHERE id = $1', [taskId]);
+        if (t.rows.length === 0) return;
+        const taskName = t.rows[0].task_name;
+
         const actorId = await resolveActorId(actorEmail);
-        let recipients = await policy.recipients({ entityId: taskId, after, db });
-        recipients = [...new Set(recipients.filter(Boolean))].filter(id => id !== actorId);
+        const res = await db.query(
+            `SELECT user_id FROM resources
+              WHERE id = ANY($1::uuid[]) AND user_id IS NOT NULL AND deleted_at IS NULL`,
+            [addedResourceIds]
+        );
+        const recipients = [...new Set(res.rows.map(r => r.user_id).filter(Boolean))]
+            .filter(uid => uid !== actorId);
         if (recipients.length === 0) return;
 
         await insertMany(recipients, {
             type: 'task_assigned',
-            title: 'Task assignment changed',
-            message: `Assignments changed on task "${after.task_name}".`,
-            entity_type: policy.entityType,
+            title: 'You were assigned a task',
+            message: `You were assigned to task "${taskName}".`,
+            entity_type: NOTIFICATION_POLICIES.tasks.entityType,
             entity_id: taskId,
             action: 'ASSIGN',
             actor_id: actorId,

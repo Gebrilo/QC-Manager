@@ -3,7 +3,7 @@
 const mockQuery = jest.fn();
 jest.mock('../src/config/db', () => ({ query: mockQuery }));
 
-const { dispatchFromAudit } = require('../src/services/notifications/dispatcher');
+const { dispatchFromAudit, dispatchTaskAssignment } = require('../src/services/notifications/dispatcher');
 
 afterEach(() => jest.clearAllMocks());
 
@@ -74,6 +74,29 @@ describe('dispatchFromAudit — tasks', () => {
             entityType: 'widgets', entityId: 'w-1', action: 'CREATE',
             before: null, after: {}, changedFields: [], actorEmail: 'system',
         });
+        expect(mockQuery).not.toHaveBeenCalled();
+    });
+});
+
+describe('dispatchTaskAssignment — only newly-added assignees', () => {
+    test('notifies the added assignees, excluding the actor', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'task-1', task_name: 'Build login' }] })  // task lookup
+            .mockResolvedValueOnce({ rows: [{ id: 'actor-9' }] })                            // resolveActorId
+            .mockResolvedValueOnce({ rows: [{ user_id: 'new-1' }, { user_id: 'actor-9' }] }); // resources of added ids
+
+        await dispatchTaskAssignment('task-1', 'actor@x', ['res-1', 'res-2']);
+
+        // actor-9 is the acting user → excluded; only the newly-added user remains
+        expect(notifiedUserIds()).toEqual(['new-1']);
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('task_assigned');
+    });
+
+    test('no-op when no resources were added', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchTaskAssignment('task-1', 'actor@x', []);
         expect(mockQuery).not.toHaveBeenCalled();
     });
 });
