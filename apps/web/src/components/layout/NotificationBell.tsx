@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { Bell, Check, Trash2, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { useToastSafe } from '../ui/Toast';
+import { NotifTypeIcon } from './notificationTypes';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -23,56 +24,6 @@ interface Notification {
     action?: string | null;
 }
 
-export const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-    user_registered: { icon: '👤', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
-    user_activated: { icon: '✅', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
-    user_deactivated: { icon: '🚫', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    user_deleted: { icon: '🗑️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
-    warning: { icon: '⚠️', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    success: { icon: '🎉', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
-    info: { icon: 'ℹ️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    task_created: { icon: '🆕', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    task_updated: { icon: '✏️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    task_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    task_assigned: { icon: '🙋', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
-    task_deleted: { icon: '🗑️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
-    bug_created: { icon: '🐛', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
-    bug_updated: { icon: '🐛', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    bug_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    bug_severity_changed: { icon: '⚠️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
-    bug_reassigned: { icon: '🙋', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
-    bug_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    story_created: { icon: '📖', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    story_updated: { icon: '📖', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    story_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    story_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_case_created: { icon: '🧪', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    test_case_updated: { icon: '🧪', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_case_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    test_case_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_suite_created: { icon: '📋', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    test_suite_updated: { icon: '📋', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_suite_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    test_suite_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_execution_created: { icon: '🏃', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
-    test_execution_updated: { icon: '🏃', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    test_execution_status_changed: { icon: '🏃', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    test_execution_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    project_created: { icon: '📁', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    project_updated: { icon: '📁', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    project_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
-    project_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    resource_created: { icon: '👥', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
-    resource_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    resource_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    team_created: { icon: '👥', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
-    team_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    team_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-    role_changed: { icon: '🔑', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' },
-    tuleap_sync_succeeded: { icon: '✅', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
-    tuleap_sync_failed: { icon: '❌', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
-};
-
 export function NotificationBell() {
     const { token, user } = useAuth();
     const router = useRouter();
@@ -80,7 +31,6 @@ export function NotificationBell() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const fetchNotifications = useCallback(async () => {
@@ -227,26 +177,36 @@ export function NotificationBell() {
                     setIsOpen(!isOpen);
                     if (!isOpen) fetchNotifications();
                 }}
-                className="relative p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className={`relative p-2.5 rounded-lg transition-colors ${isOpen
+                    ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-800 dark:text-white'
+                    : 'text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
                 aria-label="Notifications"
             >
                 <Bell className="w-[18px] h-[18px]" strokeWidth={1.75} />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 bg-rose-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-96 max-h-[480px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                <div className="absolute right-0 top-full mt-2 w-96 max-h-[480px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-2xl shadow-2xl shadow-black/20 dark:shadow-black/50 z-50 overflow-hidden flex flex-col">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h3>
+                    <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-200/70 dark:border-slate-700/50">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-[15px] font-bold text-slate-900 dark:text-white">Notifications</h3>
+                            {unreadCount > 0 && (
+                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+                                    {unreadCount} new
+                                </span>
+                            )}
+                        </div>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllRead}
-                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
+                                className="text-[12px] font-medium text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
                             >
                                 Mark all read
                             </button>
@@ -254,73 +214,67 @@ export function NotificationBell() {
                     </div>
 
                     {/* Notification List */}
-                    <div className="overflow-y-auto flex-1">
+                    <div className="overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-slate-800/70">
                         {notifications.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 px-4">
                                 <Bell className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" strokeWidth={1.5} />
                                 <p className="text-sm text-slate-400 dark:text-slate-500">No notifications yet</p>
                             </div>
                         ) : (
-                            notifications.map(n => {
-                                const typeInfo = TYPE_ICONS[n.type] || TYPE_ICONS.info;
-                                return (
-                                    <div
-                                        key={n.id}
-                                        className={`flex items-start gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 transition-colors group ${!n.read
-                                                ? 'bg-indigo-50/50 dark:bg-indigo-950/20'
-                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
-                                            }`}
-                                    >
-                                        {/* Icon */}
-                                        <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm ${typeInfo.color}`}>
-                                            {typeInfo.icon}
-                                        </div>
+                            notifications.map(n => (
+                                <div
+                                    key={n.id}
+                                    className={`group relative flex items-start gap-3 px-4 py-3 transition-colors ${!n.read
+                                        ? 'bg-indigo-500/[0.06] dark:bg-indigo-500/[0.07] hover:bg-indigo-500/[0.1]'
+                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                                        }`}
+                                >
+                                    {!n.read && <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400" />}
 
-                                        {/* Content */}
-                                        <div
-                                            className="flex-1 min-w-0 cursor-pointer"
-                                            onClick={() => openNotification(n)}
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                    {n.title}
-                                                </p>
-                                                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {/* Type icon */}
+                                    <NotifTypeIcon type={n.type} size="sm" />
+
+                                    {/* Content */}
+                                    <div
+                                        className="flex-1 min-w-0 cursor-pointer"
+                                        onClick={() => openNotification(n)}
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className={`text-[13px] truncate ${!n.read ? 'font-semibold text-slate-900 dark:text-slate-100' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
+                                                {n.title}
+                                            </p>
+                                            <div className="flex items-center gap-1 flex-shrink-0">
+                                                <span className="text-[11px] text-slate-400 dark:text-slate-500 group-hover:opacity-0 transition-opacity">
+                                                    {formatTime(n.created_at)}
+                                                </span>
+                                                <div className="absolute right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {!n.read && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); markAsRead(n.id); }}
-                                                            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                            className="p-1 rounded text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                                             title="Mark as read"
                                                         >
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                            </svg>
+                                                            <Check className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); deleteNotification(n.id, !n.read); }}
-                                                        className="p-1 rounded text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                                                        className="p-1 rounded text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                                         title="Delete"
                                                     >
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
                                             </div>
-                                            {n.message && (
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
-                                            )}
-                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{formatTime(n.created_at)}</p>
                                         </div>
-
-                                        {/* Unread indicator */}
-                                        {!n.read && (
-                                            <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5" />
+                                        {n.message && (
+                                            <p dir="auto" className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-snug">
+                                                {n.message}
+                                            </p>
                                         )}
                                     </div>
-                                );
-                            })
+                                </div>
+                            ))
                         )}
                     </div>
 
@@ -329,9 +283,9 @@ export function NotificationBell() {
                         <Link
                             href="/notifications"
                             onClick={() => setIsOpen(false)}
-                            className="block px-4 py-2.5 text-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 border-t border-slate-200 dark:border-slate-700 transition-colors"
+                            className="flex items-center justify-center gap-1.5 px-4 py-3 text-center text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 border-t border-slate-200/70 dark:border-slate-700/50 transition-colors"
                         >
-                            View all notifications →
+                            View all notifications <ArrowRight className="w-3.5 h-3.5" />
                         </Link>
                     )}
                 </div>

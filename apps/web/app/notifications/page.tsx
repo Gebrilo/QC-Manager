@@ -3,11 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Bell, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bell, Check, Trash2, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { notificationsApi, type AppNotification } from '@/lib/api';
 import { useToastSafe } from '@/components/ui/Toast';
-import { TYPE_ICONS } from '@/components/layout/NotificationBell';
+import { NotifTypeIcon, getNotifType, TINT_PILL } from '@/components/layout/notificationTypes';
 
 const PAGE_SIZE = 20;
 
@@ -41,10 +41,28 @@ function formatTime(dateStr: string): string {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** Pill / toggle switch for the "unread only" filter. */
+function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+    return (
+        <button onClick={onClick} className="flex items-center gap-2.5 group" type="button">
+            <span
+                className={`relative w-9 h-5 rounded-full transition-colors ${on ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+            >
+                <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`}
+                />
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                {label}
+            </span>
+        </button>
+    );
+}
+
 function NotificationsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { token, user } = useAuth();
+    const { token } = useAuth();
     const toast = useToastSafe();
 
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -179,71 +197,59 @@ function NotificationsContent() {
     };
 
     return (
-        <div className="space-y-6 px-4 sm:px-0">
+        <div className="max-w-4xl mx-auto space-y-5">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-end justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Notifications</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Notifications</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
                         {total === 0
                             ? 'You have no notifications yet'
-                            : `${total.toLocaleString()} notification${total === 1 ? '' : 's'}${unreadCount > 0 ? ` · ${unreadCount} unread` : ''}`}
+                            : <>
+                                {total.toLocaleString()} {total === 1 ? 'notification' : 'notifications'}
+                                {unreadCount > 0 && <span className="text-slate-400 dark:text-slate-500"> · {unreadCount} unread</span>}
+                            </>}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {unreadCount > 0 && (
-                        <button
-                            onClick={markAllRead}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
-                        >
-                            <Check className="w-4 h-4" />
-                            Mark all read
-                        </button>
-                    )}
-                </div>
+                {unreadCount > 0 && (
+                    <button
+                        onClick={markAllRead}
+                        className="hidden sm:inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md transition-colors"
+                    >
+                        <Check className="w-4 h-4" /> Mark all read
+                    </button>
+                )}
             </div>
 
             {/* Filter bar */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Type:
-                    </label>
+            <div className="glass-card rounded-2xl px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">Type</span>
                     <select
                         value={entityType}
                         onChange={(e) => handleFilterChange('entity_type', e.target.value)}
-                        className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                        className="h-10 pl-3.5 pr-9 rounded-lg bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-[13px] font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
                     >
                         {ENTITY_TYPE_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>
+
+                    {typeFilter && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {getNotifType(typeFilter).label}: {typeFilter}
+                            <button
+                                onClick={() => { setPage(1); updateUrl({ entity_type: entityType || undefined, page: 1, unread_only: unreadOnly || undefined }); }}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                aria-label="Clear type filter"
+                            >
+                                ✕
+                            </button>
+                        </span>
+                    )}
                 </div>
 
-                {typeFilter && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        Notification type: {typeFilter}
-                        <button
-                            onClick={() => { setPage(1); updateUrl({ entity_type: entityType || undefined, page: 1, unread_only: unreadOnly || undefined }); }}
-                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                            aria-label="Clear type filter"
-                        >
-                            ✕
-                        </button>
-                    </span>
-                )}
-
-                <div className="flex items-center gap-2 ml-auto">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer flex items-center gap-2 select-none">
-                        <input
-                            type="checkbox"
-                            checked={unreadOnly}
-                            onChange={(e) => handleFilterChange('unread_only', e.target.checked)}
-                            className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500/50"
-                        />
-                        Unread only
-                    </label>
-                </div>
+                <Toggle on={unreadOnly} onClick={() => handleFilterChange('unread_only', !unreadOnly)} label="Unread only" />
             </div>
 
             {/* Notification list */}
@@ -255,15 +261,19 @@ function NotificationsContent() {
                     </svg>
                 </div>
             ) : notifications.length === 0 ? (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-20 flex flex-col items-center justify-center text-center">
-                    <Bell className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" strokeWidth={1.25} />
-                    <p className="text-base font-medium text-slate-700 dark:text-slate-300">No notifications</p>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                        {entityType || unreadOnly
-                            ? 'Try clearing the filters to see all notifications.'
-                            : "You're all caught up!"}
+                <div className="glass-card rounded-2xl py-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-400 mb-4">
+                        <Bell className="w-6 h-6" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-[15px] font-semibold text-slate-700 dark:text-slate-300">
+                        {entityType || unreadOnly || typeFilter ? 'No matching notifications' : "You're all caught up"}
                     </p>
-                    {(entityType || unreadOnly) && (
+                    <p className="text-[13px] text-slate-400 dark:text-slate-500 mt-1">
+                        {entityType || unreadOnly || typeFilter
+                            ? 'Try clearing the filters to see everything.'
+                            : 'New notifications will show up here.'}
+                    </p>
+                    {(entityType || unreadOnly || typeFilter) && (
                         <button
                             onClick={() => { setPage(1); router.replace('/notifications', { scroll: false }); }}
                             className="mt-4 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
@@ -273,71 +283,69 @@ function NotificationsContent() {
                     )}
                 </div>
             ) : (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+                <div className="glass-card rounded-2xl overflow-hidden divide-y divide-slate-200/60 dark:divide-slate-700/30">
                     {notifications.map(n => {
-                        const typeInfo = TYPE_ICONS[n.type] || TYPE_ICONS.info;
+                        const meta = getNotifType(n.type);
                         return (
                             <div
                                 key={n.id}
-                                className={`flex items-start gap-4 p-4 group transition-colors ${!n.read
-                                        ? 'bg-indigo-50/40 dark:bg-indigo-950/10'
-                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                                className={`group relative flex items-start gap-4 px-5 py-4 transition-colors ${!n.read
+                                    ? 'bg-indigo-500/[0.06] dark:bg-indigo-500/[0.07] hover:bg-indigo-500/[0.1]'
+                                    : 'hover:bg-slate-100/60 dark:hover:bg-slate-800/40'
                                     }`}
                             >
-                                {/* Icon */}
-                                <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 text-base ${typeInfo.color}`}>
-                                    {typeInfo.icon}
-                                </div>
+                                {/* Unread accent bar */}
+                                {!n.read && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500" />}
+
+                                {/* Type icon */}
+                                <NotifTypeIcon type={n.type} />
 
                                 {/* Content (clickable) */}
                                 <div
-                                    className="flex-1 min-w-0 cursor-pointer"
+                                    className="min-w-0 flex-1 py-0.5 cursor-pointer"
                                     onClick={() => openNotification(n)}
                                 >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                {n.title}
-                                            </p>
-                                            {n.message && (
-                                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
-                                                    {n.message}
-                                                </p>
-                                            )}
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <p className="text-xs text-slate-400 dark:text-slate-500">{formatTime(n.created_at)}</p>
-                                                {n.entity_type && (
-                                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                                                        {n.entity_type}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Unread indicator */}
-                                        {!n.read && (
-                                            <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5" />
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                        <h3 className={`text-[15px] leading-snug ${!n.read ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
+                                            {n.title}
+                                        </h3>
+                                        {!n.read && <span className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
+                                        <span className={`text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-md ${TINT_PILL[meta.tint]}`}>
+                                            {meta.label}
+                                        </span>
+                                    </div>
+                                    {n.message && (
+                                        <p dir="auto" className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 max-w-3xl">
+                                            {n.message}
+                                        </p>
+                                    )}
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                        <span className="text-[12px] font-medium text-slate-400 dark:text-slate-500">{formatTime(n.created_at)}</span>
+                                        {n.entity_type && (
+                                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                                {n.entity_type}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Actions */}
-                                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                {/* Row actions */}
+                                <div className="self-center flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                     {!n.read && (
                                         <button
                                             onClick={() => markAsRead(n.id)}
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+                                            className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
                                             title="Mark as read"
                                         >
-                                            <Check className="w-4 h-4" />
+                                            <Check className="w-[18px] h-[18px]" />
                                         </button>
                                     )}
                                     <button
                                         onClick={() => deleteNotification(n.id, !n.read)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                                        className="p-2 rounded-lg text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                                         title="Delete"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-[18px] h-[18px]" />
                                     </button>
                                 </div>
                             </div>
@@ -348,18 +356,17 @@ function NotificationsContent() {
 
             {/* Pagination */}
             {!loading && total > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="flex items-center justify-between">
+                    <p className="text-[13px] text-slate-400 dark:text-slate-500">
                         Page {page} of {totalPages} · showing {notifications.length} of {total.toLocaleString()}
                     </p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => handlePageChange(page - 1)}
                             disabled={page <= 1}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[13px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <ChevronLeft className="w-4 h-4" />
-                            Previous
+                            <ChevronLeft className="w-[15px] h-[15px]" /> Previous
                         </button>
                         {Array.from({ length: totalPages }, (_, i) => i + 1)
                             .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
@@ -369,14 +376,14 @@ function NotificationsContent() {
                                 return acc;
                             }, [])
                             .map((p, i) => p === 'ellipsis' ? (
-                                <span key={`e-${i}`} className="px-2 text-slate-400">…</span>
+                                <span key={`e-${i}`} className="px-1.5 text-slate-400">…</span>
                             ) : (
                                 <button
                                     key={p}
                                     onClick={() => handlePageChange(p as number)}
-                                    className={`min-w-[2rem] px-2 py-1.5 text-sm font-medium rounded-lg transition-colors ${p === page
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    className={`w-9 h-9 rounded-lg text-[13px] font-bold transition-colors ${p === page
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
+                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                                         }`}
                                 >
                                     {p}
@@ -385,18 +392,19 @@ function NotificationsContent() {
                         <button
                             onClick={() => handlePageChange(page + 1)}
                             disabled={page >= totalPages}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[13px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            Next
-                            <ChevronRight className="w-4 h-4" />
+                            Next <ChevronRight className="w-[15px] h-[15px]" />
                         </button>
                     </div>
                 </div>
             )}
 
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-                <Link href="/dashboard" className="hover:underline">← Back to dashboard</Link>
-            </p>
+            <div className="pt-2">
+                <Link href="/dashboard" className="inline-flex items-center gap-2 text-[13px] font-medium text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors">
+                    <ArrowLeft className="w-[15px] h-[15px]" /> Back to dashboard
+                </Link>
+            </div>
         </div>
     );
 }
