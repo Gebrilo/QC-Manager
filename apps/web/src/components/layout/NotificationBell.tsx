@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
+import { useToastSafe } from '../ui/Toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -15,6 +17,9 @@ interface Notification {
     read: boolean;
     metadata: Record<string, any>;
     created_at: string;
+    entity_type?: string | null;
+    entity_id?: string | null;
+    action?: string | null;
 }
 
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
@@ -23,10 +28,17 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     warning: { icon: '⚠️', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     success: { icon: '🎉', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
     info: { icon: 'ℹ️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    task_created: { icon: '🆕', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    task_updated: { icon: '✏️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    task_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    task_assigned: { icon: '🙋', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+    task_deleted: { icon: '🗑️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
 };
 
 export function NotificationBell() {
-    const { token, isAdmin, user } = useAuth();
+    const { token, user } = useAuth();
+    const router = useRouter();
+    const toast = useToastSafe();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
@@ -104,6 +116,31 @@ export function NotificationBell() {
         }
     };
 
+    const openNotification = async (n: Notification) => {
+        if (!n.read) markAsRead(n.id);
+        if (!n.entity_type || !n.entity_id) return; // informational, non-navigable
+        setIsOpen(false);
+        try {
+            const res = await fetch(`${API_URL}/notifications/${n.id}/open`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                toast.error('Could not open this item.');
+                return;
+            }
+            const data = await res.json();
+            if (data.status === 'ok' && data.href) {
+                router.push(data.href);
+            } else if (data.status === 'forbidden') {
+                toast.error('You no longer have access to this item.');
+            } else if (data.status === 'gone') {
+                toast.info('This item is no longer available.');
+            }
+        } catch {
+            toast.error('Could not open this item.');
+        }
+    };
+
     const markAllRead = async () => {
         try {
             await fetch(`${API_URL}/notifications/read-all`, {
@@ -144,8 +181,6 @@ export function NotificationBell() {
         if (diffDays < 7) return `${diffDays}d ago`;
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
-
-    if (!isAdmin) return null;
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -204,7 +239,10 @@ export function NotificationBell() {
                                         </div>
 
                                         {/* Content */}
-                                        <div className="flex-1 min-w-0">
+                                        <div
+                                            className="flex-1 min-w-0 cursor-pointer"
+                                            onClick={() => openNotification(n)}
+                                        >
                                             <div className="flex items-start justify-between gap-2">
                                                 <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
                                                     {n.title}
@@ -212,7 +250,7 @@ export function NotificationBell() {
                                                 <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {!n.read && (
                                                         <button
-                                                            onClick={() => markAsRead(n.id)}
+                                                            onClick={(e) => { e.stopPropagation(); markAsRead(n.id); }}
                                                             className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                                                             title="Mark as read"
                                                         >
@@ -222,7 +260,7 @@ export function NotificationBell() {
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={() => deleteNotification(n.id, !n.read)}
+                                                        onClick={(e) => { e.stopPropagation(); deleteNotification(n.id, !n.read); }}
                                                         className="p-1 rounded text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                                                         title="Delete"
                                                     >

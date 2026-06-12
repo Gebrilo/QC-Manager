@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
+const { dispatchTaskAssignment } = require('../services/notifications/dispatcher');
 const { requireAuth, requirePermission, optionalAuth, blockContributors } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const { emitToTuleap: emitTask, buildTaskEmitUnified } = require('../services/emitters/task');
@@ -353,7 +354,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
             query: db.query.bind(db),
         });
 
-        await auditLog('tasks', task.id, 'CREATE', task, null);
+        await auditLog('tasks', task.id, 'CREATE', task, null, req.user?.email || 'system');
         triggerWorkflow('task-created', task);
 
         if (data.project_id) {
@@ -414,6 +415,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
 
         // Detect a genuine assignment change to gate the take-over permission.
         let assignmentChanged = false;
+        let addedResourceIds = [];
         if (desiredAssignments) {
             const currentAssignments = await getTaskAssignments(db.query.bind(db), id);
             const curPrimary = (currentAssignments.find(a => a.assignment_type === 'PRIMARY') || {}).resource_id || null;
@@ -427,6 +429,11 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             assignmentChanged = newPrimary !== curPrimary
                 || newSecondaries.size !== curSecondaries.size
                 || [...newSecondaries].some(rid => !curSecondaries.has(rid));
+
+            const currentResourceIds = new Set(currentAssignments.map(a => a.resource_id));
+            addedResourceIds = desiredAssignments
+                .map(a => a.resource_id)
+                .filter(rid => rid && !currentResourceIds.has(rid));
         }
 
         if (assignmentChanged) {
@@ -566,7 +573,11 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             await replaceTaskAssignments({ query: db.query.bind(db), taskId: id, assignments: desiredAssignments });
         }
 
-        await auditLog('tasks', id, 'UPDATE', updated, original);
+        await auditLog('tasks', id, 'UPDATE', updated, original, req.user?.email || 'system');
+        if (assignmentChanged && addedResourceIds.length > 0) {
+            dispatchTaskAssignment(id, req.user?.email || 'system', addedResourceIds)
+                .catch(err => console.error('Task assignment notification error:', err.message));
+        }
         triggerWorkflow('task-updated', updated);
 
         const config = await resolveTaskSyncConfig(updated.project_id);
@@ -725,7 +736,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.task
 
             const refreshed = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
             const deleted = refreshed.rows[0];
-            await auditLog('tasks', id, 'DELETE', deleted, original);
+            await auditLog('tasks', id, 'DELETE', deleted, original, req.user?.email || 'system');
             triggerWorkflow('task-deleted', deleted);
             return res.json({
                 success: true,
@@ -741,7 +752,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.task
         );
 
         const deleted = result.rows[0];
-        await auditLog('tasks', id, 'DELETE', deleted, original);
+        await auditLog('tasks', id, 'DELETE', deleted, original, req.user?.email || 'system');
         triggerWorkflow('task-deleted', deleted);
 
         res.json({
