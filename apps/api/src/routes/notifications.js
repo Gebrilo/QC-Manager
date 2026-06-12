@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { resolveNotificationTarget } = require('../services/notifications/open');
+const { insertNotification } = require('../services/notifications/dispatcher');
 
 router.use(requireAuth);
 
@@ -11,7 +13,8 @@ router.get('/', async (req, res, next) => {
         const { unread_only, limit = 50 } = req.query;
 
         let query = `
-            SELECT id, type, title, message, read, metadata, created_at
+            SELECT id, type, title, message, read, metadata, created_at,
+                   entity_type, entity_id, action, actor_id
             FROM notification
             WHERE user_id = $1
         `;
@@ -36,6 +39,24 @@ router.get('/', async (req, res, next) => {
             notifications: result.rows,
             unread_count: parseInt(countResult.rows[0].count),
         });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Resolve where a notification points, re-checking access live.
+router.get('/:id/open', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query(
+            'SELECT entity_type, entity_id FROM notification WHERE id = $1 AND user_id = $2',
+            [id, req.user.id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Notification not found' });
+        }
+        const target = await resolveNotificationTarget(req.user, result.rows[0], req);
+        res.json(target);
     } catch (err) {
         next(err);
     }
@@ -88,14 +109,11 @@ router.delete('/:id', async (req, res, next) => {
     }
 });
 
-// Helper: Create a notification (used by other routes)
+// Helper: Create a notification (used by other routes). Backward-compatible
+// 5-arg signature; nav columns default to null.
 async function createNotification(userId, type, title, message, metadata = {}) {
     try {
-        await db.query(
-            `INSERT INTO notification (user_id, type, title, message, metadata) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [userId, type, title, message, JSON.stringify(metadata)]
-        );
+        await insertNotification({ user_id: userId, type, title, message, metadata });
     } catch (err) {
         console.error('Failed to create notification:', err.message);
     }
