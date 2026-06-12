@@ -582,3 +582,217 @@ describe('dispatchFromAudit — test_execution', () => {
         expect(notifiedUserIds().sort()).toEqual(['pm-1', 'qa-1', 'run-owner'].sort());
     });
 });
+
+const projectAfter = {
+    id: 'proj-1',
+    project_name: 'Onboarding portal',
+    status: 'active',
+    team_id: 'team-1',
+};
+
+describe('dispatchFromAudit — projects', () => {
+    test('CREATE notifies all active admins (no PMs or team leads yet)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })                                           // resolveActorId → no actor
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }, { id: 'admin-2' }] });      // admins
+
+        await dispatchFromAudit({
+            entityType: 'projects', entityId: 'proj-1', action: 'CREATE',
+            before: null, after: projectAfter, changedFields: [], actorEmail: 'unknown@x',
+        });
+
+        expect(notifiedUserIds().sort()).toEqual(['admin-1', 'admin-2'].sort());
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('project_created');
+        expect(insert[1][5]).toBe('project');
+        expect(insert[1][6]).toBe('proj-1');
+    });
+
+    test('CREATE excludes the actor when they are themselves an admin', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] })                    // resolveActorId → actor IS admin-1
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }, { id: 'admin-2' }] }); // admins
+
+        await dispatchFromAudit({
+            entityType: 'projects', entityId: 'proj-1', action: 'CREATE',
+            before: null, after: projectAfter, changedFields: [], actorEmail: 'actor@x',
+        });
+
+        expect(notifiedUserIds()).toEqual(['admin-2']);
+    });
+
+    test('UPDATE on status notifies PMs and member-team leads', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        // actorEmail 'system' → resolveActorId returns null WITHOUT a query.
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'pm-1' }, { user_id: 'pm-2' }] })       // project_managers
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'lead-1' }, { manager_id: 'lead-2' }] }); // team leads
+
+        await dispatchFromAudit({
+            entityType: 'projects', entityId: 'proj-1', action: 'UPDATE',
+            before: { ...projectAfter, status: 'active' },
+            after: { ...projectAfter, status: 'on_hold' },
+            changedFields: ['status', 'updated_at'],
+            actorEmail: 'system',
+        });
+
+        expect(notifiedUserIds().sort()).toEqual(['lead-1', 'lead-2', 'pm-1', 'pm-2'].sort());
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('project_status_changed');
+    });
+
+    test('UPDATE with no significant field is a silent no-op (no queries at all)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchFromAudit({
+            entityType: 'projects', entityId: 'proj-1', action: 'UPDATE',
+            before: projectAfter, after: projectAfter,
+            changedFields: ['description', 'updated_at'], actorEmail: 'system',
+        });
+        expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test('DELETE notifies PMs and member-team leads', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'pm-1' }] })
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'lead-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'projects', entityId: 'proj-1', action: 'DELETE',
+            before: projectAfter, after: null, changedFields: [], actorEmail: 'system',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('project_deleted');
+        expect(notifiedUserIds().sort()).toEqual(['lead-1', 'pm-1'].sort());
+    });
+});
+
+const resourceAfter = {
+    id: 'res-1',
+    resource_name: 'Alice',
+    user_id: 'user-1',
+    weekly_capacity_hrs: 40,
+    is_active: true,
+};
+
+describe('dispatchFromAudit — resources', () => {
+    test('CREATE notifies the linked user + their manager + all admins, excluding the actor', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'user-1' }] })                       // resolveActorId → actor IS the linked user
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'mgr-1' }] })               // linked user's manager
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }, { id: 'admin-2' }] });  // admins
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'CREATE',
+            before: null, after: resourceAfter, changedFields: [], actorEmail: 'actor@x',
+        });
+
+        // user-1 (actor) excluded; manager + admins remain
+        expect(notifiedUserIds().sort()).toEqual(['admin-1', 'admin-2', 'mgr-1'].sort());
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('resource_created');
+        expect(insert[1][5]).toBe('resource');
+        expect(insert[1][6]).toBe('res-1');
+    });
+
+    test('CREATE works when the linked user has no manager', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })                                       // resolveActorId → no actor
+            .mockResolvedValueOnce({ rows: [{ manager_id: null }] })                   // manager lookup → null
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] });                     // admins
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'CREATE',
+            before: null, after: { ...resourceAfter, user_id: 'user-1' },
+            changedFields: [], actorEmail: 'unknown@x',
+        });
+
+        expect(notifiedUserIds().sort()).toEqual(['admin-1', 'user-1'].sort());
+    });
+
+    test('CREATE works when resource is not linked to any user', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [] })                                       // resolveActorId
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] });                     // admins (no manager lookup)
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'CREATE',
+            before: null, after: { ...resourceAfter, user_id: null },
+            changedFields: [], actorEmail: 'unknown@x',
+        });
+
+        expect(notifiedUserIds()).toEqual(['admin-1']);
+    });
+
+    test('UPDATE on is_active renders an "activated/deactivated" notification', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'mgr-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'UPDATE',
+            before: { ...resourceAfter, is_active: true },
+            after: { ...resourceAfter, is_active: false },
+            changedFields: ['is_active', 'updated_at'],
+            actorEmail: 'system',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('resource_updated');
+        expect(insert[1][2]).toBe('Resource deactivated');
+        expect(notifiedUserIds().sort()).toEqual(['admin-1', 'mgr-1', 'user-1'].sort());
+    });
+
+    test('UPDATE on weekly_capacity_hrs renders a "capacity changed" notification', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'mgr-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'UPDATE',
+            before: { ...resourceAfter, weekly_capacity_hrs: 40 },
+            after: { ...resourceAfter, weekly_capacity_hrs: 32 },
+            changedFields: ['weekly_capacity_hrs', 'updated_at'],
+            actorEmail: 'system',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('resource_updated');
+        expect(insert[1][2]).toBe('Resource capacity changed');
+        expect(insert[1][3]).toMatch(/32h/);
+    });
+
+    test('UPDATE with no significant field is a silent no-op', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'UPDATE',
+            before: resourceAfter, after: resourceAfter,
+            changedFields: ['email', 'updated_at'], actorEmail: 'system',
+        });
+        expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test('DELETE notifies the linked user + manager + admins', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ manager_id: 'mgr-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'resources', entityId: 'res-1', action: 'DELETE',
+            before: resourceAfter, after: null, changedFields: [], actorEmail: 'system',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('resource_deleted');
+        expect(notifiedUserIds().sort()).toEqual(['admin-1', 'mgr-1', 'user-1'].sort());
+    });
+});

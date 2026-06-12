@@ -242,3 +242,120 @@ describe('resolveNotificationTarget — test_execution', () => {
         expect(mockCanPerform).not.toHaveBeenCalled();
     });
 });
+
+describe('resolveNotificationTarget — project', () => {
+    function mockProjectFound() {
+        // loadProjectArtifact: SELECT id, team_id FROM projects ...
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'proj-1', team_id: 't1' }] });
+    }
+
+    test('ok + href when the user is a PM of the project', async () => {
+        mockProjectFound();
+        // canAccessProject: PM lookup returns a row → allowed (no team fallback needed)
+        mockQuery.mockResolvedValueOnce({ rows: [{ user_id: 'u-1' }] });
+        const out = await resolveNotificationTarget(user, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/work/projects/proj-1' });
+    });
+
+    test('ok + href when the user is on a member team of the project', async () => {
+        mockProjectFound();
+        const teamMember = { id: 'u-1', role: 'member', team_id: 't1' };
+        // canAccessProject: PM lookup empty, then project_teams lookup matches user's team_id
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        mockQuery.mockResolvedValueOnce({ rows: [{ project_id: 'proj-1' }] });
+        const out = await resolveNotificationTarget(teamMember, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/work/projects/proj-1' });
+    });
+
+    test('ok + href when the user is an admin (no PM/team queries fired)', async () => {
+        mockProjectFound();
+        const adminUser = { id: 'admin-1', role: 'admin' };
+        const out = await resolveNotificationTarget(adminUser, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/work/projects/proj-1' });
+        // Only the load query — canAccess short-circuits for admin
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    test('forbidden + null href when the user is not a PM and not on a member team', async () => {
+        mockProjectFound();
+        const memberUser = { id: 'u-1', role: 'member', team_id: 'other-team' };
+        mockQuery.mockResolvedValueOnce({ rows: [] });   // PM lookup empty
+        mockQuery.mockResolvedValueOnce({ rows: [] });   // project_teams empty
+        const out = await resolveNotificationTarget(memberUser, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('forbidden for a user with no team who is not a PM', async () => {
+        mockProjectFound();
+        const orphan = { id: 'u-1', role: 'member', team_id: null };
+        mockQuery.mockResolvedValueOnce({ rows: [] });   // PM lookup empty
+        // canAccessProject returns false on team_id===null without firing the project_teams query
+        const out = await resolveNotificationTarget(orphan, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('gone when the project no longer exists', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const out = await resolveNotificationTarget(user, { entity_type: 'project', entity_id: 'proj-1' }, {});
+        expect(out).toEqual({ status: 'gone', href: null });
+    });
+});
+
+describe('resolveNotificationTarget — resource', () => {
+    function mockResourceFound() {
+        // loadResourceArtifact: resources LEFT JOIN app_user
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: 'res-1',
+                user_id: 'u-1',
+                team_id: 't1',
+                manager_id: 'mgr-1',
+            }],
+        });
+    }
+
+    test('ok + href when the user is the linked user (self)', async () => {
+        mockResourceFound();
+        const self = { id: 'u-1', role: 'member' };
+        const out = await resolveNotificationTarget(self, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/team/resources/res-1' });
+        // canAccessResource short-circuits for self — no further queries
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    test('ok + href when the user is the linked user\'s manager', async () => {
+        mockResourceFound();
+        const mgr = { id: 'mgr-1', role: 'team_manager' };
+        const out = await resolveNotificationTarget(mgr, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/team/resources/res-1' });
+    });
+
+    test('ok + href when the user is an admin', async () => {
+        mockResourceFound();
+        const admin = { id: 'admin-1', role: 'admin' };
+        const out = await resolveNotificationTarget(admin, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/team/resources/res-1' });
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    test('forbidden + null href when the user is unrelated', async () => {
+        mockResourceFound();
+        const stranger = { id: 'stranger', role: 'member' };
+        const out = await resolveNotificationTarget(stranger, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('forbidden + null href when the resource has no linked user', async () => {
+        // unlinked resource: user_id null, manager_id null
+        mockQuery.mockResolvedValueOnce({ rows: [{ id: 'res-1', user_id: null, team_id: null, manager_id: null }] });
+        const stranger = { id: 'stranger', role: 'member' };
+        const out = await resolveNotificationTarget(stranger, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('gone when the resource no longer exists', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const out = await resolveNotificationTarget(user, { entity_type: 'resource', entity_id: 'res-1' }, {});
+        expect(out).toEqual({ status: 'gone', href: null });
+    });
+});

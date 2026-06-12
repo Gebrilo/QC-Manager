@@ -51,7 +51,7 @@ async function dispatchFromAudit({ entityType, entityId, action, before, after, 
 
     const actorId = await resolveActorId(actorEmail);
 
-    let recipients = await policy.recipients({ entityId, before, after, changedFields, db });
+    let recipients = await policy.recipients({ entityId, before, after, changedFields, action, db });
     recipients = [...new Set(recipients.filter(Boolean))].filter(id => id !== actorId);
     if (recipients.length === 0) return;
 

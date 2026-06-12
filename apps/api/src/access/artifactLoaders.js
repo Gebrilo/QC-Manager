@@ -188,6 +188,75 @@ async function loadTestExecutionArtifact(executionId, user, req) {
     };
 }
 
+// Project is a non-artifact entity: no access-engine coverage, no
+// owner_team_id / visibility_scope on the row. We expose just enough
+// fields for a manual canAccess to decide (see canAccessProject).
+async function loadProjectArtifact(projectId, user, req) {
+    const p = await db.query(
+        `SELECT id, team_id FROM projects WHERE id = $1 AND deleted_at IS NULL`,
+        [projectId]
+    );
+    if (p.rows.length === 0) return null;
+    return {
+        type: 'project',
+        id: p.rows[0].id,
+        project_id: p.rows[0].id,
+        team_id: p.rows[0].team_id,
+    };
+}
+
+// Manual access for projects: admin ∪ PM of this project ∪ member of a
+// team that's linked to the project via project_teams. AccessEngine's
+// canPerform only knows about artifact-shaped entities, so we replicate
+// the rule here in SQL.
+async function canAccessProject(user, artifact, req) {
+    if (!user || !user.id) return false;
+    if (user.role === 'admin') return true;
+    const pm = await db.query(
+        'SELECT 1 FROM project_managers WHERE project_id = $1 AND user_id = $2',
+        [artifact.id, user.id]
+    );
+    if (pm.rows.length > 0) return true;
+    if (!user.team_id) return false;
+    const team = await db.query(
+        'SELECT 1 FROM project_teams WHERE project_id = $1 AND team_id = $2',
+        [artifact.id, user.team_id]
+    );
+    return team.rows.length > 0;
+}
+
+// Resource is a non-artifact entity: no access-engine coverage. We expose
+// the linked user_id (and the user's team/manager) so the gate can decide.
+async function loadResourceArtifact(resourceId, user, req) {
+    const r = await db.query(
+        `SELECT r.id, r.user_id, u.team_id, u.manager_id
+           FROM resources r
+           LEFT JOIN app_user u ON u.id = r.user_id
+          WHERE r.id = $1 AND r.deleted_at IS NULL`,
+        [resourceId]
+    );
+    if (r.rows.length === 0) return null;
+    const row = r.rows[0];
+    return {
+        type: 'resource',
+        id: row.id,
+        user_id: row.user_id,
+        team_id: row.team_id,
+        manager_id: row.manager_id,
+    };
+}
+
+// Manual access for resources: admin ∪ self (resources.user_id) ∪ the
+// linked user's manager. Same reasoning as project — the access engine
+// has no concept of these entities.
+async function canAccessResource(user, artifact, req) {
+    if (!user || !user.id) return false;
+    if (user.role === 'admin') return true;
+    if (artifact.user_id && artifact.user_id === user.id) return true;
+    if (artifact.manager_id && artifact.manager_id === user.id) return true;
+    return false;
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
@@ -231,6 +300,14 @@ const ARTIFACT_GATES = {
             const r = await canPerform(user, artifact, 'view', req);
             return !!r.allowed;
         },
+    },
+    project: {
+        load: loadProjectArtifact,
+        canAccess: canAccessProject,
+    },
+    resource: {
+        load: loadResourceArtifact,
+        canAccess: canAccessResource,
     },
 };
 

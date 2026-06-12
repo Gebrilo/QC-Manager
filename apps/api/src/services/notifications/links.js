@@ -11,6 +11,8 @@ const STATIC_LINK_BUILDERS = {
     user_story: id => `/work/stories/${id}`,
     test_case: id => `/test/cases/${id}`,
     test_suite: id => `/test/suites/${id}`,
+    project: id => `/work/projects/${id}`,
+    resource: id => `/team/resources/${id}`,
 };
 
 async function buildTestRunLinkForExecution(executionId) {

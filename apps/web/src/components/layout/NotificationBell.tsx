@@ -55,6 +55,13 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     test_execution_updated: { icon: '🏃', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     test_execution_status_changed: { icon: '🏃', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     test_execution_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    project_created: { icon: '📁', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    project_updated: { icon: '📁', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    project_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    project_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    resource_created: { icon: '👥', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    resource_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    resource_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
 };
 
 export function NotificationBell() {

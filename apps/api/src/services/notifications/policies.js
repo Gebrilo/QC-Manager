@@ -31,6 +31,18 @@ const TEST_SUITE_SIGNIFICANT_FIELDS = ['status', 'name'];
 // field on the execution row that meaningfully changes ownership/attention.
 const TEST_EXECUTION_SIGNIFICANT_FIELDS = ['status'];
 
+// Project fields whose change is worth a notification. Projects are
+// non-artifact entities (no junction for assignment, no access engine
+// coverage) — the only ownership surface is status, which drives who
+// pays attention to the project. Other field edits (description, dates)
+// are not significant on their own.
+const PROJECT_SIGNIFICANT_FIELDS = ['status'];
+
+// Resource fields whose change is worth a notification. The capacity /
+// active flag drive who is "available" — both are the only meaningful
+// attention surfaces on a resource row.
+const RESOURCE_SIGNIFICANT_FIELDS = ['is_active', 'weekly_capacity_hrs'];
+
 // recipients: returns an array of app_user ids related to the task.
 // The acting user is removed later by the dispatcher.
 async function taskRecipients({ entityId, after, db }) {
@@ -372,6 +384,128 @@ function testExecutionRender({ action, before, after, changedFields }) {
     };
 }
 
+// Project recipients:
+//   - on CREATE: all active admins
+//   - on UPDATE/DELETE: project PMs (project_managers) ∪ leads of every
+//     team in project_teams (team.manager_id)
+// The actor is excluded by the dispatcher. CREATE special-cases admins
+// because a fresh project has no PMs/teams assigned yet — there is no
+// "owner" surface for it.
+async function projectRecipients({ entityId, after, before, changedFields, action, db }) {
+    const row = after || before || {};
+    const out = [];
+
+    if (action === 'CREATE') {
+        const admins = await db.query(
+            `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
+        );
+        for (const a of admins.rows) out.push(a.id);
+        return out;
+    }
+
+    if (row.id || entityId) {
+        const pid = row.id || entityId;
+        const pms = await db.query(
+            'SELECT user_id FROM project_managers WHERE project_id = $1',
+            [pid]
+        );
+        for (const p of pms.rows) out.push(p.user_id);
+
+        // member-team leads: managers of teams linked via project_teams
+        const leads = await db.query(
+            `SELECT t.manager_id
+               FROM project_teams pt
+               JOIN teams t ON t.id = pt.team_id
+              WHERE pt.project_id = $1 AND t.manager_id IS NOT NULL`,
+            [pid]
+        );
+        for (const l of leads.rows) out.push(l.manager_id);
+    }
+
+    return out;
+}
+
+function projectRender({ action, before, after, changedFields }) {
+    const name = (after && after.project_name) || (before && before.project_name) || 'a project';
+    if (action === 'CREATE') {
+        return { type: 'project_created', title: 'New project created', message: `Project "${name}" was created.` };
+    }
+    if (action === 'DELETE') {
+        return { type: 'project_deleted', title: 'Project deleted', message: `Project "${name}" was deleted.` };
+    }
+    const changed = (changedFields || []).filter(f => PROJECT_SIGNIFICANT_FIELDS.includes(f));
+    if (changed.includes('status')) {
+        return {
+            type: 'project_status_changed',
+            title: 'Project status changed',
+            message: `Project "${name}" is now ${after && after.status}.`,
+        };
+    }
+    return {
+        type: 'project_updated',
+        title: 'Project updated',
+        message: `Project "${name}" was updated.`,
+    };
+}
+
+// Resource recipients:
+//   - the linked user (resources.user_id)
+//   - their manager (app_user.manager_id on the linked user)
+//   - all active admins
+// On DELETE we still notify — the resource row has no `created_by_user_id`,
+// so the only ownership surfaces are user_id and manager_id.
+async function resourceRecipients({ entityId, after, before, db }) {
+    const row = after || before || {};
+    const out = [];
+
+    if (row.user_id) {
+        out.push(row.user_id);
+        const m = await db.query(
+            'SELECT manager_id FROM app_user WHERE id = $1',
+            [row.user_id]
+        );
+        if (m.rows[0] && m.rows[0].manager_id) out.push(m.rows[0].manager_id);
+    }
+
+    const admins = await db.query(
+        `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
+    );
+    for (const a of admins.rows) out.push(a.id);
+
+    return out;
+}
+
+function resourceRender({ action, before, after, changedFields }) {
+    const name = (after && after.resource_name) || (before && before.resource_name) || 'a resource';
+    if (action === 'CREATE') {
+        return { type: 'resource_created', title: 'New resource added', message: `Resource "${name}" was added.` };
+    }
+    if (action === 'DELETE') {
+        return { type: 'resource_deleted', title: 'Resource removed', message: `Resource "${name}" was removed.` };
+    }
+    const changed = (changedFields || []).filter(f => RESOURCE_SIGNIFICANT_FIELDS.includes(f));
+    if (changed.includes('is_active')) {
+        const nowActive = after && after.is_active;
+        return {
+            type: 'resource_updated',
+            title: nowActive ? 'Resource activated' : 'Resource deactivated',
+            message: `Resource "${name}" is now ${nowActive ? 'active' : 'inactive'}.`,
+        };
+    }
+    if (changed.includes('weekly_capacity_hrs')) {
+        return {
+            type: 'resource_updated',
+            title: 'Resource capacity changed',
+            message: `Resource "${name}" weekly capacity is now ${after && after.weekly_capacity_hrs}h.`,
+        };
+    }
+    return {
+        type: 'resource_updated',
+        title: 'Resource updated',
+        message: `Resource "${name}" was updated.`,
+    };
+}
+
 // Keyed by the audit entity_type string (the table name passed to auditLog).
 const NOTIFICATION_POLICIES = {
     tasks: {
@@ -410,6 +544,18 @@ const NOTIFICATION_POLICIES = {
         recipients: testExecutionRecipients,
         render: testExecutionRender,
     },
+    projects: {
+        entityType: 'project',
+        significantFields: PROJECT_SIGNIFICANT_FIELDS,
+        recipients: projectRecipients,
+        render: projectRender,
+    },
+    resources: {
+        entityType: 'resource',
+        significantFields: RESOURCE_SIGNIFICANT_FIELDS,
+        recipients: resourceRecipients,
+        render: resourceRender,
+    },
 };
 
 module.exports = {
@@ -420,4 +566,6 @@ module.exports = {
     TEST_CASE_SIGNIFICANT_FIELDS,
     TEST_SUITE_SIGNIFICANT_FIELDS,
     TEST_EXECUTION_SIGNIFICANT_FIELDS,
+    PROJECT_SIGNIFICANT_FIELDS,
+    RESOURCE_SIGNIFICANT_FIELDS,
 };
