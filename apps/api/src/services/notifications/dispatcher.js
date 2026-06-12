@@ -86,7 +86,7 @@ async function dispatchTaskAssignment(taskId, actorEmail) {
             type: 'task_assigned',
             title: 'Task assignment changed',
             message: `Assignments changed on task "${after.task_name}".`,
-            entity_type: 'task',
+            entity_type: policy.entityType,
             entity_id: taskId,
             action: 'ASSIGN',
             actor_id: actorId,
