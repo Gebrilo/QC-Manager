@@ -5,6 +5,7 @@ const {
   materializeAclGrants,
 } = require('../accessDefaults');
 const { applyTuleapPrimary, getTaskAssignmentSummary } = require('../assignments/taskAssignments');
+const { auditLog } = require('../../middleware/audit');
 
 // ADR 0009 §3 — Tracker Config setting: on reassignment, demote the previous
 // primary to SECONDARY when it logged effort (default), else remove it.
@@ -239,6 +240,8 @@ async function handleSync(unified, config, { query }) {
       demoteWhenEffort: demoteOnReassign(config),
     });
 
+    await auditLog('tasks', result.rows[0].id, 'UPDATE', result.rows[0], task, 'tuleap');
+
     return { action: 'updated', id: result.rows[0].id, data: result.rows[0] };
   }
 
@@ -289,6 +292,8 @@ async function handleSync(unified, config, { query }) {
         query,
       });
     }
+
+    await auditLog('tasks', result.rows[0].id, 'UPDATE', result.rows[0], task, 'tuleap');
 
     return { action: 'revived', id: result.rows[0].id, data: result.rows[0] };
   }
@@ -351,6 +356,8 @@ async function handleSync(unified, config, { query }) {
       query,
     });
   }
+
+  await auditLog('tasks', result.rows[0].id, 'CREATE', result.rows[0], null, 'tuleap');
 
   return { action: 'created', id: result.rows[0].id, data: result.rows[0] };
 }

@@ -6,6 +6,7 @@ const {
   buildAccessDefaults,
   materializeAclGrants,
 } = require('../accessDefaults');
+const { auditLog } = require('../../middleware/audit');
 
 const VALID_BUG_ACTIONS = new Set(['sync', 'delete']);
 
@@ -69,7 +70,7 @@ async function handleSync(unified, config, deps) {
   const source = resolvedTestCases.length > 0 ? 'TEST_CASE' : 'EXPLORATORY';
 
   const existing = await query(
-    'SELECT id, deleted_at FROM bugs WHERE tuleap_artifact_id = $1',
+    'SELECT * FROM bugs WHERE tuleap_artifact_id = $1',
     [tuleapArtifactId]
   );
 
@@ -78,6 +79,7 @@ async function handleSync(unified, config, deps) {
 
     if (row.deleted_at) {
       const result = await updateBug(row.id, unified, config, projectId, source, resolvedTestCases, query);
+      await auditLog('bugs', row.id, 'UPDATE', result.rows[0], row, 'tuleap');
       return { action: 'revived', id: row.id, data: result.rows[0] };
     }
 
@@ -86,10 +88,13 @@ async function handleSync(unified, config, deps) {
     }
 
     const result = await updateBug(row.id, unified, config, projectId, source, resolvedTestCases, query);
+    await auditLog('bugs', row.id, 'UPDATE', result.rows[0], row, 'tuleap');
     return { action: 'updated', id: row.id, data: result.rows[0] };
   }
 
-  return createBug(unified, config, projectId, source, resolvedTestCases, pending, tuleapArtifactId, tuleapUrl, query);
+  const created = await createBug(unified, config, projectId, source, resolvedTestCases, pending, tuleapArtifactId, tuleapUrl, query);
+  await auditLog('bugs', created.id, 'CREATE', created.data, null, 'tuleap');
+  return created;
 }
 
 async function createBug(unified, config, projectId, source, resolvedTestCases, pending, tuleapArtifactId, tuleapUrl, query) {

@@ -15,6 +15,7 @@ const STATIC_LINK_BUILDERS = {
     resource: id => `/team/resources/${id}`,
     user: id => `/admin/users?focus=${id}`,
     team: id => `/admin/teams?focus=${id}`,
+    tuleap_sync: () => '/admin/integrations',
 };
 
 async function buildTestRunLinkForExecution(executionId) {

@@ -59,7 +59,7 @@ describe('Access Engine Slice 2 wiring (issue #81)', () => {
 
     const responses = [
       // existing bug select
-      { match: (sql) => /SELECT id, deleted_at FROM bugs WHERE tuleap_artifact_id/i.test(sql), response: { rows: [] } },
+      { match: (sql) => /SELECT \* FROM bugs WHERE tuleap_artifact_id/i.test(sql), response: { rows: [] } },
       // reporter resource lookup
       { match: (sql) => /FROM resources WHERE deleted_at IS NULL AND \(LOWER\(email\)/i.test(sql), response: { rows: [{ id: 'rsrc-1' }] } },
       // tuleap creator → resources.user_id
@@ -124,7 +124,7 @@ describe('Access Engine Slice 2 wiring (issue #81)', () => {
     resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
 
     const responses = [
-      { match: (sql) => /SELECT id, deleted_at FROM bugs WHERE tuleap_artifact_id/i.test(sql), response: { rows: [{ id: 'existing-uuid', deleted_at: null }] } },
+      { match: (sql) => /SELECT \* FROM bugs WHERE tuleap_artifact_id/i.test(sql), response: { rows: [{ id: 'existing-uuid', deleted_at: null }] } },
       { match: (sql) => /UPDATE bugs SET/i.test(sql), response: { rows: [{ id: 'existing-uuid', title: 'Bug', owner_team_id: 'team-qc-uuid', visibility_scope: 'team' }] } },
     ];
 

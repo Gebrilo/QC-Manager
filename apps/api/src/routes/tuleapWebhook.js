@@ -31,6 +31,7 @@ const { dispatchAction: dispatchTestCase } = require('../services/persisters/tes
 const { reconcileDeletes } = require('../services/tuleapReconcileDeletes');
 const { normalize } = require('../services/tuleapValueNormalizer');
 const { defaultRegistry: tuleapFieldRegistry } = require('../services/tuleapFieldRegistry');
+const { insertNotification } = require('../services/notifications/dispatcher');
 
 
 
@@ -170,6 +171,63 @@ async function logWebhook(data) {
         ]);
     } catch (err) {
         console.error('Error logging webhook:', err);
+    }
+}
+
+// =====================================================
+// HELPER: emit a tuleap_sync_succeeded / tuleap_sync_failed
+// notification to every active admin. Operational event; not tied
+// to a navigable entity (entity_id = null → bell shows as info).
+// =====================================================
+async function emitTuleapSyncNotification({ status, error, tuleapTrackerId, trackerType, tuleapArtifactId, action }) {
+    try {
+        const admins = await pool.query(
+            `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
+        );
+        if (admins.rows.length === 0) return;
+
+        const succeeded = status === 'succeeded';
+        const type = succeeded ? 'tuleap_sync_succeeded' : 'tuleap_sync_failed';
+        const title = succeeded ? 'Tuleap sync succeeded' : 'Tuleap sync failed';
+        const message = succeeded
+            ? `Tuleap ${trackerType || 'artifact'} ${tuleapArtifactId} synced successfully.`
+            : `Tuleap ${trackerType || 'artifact'} ${tuleapArtifactId} failed to sync: ${(error && error.message) || 'unknown error'}`;
+        const metadata = {
+            tuleap_tracker_id: tuleapTrackerId,
+            tracker_type: trackerType,
+            tuleap_artifact_id: tuleapArtifactId,
+            action,
+        };
+        if (!succeeded && error) {
+            metadata.error = error.message || 'unknown error';
+        }
+
+        for (const admin of admins.rows) {
+            await insertNotification({
+                user_id: admin.id,
+                type,
+                title,
+                message,
+                metadata,
+                entity_type: 'tuleap_sync',
+                entity_id: null,
+            });
+        }
+    } catch (notifyErr) {
+        // Never let a notification failure mask the actual sync outcome.
+        console.error('Failed to emit tuleap sync notification:', notifyErr.message);
+    }
+}
+
+// Wraps a persister dispatch with success/failure admin notification.
+async function dispatchWithSyncNotification(dispatchFn, unified, syncConfig, deps, context) {
+    try {
+        const result = await dispatchFn(unified, syncConfig, deps);
+        await emitTuleapSyncNotification({ status: 'succeeded', ...context });
+        return result;
+    } catch (err) {
+        await emitTuleapSyncNotification({ status: 'failed', error: err, ...context });
+        throw err;
     }
 }
 
@@ -856,7 +914,13 @@ router.post('/unified', async (req, res) => {
         }
 
         if (isBug) {
-            const result = await dispatchBug(unified, syncConfig, { query: pool.query.bind(pool) });
+            const result = await dispatchWithSyncNotification(
+                dispatchBug,
+                unified,
+                syncConfig,
+                { query: pool.query.bind(pool) },
+                { tuleapTrackerId: tracker_id, trackerType: syncConfig.tracker_type, tuleapArtifactId, action }
+            );
 
             await pool.query(
                 "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",
@@ -875,7 +939,13 @@ router.post('/unified', async (req, res) => {
         }
 
         if (isTask) {
-            const result = await dispatchTask(unified, syncConfig, { query: pool.query.bind(pool) });
+            const result = await dispatchWithSyncNotification(
+                dispatchTask,
+                unified,
+                syncConfig,
+                { query: pool.query.bind(pool) },
+                { tuleapTrackerId: tracker_id, trackerType: syncConfig.tracker_type, tuleapArtifactId, action }
+            );
 
             await pool.query(
                 "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",
@@ -895,7 +965,13 @@ router.post('/unified', async (req, res) => {
         }
 
          if (isUserStory) {
-             const result = await dispatchUserStory(unified, syncConfig, { query: pool.query.bind(pool) });
+             const result = await dispatchWithSyncNotification(
+                 dispatchUserStory,
+                 unified,
+                 syncConfig,
+                 { query: pool.query.bind(pool) },
+                 { tuleapTrackerId: tracker_id, trackerType: syncConfig.tracker_type, tuleapArtifactId, action }
+             );
 
              await pool.query(
                  "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",
@@ -914,7 +990,13 @@ router.post('/unified', async (req, res) => {
          }
 
          if (isTestCase) {
-             const result = await dispatchTestCase(unified, syncConfig, { query: pool.query.bind(pool) });
+             const result = await dispatchWithSyncNotification(
+                 dispatchTestCase,
+                 unified,
+                 syncConfig,
+                 { query: pool.query.bind(pool) },
+                 { tuleapTrackerId: tracker_id, trackerType: syncConfig.tracker_type, tuleapArtifactId, action }
+             );
 
              await pool.query(
                  "UPDATE tuleap_webhook_log SET processing_status = 'processed', processed_at = NOW() WHERE tuleap_artifact_id = $1 AND payload_hash = $2",

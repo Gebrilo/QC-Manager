@@ -68,6 +68,8 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     team_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     team_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     role_changed: { icon: '🔑', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' },
+    tuleap_sync_succeeded: { icon: '✅', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
+    tuleap_sync_failed: { icon: '❌', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
 };
 
 export function NotificationBell() {
