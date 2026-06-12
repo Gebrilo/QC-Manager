@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -97,6 +97,8 @@ const ALL_PERMISSIONS = [
 export default function UsersPage() {
     const { user: currentUser, token, isAdmin } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const focusId = searchParams.get('focus');
     const [users, setUsers] = useState<UserRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -117,6 +119,8 @@ export default function UsersPage() {
         { name: 'viewer', is_builtin: true },
         { name: 'contributor', is_builtin: true },
     ]);
+    const [highlightedUser, setHighlightedUser] = useState<string | null>(null);
+    const focusHandledRef = useRef(false);
 
     const fetchRoles = useCallback(async () => {
         try {
@@ -168,6 +172,32 @@ export default function UsersPage() {
             fetchRoles();
         }
     }, [token, isAdmin, fetchUsers, fetchResources, fetchRoles]);
+
+    // When a notification deep-links to /admin/users?focus=<id>, expand
+    // that user, scroll their row into view, and flash a highlight ring
+    // for a couple of seconds. We only auto-trigger once per focus param
+    // (the ref guard prevents the effect from re-firing on re-renders).
+    useEffect(() => {
+        if (!focusId || focusHandledRef.current) return;
+        if (loading || users.length === 0) return;
+        if (!users.some(u => u.id === focusId)) return;
+
+        focusHandledRef.current = true;
+        setExpandedUser(focusId);
+        setHighlightedUser(focusId);
+        if (!userPermissions[focusId]) {
+            fetchPermissions(focusId);
+        }
+
+        // Scroll the row into view once it's mounted.
+        const el = document.getElementById(`user-row-${focusId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        const timer = setTimeout(() => setHighlightedUser(null), 2500);
+        return () => clearTimeout(timer);
+    }, [focusId, loading, users, userPermissions]);
 
     const fetchPermissions = async (userId: string) => {
         try {
@@ -368,9 +398,13 @@ export default function UsersPage() {
                     {users.map(u => (
                         <div
                             key={u.id}
+                            id={`user-row-${u.id}`}
                             className={`bg-white dark:bg-slate-900 border rounded-xl transition-all ${expandedUser === u.id
                                 ? 'border-indigo-300 dark:border-indigo-700 shadow-lg shadow-indigo-500/5'
                                 : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                } ${highlightedUser === u.id
+                                    ? 'ring-2 ring-indigo-400 dark:ring-indigo-500 ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950'
+                                    : ''
                                 }`}
                         >
                             {/* User Row */}

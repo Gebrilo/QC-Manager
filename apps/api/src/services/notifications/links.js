@@ -13,6 +13,7 @@ const STATIC_LINK_BUILDERS = {
     test_suite: id => `/test/suites/${id}`,
     project: id => `/work/projects/${id}`,
     resource: id => `/team/resources/${id}`,
+    user: id => `/admin/users?focus=${id}`,
 };
 
 async function buildTestRunLinkForExecution(executionId) {

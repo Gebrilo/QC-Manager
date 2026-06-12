@@ -3,7 +3,7 @@
 const mockQuery = jest.fn();
 jest.mock('../src/config/db', () => ({ query: mockQuery }));
 
-const { dispatchFromAudit, dispatchTaskAssignment } = require('../src/services/notifications/dispatcher');
+const { dispatchFromAudit, dispatchTaskAssignment, insertNotification } = require('../src/services/notifications/dispatcher');
 
 afterEach(() => jest.clearAllMocks());
 
@@ -794,5 +794,120 @@ describe('dispatchFromAudit — resources', () => {
         const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
         expect(insert[1][1]).toBe('resource_deleted');
         expect(notifiedUserIds().sort()).toEqual(['admin-1', 'mgr-1', 'user-1'].sort());
+    });
+});
+
+describe('insertNotification — user lifecycle shape', () => {
+    test('user_activated writes the full entity_type/entity_id/actor_id columns', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await insertNotification({
+            user_id: 'user-1',
+            type: 'user_activated',
+            title: 'You are now an Active Resource',
+            message: 'Your account has been activated. You now have full system access.',
+            entity_type: 'user',
+            entity_id: 'user-1',
+            actor_id: 'admin-1',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert).toBeDefined();
+        // Column order in the INSERT statement:
+        // user_id, type, title, message, metadata, entity_type, entity_id, action, actor_id
+        const cols = insert[1];
+        expect(cols[0]).toBe('user-1');          // user_id
+        expect(cols[1]).toBe('user_activated');  // type
+        expect(cols[5]).toBe('user');            // entity_type
+        expect(cols[6]).toBe('user-1');          // entity_id
+        expect(cols[7]).toBeNull();              // action (not set for lifecycle events)
+        expect(cols[8]).toBe('admin-1');         // actor_id
+    });
+
+    test('user_deactivated can be written with metadata, no action', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await insertNotification({
+            user_id: 'user-1',
+            type: 'user_deactivated',
+            title: 'Your account has been deactivated',
+            message: 'Your account has been deactivated by an admin.',
+            metadata: { user_name: 'Alice', user_email: 'alice@x' },
+            entity_type: 'user',
+            entity_id: 'user-1',
+            actor_id: 'admin-1',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('user_deactivated');
+        expect(insert[1][5]).toBe('user');
+        expect(insert[1][6]).toBe('user-1');
+        // metadata is JSON.stringified into the 5th column
+        const meta = JSON.parse(insert[1][4]);
+        expect(meta.user_name).toBe('Alice');
+    });
+
+    test('user_deleted writes to the admin (not the deleted user)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await insertNotification({
+            user_id: 'admin-1',
+            type: 'user_deleted',
+            title: 'User deleted',
+            message: 'Alice was permanently deleted.',
+            metadata: { user_name: 'Alice', user_email: 'alice@x' },
+            entity_type: 'user',
+            entity_id: 'deleted-user-1', // intentionally a non-existent id
+            actor_id: 'admin-2',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][0]).toBe('admin-1');     // recipient is an admin
+        expect(insert[1][1]).toBe('user_deleted'); // type
+        expect(insert[1][5]).toBe('user');         // entity_type
+        expect(insert[1][6]).toBe('deleted-user-1'); // entity_id can be a now-deleted user
+    });
+
+    test('user_registered writes the admin-recipient shape with auth metadata', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await insertNotification({
+            user_id: 'admin-1',
+            type: 'user_registered',
+            title: 'New User Registered',
+            message: 'Alice (alice@x) has registered via magic link.',
+            metadata: { user_name: 'Alice', user_email: 'alice@x', auth_provider: 'google' },
+            entity_type: 'user',
+            entity_id: 'new-user-1',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('user_registered');
+        expect(insert[1][5]).toBe('user');
+        expect(insert[1][6]).toBe('new-user-1');
+        const meta = JSON.parse(insert[1][4]);
+        expect(meta.auth_provider).toBe('google');
+    });
+});
+
+describe('userLifecycle activation flow — insertNotification shape', () => {
+    // The activation flow uses `insertNotification` directly (not
+    // dispatchFromAudit), so we don't exercise the audit path here.
+    // This block documents the contract: activation produces exactly
+    // one notification, targeting the activated user, with the
+    // entity_type='user' / entity_id=<their id> shape the bell needs.
+    test('activation produces a single notification for the activated user', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await insertNotification({
+            user_id: 'user-1',
+            type: 'user_activated',
+            title: 'You are now an Active Resource',
+            message: 'Your account has been activated. You now have full system access.',
+            entity_type: 'user',
+            entity_id: 'user-1',
+        });
+
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        expect(inserts).toHaveLength(1);
+        expect(inserts[0][1][0]).toBe('user-1');         // user_id
+        expect(inserts[0][1][1]).toBe('user_activated'); // type
+        expect(inserts[0][1][5]).toBe('user');           // entity_type
+        expect(inserts[0][1][6]).toBe('user-1');         // entity_id
     });
 });

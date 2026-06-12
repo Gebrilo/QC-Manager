@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
-const { createNotification } = require('./notifications');
+const { insertNotification } = require('../services/notifications/dispatcher');
 const { rollbackUser } = require('../services/userLifecycle');
 const { ROLES } = require('../../../shared/rbac/catalog.ts');
 
@@ -39,6 +39,19 @@ router.patch('/:id', requirePermission('qc.admin.manage_users'), async (req, res
         if (id === req.user.id && role && role !== 'admin') {
             return res.status(400).json({ error: 'Cannot demote yourself' });
         }
+
+        // Capture the prior state so we can detect deactivation transitions
+        // (active: true → false, or status: ACTIVE → anything else). Loading
+        // up-front keeps the notification logic in sync with whatever
+        // combination of fields the admin actually changed in this PATCH.
+        const priorResult = await db.query(
+            `SELECT id, name, email, role, active, status FROM app_user WHERE id = $1`,
+            [id]
+        );
+        if (priorResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const priorUser = priorResult.rows[0];
 
         const fields = [];
         const values = [];
@@ -115,15 +128,32 @@ router.patch('/:id', requirePermission('qc.admin.manage_users'), async (req, res
 
         res.json(updatedUser);
 
+        // Deactivation = the user was active (or active=true) and is now
+        // not. We detect either of:
+        //   - active: true → false
+        //   - status: ACTIVE → non-ACTIVE (e.g. SUSPENDED, ARCHIVED, PREPARATION)
+        // Both surface as a single "user_deactivated" notification so the
+        // bell UI can render a single entry per PATCH.
+        const wasActive = priorUser.active && priorUser.status === 'ACTIVE';
+        const nowActive = updatedUser.active && updatedUser.status === 'ACTIVE';
+        const isDeactivation = wasActive && !nowActive;
+
+        if (isDeactivation) {
+            notifyUserDeactivated(id, updatedUser, req.user).catch(err =>
+                console.error('Failed to notify user of deactivation:', err.message)
+            );
+        }
+
         // Notify user if they were just activated + auto-assign journeys
         if (status === 'ACTIVE' && updatedUser.status === 'ACTIVE') {
-            createNotification(
-                id,
-                'user_activated',
-                'Account Activated',
-                'Your account has been activated. You now have full access to the platform.',
-                {}
-            );
+            insertNotification({
+                user_id: id,
+                type: 'user_activated',
+                title: 'Account Activated',
+                message: 'Your account has been activated. You now have full access to the platform.',
+                entity_type: 'user',
+                entity_id: id,
+            }).catch(err => console.error('Failed to notify user of activation:', err.message));
 
             // Auto-assign active journeys with auto_assign_on_activation
             db.query(
@@ -291,7 +321,7 @@ router.delete('/:id', requirePermission('qc.admin.manage_users'), async (req, re
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const supabaseId = userCheck.rows[0].supabase_id;
+        const { name: deletedName, email: deletedEmail, supabase_id: supabaseId } = userCheck.rows[0];
 
         await db.query('DELETE FROM user_permissions WHERE user_id = $1', [id]);
         await db.query('DELETE FROM app_user WHERE id = $1', [id]);
@@ -299,6 +329,15 @@ router.delete('/:id', requirePermission('qc.admin.manage_users'), async (req, re
         if (supabaseId) {
             await db.query('DELETE FROM auth.users WHERE id = $1', [supabaseId]).catch(() => {});
         }
+
+        // Notify all active admins. The deleted user can't be a recipient
+        // (their account is gone) — the FK on notification.user_id would
+        // reject it. The notification row's entity_id still points to the
+        // now-deleted user id, so the bell link carries the historical
+        // reference without needing a live app_user row.
+        notifyUserDeleted(id, deletedName, deletedEmail, req.user).catch(err =>
+            console.error('Failed to notify admins of user deletion:', err.message)
+        );
 
         res.status(204).send();
     } catch (err) {
@@ -320,5 +359,55 @@ router.post('/:id/rollback', requirePermission('qc.admin.manage_users'), async (
         next(err);
     }
 });
+
+// Helper: notify the deactivated user + all active admins. Wraps two
+// direct inserts so callers can fire-and-forget without dealing with
+// the actor-exclusion logic the audit dispatcher normally handles.
+async function notifyUserDeactivated(userId, updatedUser, actor) {
+    const name = updatedUser.name || 'a user';
+    const message = `Your account has been deactivated${actor ? ` by ${actor.name || actor.email}` : ''}. Contact an administrator for help.`;
+    const recipients = [userId];
+
+    const admins = await db.query("SELECT id FROM app_user WHERE role = 'admin' AND active = true");
+    for (const a of admins.rows) recipients.push(a.id);
+
+    const dedup = [...new Set(recipients.filter(Boolean).filter(rid => rid !== (actor && actor.id)))];
+
+    for (const recipientId of dedup) {
+        await insertNotification({
+            user_id: recipientId,
+            type: 'user_deactivated',
+            title: recipientId === userId ? 'Your account has been deactivated' : 'User deactivated',
+            message: recipientId === userId
+                ? message
+                : `${name} (${updatedUser.email || ''}) was deactivated.`,
+            metadata: { user_name: name, user_email: updatedUser.email },
+            entity_type: 'user',
+            entity_id: userId,
+            actor_id: actor ? actor.id : null,
+        });
+    }
+}
+
+// Helper: notify all active admins that a user was deleted. The user
+// themselves is gone by the time this fires (the FK on notification.user_id
+// would reject them anyway), so we only target admins.
+async function notifyUserDeleted(userId, name, email, actor) {
+    const admins = await db.query("SELECT id FROM app_user WHERE role = 'admin' AND active = true");
+    const recipients = [...new Set(admins.rows.map(a => a.id).filter(rid => rid !== (actor && actor.id)))];
+
+    for (const adminId of recipients) {
+        await insertNotification({
+            user_id: adminId,
+            type: 'user_deleted',
+            title: 'User deleted',
+            message: `${name} (${email || 'no email'}) was permanently deleted.`,
+            metadata: { user_name: name, user_email: email },
+            entity_type: 'user',
+            entity_id: userId,
+            actor_id: actor ? actor.id : null,
+        });
+    }
+}
 
 module.exports = router;

@@ -25,6 +25,8 @@ interface Notification {
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     user_registered: { icon: '👤', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
     user_activated: { icon: '✅', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
+    user_deactivated: { icon: '🚫', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    user_deleted: { icon: '🗑️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
     warning: { icon: '⚠️', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     success: { icon: '🎉', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
     info: { icon: 'ℹ️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },

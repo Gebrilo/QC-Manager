@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
-const { notifyAdmins } = require('./notifications');
+const { insertNotification } = require('../services/notifications/dispatcher');
 const { canonicalRole, resolve: resolveRole } = require('../access/RoleResolver');
 const {
     BUILT_IN_ROLE_PERMISSION_DEFAULTS,
@@ -319,14 +319,26 @@ router.post('/sync', async (req, res, next) => {
             token: accessToken,
         });
 
-        // Notify admins about new registration (fire-and-forget)
+        // Notify admins about new registration (fire-and-forget).
+        // The new user entity_type links the bell to the admin/users page
+        // with a focus param, so the admin can jump straight to the row.
         if (!isFirstUser) {
-            notifyAdmins(
-                'user_registered',
-                'New User Registered',
-                `${user.name} (${user.email || user.phone}) has registered via magic link and is awaiting activation.`,
-                { user_id: user.id, user_name: user.name, user_email: user.email, auth_provider: authProvider }
-            );
+            db.query("SELECT id FROM app_user WHERE role = 'admin' AND active = true")
+                .then(({ rows }) => {
+                    const meta = { user_name: user.name, user_email: user.email, auth_provider: authProvider };
+                    return Promise.all(rows.map(admin =>
+                        insertNotification({
+                            user_id: admin.id,
+                            type: 'user_registered',
+                            title: 'New User Registered',
+                            message: `${user.name} (${user.email || user.phone}) has registered via magic link and is awaiting activation.`,
+                            metadata: meta,
+                            entity_type: 'user',
+                            entity_id: user.id,
+                        })
+                    ));
+                })
+                .catch(err => console.error('Failed to notify admins of new user:', err.message));
         }
     } catch (err) {
         next(err);

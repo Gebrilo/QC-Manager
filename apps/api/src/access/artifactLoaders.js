@@ -257,6 +257,33 @@ async function canAccessResource(user, artifact, req) {
     return false;
 }
 
+// User is a non-artifact entity: the user record is the artifact itself.
+// We only surface the role so canAccess can gate to admins. We don't load
+// the full app_user row here to keep this loader cheap — the admin/users
+// page is the canonical place to view user details.
+async function loadUserArtifact(userId, user, req) {
+    const u = await db.query(
+        `SELECT id, role, active, status FROM app_user WHERE id = $1`,
+        [userId]
+    );
+    if (u.rows.length === 0) return null;
+    return {
+        type: 'user',
+        id: u.rows[0].id,
+        role: u.rows[0].role,
+        active: u.rows[0].active,
+        status: u.rows[0].status,
+    };
+}
+
+// Manual access for users: admin only. The admin/users page itself
+// is gated by qc.admin.users.view — we re-enforce that here so a
+// notification deep-link can never bypass it.
+async function canAccessUser(user, artifact, req) {
+    if (!user || !user.id) return false;
+    return user.role === 'admin';
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
@@ -308,6 +335,10 @@ const ARTIFACT_GATES = {
     resource: {
         load: loadResourceArtifact,
         canAccess: canAccessResource,
+    },
+    user: {
+        load: loadUserArtifact,
+        canAccess: canAccessUser,
     },
 };
 

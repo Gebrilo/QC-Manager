@@ -359,3 +359,60 @@ describe('resolveNotificationTarget — resource', () => {
         expect(out).toEqual({ status: 'gone', href: null });
     });
 });
+
+describe('resolveNotificationTarget — user', () => {
+    function mockUserFound({ role = 'tester', active = true, status = 'ACTIVE' } = {}) {
+        // loadUserArtifact: SELECT id, role, active, status FROM app_user ...
+        mockQuery.mockResolvedValueOnce({
+            rows: [{ id: 'user-1', role, active, status }],
+        });
+    }
+
+    test('ok + href when the user is an admin', async () => {
+        mockUserFound();
+        const admin = { id: 'admin-1', role: 'admin' };
+        const out = await resolveNotificationTarget(admin, { entity_type: 'user', entity_id: 'user-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/admin/users?focus=user-1' });
+        // canAccessUser short-circuits for admin — only the load query
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    test('forbidden + null href when the user is not an admin (the target user)', async () => {
+        mockUserFound();
+        // Same id as the artifact — a self-notification must still be
+        // blocked, because non-admins can't access /admin/users at all.
+        const self = { id: 'user-1', role: 'tester' };
+        const out = await resolveNotificationTarget(self, { entity_type: 'user', entity_id: 'user-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('forbidden + null href for a non-admin, unrelated viewer', async () => {
+        mockUserFound();
+        const viewer = { id: 'viewer-1', role: 'viewer' };
+        const out = await resolveNotificationTarget(viewer, { entity_type: 'user', entity_id: 'user-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('forbidden + null href for a team_manager (admins only)', async () => {
+        mockUserFound();
+        const mgr = { id: 'mgr-1', role: 'team_manager' };
+        const out = await resolveNotificationTarget(mgr, { entity_type: 'user', entity_id: 'user-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('forbidden + null href for an unauthenticated request', async () => {
+        mockUserFound();
+        const out = await resolveNotificationTarget(null, { entity_type: 'user', entity_id: 'user-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('gone when the user no longer exists (e.g. after a deletion notification)', async () => {
+        // A user_deleted notification may still target a now-deleted user
+        // id; the gate should report "gone" so the bell can render the
+        // toast for a removed item.
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const admin = { id: 'admin-1', role: 'admin' };
+        const out = await resolveNotificationTarget(admin, { entity_type: 'user', entity_id: 'deleted-user-1' }, {});
+        expect(out).toEqual({ status: 'gone', href: null });
+    });
+});

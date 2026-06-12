@@ -2,6 +2,7 @@
 
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const db = require('../config/db');
+const { insertNotification } = require('./notifications/dispatcher');
 
 function lifecycleError(status, message) {
     const err = new Error(message);
@@ -49,12 +50,14 @@ async function activateUser(userId, actorId, options = {}, actorRole = 'team_man
             [user.name, userId, user.email, user.role, department, weekly_capacity_hrs]
         );
 
-        await db.query(
-            `INSERT INTO notification (user_id, type, title, message)
-             VALUES ($1, 'LIFECYCLE_ACTIVATED', 'You are now an Active Resource',
-                     'Your account has been activated. You now have full system access.')`,
-            [userId]
-        );
+        await insertNotification({
+            user_id: userId,
+            type: 'user_activated',
+            title: 'You are now an Active Resource',
+            message: 'Your account has been activated. You now have full system access.',
+            entity_type: 'user',
+            entity_id: userId,
+        });
 
         await db.query('COMMIT');
         return updated.rows[0];
