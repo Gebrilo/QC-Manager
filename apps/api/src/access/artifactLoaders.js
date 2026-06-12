@@ -106,6 +106,88 @@ async function loadUserStoryArtifact(storyId, user, req) {
     };
 }
 
+// Load the test case in the shape AccessEngine.canPerform expects.
+// The test_case table has `assigned_to` (UUID, an app_user id from the route
+// that resolves a resource UUID to a user). We surface that as the
+// assignee_user_id, and fall back to the executor (executed_by is set on
+// the test_case row by later slices — if absent, owner_user_id stays as
+// the creator).
+async function loadTestCaseArtifact(testCaseId, user, req) {
+    const t = await db.query(
+        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope,
+                assigned_to
+           FROM test_case WHERE id = $1 AND deleted_at IS NULL`,
+        [testCaseId]
+    );
+    if (t.rows.length === 0) return null;
+    const row = t.rows[0];
+
+    return {
+        type: 'test_case',
+        id: row.id,
+        project_id: row.project_id,
+        owner_team_id: row.owner_team_id,
+        owner_user_id: row.created_by_user_id,
+        assignee_user_id: row.assigned_to || null,
+        assignee_resource_id: null,
+        visibility_scope: row.visibility_scope,
+    };
+}
+
+// Load the test suite in the shape AccessEngine.canPerform expects.
+// Suites have no `assigned_to` column — only the creator is the owner.
+async function loadTestSuiteArtifact(suiteId, user, req) {
+    const s = await db.query(
+        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope
+           FROM test_suites WHERE id = $1 AND deleted_at IS NULL`,
+        [suiteId]
+    );
+    if (s.rows.length === 0) return null;
+    const row = s.rows[0];
+
+    return {
+        type: 'test_suite',
+        id: row.id,
+        project_id: row.project_id,
+        owner_team_id: row.owner_team_id,
+        owner_user_id: row.created_by_user_id,
+        assignee_user_id: null,
+        assignee_resource_id: null,
+        visibility_scope: row.visibility_scope,
+    };
+}
+
+// Load the test execution in the shape AccessEngine.canPerform expects.
+// project_id/owner_team_id/created_by live on the parent test_run, so the
+// loader joins to surface them. `assigned_to` on test_execution is an
+// app_user id (a person — not a resource), so it's exposed as
+// assignee_user_id. test_run_id is stashed on the returned artifact so
+// link-builders can navigate to the parent run page.
+async function loadTestExecutionArtifact(executionId, user, req) {
+    const r = await db.query(
+        `SELECT te.id, te.test_run_id, te.assigned_to, te.executed_by,
+                tr.project_id, tr.owner_team_id, tr.created_by, tr.visibility_scope
+           FROM test_execution te
+           LEFT JOIN test_run tr ON tr.id = te.test_run_id
+          WHERE te.id = $1`,
+        [executionId]
+    );
+    if (r.rows.length === 0) return null;
+    const row = r.rows[0];
+
+    return {
+        type: 'test_execution',
+        id: row.id,
+        project_id: row.project_id,
+        owner_team_id: row.owner_team_id,
+        owner_user_id: row.created_by,
+        assignee_user_id: row.assigned_to || null,
+        assignee_resource_id: null,
+        visibility_scope: row.visibility_scope,
+        test_run_id: row.test_run_id,
+    };
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
@@ -124,6 +206,27 @@ const ARTIFACT_GATES = {
     },
     user_story: {
         load: loadUserStoryArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    test_case: {
+        load: loadTestCaseArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    test_suite: {
+        load: loadTestSuiteArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    test_execution: {
+        load: loadTestExecutionArtifact,
         canAccess: async (user, artifact, req) => {
             const r = await canPerform(user, artifact, 'view', req);
             return !!r.allowed;

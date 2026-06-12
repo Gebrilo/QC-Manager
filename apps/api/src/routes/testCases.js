@@ -8,6 +8,7 @@ const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
+const { auditLog } = require('../middleware/audit');
 
 const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
 
@@ -251,6 +252,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.testcases
              JSON.stringify({ test_case_id: testCaseId, title: validatedData.title })]);
 
         await client.query('COMMIT');
+        await auditLog('test_case', result.rows[0].id, 'CREATE', result.rows[0], null, req.user?.email || 'system');
         const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [result.rows[0].id]);
         const testCase = { ...fullResult.rows[0] };
 
@@ -339,6 +341,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.testc
             ['test_case_updated', 'test_case', id, req.user?.id || null, JSON.stringify({ changed_fields: changedFields })]);
 
         await client.query('COMMIT');
+        await auditLog('test_case', id, 'UPDATE', result.rows[0], existing, req.user?.email || 'system');
         const fullResult = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
         const testCase = { ...fullResult.rows[0] };
 
@@ -446,6 +449,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.test
             ['test_case_deleted', 'test_case', id, req.user?.id || null, JSON.stringify({ test_case_id: existing.test_case_id })]);
 
         await client.query('COMMIT');
+        await auditLog('test_case', id, 'DELETE', null, existing, req.user?.email || 'system');
         res.status(204).send();
     } catch (error) { await client.query('ROLLBACK'); next(error); }
     finally { client.release(); }

@@ -10,6 +10,7 @@ const {
     enforceArtifact,
     shadowList,
 } = require('../services/access/enforcement');
+const { auditLog } = require('../middleware/audit');
 
 const suiteCreateSchema = z.object({
     name: z.string().min(3).max(255),
@@ -229,6 +230,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.testsuite
              JSON.stringify({ suite_id: suiteId, name: validatedData.title, test_case_count: validatedData.test_case_ids.length })]);
 
         await client.query('COMMIT');
+        await auditLog('test_suites', suite.id, 'CREATE', suite, null, req.user?.email || 'system');
 
         const fullResult = await pool.query(
             `SELECT ts.*,
@@ -297,6 +299,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tests
             ['test_suite_updated', 'test_suite', id, req.user?.id || null, JSON.stringify({ changed_fields: changedFields })]);
 
         await client.query('COMMIT');
+        await auditLog('test_suites', id, 'UPDATE', result.rows[0], existing, req.user?.email || 'system');
 
         const fullResult = await pool.query(
             `SELECT ts.*,
@@ -343,6 +346,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.test
              JSON.stringify({ suite_id: existing.suite_id, name: existing.name })]);
 
         await client.query('COMMIT');
+        await auditLog('test_suites', id, 'DELETE', null, existing, req.user?.email || 'system');
         res.status(204).send();
     } catch (error) { await client.query('ROLLBACK'); next(error); }
     finally { client.release(); }

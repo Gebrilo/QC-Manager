@@ -11,6 +11,7 @@ const {
   enforceArtifact,
   shadowList,
 } = require('../services/access/enforcement');
+const { auditLog } = require('../middleware/audit');
 
 // Configure multer for file upload (memory storage)
 const upload = multer({
@@ -677,6 +678,7 @@ router.post('/executions', requireAuth, blockContributors, requirePermission('qc
     );
 
     await client.query('COMMIT');
+    await auditLog('test_execution', result.rows[0].id, 'CREATE', result.rows[0], null, req.user?.email || 'system');
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -790,6 +792,7 @@ router.patch('/executions/:id', requireAuth, blockContributors, requirePermissio
     );
 
     await client.query('COMMIT');
+    await auditLog('test_execution', id, 'UPDATE', result.rows[0], existing, req.user?.email || 'system');
 
     res.json(result.rows[0]);
   } catch (error) {

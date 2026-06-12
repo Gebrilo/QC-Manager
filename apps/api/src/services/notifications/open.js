@@ -11,7 +11,7 @@ async function resolveNotificationTarget(user, notification, req) {
 
     const gate = await gateEntity(entityType, entityId, user, req);
     if (gate.status === 'ok') {
-        return { status: 'ok', href: buildLink(entityType, entityId) };
+        return { status: 'ok', href: await buildLink(entityType, entityId) };
     }
     return { status: gate.status, href: null };
 }

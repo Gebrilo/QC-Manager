@@ -43,6 +43,18 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     story_updated: { icon: '📖', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     story_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     story_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_case_created: { icon: '🧪', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    test_case_updated: { icon: '🧪', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_case_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    test_case_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_suite_created: { icon: '📋', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
+    test_suite_updated: { icon: '📋', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_suite_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    test_suite_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_execution_created: { icon: '🏃', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' },
+    test_execution_updated: { icon: '🏃', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    test_execution_status_changed: { icon: '🏃', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    test_execution_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
 };
 
 export function NotificationBell() {
