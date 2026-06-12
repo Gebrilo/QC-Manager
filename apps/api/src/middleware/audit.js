@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { dispatchFromAudit } = require('../services/notifications/dispatcher');
 
 /**
  * Audit Log Middleware
@@ -41,6 +42,17 @@ const auditLog = async (entityType, entityId, action, afterState = null, beforeS
                 userEmail
             ]
         );
+
+        // Fire-and-forget: never block or fail the request on notification work.
+        dispatchFromAudit({
+            entityType,
+            entityId,
+            action,
+            before: beforeState,
+            after: afterState,
+            changedFields,
+            actorEmail: userEmail,
+        }).catch(err => console.error('Notification dispatch error:', err.message));
     } catch (err) {
         console.error('Audit Log Error:', err);
     }
