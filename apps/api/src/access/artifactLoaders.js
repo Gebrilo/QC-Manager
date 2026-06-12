@@ -41,10 +41,58 @@ async function loadTaskArtifact(taskId, user, req) {
     };
 }
 
+// Load the bug in the shape AccessEngine.canPerform expects.
+// `assigned_to` is a text field (Tuleap username) and is resolved to a
+// resources.id so the AccessEngine's assignee branch can fire for whoever
+// the bug is currently assigned to. The reporter is also surfaced via
+// owner_resource_id (immutable) so it acts as a secondary assignee match.
+async function loadBugArtifact(bugId, user, req) {
+    const b = await db.query(
+        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope,
+                assigned_to, owner_resource_id
+           FROM bugs WHERE id = $1 AND deleted_at IS NULL`,
+        [bugId]
+    );
+    if (b.rows.length === 0) return null;
+    const row = b.rows[0];
+
+    let assigneeResourceId = row.owner_resource_id || null;
+    if (row.assigned_to) {
+        const a = await db.query(
+            `SELECT id FROM resources
+              WHERE resource_name = $1 AND deleted_at IS NULL
+              ORDER BY (user_id IS NOT NULL) DESC, id
+              LIMIT 1`,
+            [row.assigned_to]
+        );
+        if (a.rows[0] && !assigneeResourceId) {
+            assigneeResourceId = a.rows[0].id;
+        }
+    }
+
+    return {
+        type: 'bug',
+        id: row.id,
+        project_id: row.project_id,
+        owner_team_id: row.owner_team_id,
+        owner_user_id: row.created_by_user_id,
+        assignee_user_id: null,
+        assignee_resource_id: assigneeResourceId,
+        visibility_scope: row.visibility_scope,
+    };
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
         load: loadTaskArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    bug: {
+        load: loadBugArtifact,
         canAccess: async (user, artifact, req) => {
             const r = await canPerform(user, artifact, 'view', req);
             return !!r.allowed;

@@ -3,6 +3,7 @@
 // entity_type → function(entityId) → frontend href. Later slices add entries.
 const LINK_BUILDERS = {
     task: id => `/work/tasks/${id}`,
+    bug: id => `/work/bugs/${id}`,
 };
 
 function buildLink(entityType, entityId) {

@@ -33,6 +33,12 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     task_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     task_assigned: { icon: '🙋', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
     task_deleted: { icon: '🗑️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
+    bug_created: { icon: '🐛', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
+    bug_updated: { icon: '🐛', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    bug_status_changed: { icon: '🔄', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+    bug_severity_changed: { icon: '⚠️', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' },
+    bug_reassigned: { icon: '🙋', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+    bug_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
 };
 
 export function NotificationBell() {
