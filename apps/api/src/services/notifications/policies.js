@@ -43,6 +43,18 @@ const PROJECT_SIGNIFICANT_FIELDS = ['status'];
 // attention surfaces on a resource row.
 const RESOURCE_SIGNIFICANT_FIELDS = ['is_active', 'weekly_capacity_hrs'];
 
+// Team fields whose change is worth a notification. Teams have no `is_active`
+// column (they use a `deleted_at` soft-delete instead) — the only meaningful
+// surfaces are the team name and the assigned manager.
+const TEAM_SIGNIFICANT_FIELDS = ['name', 'manager_id'];
+
+// Role fields whose change is worth a notification. This is keyed to the
+// `role` column on app_user (a user being assigned a new role) — it lives
+// on a users PATCH, so the policy is wired up with `auditTriggers: ['users']`
+// and fires when `role` is in the changed fields. The `role` value itself
+// is the only thing that changes ownership/attention.
+const ROLE_SIGNIFICANT_FIELDS = ['role'];
+
 // recipients: returns an array of app_user ids related to the task.
 // The acting user is removed later by the dispatcher.
 async function taskRecipients({ entityId, after, db }) {
@@ -506,6 +518,82 @@ function resourceRender({ action, before, after, changedFields }) {
     };
 }
 
+// Team recipients:
+//   - all active admins
+//   - the team's manager (after.manager_id), if set
+// On DELETE the manager is unlinked by the route, so the manager_id lookup
+// is best-effort against the `before` snapshot.
+async function teamRecipients({ entityId, after, before, db }) {
+    const row = after || before || {};
+    const out = [];
+
+    const admins = await db.query(
+        `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
+    );
+    for (const a of admins.rows) out.push(a.id);
+
+    if (row.manager_id) out.push(row.manager_id);
+
+    return out;
+}
+
+function teamRender({ action, before, after }) {
+    const name = (after && after.name) || (before && before.name) || 'a team';
+    if (action === 'CREATE') {
+        return { type: 'team_created', title: 'New team created', message: `Team "${name}" was created.` };
+    }
+    if (action === 'DELETE') {
+        return { type: 'team_deleted', title: 'Team deleted', message: `Team "${name}" was deleted.` };
+    }
+    return {
+        type: 'team_updated',
+        title: 'Team updated',
+        message: `Team "${name}" was updated.`,
+    };
+}
+
+// Role recipients:
+//   - all active admins
+//   - the affected user (the user whose role changed — i.e. the audit entityId)
+//
+// Render is a no-recipient distinction here: both groups get the same payload
+// shape. The dispatcher is responsible for stripping entity_id for the
+// affected user (per spec: "no entity_id, non-clickable" for the user-facing
+// "your permissions changed" notification).
+async function roleRecipients({ entityId, db }) {
+    const out = [];
+
+    if (entityId) out.push(entityId);
+
+    const admins = await db.query(
+        `SELECT id FROM app_user WHERE role = 'admin' AND active = true`
+    );
+    for (const a of admins.rows) out.push(a.id);
+
+    return out;
+}
+
+function roleRender({ action, before, after }) {
+    const oldRole = before && before.role;
+    const newRole = after && after.role;
+    const userName = (after && after.name) || (before && before.name) || 'a user';
+    if (action === 'DELETE') {
+        return { type: 'role_changed', title: 'Role changed', message: `Role for ${userName} was cleared.` };
+    }
+    if (oldRole && newRole && oldRole !== newRole) {
+        return {
+            type: 'role_changed',
+            title: 'Role changed',
+            message: `${userName}'s role changed from ${oldRole} to ${newRole}.`,
+        };
+    }
+    return {
+        type: 'role_changed',
+        title: 'Role changed',
+        message: `${userName}'s role is now ${newRole || oldRole || 'unset'}.`,
+    };
+}
+
 // Keyed by the audit entity_type string (the table name passed to auditLog).
 const NOTIFICATION_POLICIES = {
     tasks: {
@@ -556,6 +644,18 @@ const NOTIFICATION_POLICIES = {
         recipients: resourceRecipients,
         render: resourceRender,
     },
+    teams: {
+        entityType: 'team',
+        significantFields: TEAM_SIGNIFICANT_FIELDS,
+        recipients: teamRecipients,
+        render: teamRender,
+    },
+    users: {
+        entityType: 'user',
+        significantFields: ROLE_SIGNIFICANT_FIELDS,
+        recipients: roleRecipients,
+        render: roleRender,
+    },
 };
 
 module.exports = {
@@ -568,4 +668,6 @@ module.exports = {
     TEST_EXECUTION_SIGNIFICANT_FIELDS,
     PROJECT_SIGNIFICANT_FIELDS,
     RESOURCE_SIGNIFICANT_FIELDS,
+    TEAM_SIGNIFICANT_FIELDS,
+    ROLE_SIGNIFICANT_FIELDS,
 };

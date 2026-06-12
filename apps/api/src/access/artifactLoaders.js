@@ -284,6 +284,21 @@ async function canAccessUser(user, artifact, req) {
     return user.role === 'admin';
 }
 
+// Team is a non-artifact entity: admin-only gating.
+async function loadTeamArtifact(teamId, user, req) {
+    const t = await db.query(
+        `SELECT id, name FROM teams WHERE id = $1 AND deleted_at IS NULL`,
+        [teamId]
+    );
+    if (t.rows.length === 0) return null;
+    return { type: 'team', id: t.rows[0].id, name: t.rows[0].name };
+}
+
+async function canAccessTeam(user, artifact, req) {
+    if (!user || !user.id) return false;
+    return user.role === 'admin';
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
@@ -339,6 +354,10 @@ const ARTIFACT_GATES = {
     user: {
         load: loadUserArtifact,
         canAccess: canAccessUser,
+    },
+    team: {
+        load: loadTeamArtifact,
+        canAccess: canAccessTeam,
     },
 };
 

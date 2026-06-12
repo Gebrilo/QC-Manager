@@ -1,10 +1,12 @@
 const db = require('../config/db');
 const { dispatchFromAudit } = require('../services/notifications/dispatcher');
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Audit Log Middleware
  * @param {string} entityType - Table name (e.g., 'projects', 'tasks')
- * @param {string} entityId - UUID of the entity
+ * @param {string} entityId - UUID or string key of the entity
  * @param {string} action - 'CREATE', 'UPDATE', 'DELETE'
  * @param {Object} afterState - Full record state after change (or null for DELETE)
  * @param {Object} beforeState - Full record state before change (or null for CREATE)
@@ -25,15 +27,20 @@ const auditLog = async (entityType, entityId, action, afterState = null, beforeS
 
         const summary = `${action} ${entityType} ${entityId}`;
 
+        // UUID entities go in entity_uuid; non-UUID (e.g. custom_roles.name)
+        // go in entity_key so we don't lose audit history for string-PK tables.
+        const isUuid = typeof entityId === 'string' && UUID_PATTERN.test(entityId);
+
         await db.query(
             `INSERT INTO audit_log (
-                entity_type, entity_uuid, action, 
-                before_state, after_state, changed_fields, 
+                entity_type, entity_uuid, entity_key, action,
+                before_state, after_state, changed_fields,
                 change_summary, user_email
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
             [
                 entityType,
-                entityId,
+                isUuid ? entityId : null,
+                isUuid ? null : String(entityId),
                 action,
                 beforeState ? JSON.stringify(beforeState) : null,
                 afterState ? JSON.stringify(afterState) : null,

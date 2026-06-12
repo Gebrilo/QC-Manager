@@ -156,6 +156,9 @@ const runMigrations = async () => {
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='user_email') THEN
                     ALTER TABLE audit_log ADD COLUMN user_email VARCHAR(255) DEFAULT 'system';
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='entity_key') THEN
+                    ALTER TABLE audit_log ADD COLUMN entity_key VARCHAR(255);
+                END IF;
             END $$;
         `);
 

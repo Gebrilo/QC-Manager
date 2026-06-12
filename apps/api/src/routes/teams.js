@@ -20,6 +20,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { auditLog } = require('../middleware/audit');
 const { getManagerTeam } = require('../middleware/teamAccess');
 const { isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 
@@ -82,7 +83,9 @@ router.post('/', requireAuth, requirePermission('qc.admin.manage_teams'), async 
              RETURNING *`,
             [name.trim(), description || null, manager_id || null, req.user.email]
         );
-        res.status(201).json(result.rows[0]);
+        const created = result.rows[0];
+        await auditLog('teams', created.id, 'CREATE', created, null, req.user.email);
+        res.status(201).json(created);
     } catch (err) { next(err); }
 });
 
@@ -178,8 +181,11 @@ router.patch('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), as
         const { id } = req.params;
         const { name, description, manager_id } = req.body;
 
-        const check = await db.query(`SELECT id FROM teams WHERE id = $1 AND deleted_at IS NULL`, [id]);
-        if (check.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
+        const existingRes = await db.query(
+            `SELECT * FROM teams WHERE id = $1 AND deleted_at IS NULL`, [id]
+        );
+        if (existingRes.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
+        const existing = existingRes.rows[0];
 
         const fields = [];
         const values = [];
@@ -217,7 +223,9 @@ router.patch('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), as
             `UPDATE teams SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
             values
         );
-        res.json(result.rows[0]);
+        const updated = result.rows[0];
+        await auditLog('teams', id, 'UPDATE', updated, existing, req.user.email);
+        res.json(updated);
     } catch (err) { next(err); }
 });
 
@@ -226,8 +234,11 @@ router.delete('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), a
     try {
         const { id } = req.params;
 
-        const check = await db.query(`SELECT id FROM teams WHERE id = $1 AND deleted_at IS NULL`, [id]);
-        if (check.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
+        const existingRes = await db.query(
+            `SELECT * FROM teams WHERE id = $1 AND deleted_at IS NULL`, [id]
+        );
+        if (existingRes.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
+        const existing = existingRes.rows[0];
 
         // Unlink members and projects before soft-deleting
         await db.query(`UPDATE app_user SET team_id = NULL WHERE team_id = $1`, [id]);
@@ -238,6 +249,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.admin.manage_teams'), a
             [id]
         );
 
+        await auditLog('teams', id, 'DELETE', null, existing, req.user.email);
         res.json({ success: true, message: 'Team deleted and members/projects unlinked' });
     } catch (err) { next(err); }
 });

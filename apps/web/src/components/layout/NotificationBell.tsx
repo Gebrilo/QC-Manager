@@ -64,6 +64,10 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
     resource_created: { icon: '👥', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' },
     resource_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     resource_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    team_created: { icon: '👥', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
+    team_updated: { icon: '👥', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    team_deleted: { icon: '🗑️', color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+    role_changed: { icon: '🔑', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' },
 };
 
 export function NotificationBell() {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { auditLog } = require('../middleware/audit');
 const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const { insertNotification } = require('../services/notifications/dispatcher');
 const { rollbackUser } = require('../services/userLifecycle');
@@ -119,6 +120,10 @@ router.patch('/:id', requirePermission('qc.admin.manage_users'), async (req, res
         }
 
         const updatedUser = result.rows[0];
+
+        // Audit the change. The notification dispatcher picks this up and
+        // fires role/active/status notifications via the policy registry.
+        await auditLog('users', id, 'UPDATE', updatedUser, priorUser, req.user?.email || 'system');
 
         // Apply role permissions when role changes OR when activating a user
         if (role || status === 'ACTIVE') {

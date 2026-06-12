@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { auditLog } = require('../middleware/audit');
 const {
     ALL_PERMISSION_VALUES,
     BUILT_IN_ROLE_PERMISSION_DEFAULTS,
@@ -125,6 +126,12 @@ router.post('/', requireAuth, requirePermission('qc.admin.manage_roles'), async 
         );
         await syncRolePermissions(db, normalizedName, validPerms, grantedBy);
 
+        await auditLog('roles', normalizedName, 'CREATE',
+            { name: normalizedName, permissions: validPerms },
+            null,
+            grantedBy
+        );
+
         res.status(201).json({
             name: normalizedName,
             permissions: validPerms,
@@ -164,10 +171,23 @@ router.patch('/:roleName', requireAuth, requirePermission('qc.admin.manage_roles
             }
         }
 
+        // Snapshot the current permissions so the audit row records both sides.
+        const beforeRes = await db.query(
+            'SELECT permission_key FROM role_permissions WHERE role_identifier = $1 ORDER BY permission_key',
+            [roleName]
+        );
+        const beforePerms = beforeRes.rows.map(r => r.permission_key);
+
         const syncResult = await syncRolePermissions(db, roleName, validPerms, grantedBy);
         const usersResult = await db.query(
             'SELECT COUNT(*) AS count FROM app_user WHERE role = ANY($1::text[])',
             [syncResult.affectedRoleNames]
+        );
+
+        await auditLog('roles', roleName, 'UPDATE',
+            { name: roleName, permissions: validPerms },
+            { name: roleName, permissions: beforePerms },
+            grantedBy
         );
 
         res.json({
@@ -204,6 +224,12 @@ router.delete('/:roleName', requireAuth, requirePermission('qc.admin.manage_role
         if (result.rows.length === 0) {
             return res.status(404).json({ error: `Role '${roleName}' not found` });
         }
+
+        await auditLog('roles', roleName, 'DELETE',
+            null,
+            { name: roleName },
+            req.user?.email || 'system'
+        );
 
         res.json({ success: true, message: `Role '${roleName}' deleted` });
     } catch (err) {
