@@ -82,6 +82,30 @@ async function loadBugArtifact(bugId, user, req) {
     };
 }
 
+// Load the user story in the shape AccessEngine.canPerform expects.
+// Stories have no `assigned_to` text field, so the only owner surface is
+// created_by_user_id (the story creator) — no assignee_resource_id is set.
+async function loadUserStoryArtifact(storyId, user, req) {
+    const s = await db.query(
+        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope
+           FROM user_stories WHERE id = $1 AND deleted_at IS NULL`,
+        [storyId]
+    );
+    if (s.rows.length === 0) return null;
+    const row = s.rows[0];
+
+    return {
+        type: 'user_story',
+        id: row.id,
+        project_id: row.project_id,
+        owner_team_id: row.owner_team_id,
+        owner_user_id: row.created_by_user_id,
+        assignee_user_id: null,
+        assignee_resource_id: null,
+        visibility_scope: row.visibility_scope,
+    };
+}
+
 // entity_type → { load(entityId, user, req), canAccess(user, artifact, req) }
 const ARTIFACT_GATES = {
     task: {
@@ -93,6 +117,13 @@ const ARTIFACT_GATES = {
     },
     bug: {
         load: loadBugArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    user_story: {
+        load: loadUserStoryArtifact,
         canAccess: async (user, artifact, req) => {
             const r = await canPerform(user, artifact, 'view', req);
             return !!r.allowed;

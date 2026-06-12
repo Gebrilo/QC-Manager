@@ -4,6 +4,7 @@
 const LINK_BUILDERS = {
     task: id => `/work/tasks/${id}`,
     bug: id => `/work/bugs/${id}`,
+    user_story: id => `/work/stories/${id}`,
 };
 
 function buildLink(entityType, entityId) {

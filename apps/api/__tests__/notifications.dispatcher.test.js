@@ -255,3 +255,78 @@ describe('dispatchFromAudit — bugs', () => {
         expect(notifiedUserIds().sort()).toEqual(['assignee-alice', 'pm-1', 'reporter-1'].sort());
     });
 });
+
+const storyAfter = {
+    id: 'story-1',
+    title: 'Login flow',
+    status: 'Draft',
+    project_id: 'proj-1',
+    created_by_user_id: 'creator-1',
+};
+
+describe('dispatchFromAudit — user_stories', () => {
+    test('CREATE notifies creator + PMs, excluding the actor', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 'creator-1' }] })            // resolveActorId → actor IS the creator
+            .mockResolvedValueOnce({ rows: [{ user_id: 'pm-1' }] });           // project_managers
+
+        await dispatchFromAudit({
+            entityType: 'user_stories', entityId: 'story-1', action: 'CREATE',
+            before: null, after: storyAfter, changedFields: [], actorEmail: 'actor@x',
+        });
+
+        // creator-1 is the actor → excluded; only pm-1 remains
+        expect(notifiedUserIds().sort()).toEqual(['pm-1'].sort());
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('story_created');
+        expect(insert[1][5]).toBe('user_story');  // entity_type
+        expect(insert[1][6]).toBe('story-1');     // entity_id
+    });
+
+    test('UPDATE with status change notifies creator + PMs', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        // actorEmail 'system' → resolveActorId returns null WITHOUT a query,
+        // so the first real query is the PMs lookup.
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'pm-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'user_stories', entityId: 'story-1', action: 'UPDATE',
+            before: { ...storyAfter, status: 'Draft' },
+            after: { ...storyAfter, status: 'Review' },
+            changedFields: ['status', 'updated_at'],
+            actorEmail: 'system',
+        });
+
+        expect(notifiedUserIds().sort()).toEqual(['creator-1', 'pm-1'].sort());
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('story_status_changed');
+    });
+
+    test('UPDATE with no significant field is a silent no-op (no queries at all)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchFromAudit({
+            entityType: 'user_stories', entityId: 'story-1', action: 'UPDATE',
+            before: storyAfter, after: storyAfter,
+            changedFields: ['updated_at', 'description'], actorEmail: 'system',
+        });
+        expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test('DELETE notifies creator + PMs', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        // DELETE always passes the significant-field gate.
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'pm-1' }] });
+
+        await dispatchFromAudit({
+            entityType: 'user_stories', entityId: 'story-1', action: 'DELETE',
+            before: storyAfter, after: null, changedFields: [], actorEmail: 'system',
+        });
+
+        const insert = mockQuery.mock.calls.find(c => /INSERT INTO notification/i.test(c[0]));
+        expect(insert[1][1]).toBe('story_deleted');
+        expect(notifiedUserIds().sort()).toEqual(['creator-1', 'pm-1'].sort());
+    });
+});

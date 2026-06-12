@@ -95,3 +95,38 @@ describe('resolveNotificationTarget — bugs', () => {
         expect(mockCanPerform).not.toHaveBeenCalled();
     });
 });
+
+describe('resolveNotificationTarget — user_stories', () => {
+    function mockStoryFound() {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: 'story-1',
+                project_id: 'p1',
+                owner_team_id: 't1',
+                created_by_user_id: 'c1',
+                visibility_scope: 'team',
+            }],
+        });
+    }
+
+    test('ok + href when the user may view the story', async () => {
+        mockStoryFound();
+        mockCanPerform.mockResolvedValue({ allowed: true });
+        const out = await resolveNotificationTarget(user, { entity_type: 'user_story', entity_id: 'story-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/work/stories/story-1' });
+    });
+
+    test('forbidden + null href when the user may not view the story', async () => {
+        mockStoryFound();
+        mockCanPerform.mockResolvedValue({ allowed: false });
+        const out = await resolveNotificationTarget(user, { entity_type: 'user_story', entity_id: 'story-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('gone when the story no longer exists', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const out = await resolveNotificationTarget(user, { entity_type: 'user_story', entity_id: 'story-1' }, {});
+        expect(out).toEqual({ status: 'gone', href: null });
+        expect(mockCanPerform).not.toHaveBeenCalled();
+    });
+});

@@ -11,6 +11,11 @@ const TASK_SIGNIFICANT_FIELDS = ['status', 'estimate_days', 'completed_date'];
 // and is matched against resources.resource_name to resolve the user.
 const BUG_SIGNIFICANT_FIELDS = ['status', 'severity', 'assigned_to'];
 
+// User-story fields whose change is worth a notification. Stories are a flat
+// record with no junction and no `assigned_to` text field — status is the
+// only column on the story row that meaningfully changes ownership/attention.
+const STORY_SIGNIFICANT_FIELDS = ['status'];
+
 // recipients: returns an array of app_user ids related to the task.
 // The acting user is removed later by the dispatcher.
 async function taskRecipients({ entityId, after, db }) {
@@ -148,6 +153,51 @@ function bugRender({ action, before, after, changedFields }) {
     };
 }
 
+// User-story recipients:
+//   - story creator (created_by_user_id)
+//   - project PMs
+// Stories have no `assigned_to` text field, so there is no assignee lookup.
+// Dedup + actor exclusion is handled by the dispatcher.
+async function storyRecipients({ entityId, after, before, db }) {
+    const row = after || before || {};
+    const out = [];
+
+    if (row.created_by_user_id) out.push(row.created_by_user_id);
+
+    if (row.project_id) {
+        const pms = await db.query(
+            'SELECT user_id FROM project_managers WHERE project_id = $1',
+            [row.project_id]
+        );
+        for (const p of pms.rows) out.push(p.user_id);
+    }
+
+    return out;
+}
+
+function storyRender({ action, before, after, changedFields }) {
+    const name = (after && after.title) || (before && before.title) || 'a user story';
+    if (action === 'CREATE') {
+        return { type: 'story_created', title: 'New user story created', message: `Story "${name}" was created.` };
+    }
+    if (action === 'DELETE') {
+        return { type: 'story_deleted', title: 'User story deleted', message: `Story "${name}" was deleted.` };
+    }
+    const changed = (changedFields || []).filter(f => STORY_SIGNIFICANT_FIELDS.includes(f));
+    if (changed.includes('status')) {
+        return {
+            type: 'story_status_changed',
+            title: 'Story status changed',
+            message: `Story "${name}" is now ${after && after.status}.`,
+        };
+    }
+    return {
+        type: 'story_updated',
+        title: 'Story updated',
+        message: `Story "${name}" was updated.`,
+    };
+}
+
 // Keyed by the audit entity_type string (the table name passed to auditLog).
 const NOTIFICATION_POLICIES = {
     tasks: {
@@ -162,6 +212,12 @@ const NOTIFICATION_POLICIES = {
         recipients: bugRecipients,
         render: bugRender,
     },
+    user_stories: {
+        entityType: 'user_story',
+        significantFields: STORY_SIGNIFICANT_FIELDS,
+        recipients: storyRecipients,
+        render: storyRender,
+    },
 };
 
-module.exports = { NOTIFICATION_POLICIES, TASK_SIGNIFICANT_FIELDS, BUG_SIGNIFICANT_FIELDS };
+module.exports = { NOTIFICATION_POLICIES, TASK_SIGNIFICANT_FIELDS, BUG_SIGNIFICANT_FIELDS, STORY_SIGNIFICANT_FIELDS };
