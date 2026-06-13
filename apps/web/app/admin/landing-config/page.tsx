@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { MarkdownContent } from '@/components/landing/MarkdownContent';
+import { FEATURE_ICON_OPTIONS } from '@/components/landing/iconRegistry';
 import {
     landingPageApi,
     type ChangelogEntry,
@@ -47,19 +48,6 @@ const tabs: Array<{ key: TabKey; label: string; icon: typeof LayoutTemplate }> =
     { key: 'roadmap', label: 'Roadmap', icon: CalendarClock },
     { key: 'changelog', label: 'Changelog', icon: FileText },
     { key: 'ai', label: 'AI / n8n', icon: Bot },
-];
-
-const iconOptions = [
-    { value: 'shield', label: 'Shield' },
-    { value: 'clipboard-list', label: 'Clipboard' },
-    { value: 'test-tube', label: 'Test Tube' },
-    { value: 'bar-chart', label: 'Chart' },
-    { value: 'workflow', label: 'Workflow' },
-    { value: 'bug', label: 'Bug' },
-    { value: 'gauge', label: 'Gauge' },
-    { value: 'map', label: 'Map' },
-    { value: 'sparkles', label: 'Sparkles' },
-    { value: 'users', label: 'Users' },
 ];
 
 const emptyFeature = {
@@ -137,14 +125,26 @@ function ToggleField({
     onChange: (checked: boolean) => void;
 }) {
     return (
-        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer">
             <span>{label}</span>
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => onChange(event.target.checked)}
-                className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                onClick={() => onChange(!checked)}
+                className={classNames(
+                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+                    checked ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700',
+                )}
+            >
+                <span
+                    aria-hidden="true"
+                    className={classNames(
+                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                        checked ? 'translate-x-5' : 'translate-x-0',
+                    )}
+                />
+            </button>
         </label>
     );
 }
@@ -166,7 +166,7 @@ function SelectField({
             <select
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                className="h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-sm text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
             >
                 {children}
             </select>
@@ -456,9 +456,9 @@ export default function LandingConfigPage() {
 
             {activeTab === 'settings' && config && (
                 <section className="space-y-6">
-                    <div className="glass-card rounded-2xl p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div className="mb-5 flex items-center gap-2">
-                            <Megaphone className="h-5 w-5 text-cyan-600" />
+                            <Megaphone className="h-5 w-5 text-indigo-600" />
                             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Hero and Marketing Copy</h2>
                         </div>
                         <div className="grid gap-4 lg:grid-cols-2">
@@ -478,7 +478,7 @@ export default function LandingConfigPage() {
                     </div>
 
                     <div className="grid gap-6 lg:grid-cols-2">
-                        <div className="glass-card rounded-2xl p-6">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">Section Visibility</h2>
                             <div className="space-y-3">
                                 <ToggleField label="Landing page is public" checked={config.is_public} onChange={(checked) => setConfig({ ...config, is_public: checked })} />
@@ -489,7 +489,7 @@ export default function LandingConfigPage() {
                             </div>
                         </div>
 
-                        <div className="glass-card rounded-2xl p-6">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">Footer CTA</h2>
                             <div className="space-y-4">
                                 <Input label="Footer CTA title" value={config.footer_cta_title || ''} onChange={(event) => setConfig({ ...config, footer_cta_title: event.target.value })} />
@@ -511,13 +511,13 @@ export default function LandingConfigPage() {
 
             {activeTab === 'features' && (
                 <section className="grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
-                    <div className="glass-card rounded-2xl p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">{editingFeatureId ? 'Edit Feature' : 'Add Feature'}</h2>
                         <div className="space-y-4">
                             <Input label="Title" value={featureForm.title} onChange={(event) => setFeatureForm({ ...featureForm, title: event.target.value })} />
                             <Textarea label="Description" value={featureForm.description} onChange={(event) => setFeatureForm({ ...featureForm, description: event.target.value })} />
                             <SelectField label="Icon" value={featureForm.icon_key || ''} onChange={(value) => setFeatureForm({ ...featureForm, icon_key: value })}>
-                                {iconOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                {FEATURE_ICON_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </SelectField>
                             <Input label="Display order" type="number" min={0} value={featureForm.display_order} onChange={(event) => setFeatureForm({ ...featureForm, display_order: Number(event.target.value) })} />
                             <ToggleField label="Active" checked={featureForm.is_active} onChange={(checked) => setFeatureForm({ ...featureForm, is_active: checked })} />
@@ -586,7 +586,7 @@ export default function LandingConfigPage() {
 
             {activeTab === 'roadmap' && (
                 <section className="grid gap-6 xl:grid-cols-[0.9fr_1.5fr]">
-                    <div className="glass-card rounded-2xl p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">{editingRoadmapId ? 'Edit Roadmap Item' : 'Add Roadmap Item'}</h2>
                         <div className="space-y-4">
                             <Input label="Title" value={roadmapForm.title} onChange={(event) => setRoadmapForm({ ...roadmapForm, title: event.target.value })} />
@@ -676,7 +676,7 @@ export default function LandingConfigPage() {
 
             {activeTab === 'changelog' && (
                 <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                    <div className="glass-card rounded-2xl p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">{editingChangelogId ? 'Edit Changelog Entry' : 'Add Changelog Entry'}</h2>
                         <div className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -755,9 +755,9 @@ export default function LandingConfigPage() {
 
             {activeTab === 'ai' && (
                 <section className="space-y-6">
-                    <div className="glass-card rounded-2xl p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div className="mb-5 flex items-center gap-2">
-                            <Bot className="h-5 w-5 text-cyan-600" />
+                            <Bot className="h-5 w-5 text-indigo-600" />
                             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">AI / n8n Content Intake</h2>
                         </div>
                         <div className="grid gap-4 lg:grid-cols-2">
@@ -783,7 +783,7 @@ export default function LandingConfigPage() {
                     <div className="grid gap-6 lg:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
                             <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
-                                <Clipboard className="h-4 w-4 text-cyan-600" />
+                                <Clipboard className="h-4 w-4 text-indigo-600" />
                                 Changelog payload
                             </h3>
                             <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs leading-6 text-slate-100">{`{
@@ -797,7 +797,7 @@ export default function LandingConfigPage() {
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
                             <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
-                                <BarChart3 className="h-4 w-4 text-cyan-600" />
+                                <BarChart3 className="h-4 w-4 text-indigo-600" />
                                 Roadmap payload
                             </h3>
                             <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs leading-6 text-slate-100">{`{

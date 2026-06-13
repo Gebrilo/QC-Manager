@@ -28,23 +28,8 @@ import { getLandingPage } from '@/config/routes';
 import { landingPageApi, type ChangelogEntry, type LandingPageFeature, type PublicLandingPageResponse, type RoadmapItem, type RoadmapPriority, type RoadmapStatus } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { getFeatureIcon } from './iconRegistry';
 import { MarkdownContent } from './MarkdownContent';
-
-// Feature icon keys mirror the admin landing-config screen's icon picker.
-const iconMap = {
-    'bar-chart': BarChart3,
-    bug: Bug,
-    'clipboard-list': ClipboardList,
-    file: FileText,
-    gauge: Gauge,
-    git: GitBranch,
-    map: Map,
-    shield: ShieldCheck,
-    sparkles: Sparkles,
-    'test-tube': TestTube2,
-    users: Users2,
-    workflow: Workflow,
-};
 
 // ---- Static marketing content (presentational, not backend-driven) ----
 const VALUE_PROPS: Array<{ label: string; Icon: typeof BarChart3 }> = [
@@ -207,7 +192,7 @@ function HeroMockup() {
 }
 
 function FeatureCard({ feature }: { feature: LandingPageFeature }) {
-    const Icon = iconMap[(feature.icon_key || '') as keyof typeof iconMap] || ShieldCheck;
+    const Icon = getFeatureIcon(feature.icon_key);
     return (
         <div className="lp-reveal group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_12px_28px_-8px_rgba(15,23,42,0.14)]">
             <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition-colors group-hover:border-transparent group-hover:bg-gradient-to-br group-hover:from-indigo-600 group-hover:to-violet-600 group-hover:text-white">
