@@ -1,0 +1,178 @@
+[
+  {
+    "name": "GitHub Release -> Changelog (draft)",
+    "active": false,
+    "nodes": [
+      {
+        "id": "2047ca81f1e24089",
+        "name": "Webhook: GitHub Release",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "cb0dcf7b-860f-4818-832f-1cf6f9753b77",
+        "parameters": {
+          "path": "github-release-changelog",
+          "httpMethod": "POST",
+          "responseMode": "onReceived",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "63c89a8c2cfe4ba9",
+        "name": "Build changelog",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// GitHub Release webhook -> draft changelog entry for QC Manager.\n// Handles application/json and form-encoded (payload=...) GitHub webhooks.\nlet body = $json.body;\nif (body && typeof body.payload === 'string') {\n  try { body = JSON.parse(body.payload); } catch (e) {}\n}\n\n// Only act when a release is actually *published*. GitHub also fires\n// created / edited / released / prereleased / deleted on the same event —\n// acting on those would create duplicate entries.\nif (!body || body.action !== 'published' || !body.release) {\n  return [];\n}\n\nconst release = body.release;\nif (release.draft === true) {\n  return [];\n}\n\nconst tag = String(release.tag_name || '').slice(0, 50);\nconst title = String(release.name || release.tag_name || 'Release').slice(0, 255);\n\n// Lightly clean GitHub's auto-generated notes: drop the trailing\n// \"**Full Changelog**: <url>\" line; keep everything else as Markdown.\nlet md = String(release.body || '')\n  .split('\\n')\n  .filter(line => !/^\\s*\\*\\*Full Changelog\\*\\*:/i.test(line))\n  .join('\\n')\n  .trim();\n\nif (!md) md = 'Release ' + title + '.';\n\n// QC API caps content_markdown at 20000 chars.\nif (md.length > 20000) md = md.slice(0, 19980).trim() + '\\n\\n...';\n\nreturn [{\n  json: {\n    version_number: tag || null,\n    title: title,\n    content_markdown: md,\n    is_published: false,\n    generated_by_ai: false,\n    source: 'github',\n    source_reference: 'github-release-' + (release.id != null ? release.id : tag),\n  },\n}];\n"
+        }
+      },
+      {
+        "id": "2c35b2cdf2d04435",
+        "name": "AI Summarize (disabled)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          680,
+          300
+        ],
+        "disabled": true,
+        "parameters": {
+          "url": "https://api.anthropic.com/v1/messages",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              },
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1500, system: 'You are a release-notes editor for the QC Manager product. Rewrite the GitHub release notes below into a concise, user-facing changelog in Markdown. Group changes under ### Added, ### Changed, ### Fixed, and ### Removed where appropriate. Keep it factual, drop CI/chore/version-bump noise, and do not invent features. Output only the changelog Markdown with no preamble.', messages: [{ role: 'user', content: $json.content_markdown }] }) }}",
+          "options": {
+            "timeout": 60000
+          }
+        }
+      },
+      {
+        "id": "fbd6c1e20114465c",
+        "name": "Apply AI result (disabled)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          900,
+          300
+        ],
+        "disabled": true,
+        "parameters": {
+          "jsCode": "// DISABLED by default. Enable this together with the \"AI Summarize\" node\n// once you have added an ANTHROPIC_API_KEY env var to n8n.\n// Reads the Anthropic Messages API response from the previous node and merges\n// the generated text back with the changelog fields from \"Build changelog\".\nconst base = $('Build changelog').item.json;\nlet text = '';\ntry {\n  text = ($json.content || [])\n    .filter(b => b && b.type === 'text')\n    .map(b => b.text)\n    .join('\\n')\n    .trim();\n} catch (e) { text = ''; }\n\nlet md = (text || base.content_markdown || '').trim();\nif (md.length > 20000) md = md.slice(0, 19980).trim() + '\\n\\n...';\n\nreturn [{ json: Object.assign({}, base, { content_markdown: md, generated_by_ai: true }) }];\n"
+        }
+      },
+      {
+        "id": "1711328b93584573",
+        "name": "Post draft to QC Manager",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1120,
+          300
+        ],
+        "parameters": {
+          "url": "http://qc-api:3001/webhooks/landing-content/changelog",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-qc-agent-secret",
+                "value": "={{ $env.QC_AGENT_WEBHOOK_SECRET }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ version_number: $json.version_number, title: $json.title, content_markdown: $json.content_markdown, is_published: $json.is_published, generated_by_ai: $json.generated_by_ai, source: $json.source, source_reference: $json.source_reference }) }}",
+          "options": {
+            "timeout": 20000
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook: GitHub Release": {
+        "main": [
+          [
+            {
+              "node": "Build changelog",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build changelog": {
+        "main": [
+          [
+            {
+              "node": "AI Summarize (disabled)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Summarize (disabled)": {
+        "main": [
+          [
+            {
+              "node": "Apply AI result (disabled)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply AI result (disabled)": {
+        "main": [
+          [
+            {
+              "node": "Post draft to QC Manager",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "tags": [
+      {
+        "name": "qc"
+      },
+      {
+        "name": "changelog"
+      }
+    ]
+  }
+]
