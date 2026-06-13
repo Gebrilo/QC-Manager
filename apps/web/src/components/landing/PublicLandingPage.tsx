@@ -1,18 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     BarChart3,
     Bug,
     CheckCircle2,
     ClipboardList,
-    ExternalLink,
     FileText,
     Gauge,
     GitBranch,
-    Loader2,
     LogIn,
     Map,
     ShieldCheck,
@@ -24,6 +21,9 @@ import {
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getLandingPage } from '@/config/routes';
 import { landingPageApi, type ChangelogEntry, type LandingPageFeature, type PublicLandingPageResponse, type RoadmapItem, type RoadmapStatus } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Spinner } from '@/components/ui/Spinner';
 import { MarkdownContent } from './MarkdownContent';
 
 const iconMap = {
@@ -47,47 +47,11 @@ const roadmapLabels: Record<RoadmapStatus, string> = {
     completed: 'Completed',
 };
 
-const priorityClasses: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-    medium: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-    high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-};
-
 function formatDate(value?: string | null) {
     if (!value) return null;
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return null;
     return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
-}
-
-function isExternalUrl(url?: string | null) {
-    return Boolean(url && /^https?:\/\//i.test(url));
-}
-
-function CtaLink({
-    href,
-    children,
-    variant = 'primary',
-}: {
-    href?: string | null;
-    children: ReactNode;
-    variant?: 'primary' | 'secondary';
-}) {
-    if (!href) return null;
-    return (
-        <a
-            href={href}
-            target={isExternalUrl(href) ? '_blank' : undefined}
-            rel={isExternalUrl(href) ? 'noreferrer' : undefined}
-            className={variant === 'primary'
-                ? 'inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100'
-                : 'inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-900'}
-        >
-            {children}
-            {isExternalUrl(href) && <ExternalLink className="h-4 w-4" />}
-        </a>
-    );
 }
 
 function ProductScene() {
@@ -166,7 +130,7 @@ function RoadmapColumn({ status, items }: { status: RoadmapStatus; items: Roadma
         <section className="min-w-0">
             <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{roadmapLabels[status]}</h3>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{items.length}</span>
+                <Badge variant="default">{items.length}</Badge>
             </div>
             <div className="space-y-3">
                 {items.length === 0 ? (
@@ -177,9 +141,9 @@ function RoadmapColumn({ status, items }: { status: RoadmapStatus; items: Roadma
                     <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div className="flex items-start justify-between gap-3">
                             <h4 className="text-sm font-semibold text-slate-950 dark:text-white">{item.title}</h4>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${priorityClasses[item.priority] || priorityClasses.medium}`}>
+                            <Badge variant={item.priority === 'critical' ? 'danger' : item.priority === 'high' ? 'warning' : item.priority === 'medium' ? 'info' : 'secondary'}>
                                 {item.priority}
-                            </span>
+                            </Badge>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.description}</p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -199,8 +163,8 @@ function ChangelogCard({ entry }: { entry: ChangelogEntry }) {
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 {entry.version_number && <span className="font-semibold text-cyan-700 dark:text-cyan-300">{entry.version_number}</span>}
                 {formatDate(entry.published_at) && <span>{formatDate(entry.published_at)}</span>}
-                {entry.generated_by_ai && <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">AI assisted</span>}
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{entry.source}</span>
+                {entry.generated_by_ai && <Badge variant="info">AI assisted</Badge>}
+                <Badge variant="secondary">{entry.source}</Badge>
             </div>
             <h3 className="mt-3 text-base font-semibold text-slate-950 dark:text-white">{entry.title}</h3>
             <div className="mt-3">
@@ -254,7 +218,7 @@ export function PublicLandingPage() {
     if (authLoading || (user && loading)) {
         return (
             <main className="flex h-screen items-center justify-center overflow-y-auto bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-                <Loader2 className="h-7 w-7 animate-spin" />
+                <Spinner size="lg" />
             </main>
         );
     }
@@ -264,7 +228,7 @@ export function PublicLandingPage() {
             <main className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-950">
                 <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6">
                     <div className="flex items-center gap-3 text-sm font-medium text-slate-500 dark:text-slate-400">
-                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <Spinner size="md" />
                         Loading QC Manager...
                     </div>
                 </div>
@@ -279,7 +243,7 @@ export function PublicLandingPage() {
                     <h1 className="text-2xl font-bold text-slate-950 dark:text-white">QC Manager</h1>
                     <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{error || 'Landing page content is unavailable.'}</p>
                     <div className="mt-6 flex justify-center gap-3">
-                        <CtaLink href="/login"><LogIn className="h-4 w-4" /> Sign in</CtaLink>
+                        <a href="/login"><Button variant="primary"><LogIn className="h-4 w-4" /> Sign in</Button></a>
                     </div>
                 </div>
             </main>
@@ -296,21 +260,18 @@ export function PublicLandingPage() {
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">QC</span>
                         QC Manager
                     </a>
-                    <a href="/login" className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100">
-                        <LogIn className="h-4 w-4" />
-                        Sign in
-                    </a>
+                    <a href="/login"><Button variant="outline" size="sm"><LogIn className="h-4 w-4" /> Sign in</Button></a>
                 </div>
             </header>
 
-            <section className="relative min-h-[78vh] overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,0.16),transparent_28%),linear-gradient(135deg,#f8fafc_0%,#ecfeff_48%,#fff7ed_100%)] pt-28 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,0.12),transparent_28%),linear-gradient(135deg,#020617_0%,#0f172a_56%,#111827_100%)]">
+            <section className="relative min-h-[78vh] overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_20%_20%,rgba(6,182,212,0.14),transparent_28%)] bg-gradient-to-br from-slate-50 via-cyan-50/40 to-amber-50/30 pt-28 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_20%_20%,rgba(6,182,212,0.10),transparent_28%)] dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
                 <ProductScene />
                 <div className="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-10 sm:px-8 lg:pt-20">
                     <div className="max-w-3xl">
-                        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-700 shadow-sm backdrop-blur dark:border-cyan-800 dark:bg-slate-900/80 dark:text-cyan-300">
+                        <Badge variant="info" className="mb-6 gap-2 border border-cyan-200/50 bg-white/80 backdrop-blur dark:border-cyan-800/50 dark:bg-slate-900/80">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Public quality workspace
-                        </div>
+                        </Badge>
                         <h1 className="max-w-3xl text-5xl font-bold leading-tight text-slate-950 sm:text-6xl dark:text-white">
                             {config.hero_title}
                         </h1>
@@ -318,8 +279,8 @@ export function PublicLandingPage() {
                             {config.hero_subtitle}
                         </p>
                         <div className="mt-8 flex flex-wrap gap-3">
-                            <CtaLink href={config.hero_cta_url}><LogIn className="h-4 w-4" /> {config.hero_cta_label}</CtaLink>
-                            <CtaLink href={config.hero_secondary_cta_url} variant="secondary">{config.hero_secondary_cta_label}</CtaLink>
+                            <a href={config.hero_cta_url || '/login'}><Button variant="primary" size="lg"><LogIn className="h-4 w-4" /> {config.hero_cta_label}</Button></a>
+                            <a href={config.hero_secondary_cta_url || '/register'}><Button variant="outline" size="lg">{config.hero_secondary_cta_label}</Button></a>
                         </div>
                     </div>
                 </div>
@@ -400,7 +361,7 @@ export function PublicLandingPage() {
                             <h2 className="text-3xl font-bold">{config.footer_cta_title}</h2>
                             <p className="mt-3 text-sm leading-6 text-slate-300">{config.footer_cta_description}</p>
                         </div>
-                        <CtaLink href={config.footer_cta_url} variant="secondary">{config.footer_cta_label}</CtaLink>
+                        <a href={config.footer_cta_url || '/login'}><Button variant="outline" size="lg">{config.footer_cta_label}</Button></a>
                     </div>
                 </section>
             )}
