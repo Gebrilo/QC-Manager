@@ -142,3 +142,47 @@
     print-color-adjust: exact;
   }
 }
+
+/* ============================================================
+   Public landing page (marketing) — mirrors the QC-Manager
+   Landing design from claude.ai/design. Only the bits Tailwind
+   cannot express live here; everything else is utility classes.
+   Prefixed `lp-` so single-class specificity matches Tailwind.
+   ============================================================ */
+
+/* Edge-masked auto-scrolling marquee for the value strip */
+.lp-marquee {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.lp-marquee-track {
+  animation: lp-scrollx 32s linear infinite;
+}
+@keyframes lp-scrollx {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* Scroll-reveal. Hidden state only applies once JS has marked the
+   root with `.lp-js`, so the page stays fully visible without JS. */
+.lp-js .lp-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lp-js .lp-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-marquee-track {
+    animation: none;
+  }
+  .lp-js .lp-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
