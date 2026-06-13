@@ -1,185 +1,307 @@
-# QC Management Tool
+# QC-Manager
 
-A comprehensive Quality Control Project Management System for tracking projects, managing tasks and resources, running test cycles, enforcing governance, and coordinating teams — powered by **Supabase** and deployed with **Docker + Traefik**.
+QC-Manager is a quality-control and delivery-management system for work tracked in Tuleap. It mirrors Tuleap artifacts into a QC-owned PostgreSQL database, then adds governance, test management, dashboards, resource planning, access control, notifications, and reporting on top.
 
-## Features
+The app is split into an Express API, a Next.js frontend, shared RBAC/domain utilities, PostgreSQL migrations, Docker deployment files, and n8n workflow definitions.
 
-- **Dashboard** — Real-time aggregated metrics across projects, tasks, resources, testing, and governance
-- **Project Management** — Full CRUD with soft delete and status lifecycle (active, completed, on_hold, cancelled)
-- **Task Management** — Status workflow (Backlog → In Progress → Done/Cancelled) with resource allocation and hour tracking
-- **Resource Management** — Capacity planning, allocation tracking, utilization metrics with overallocation warnings
-- **Test Management** — Test cases, test runs, test executions, and results tracking with pass/fail metrics
-- **Governance** — Quality gates, release approvals, trend analysis, and release readiness evaluation
-- **Reports** — Async report generation (Excel, CSV, JSON, PDF) via n8n workflows
-- **User Management** — Role-based access (admin, manager, user, viewer, contributor) with JWT authentication
-- **Teams** — Team-based access control with manager hierarchy and team assignments
-- **Journeys** — User onboarding journeys, manager views, and probation tracking
-- **Personal Tasks** — Individual task management per user
-- **Bug Tracking** — Tuleap-integrated bug management with severity/priority tracking
-- **Notifications** — In-app notification system
-- **Preferences** — Per-user UI settings and display name customization
+## Product Scope
+
+- **Work tracking**: QC projects, user stories, tasks, bugs, task assignments, task history, and soft deletes.
+- **Test management**: test cases, suites, runs, executions, result upload, quality metrics, and artifact traceability.
+- **Dashboards**: global dashboard plus PM, team-manager, and member dashboards.
+- **Governance**: quality gates, release approvals, release readiness, trend views, and quality reports.
+- **People management**: users, teams, resources, journeys, onboarding/probation, and individual development plans.
+- **Access control**: shared RBAC catalog, role permissions, per-user permission overrides, scoped artifact access, and row-level action flags.
+- **Integrations**: Tuleap inbound/outbound artifact sync, n8n report/workflow webhooks, Supabase auth/storage, TestSprite webhook support, and artifact attachments.
+- **Notifications and preferences**: in-app notifications, avatar/profile data, user preferences, display density, and default landing pages.
 
 ## Technology Stack
 
 | Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 14, React 18, TypeScript 5.9, Tailwind CSS, TanStack Table, Recharts, React Hook Form, Radix UI |
-| Backend | Node.js 18, Express 4.18, Zod, JWT, Multer, pg |
-| Database | **Supabase** (cloud-hosted PostgreSQL) with database views for real-time metrics |
-| Auth | JWT-based authentication with role-based access control |
-| Automation | n8n 1.29.0 for async report generation and workflows |
-| Reverse Proxy | Traefik (production) with Let's Encrypt TLS |
-| Containers | Docker & Docker Compose |
-| CI/CD | GitHub Actions → Docker Hub → VPS auto-deploy |
+| --- | --- |
+| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, Radix UI, TanStack Table, Recharts, React Hook Form, Supabase JS |
+| Backend | Node.js 18, Express 4, Zod, JWT, pg, Multer, xlsx |
+| Shared code | RBAC catalog and access helpers under `apps/shared/` |
+| Database | PostgreSQL. Production app data uses Supabase PostgreSQL; local Docker uses a local PostgreSQL container by default. |
+| Auth | Supabase Auth sessions synced to `app_user`; legacy JWT verification is retained as a fallback during migration. |
+| Automation | n8n workflow JSON under `n8n/`; n8n itself is optional/external to the main compose files. |
+| Deployment | Docker, Docker Compose, Traefik labels, Docker Hub images, manual GitHub Actions deploy workflow |
+| Testing | Jest/Supertest for API tests; Playwright for web e2e tests |
+
+## Repository Layout
+
+```text
+.
+|-- apps/
+|   |-- api/                  # Express REST API, migrations-on-startup, route modules
+|   |-- web/                  # Next.js App Router frontend
+|   `-- shared/               # Shared RBAC catalog and cross-app utilities
+|-- database/migrations/      # SQL reference migrations and targeted manual migrations
+|-- docs/                     # Requirements, architecture, guides, QA packs, ADRs
+|-- n8n/                      # n8n workflow definitions and workflow README
+|-- specs/                    # Feature specifications
+|-- docker-compose.yml        # Local Docker services
+|-- docker-compose.override.yml
+|-- docker-compose.staging.yml
+|-- docker-compose.prod.yml
+`-- .github/workflows/deploy.yml
+```
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Node.js 18+](https://nodejs.org/)
-- A [Supabase](https://supabase.com/) project (free tier works)
+- Node.js 18+ and npm
+- Docker and Docker Compose, if using the containerized setup
+- A Supabase project for authentication and production database/storage
+- Access to Tuleap only if you are testing sync or outbound artifact creation
 
-### Local Development
+### Option 1: Local Docker
 
-```bash
-# 1. Clone repository
-git clone https://github.com/Gebrilo/QC-Manager.git
-cd QC-Manager
-
-# 2. Create environment file
-cp .env.example .env
-# Edit .env — set your Supabase DATABASE_URL, SUPABASE_URL, and keys
-
-# 3. Start API
-cd apps/api && npm install && npm run dev
-
-# 4. Start Frontend (separate terminal)
-cd apps/web && npm install && npm run dev
-```
-
-**Access the app:**
-- Frontend: http://localhost:3000
-- API: http://localhost:3001
-
-### Docker Development
+The local Docker setup starts `qc-postgres`, `qc-api`, and `qc-web`. It uses the local PostgreSQL container for app data because `docker-compose.override.yml` overrides `DATABASE_URL`.
 
 ```bash
-# 1. Create shared network (one-time)
 docker network create qc-shared-network
-
-# 2. Set up environment
 cp .env.example .env
-# Edit .env with your Supabase credentials
-
-# 3. Start all services
 docker compose up -d
-
-# 4. View logs
-docker compose logs -f
+docker compose logs -f api
 ```
 
-## Project Structure
+Local URLs:
 
+- Web: http://localhost:3000
+- API: http://localhost:3001
+- Health: http://localhost:3001/health
+- OpenAPI spec, when present: http://localhost:3001/openapi.json
+
+Important local Docker notes:
+
+- `docker-compose.override.yml` is automatically merged by Docker Compose.
+- Root `.env` is used by Docker Compose variable substitution.
+- Local compose does not start n8n. Configure `N8N_WEBHOOK_URL` only when an n8n instance is reachable.
+- If the web app imports Supabase client code in your local flow, provide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` through the web runtime or an `apps/web/.env.local` file.
+
+### Option 2: Direct Node Development
+
+When running services directly, each app reads env files from its own working directory. A root `.env` is not automatically loaded by `cd apps/api && npm run dev` or `cd apps/web && npm run dev`.
+
+API:
+
+```bash
+cd apps/api
+npm install
+cp ../../.env.example .env
+# Edit .env: set DATABASE_URL or SUPABASE_DATABASE_URL, JWT_SECRET,
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_JWT_SECRET.
+npm run dev
 ```
-├── apps/
-│   ├── api/                  # Express.js Backend API
-│   │   ├── src/
-│   │   │   ├── routes/       # 21 route files
-│   │   │   ├── schemas/      # Zod validation schemas
-│   │   │   ├── middleware/   # Error handling, audit logging
-│   │   │   ├── config/       # Database connection (Supabase)
-│   │   │   └── utils/        # n8n integration, helpers
-│   │   ├── __tests__/        # Jest unit tests
-│   │   └── Dockerfile
-│   └── web/                  # Next.js Frontend
-│       ├── app/              # App Router (18 page routes)
-│       └── src/
-│           ├── components/   # React components
-│           ├── lib/          # API client, utilities
-│           └── types/        # TypeScript interfaces
-├── database/
-│   └── migrations/           # Reference SQL migration files
-├── n8n/                      # n8n workflow definitions
-├── docs/                     # Architecture & guide documentation
-├── scripts/                  # Test utilities
-├── specs/                    # Feature specifications (SpecKit)
-├── docker-compose.yml        # Local development
-└── docker-compose.prod.yml   # Production (Traefik + Supabase)
+
+Web:
+
+```bash
+cd apps/web
+npm install
+cat > .env.local <<'EOF'
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EOF
+npm run dev
 ```
 
-## API Endpoints
+## Common Commands
 
-| Category | Routes | Key Operations |
-|----------|--------|----------------|
-| Auth | `auth.js` | Login, register, token refresh, password management |
-| Projects | `projects.js` | CRUD, soft delete, status lifecycle |
-| Tasks | `tasks.js` | CRUD, status transitions, resource assignment, hour tracking |
-| Resources | `resources.js` | CRUD, utilization metrics, allocation warnings |
-| Test Cases | `testCases.js` | CRUD, bulk import |
-| Test Executions | `testExecutions.js` | Test runs, executions, results management |
-| Test Results | `testResults.js` | Results upload & metrics |
-| Dashboard | `dashboard.js` | Aggregated metrics |
-| Reports | `reports.js` | Async report generation via n8n |
-| Governance | `governance.js` | Quality gates, release approvals, trend analysis |
-| Users | `users.js` | User management, activation, role updates |
-| Teams | `teams.js` | Team CRUD, member management |
-| Roles | `roles.js` | Role-based permission management |
-| Bugs | `bugs.js` | Bug tracking (Tuleap integration) |
-| Journeys | `journeys.js` | User onboarding journeys |
-| My Journeys | `myJourneys.js` | Personal journey progress |
-| Manager View | `managerView.js` | Team oversight for managers |
-| Personal Tasks | `personalTasks.js` | Individual task management |
-| Notifications | `notifications.js` | In-app notifications |
-| Tuleap Webhook | `tuleapWebhook.js` | Tuleap artifact sync |
-| Preferences | via `users.js` | Per-user UI settings |
+| Task | Command |
+| --- | --- |
+| Start local Docker stack | `docker compose up -d` |
+| Stop local Docker stack | `docker compose down` |
+| API logs | `docker compose logs -f api` |
+| Web logs | `docker compose logs -f web` |
+| API dev server | `cd apps/api && npm run dev` |
+| Web dev server | `cd apps/web && npm run dev` |
+| API tests | `cd apps/api && npm test` |
+| Web production build | `cd apps/web && npm run build` |
+| Web e2e tests | `cd apps/web && PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e` |
+| Production deploy from VPS checkout | `docker compose -f docker-compose.prod.yml up -d` |
+| Staging deploy from VPS checkout | `docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d` |
 
 ## Environment Variables
 
-### Required
+Use root `.env` for Docker Compose, `apps/api/.env` for direct API development, and `apps/web/.env.local` for direct web development.
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | Supabase PostgreSQL connection string |
-| `JWT_SECRET` | Secret for JWT token signing (min 32 chars) |
-| `NEXT_PUBLIC_API_URL` | API URL for the frontend |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase anonymous/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+### API and Database
 
-### Optional
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | Local/direct or staging | PostgreSQL connection string. Local Docker sets this to `qc-postgres`. |
+| `SUPABASE_DATABASE_URL` | Production | Supabase PostgreSQL connection string; production compose maps it into `DATABASE_URL`. |
+| `DATABASE_SSL` | Optional | Set `false` for local/non-SSL databases. Supabase uses SSL. |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT` | Local Docker/fallback | Used when no database URL is provided. |
+| `JWT_SECRET` | Required | Legacy JWT fallback and local development secret. Use a strong secret outside local dev. |
+| `SUPABASE_JWT_SECRET` | Required for Supabase auth sync | Used to verify Supabase access tokens. |
+| `SUPABASE_URL` | Required for auth/storage features | Supabase project URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required for admin/storage features | Server-only key. Do not expose it to the browser. |
+| `CORS_ORIGIN` | Recommended | Allowed frontend origin. Defaults to `*`. |
+| `OPENAPI_SPEC_PATH` | Optional | Overrides the served OpenAPI JSON path. |
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `N8N_WEBHOOK_URL` | n8n webhook endpoint | — |
-| `CORS_ORIGIN` | Allowed CORS origins | `*` |
-| `DATABASE_SSL` | Set to `false` to disable SSL | `true` |
+### Frontend Build/Runtime
 
-See `.env.example` for a complete template.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | Required | Browser-facing API base URL. Production Docker bakes this into the image at build time. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Required | Browser-safe Supabase project URL. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Required | Browser-safe Supabase anon key. |
+| `API_INTERNAL_URL` | Optional | Used by Next.js rewrites for `/api-proxy/*`; defaults to `http://qc-api:3001`. |
 
-## Production Deployment
+### Integrations and Operations
 
-Production uses **Traefik** as a reverse proxy with automatic TLS via Let's Encrypt, and connects to **Supabase** for the database.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `N8N_WEBHOOK_URL` | Optional | Base n8n webhook URL, for example `http://n8n:5678/webhook`. Empty value mocks workflow calls in non-production. |
+| `TULEAP_BASE_URL` | Optional unless syncing Tuleap | Tuleap instance URL. |
+| `TULEAP_ACCESS_KEY` | Optional unless outbound Tuleap calls are enabled | Tuleap personal access key/API token. |
+| `TULEAP_DEFAULT_PROJECT_ID` | Optional | Default Tuleap project id. |
+| `TULEAP_TRACKER_TASK`, `TULEAP_TRACKER_USER_STORY`, `TULEAP_TRACKER_TEST_CASE`, `TULEAP_TRACKER_BUG` | Optional unless creating Tuleap artifacts | Tracker ids used by outbound artifact creation. |
+| `TULEAP_RECONCILE_MAX_MISSING`, `TULEAP_RECONCILE_CONFIRM_THRESHOLD` | Optional | Deletion reconciliation tuning. |
+| `REPORT_EMAIL_FROM`, `SYSTEM_EMAIL_FROM`, `SUPABASE_EMAIL_FROM` | Optional | Report/email sender fallbacks. |
+| `WEB_DOMAIN`, `API_DOMAIN` | Production/staging | Domains used by Traefik labels and web build args. |
+| `DOCKER_HUB_USERNAME` | Production/staging | Image namespace for compose and CI. |
+| `BACKUP_PATH`, `BACKUP_RETENTION_DAYS` | Staging/ops | Used by staging backup service. |
+
+See `.env.example`, `.env.staging.example`, and `.env.production.example` for templates.
+
+## API Surface
+
+The API mounts routes at both root and `/api` for compatibility. For example, `/projects` and `/api/projects` both resolve to the same router.
+
+Primary route prefixes:
+
+| Prefix | Purpose |
+| --- | --- |
+| `/auth`, `/auth/profile`, `/me` | Supabase session sync, current user, profile/avatar/preferences |
+| `/projects`, `/user-stories`, `/tasks`, `/bugs` | Core QC artifacts and work tracking |
+| `/resources`, `/teams`, `/manager`, `/development-plans` | Resource, team, manager, and IDP workflows |
+| `/test-cases`, `/test-suites`, `/test-executions`, `/test-results` | Test authoring, suites, runs, executions, and uploaded results |
+| `/dashboard`, `/dashboards`, `/reports`, `/governance` | Metrics, role dashboards, reporting, and quality gates |
+| `/roles`, `/admin/access`, `/users` | RBAC, access engine, users, and permission management |
+| `/journeys`, `/my-journeys`, `/my-tasks` | Onboarding journeys and personal work |
+| `/notifications`, `/search`, `/attachments` | Cross-cutting app features |
+| `/tuleap-webhook`, `/tuleap/artifacts` | Tuleap inbound webhook handling and outbound artifact APIs |
+| `/testsprite` | TestSprite webhook integration |
+| `/health`, `/openapi.json` | Health check and OpenAPI document endpoint |
+
+## Data and Migration Model
+
+- The app uses PostgreSQL tables such as `projects`, `tasks`, `task_resource_assignment`, `resources`, `app_user`, `teams`, `project_teams`, `project_managers`, `user_stories`, `bugs`, `test_case`, `test_suites`, `test_run`, `test_execution`, `test_result`, `report_jobs`, `notifications`, `tuleap_sync_config`, `tuleap_webhook_log`, and artifact link/access tables.
+- `projects`, `tasks`, bugs, tests, and related artifacts use soft-delete fields where supported. Prefer `deleted_at` over hard deletion in app behavior.
+- `apps/api/src/config/db.js` runs idempotent startup migrations and is the authoritative migration path for the running API.
+- `database/migrations/` contains reference SQL and targeted/manual migration files. Use these carefully against disposable or staging databases before production.
+- Production app data is in Supabase PostgreSQL. The production `qc-postgres` container is for n8n/internal storage only.
+
+## Access Model
+
+Built-in roles live in `apps/shared/rbac/catalog.ts`:
+
+- `admin`
+- `pm`
+- `team_manager`
+- `tester`
+- `viewer`
+- `contributor`
+
+Legacy aliases are canonicalized during permission checks:
+
+- `manager` -> `team_manager`
+- `user` -> `tester`
+- `member` -> `tester`
+
+Permissions use `qc.*` keys. The Access Engine adds scoped access such as own/team/any visibility and row-action flags through `apps/api/src/services/access/enforcement.js`.
+
+User statuses are used by route and scope checks:
+
+- `PREPARATION`
+- `ACTIVE`
+- `SUSPENDED`
+- `ARCHIVED`
+
+## Tuleap Integration
+
+Tuleap sync is based on four artifact types:
+
+- `bug`
+- `task`
+- `user_story`
+- `test_case`
+
+Key concepts:
+
+- **Tracker Config** rows live in `tuleap_sync_config` and map Tuleap trackers to QC projects, artifact types, field mappings, status mappings, and default visibility.
+- **Inbound sync** is handled through `/tuleap-webhook/*`, usually mediated by n8n.
+- **Outbound creation/update** goes through `/tuleap/artifacts/*` and uses the Tuleap base URL, access key, and tracker ids.
+- Artifact links are stored on the QC side using QC UUIDs, with Tuleap integer ids resolved at the Tuleap boundary.
+
+See `CONTEXT.md`, `docs/adr/`, and `docs/04-integrations/n8n-workflows.md` for deeper integration language and decisions.
+
+## Deployment
+
+### Production
+
+Production uses pre-built Docker Hub images and Traefik labels. The API connects to Supabase PostgreSQL through `SUPABASE_DATABASE_URL`; the local `qc-postgres` volume is not the app database.
+
+Prerequisites:
+
+- External Docker network: `qc-shared-network`
+- External Docker network: `qc-network`
+- Traefik connected to `qc-shared-network`
+- Docker Hub images: `<DOCKER_HUB_USERNAME>/qc-api:latest` and `<DOCKER_HUB_USERNAME>/qc-web:latest`
+- `.env` created from `.env.production.example`
 
 ```bash
-# 1. Set up environment
-cp .env.production.example .env
-# Edit .env with production values
-
-# 2. Create network
 docker network create qc-shared-network
-
-# 3. Deploy
+docker network create qc-network
+cp .env.production.example .env
 docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml logs -f api
 ```
 
-CI/CD is configured via GitHub Actions — pushing to `main` triggers automatic build, push to Docker Hub, and deploy to VPS.
+### Staging
+
+Staging uses `docker-compose.staging.yml`, `:staging` image tags, a local staging PostgreSQL container, and a backup sidecar.
+
+```bash
+cp .env.staging.example .env.staging
+docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d
+```
+
+### GitHub Actions
+
+`.github/workflows/deploy.yml` is manual-only (`workflow_dispatch`). Running the workflow builds API and web images, pushes them to Docker Hub, then deploys either staging or production over SSH.
+
+Required GitHub secrets include Docker Hub credentials, VPS SSH credentials, domain values, app secrets, Supabase values, and Tuleap values used by the deploy script. The workflow currently uses:
+
+- `DOCKER_HUB_USERNAME`, `DOCKER_HUB_TOKEN`
+- `VPS_HOST`, `VPS_SSH_PORT`, `VPS_USERNAME`, `VPS_SSH_KEY`, `SSH_PASSPHRASE`
+- `WEB_DOMAIN`, `API_DOMAIN`, `STAGING_WEB_DOMAIN`, `STAGING_API_DOMAIN`
+- `JWT_SECRET`, `STAGING_JWT_SECRET`
+- `POSTGRES_PASSWORD`, `STAGING_POSTGRES_PASSWORD`
+- `SUPABASE_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
+- `N8N_WEBHOOK_URL`, `CORS_ORIGIN`, `STAGING_CORS_ORIGIN`
+- `TULEAP_BASE_URL`, `TULEAP_ACCESS_KEY`
+
+Production web images bake `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY` at build time. Changing those values requires rebuilding the web image.
 
 ## Documentation
 
-- [Database Migrations](database/migrations/README.md)
-- [n8n Workflows](n8n/README.md)
-- [Architecture Docs](docs/)
-- [Style Guide](style.md)
+- [Docs index](docs/README.md)
+- [Domain language](CONTEXT.md)
+- [Architecture docs](docs/02-architecture/)
+- [Development guide](docs/03-guides/development-guide.md)
+- [Deployment guide](docs/03-guides/deployment-guide.md)
+- [n8n workflows](n8n/README.md)
+- [Database migrations](database/migrations/README.md)
+- [ADR index](docs/adr/README.md)
+- [Web design system](apps/web/DESIGN_SYSTEM.md)
+- [Web component guide](apps/web/COMPONENT_GUIDE.md)
 
 ## License
 
