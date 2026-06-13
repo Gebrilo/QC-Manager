@@ -81,9 +81,11 @@ jobs:
           if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
             echo "tag=staging" >> $GITHUB_OUTPUT
             echo "api_url=https://${{ secrets.STAGING_API_DOMAIN }}" >> $GITHUB_OUTPUT
+            echo "public_site_url=https://${{ secrets.STAGING_WEB_DOMAIN }}" >> $GITHUB_OUTPUT
           else
             echo "tag=latest" >> $GITHUB_OUTPUT
             echo "api_url=https://${{ secrets.API_DOMAIN }}" >> $GITHUB_OUTPUT
+            echo "public_site_url=https://${{ secrets.WEB_DOMAIN }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push Web image
@@ -101,6 +103,8 @@ jobs:
             NEXT_PUBLIC_API_URL=${{ steps.args.outputs.api_url }}
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            PUBLIC_SITE_URL=${{ steps.args.outputs.public_site_url }}
+            LANDING_PAGE_REVALIDATE_SECONDS=60
 
   # ===========================================================================
   # PRODUCTION DEPLOY — manual only, always from main
@@ -119,6 +123,7 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          QC_AGENT_WEBHOOK_SECRET: ${{ secrets.QC_AGENT_WEBHOOK_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
@@ -138,7 +143,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           timeout: 60s
           command_timeout: 30m
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,SUPABASE_JWT_SECRET,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,TULEAP_BASE_URL,TULEAP_ACCESS_KEY
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,QC_AGENT_WEBHOOK_SECRET,POSTGRES_PASSWORD,SUPABASE_DATABASE_URL,SUPABASE_JWT_SECRET,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,TULEAP_BASE_URL,TULEAP_ACCESS_KEY
           script_stop: true
           script: |
             set -euo pipefail
@@ -175,7 +180,10 @@ jobs:
               printf '%s\n' "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
               echo "POSTGRES_DB=qc_app"
               printf '%s\n' "JWT_SECRET=${JWT_SECRET}"
+              printf '%s\n' "QC_AGENT_WEBHOOK_SECRET=${QC_AGENT_WEBHOOK_SECRET}"
               echo "CORS_ORIGIN=${CORS_ORIGIN}"
+              echo "PUBLIC_SITE_URL=https://${WEB_DOMAIN}"
+              echo "LANDING_PAGE_REVALIDATE_SECONDS=60"
               printf '%s\n' "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
               printf '%s\n' "SUPABASE_URL=${SUPABASE_URL}"
               printf '%s\n' "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}"
@@ -218,6 +226,7 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          QC_AGENT_WEBHOOK_SECRET: ${{ secrets.STAGING_QC_AGENT_WEBHOOK_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
           N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
           WEB_DOMAIN: ${{ secrets.STAGING_WEB_DOMAIN }}
@@ -235,7 +244,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           timeout: 60s
           command_timeout: 30m
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,QC_AGENT_WEBHOOK_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH
           script_stop: true
           script: |
             set -euo pipefail
@@ -273,7 +282,10 @@ jobs:
               echo "POSTGRES_DB=qc_staging_app"
               echo "DATABASE_SSL=false"
               printf '%s\n' "JWT_SECRET=${JWT_SECRET}"
+              printf '%s\n' "QC_AGENT_WEBHOOK_SECRET=${QC_AGENT_WEBHOOK_SECRET}"
               echo "CORS_ORIGIN=${CORS_ORIGIN}"
+              echo "PUBLIC_SITE_URL=https://${WEB_DOMAIN}"
+              echo "LANDING_PAGE_REVALIDATE_SECONDS=60"
               printf '%s\n' "N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}"
               echo "BACKUP_PATH=./backups-staging"
               echo "BACKUP_RETENTION_DAYS=3"

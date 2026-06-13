@@ -40,9 +40,12 @@ DATABASE_URL=postgresql://postgres:your-secure-password@postgres:5432/qc_app
 PORT=3001
 JWT_SECRET=your-secure-jwt-secret
 NODE_ENV=development
+QC_AGENT_WEBHOOK_SECRET=change-this-agent-webhook-secret
 
 # Frontend
 NEXT_PUBLIC_API_URL=http://localhost:3001
+PUBLIC_SITE_URL=http://localhost:3000
+LANDING_PAGE_REVALIDATE_SECONDS=60
 
 # n8n Automation
 N8N_BASIC_AUTH_ACTIVE=true
@@ -95,9 +98,12 @@ DATABASE_URL=postgresql://qc_user:STRONG_PASSWORD_HERE@postgres:5432/qc_app
 PORT=3001
 JWT_SECRET=GENERATE_RANDOM_64_CHAR_STRING
 NODE_ENV=production
+QC_AGENT_WEBHOOK_SECRET=GENERATE_RANDOM_AGENT_WEBHOOK_SECRET
 
 # Frontend
 NEXT_PUBLIC_API_URL=https://qc.yourdomain.com/api
+PUBLIC_SITE_URL=https://qc.yourdomain.com
+LANDING_PAGE_REVALIDATE_SECONDS=60
 
 # n8n
 N8N_BASIC_AUTH_ACTIVE=true
@@ -173,12 +179,46 @@ docker-compose ps
 curl http://localhost:3001/health
 # Expected: {"status":"ok","timestamp":"..."}
 
+# Verify startup migrations, including landing page tables
+docker-compose logs api | grep "Database migrations completed successfully"
+
+# Test public landing content
+curl http://localhost:3001/api/public/landing-page
+
 # Test API endpoint
 curl http://localhost:3001/projects
 # Expected: [] or list of projects
 
 # Access frontend
 # Open http://localhost:3000 in browser
+```
+
+## Public Landing Page and AI/n8n Changelog Webhook
+
+The API startup migration creates:
+
+- `landing_page_config`
+- `landing_page_features`
+- `roadmap_items`
+- `changelog_entries`
+- `ai_content_generation_logs`
+
+Admin configuration is available at `/admin/landing-config` for users with `qc.admin.landing_page.manage`.
+
+Example n8n changelog publish call:
+
+```bash
+curl -X POST "https://api.yourdomain.com/api/webhooks/landing-content/changelog" \
+  -H "Content-Type: application/json" \
+  -H "x-qc-agent-secret: $QC_AGENT_WEBHOOK_SECRET" \
+  -d '{
+    "version_number": "v1.4.0",
+    "title": "Release v1.4.0",
+    "content_markdown": "### Added\n- New dashboard widgets\n\n### Fixed\n- Bug sync issue",
+    "published_at": "2026-06-13T10:00:00Z",
+    "source": "n8n",
+    "source_reference": "workflow-id-or-github-release"
+  }'
 ```
 
 ## n8n Workflow Setup

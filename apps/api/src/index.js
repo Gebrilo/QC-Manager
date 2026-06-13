@@ -24,7 +24,7 @@ app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Cache-Control', 'Pragma'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Cache-Control', 'Pragma', 'x-qc-agent-secret'],
     exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -66,6 +66,9 @@ apiRouter.use('/my-journeys', require('./routes/myJourneys'));
 apiRouter.use('/manager', require('./routes/managerView'));
 apiRouter.use('/development-plans', require('./routes/developmentPlans'));
 apiRouter.use('/teams', require('./routes/teams'));
+apiRouter.use('/public/landing-page', require('./routes/publicLandingPage'));
+apiRouter.use('/admin/landing-page', require('./routes/adminLandingPage'));
+apiRouter.use('/webhooks/landing-content', require('./routes/landingContentWebhooks'));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

@@ -21,6 +21,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@qc-postgres:5432/qc_app
       - JWT_SECRET=dev-secret-not-for-production-use-only
       - N8N_WEBHOOK_URL=
+      - QC_AGENT_WEBHOOK_SECRET=dev-agent-secret
     ports:
       - "3001:3001"
     healthcheck:
@@ -30,6 +31,8 @@ services:
   web:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - PUBLIC_SITE_URL=http://localhost:3000
+      - LANDING_PAGE_REVALIDATE_SECONDS=60
     ports:
       - "3000:3000"
     healthcheck:

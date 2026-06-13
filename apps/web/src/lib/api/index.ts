@@ -277,6 +277,83 @@ export interface ReportJob {
     completed_at?: string;
 }
 
+export interface LandingPageConfig {
+    id?: string;
+    hero_title: string;
+    hero_subtitle: string;
+    hero_cta_label: string;
+    hero_cta_url: string;
+    hero_secondary_cta_label?: string | null;
+    hero_secondary_cta_url?: string | null;
+    marketing_intro_title: string;
+    marketing_intro_description: string;
+    show_features: boolean;
+    show_roadmap: boolean;
+    show_changelog: boolean;
+    show_footer_cta: boolean;
+    footer_cta_title?: string | null;
+    footer_cta_description?: string | null;
+    footer_cta_label?: string | null;
+    footer_cta_url?: string | null;
+    is_public: boolean;
+    created_at?: string;
+    updated_at?: string;
+    created_by?: string | null;
+    updated_by?: string | null;
+}
+
+export interface LandingPageFeature {
+    id: string;
+    title: string;
+    description: string;
+    icon_key?: string | null;
+    display_order: number;
+    is_active?: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export type RoadmapStatus = 'planned' | 'in_progress' | 'completed';
+export type RoadmapPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface RoadmapItem {
+    id: string;
+    title: string;
+    description: string;
+    status: RoadmapStatus;
+    priority: RoadmapPriority;
+    target_date?: string | null;
+    completion_date?: string | null;
+    display_order: number;
+    is_public?: boolean;
+    source_reference?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export type ChangelogSource = 'manual' | 'ai_agent' | 'github' | 'n8n' | 'system';
+
+export interface ChangelogEntry {
+    id: string;
+    version_number?: string | null;
+    title: string;
+    content_markdown: string;
+    published_at?: string | null;
+    is_published?: boolean;
+    generated_by_ai: boolean;
+    source: ChangelogSource;
+    source_reference?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface PublicLandingPageResponse {
+    config: LandingPageConfig;
+    features: LandingPageFeature[];
+    roadmap_items: RoadmapItem[];
+    changelog_entries: ChangelogEntry[];
+}
+
 // ============================================================================
 // API Client - Projects
 // ============================================================================
@@ -2123,6 +2200,80 @@ export const bugLinksApi = {
 
     removeUserStory: (bugId: string, userStoryId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
+};
+
+// ============================================================================
+// API Client - Landing Page
+// ============================================================================
+
+export const landingPageApi = {
+    getPublic: () =>
+        fetchApi<PublicLandingPageResponse>('/public/landing-page'),
+
+    admin: {
+        getConfig: () =>
+            fetchApi<LandingPageConfig>('/admin/landing-page/config'),
+
+        updateConfig: (data: LandingPageConfig) =>
+            fetchApi<LandingPageConfig>('/admin/landing-page/config', {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            }),
+
+        listFeatures: () =>
+            fetchApi<LandingPageFeature[]>('/admin/landing-page/features'),
+
+        createFeature: (data: Omit<LandingPageFeature, 'id'>) =>
+            fetchApi<LandingPageFeature>('/admin/landing-page/features', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
+        updateFeature: (id: string, data: Partial<LandingPageFeature>) =>
+            fetchApi<LandingPageFeature>(`/admin/landing-page/features/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            }),
+
+        deleteFeature: (id: string) =>
+            fetchApi<{ success: boolean; id: string }>(`/admin/landing-page/features/${id}`, { method: 'DELETE' }),
+
+        listRoadmap: () =>
+            fetchApi<RoadmapItem[]>('/admin/landing-page/roadmap'),
+
+        createRoadmapItem: (data: Omit<RoadmapItem, 'id'>) =>
+            fetchApi<RoadmapItem>('/admin/landing-page/roadmap', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
+        updateRoadmapItem: (id: string, data: Partial<RoadmapItem>) =>
+            fetchApi<RoadmapItem>(`/admin/landing-page/roadmap/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            }),
+
+        deleteRoadmapItem: (id: string) =>
+            fetchApi<{ success: boolean; id: string }>(`/admin/landing-page/roadmap/${id}`, { method: 'DELETE' }),
+
+        listChangelog: () =>
+            fetchApi<ChangelogEntry[]>('/admin/landing-page/changelog'),
+
+        createChangelogEntry: (data: Omit<ChangelogEntry, 'id'>) =>
+            fetchApi<ChangelogEntry>('/admin/landing-page/changelog', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
+        updateChangelogEntry: (id: string, data: Partial<ChangelogEntry>) =>
+            fetchApi<ChangelogEntry>(`/admin/landing-page/changelog/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            }),
+
+        deleteChangelogEntry: (id: string) =>
+            fetchApi<{ success: boolean; id: string }>(`/admin/landing-page/changelog/${id}`, { method: 'DELETE' }),
+    },
 };
 
 // ============================================================================

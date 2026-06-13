@@ -143,6 +143,7 @@ Use root `.env` for Docker Compose, `apps/api/.env` for direct API development, 
 | `SUPABASE_SERVICE_ROLE_KEY` | Required for admin/storage features | Server-only key. Do not expose it to the browser. |
 | `CORS_ORIGIN` | Recommended | Allowed frontend origin. Defaults to `*`. |
 | `OPENAPI_SPEC_PATH` | Optional | Overrides the served OpenAPI JSON path. |
+| `QC_AGENT_WEBHOOK_SECRET` | Required for AI/n8n landing content webhooks | Shared secret checked from the `x-qc-agent-secret` header. Server-only; never expose it in the frontend. |
 
 ### Frontend Build/Runtime
 
@@ -152,6 +153,8 @@ Use root `.env` for Docker Compose, `apps/api/.env` for direct API development, 
 | `NEXT_PUBLIC_SUPABASE_URL` | Required | Browser-safe Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Required | Browser-safe Supabase anon key. |
 | `API_INTERNAL_URL` | Optional | Used by Next.js rewrites for `/api-proxy/*`; defaults to `http://qc-api:3001`. |
+| `PUBLIC_SITE_URL` | Optional | Public web origin used for landing-page metadata, for example `https://gerbil.qc`. |
+| `LANDING_PAGE_REVALIDATE_SECONDS` | Optional | Landing page metadata/static cache interval. Defaults to `60`. |
 
 ### Integrations and Operations
 
@@ -184,6 +187,7 @@ Primary route prefixes:
 | `/test-cases`, `/test-suites`, `/test-executions`, `/test-results` | Test authoring, suites, runs, executions, and uploaded results |
 | `/dashboard`, `/dashboards`, `/reports`, `/governance` | Metrics, role dashboards, reporting, and quality gates |
 | `/roles`, `/admin/access`, `/users` | RBAC, access engine, users, and permission management |
+| `/public/landing-page`, `/admin/landing-page`, `/webhooks/landing-content` | Public landing content, admin landing configuration, and AI/n8n content intake |
 | `/journeys`, `/my-journeys`, `/my-tasks` | Onboarding journeys and personal work |
 | `/notifications`, `/search`, `/attachments` | Cross-cutting app features |
 | `/tuleap-webhook`, `/tuleap/artifacts` | Tuleap inbound webhook handling and outbound artifact APIs |
@@ -192,7 +196,7 @@ Primary route prefixes:
 
 ## Data and Migration Model
 
-- The app uses PostgreSQL tables such as `projects`, `tasks`, `task_resource_assignment`, `resources`, `app_user`, `teams`, `project_teams`, `project_managers`, `user_stories`, `bugs`, `test_case`, `test_suites`, `test_run`, `test_execution`, `test_result`, `report_jobs`, `notifications`, `tuleap_sync_config`, `tuleap_webhook_log`, and artifact link/access tables.
+- The app uses PostgreSQL tables such as `projects`, `tasks`, `task_resource_assignment`, `resources`, `app_user`, `teams`, `project_teams`, `project_managers`, `user_stories`, `bugs`, `test_case`, `test_suites`, `test_run`, `test_execution`, `test_result`, `report_jobs`, `notifications`, `tuleap_sync_config`, `tuleap_webhook_log`, `landing_page_config`, `landing_page_features`, `roadmap_items`, `changelog_entries`, `ai_content_generation_logs`, and artifact link/access tables.
 - `projects`, `tasks`, bugs, tests, and related artifacts use soft-delete fields where supported. Prefer `deleted_at` over hard deletion in app behavior.
 - `apps/api/src/config/db.js` runs idempotent startup migrations and is the authoritative migration path for the running API.
 - `database/migrations/` contains reference SQL and targeted/manual migration files. Use these carefully against disposable or staging databases before production.
@@ -216,6 +220,8 @@ Legacy aliases are canonicalized during permission checks:
 - `member` -> `tester`
 
 Permissions use `qc.*` keys. The Access Engine adds scoped access such as own/team/any visibility and row-action flags through `apps/api/src/services/access/enforcement.js`.
+
+Landing page administration uses `qc.admin.landing_page.manage`. Admin users have wildcard access; other roles must be explicitly granted the permission before they can call the admin endpoints.
 
 User statuses are used by route and scope checks:
 
@@ -242,6 +248,34 @@ Key concepts:
 
 See `CONTEXT.md`, `docs/adr/`, and `docs/04-integrations/n8n-workflows.md` for deeper integration language and decisions.
 
+## Public Landing Page and AI Content Intake
+
+- Public page: `/`
+- Public API: `GET /api/public/landing-page`
+- Admin page: `/admin/landing-config`
+- Admin API: `/api/admin/landing-page/config`, `/features`, `/roadmap`, and `/changelog`
+- AI/n8n webhooks:
+  - `POST /api/webhooks/landing-content/changelog`
+  - `POST /api/webhooks/landing-content/roadmap`
+
+The AI/n8n webhook flow is intentionally narrow: n8n or another agent sends generated Markdown/content with `x-qc-agent-secret`, and QC-Manager stores only landing content. The webhook does not create a user session and does not grant general admin privileges.
+
+Example changelog webhook:
+
+```bash
+curl -X POST "https://api.gerbil.qc/api/webhooks/landing-content/changelog" \
+  -H "Content-Type: application/json" \
+  -H "x-qc-agent-secret: $QC_AGENT_WEBHOOK_SECRET" \
+  -d '{
+    "version_number": "v1.4.0",
+    "title": "Release v1.4.0",
+    "content_markdown": "### Added\n- New dashboard widgets\n\n### Fixed\n- Bug sync issue",
+    "published_at": "2026-06-13T10:00:00Z",
+    "source": "n8n",
+    "source_reference": "workflow-id-or-github-release"
+  }'
+```
+
 ## Deployment
 
 ### Production
@@ -260,8 +294,19 @@ Prerequisites:
 docker network create qc-shared-network
 docker network create qc-network
 cp .env.production.example .env
+# Set QC_AGENT_WEBHOOK_SECRET before exposing AI/n8n landing-content webhooks.
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs -f api
+```
+
+Landing page schema changes run through the API startup migration in `apps/api/src/config/db.js`. After deploying new images, restart/recreate the API container and check its logs for `Database migrations completed successfully`:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d --force-recreate
+docker compose -f docker-compose.prod.yml logs -f api
+curl -f https://api.gerbil.qc/api/public/landing-page
+curl -I https://gerbil.qc/
 ```
 
 ### Staging
@@ -283,6 +328,7 @@ Required GitHub secrets include Docker Hub credentials, VPS SSH credentials, dom
 - `VPS_HOST`, `VPS_SSH_PORT`, `VPS_USERNAME`, `VPS_SSH_KEY`, `SSH_PASSPHRASE`
 - `WEB_DOMAIN`, `API_DOMAIN`, `STAGING_WEB_DOMAIN`, `STAGING_API_DOMAIN`
 - `JWT_SECRET`, `STAGING_JWT_SECRET`
+- `QC_AGENT_WEBHOOK_SECRET`, `STAGING_QC_AGENT_WEBHOOK_SECRET`
 - `POSTGRES_PASSWORD`, `STAGING_POSTGRES_PASSWORD`
 - `SUPABASE_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
 - `N8N_WEBHOOK_URL`, `CORS_ORIGIN`, `STAGING_CORS_ORIGIN`

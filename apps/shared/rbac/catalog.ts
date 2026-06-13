@@ -165,6 +165,7 @@ const PERMISSIONS = Object.freeze({
     ADMIN_MANAGE_TEAMS: 'qc.admin.manage_teams',
     ADMIN_MANAGE_INTEGRATIONS: 'qc.admin.manage_integrations',
     ADMIN_MANAGE_SETTINGS: 'qc.admin.manage_settings',
+    ADMIN_LANDING_PAGE_MANAGE: 'qc.admin.landing_page.manage',
     ADMIN_VIEW_AUDIT_LOG: 'qc.admin.view_audit_log',
 
     // --- Dashboards ---

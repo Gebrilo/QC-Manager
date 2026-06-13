@@ -20,9 +20,10 @@ import { useEffect } from 'react';
 const inter = Inter({ subsets: ['latin'] });
 
 const AUTH_PAGES = ['/login', '/register', '/auth/callback', '/auth/confirmed'];
+const CHROMELESS_PAGES = ['/', ...AUTH_PAGES];
 
 const PAGE_TITLES: Record<string, string> = {
-    '/': 'Dashboard',
+    '/': 'Landing Page',
     '/my-tasks': 'My Tasks',
     '/me/tasks': 'My Tasks',
     '/projects': 'Projects',
@@ -72,6 +73,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/task-history': 'Task History',
     '/team/history': 'Team History',
     '/admin/journeys': 'Journey Management',
+    '/admin/landing-config': 'Landing Page Configuration',
     '/admin/permissions': 'Permissions',
     '/admin/integrations': 'Integrations',
     '/login': 'Login',
@@ -100,7 +102,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
-    const isAuthPage = AUTH_PAGES.includes(pathname || '');
+    const isChromelessPage = CHROMELESS_PAGES.includes(pathname || '');
 
     // useEffect(() => {
     //     document.title = getPageTitle(pathname);
@@ -120,7 +122,7 @@ export default function RootLayout({
                                     <RouteGuard>
                                         <SidebarProvider>
                                             <ApiErrorToaster />
-                                            {isAuthPage ? (
+                                            {isChromelessPage ? (
                                                 <ErrorBoundary>{children}</ErrorBoundary>
                                             ) : (
                                                 <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 transition-colors duration-200 relative">

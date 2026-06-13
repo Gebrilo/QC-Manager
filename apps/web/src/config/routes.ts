@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, FileText, TestTube2 } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, FileText, TestTube2, Megaphone } from 'lucide-react';
 
 const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
 
@@ -36,10 +36,11 @@ interface RouteVisibilityUser {
     status?: UserStatus | null;
 }
 
-const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
 const ACTIVE_ONLY_SCOPES = [SCOPES.ACTIVE_ONLY.key] as const;
 
 const ROUTES: RouteConfig[] = [
+    { path: '/', label: 'Landing Page' },
     { path: '/login', label: 'Login' },
     { path: '/register', label: 'Register' },
     { path: '/auth/callback', label: 'Auth Callback' },
@@ -96,6 +97,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
     { path: '/admin/permissions/matrix', label: 'Permissions Matrix', permission: PERMISSIONS.ADMIN_MANAGE_PERMISSIONS, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.2, icon: ShieldCheck },
+    { path: '/admin/landing-config', label: 'Landing Page', permission: PERMISSIONS.ADMIN_LANDING_PAGE_MANAGE, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.4, icon: Megaphone },
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
     { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/team/journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
@@ -178,6 +180,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
             { path: '/admin/users', label: 'Users', icon: UserCog },
             { path: '/admin/teams', label: 'Teams', icon: Users2 },
             { path: '/admin/journeys', label: 'Journey Templates', icon: Map },
+            { path: '/admin/landing-config', label: 'Landing Page', icon: Megaphone },
             { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
             { path: '/admin/permissions/matrix', label: 'Permissions Matrix', icon: ShieldCheck },
             {

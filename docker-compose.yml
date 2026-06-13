@@ -40,6 +40,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@qc-postgres:5432/${POSTGRES_DB}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+      - QC_AGENT_WEBHOOK_SECRET=${QC_AGENT_WEBHOOK_SECRET:-}
       - NODE_ENV=development
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - TULEAP_BASE_URL=${TULEAP_BASE_URL:-}
@@ -73,6 +74,8 @@ services:
     command: sh -c "apk add --no-cache wget && npm install && npm run dev"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-http://localhost:3000}
+      - LANDING_PAGE_REVALIDATE_SECONDS=${LANDING_PAGE_REVALIDATE_SECONDS:-60}
       - NODE_ENV=development
     volumes:
       - ./apps/web:/app
