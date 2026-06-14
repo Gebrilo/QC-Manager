@@ -447,8 +447,8 @@ export function PublicLandingPage() {
                         </nav>
                         <div className="flex items-center gap-2">
                             <a href="/login" className="hidden h-10 items-center rounded-lg px-4 text-[14px] font-semibold text-slate-600 transition-colors hover:bg-slate-100/70 hover:text-slate-900 sm:inline-flex">Login</a>
-                            <a href={primaryCtaUrl} className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-[18px] text-[14px] font-semibold text-white shadow-[0_10px_15px_-3px_rgba(99,102,241,0.30)] transition-all hover:from-indigo-700 hover:to-violet-700 hover:shadow-[0_10px_25px_-5px_rgba(99,102,241,0.40)]">
-                                {primaryCtaLabel}
+                            <a href="https://gebrils.cloud/register" className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-[18px] text-[14px] font-semibold text-white shadow-[0_10px_15px_-3px_rgba(99,102,241,0.30)] transition-all hover:from-indigo-700 hover:to-violet-700 hover:shadow-[0_10px_25px_-5px_rgba(99,102,241,0.40)]">
+                                Sign up
                                 <ArrowRight className="h-[15px] w-[15px]" />
                             </a>
                         </div>
