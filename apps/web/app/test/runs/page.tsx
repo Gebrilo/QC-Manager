@@ -9,6 +9,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { AllResultsPanel } from '@/components/testing/AllResultsPanel';
 import { Upload } from 'lucide-react';
 
 interface Project {
@@ -132,7 +133,8 @@ export default function TestExecutionsPage() {
     const [filterProject, setFilterProject] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
-    const [activeTab, setActiveTab] = useState<'upload' | 'history'>('upload');
+    const [activeTab, setActiveTab] = useState<'upload' | 'history' | 'results'>('upload');
+    const [resultsProjectId, setResultsProjectId] = useState<string | undefined>(undefined);
 
     // Load projects and recent uploads
     useEffect(() => {
@@ -367,21 +369,35 @@ export default function TestExecutionsPage() {
     };
     const canCreateRun = hasPermission('qc.testexecutions.create') || hasPermission('qc.testresults.upload');
     const canViewGovernance = hasPermission('qc.governance.view');
-    const visibleTab = canCreateRun ? activeTab : 'history';
+    // 'upload' requires create permission; 'history' and 'results' are view-only.
+    const visibleTab = activeTab === 'upload' && !canCreateRun ? 'history' : activeTab;
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const tab = new URLSearchParams(window.location.search).get('tab');
-        setActiveTab(tab === 'history' || !canCreateRun ? 'history' : 'upload');
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        setResultsProjectId(params.get('project_id') || undefined);
+        if (tab === 'results') {
+            setActiveTab('results');
+        } else if (tab === 'history') {
+            setActiveTab('history');
+        } else {
+            setActiveTab(canCreateRun ? 'upload' : 'history');
+        }
     }, [canCreateRun]);
 
-    const switchTab = (tab: 'upload' | 'history') => {
+    const switchTab = (tab: 'upload' | 'history' | 'results') => {
         setActiveTab(tab);
-        router.replace(tab === 'history' ? '/test/runs?tab=history' : '/test/runs', { scroll: false });
+        const path = tab === 'history'
+            ? '/test/runs?tab=history'
+            : tab === 'results'
+                ? '/test/runs?tab=results'
+                : '/test/runs';
+        router.replace(path, { scroll: false });
     };
 
-    const tabClass = (tab: 'upload' | 'history') => [
+    const tabClass = (tab: 'upload' | 'history' | 'results') => [
         'h-10 px-4 border-b-2 text-sm font-semibold transition-colors',
         visibleTab === tab
             ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
@@ -445,6 +461,14 @@ export default function TestExecutionsPage() {
                         onClick={() => switchTab('history')}
                     >
                         Run History
+                    </button>
+                    <button
+                        type="button"
+                        className={tabClass('results')}
+                        aria-current={visibleTab === 'results' ? 'page' : undefined}
+                        onClick={() => switchTab('results')}
+                    >
+                        All Results
                     </button>
                 </div>
             </div>
@@ -918,6 +942,19 @@ export default function TestExecutionsPage() {
                             </table>
                         </div>
                     )}
+                </section>
+                )}
+
+                {/* All Results (per test case) */}
+                {visibleTab === 'results' && (
+                <section className="glass-card p-6">
+                    <div className="mb-4">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">All Results</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Individual test-case results across every run
+                        </p>
+                    </div>
+                    <AllResultsPanel initialProjectId={resultsProjectId} />
                 </section>
                 )}
             {/* Custom animations */}

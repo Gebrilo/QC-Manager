@@ -1,4 +1,4 @@
-import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, FileText, TestTube2, Megaphone } from 'lucide-react';
+import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, TestTube2, Megaphone } from 'lucide-react';
 
 const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
 
@@ -151,7 +151,6 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
                 icon: PlayCircle,
                 children: [
                     { path: '/test/runs', label: 'Test Runs', icon: PlayCircle },
-                    { path: '/test/results', label: 'Results', icon: FileText },
                 ],
             },
             { path: '/quality/governance', label: 'Governance', icon: ShieldCheck },

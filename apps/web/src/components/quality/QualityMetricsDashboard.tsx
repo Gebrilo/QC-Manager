@@ -340,7 +340,7 @@ export default function QualityMetricsDashboard({ projectId }: QualityMetricsDas
       {/* Action Buttons */}
       <div className="flex gap-3">
         <a
-          href={`/test/results?project_id=${projectId}`}
+          href={`/test/runs?tab=results&project_id=${projectId}`}
           className="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           View All Test Results
