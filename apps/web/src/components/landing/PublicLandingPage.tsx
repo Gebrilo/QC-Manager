@@ -621,7 +621,7 @@ export function PublicLandingPage() {
                                 <span className={`${PILL} bg-gradient-to-r from-indigo-500 to-violet-600 text-white`}>AI</span>
                                 <span className="text-[13px] font-medium text-slate-300">A premium capability, not a gimmick</span>
                             </div>
-                            <h2 className="lp-reveal text-[36px] font-extrabold leading-[1.08] tracking-[-0.025em] sm:text-[44px]">
+                            <h2 className="lp-reveal text-[36px] font-extrabold leading-[1.08] tracking-[-0.025em] text-white sm:text-[44px]">
                                 Turn raw activity into{' '}
                                 <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">clear quality updates</span>
                             </h2>
