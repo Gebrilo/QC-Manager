@@ -18,10 +18,12 @@ services:
 
   api:
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@qc-postgres:5432/qc_app
+      - DATABASE_URL=postgresql://postgres:postgres@qc-postgres-dev:5432/qc_app
       - JWT_SECRET=dev-secret-not-for-production-use-only
       - N8N_WEBHOOK_URL=
       - QC_AGENT_WEBHOOK_SECRET=dev-agent-secret
+    volumes:
+      - ./apps/shared:/shared
     ports:
       - "3001:3001"
     healthcheck:
