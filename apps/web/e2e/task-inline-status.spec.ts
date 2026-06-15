@@ -25,12 +25,15 @@ async function mockTaskApis(
     page: Page,
     options: {
         initialTask?: Record<string, unknown>;
-        patchStatus?: number;
+        initialTasks?: Record<string, unknown>[];
+        patchStatus?: number | ((taskId: string, payload: any) => number | undefined);
         patchDelayMs?: number;
-        onPatch?: (payload: any) => void;
+        onPatch?: (payload: any, taskId: string) => void;
     } = {}
 ) {
-    let currentTask = makeTask(options.initialTask);
+    let currentTasks = options.initialTasks
+        ? options.initialTasks.map(task => makeTask(task))
+        : [makeTask(options.initialTask)];
 
     await page.route('**/projects*', async (route) => {
         if (route.request().method() === 'GET') {
@@ -70,12 +73,17 @@ async function mockTaskApis(
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify([currentTask]),
+                body: JSON.stringify(currentTasks),
             });
             return;
         }
 
-        if (path === `/tasks/${taskId}` && method === 'GET') {
+        const taskIdFromPath = path.match(/^\/tasks\/([^/]+)$/)?.[1];
+        const currentTask = taskIdFromPath
+            ? currentTasks.find(task => task.id === taskIdFromPath)
+            : undefined;
+
+        if (taskIdFromPath && method === 'GET' && currentTask) {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -84,25 +92,28 @@ async function mockTaskApis(
             return;
         }
 
-        if (path === `/tasks/${taskId}` && method === 'PATCH') {
+        if (taskIdFromPath && method === 'PATCH' && currentTask) {
             const payload = request.postDataJSON();
-            options.onPatch?.(payload);
+            options.onPatch?.(payload, taskIdFromPath);
             if (options.patchDelayMs) {
                 await new Promise(resolve => setTimeout(resolve, options.patchDelayMs));
             }
-            if (options.patchStatus && options.patchStatus >= 400) {
+            const patchStatus = typeof options.patchStatus === 'function'
+                ? options.patchStatus(taskIdFromPath, payload)
+                : options.patchStatus;
+            if (patchStatus && patchStatus >= 400) {
                 await route.fulfill({
-                    status: options.patchStatus,
+                    status: patchStatus,
                     contentType: 'application/json',
-                    body: JSON.stringify({ error: 'Exploded' }),
+                    body: JSON.stringify({ error: patchStatus === 403 ? 'no permission' : 'Exploded' }),
                 });
                 return;
             }
-            currentTask = { ...currentTask, ...payload };
+            currentTasks = currentTasks.map(task => task.id === taskIdFromPath ? { ...task, ...payload } : task);
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify(currentTask),
+                body: JSON.stringify(currentTasks.find(task => task.id === taskIdFromPath)),
             });
             return;
         }
@@ -113,6 +124,18 @@ async function mockTaskApis(
         }
 
         await route.continue();
+    });
+}
+
+function makeBulkTasks(count: number) {
+    return Array.from({ length: count }, (_, index) => {
+        const sequence = index + 1;
+        return makeTask({
+            id: `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`,
+            task_id: `TSK-${String(sequence).padStart(3, '0')}`,
+            task_name: `Bulk task ${sequence}`,
+            status: 'Todo',
+        });
     });
 }
 
@@ -192,5 +215,88 @@ test.describe('Task inline status control', () => {
 
         await expect(page.getByRole('button', { name: /Change status, currently In Progress/i })).toBeVisible();
         expect(patchPayload).toMatchObject({ status: 'In Progress' });
+    });
+
+    test('bulk updates selected tasks and sends one PATCH per row', async ({ page }) => {
+        const tasks = makeBulkTasks(3);
+        const patchCalls: Array<{ taskId: string; payload: any }> = [];
+        await mockAuthenticatedSession(page, {
+            effectivePermissions: ['qc.tasks.view', 'qc.tasks.edit'],
+            permissions: ['qc.tasks.view', 'qc.tasks.edit'],
+        });
+        await mockTaskApis(page, {
+            initialTasks: tasks,
+            onPatch: (payload, taskId) => { patchCalls.push({ taskId, payload }); },
+        });
+
+        await page.goto('/work/tasks');
+        await page.getByRole('checkbox', { name: 'Select all filtered tasks' }).check();
+        await expect(page.getByTestId('bulk-status-bar')).toContainText('3 selected');
+        await page.getByTestId('bulk-status-select').selectOption('Done');
+        await page.getByTestId('bulk-status-apply').click();
+
+        await expect.poll(() => patchCalls.length).toBe(3);
+        expect(patchCalls.map(call => call.taskId).sort()).toEqual(tasks.map(task => task.id).sort());
+        patchCalls.forEach(call => {
+            expect(call.payload).toMatchObject({
+                status: 'Done',
+                completion_status: 'Completed',
+            });
+            expect(call.payload.completed_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        });
+        await expect(page.getByRole('status').filter({ hasText: '3 updated' })).toBeVisible();
+        for (const task of tasks) {
+            await expect(page.getByTestId(`task-row-${task.id}`).getByRole('button', { name: /currently Done/i })).toBeVisible();
+        }
+    });
+
+    test('bulk partial failure rolls back the failed row and reports a summary', async ({ page }) => {
+        const tasks = makeBulkTasks(3);
+        const failingTask = tasks[1];
+        const patchCalls: Array<{ taskId: string; payload: any }> = [];
+        await mockAuthenticatedSession(page, {
+            effectivePermissions: ['qc.tasks.view', 'qc.tasks.edit'],
+            permissions: ['qc.tasks.view', 'qc.tasks.edit'],
+        });
+        await mockTaskApis(page, {
+            initialTasks: tasks,
+            patchStatus: (id) => id === failingTask.id ? 403 : undefined,
+            onPatch: (payload, taskId) => { patchCalls.push({ taskId, payload }); },
+        });
+
+        await page.goto('/work/tasks');
+        await page.getByRole('checkbox', { name: 'Select all filtered tasks' }).check();
+        await page.getByTestId('bulk-status-select').selectOption('Blocked');
+        await page.getByTestId('bulk-status-apply').click();
+
+        await expect.poll(() => patchCalls.length).toBe(3);
+        await expect(page.getByRole('status').filter({ hasText: '2 updated, 1 failed (no permission)' })).toBeVisible();
+        await expect(page.getByTestId(`task-row-${tasks[0].id}`).getByRole('button', { name: /currently Blocked/i })).toBeVisible();
+        await expect(page.getByTestId(`task-row-${failingTask.id}`).getByRole('button', { name: /currently Todo/i })).toBeVisible();
+        await expect(page.getByTestId(`task-row-${tasks[2].id}`).getByRole('button', { name: /currently Blocked/i })).toBeVisible();
+    });
+
+    test('bulk select all is capped at fifty tasks', async ({ page }) => {
+        const tasks = makeBulkTasks(55);
+        const patchCalls: Array<{ taskId: string; payload: any }> = [];
+        await mockAuthenticatedSession(page, {
+            effectivePermissions: ['qc.tasks.view', 'qc.tasks.edit'],
+            permissions: ['qc.tasks.view', 'qc.tasks.edit'],
+        });
+        await mockTaskApis(page, {
+            initialTasks: tasks,
+            onPatch: (payload, taskId) => { patchCalls.push({ taskId, payload }); },
+        });
+
+        await page.goto('/work/tasks');
+        await page.getByRole('checkbox', { name: 'Select all filtered tasks' }).check();
+        await expect(page.getByTestId('bulk-status-bar')).toContainText('50 selected');
+        await page.getByTestId('bulk-status-select').selectOption('In Progress');
+        await page.getByTestId('bulk-status-apply').click();
+
+        await expect.poll(() => patchCalls.length).toBe(50);
+        expect(new Set(patchCalls.map(call => call.taskId)).size).toBe(50);
+        expect(patchCalls.some(call => call.taskId === tasks[50].id)).toBe(false);
+        await expect(page.getByRole('status').filter({ hasText: '50 updated' })).toBeVisible();
     });
 });

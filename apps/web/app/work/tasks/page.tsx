@@ -11,7 +11,9 @@ import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { taskStatusRegistry } from '@/lib/statusRegistry';
+import { taskStatusRegistry, canEditStatus } from '@/lib/statusRegistry';
+import { BulkStatusActionBar } from '@/components/shared/BulkStatusActionBar';
+import { useToast } from '@/components/ui/Toast';
 
 interface Project { id: string; project_id: string; project_name: string; }
 interface Resource { id: string; resource_name: string; }
@@ -21,6 +23,9 @@ const PRIORITY_COLORS: Record<string, string> = {
     Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
 };
+
+const BULK_SELECTION_LIMIT = 50;
+const BULK_STATUS_CONCURRENCY = 5;
 
 const TASK_BOARD_COLUMNS = taskStatusRegistry.statuses.map(status => {
     const option = taskStatusRegistry.getOption(status);
@@ -49,9 +54,34 @@ function GlassSelect({ value, onChange, children }: { value: string; onChange: (
     );
 }
 
+function getBulkErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'unknown error';
+}
+
+async function runWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+) {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
 export default function TasksPage() {
     const router = useRouter();
     const { hasPermission } = useAuth();
+    const toast = useToast();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
@@ -62,6 +92,8 @@ export default function TasksPage() {
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedAssignee, setSelectedAssignee] = useState('');
     const [selectedPriority, setSelectedPriority] = useState('');
+    const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+    const [isApplyingBulkStatus, setIsApplyingBulkStatus] = useState(false);
 
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
         expected_start_date: false,
@@ -92,6 +124,8 @@ export default function TasksPage() {
             return { ...task, ...next, _can: next._can ?? task._can };
         }));
     };
+
+    const hasTaskStatusEditPermission = hasPermission(taskStatusRegistry.editPermission);
 
     useEffect(() => {
         async function load() {
@@ -132,6 +166,22 @@ export default function TasksPage() {
         });
     }, [tasks, searchTerm, selectedProject, selectedStatus, selectedAssignee, selectedPriority]);
 
+    useEffect(() => {
+        const visibleTaskIds = new Set(filteredTasks.map(task => task.id));
+        setSelectedTaskIds(prev => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (visibleTaskIds.has(id)) {
+                    next.add(id);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [filteredTasks]);
+
     const stats = useMemo(() => ({
         total:       tasks.length,
         inProgress:  tasks.filter(t => taskStatusRegistry.normalize(t.status) === 'In Progress').length,
@@ -140,6 +190,117 @@ export default function TasksPage() {
     }), [tasks]);
 
     const hasAnyFilter = !!(searchTerm || selectedProject || selectedStatus || selectedAssignee || selectedPriority);
+    const taskById = useMemo(() => new Map(tasks.map(task => [task.id, task])), [tasks]);
+    const selectedTasks = useMemo(
+        () => Array.from(selectedTaskIds)
+            .map(id => taskById.get(id))
+            .filter((task): task is Task => Boolean(task)),
+        [selectedTaskIds, taskById]
+    );
+
+    const isTaskSelectable = (task: Task) => canEditStatus(task._can?.edit, hasTaskStatusEditPermission);
+
+    const handleToggleTaskSelection = (taskId: string, selected: boolean) => {
+        const task = taskById.get(taskId);
+        if (!task) return;
+        if (selected && !isTaskSelectable(task)) {
+            toast.warning("You don't have permission to select this task");
+            return;
+        }
+        if (selected && !selectedTaskIds.has(taskId) && selectedTaskIds.size >= BULK_SELECTION_LIMIT) {
+            toast.warning(`Selection is limited to ${BULK_SELECTION_LIMIT} tasks`);
+            return;
+        }
+        setSelectedTaskIds(prev => {
+            const next = new Set(prev);
+            if (selected) {
+                next.add(taskId);
+            } else {
+                next.delete(taskId);
+            }
+            return next;
+        });
+    };
+
+    const handleToggleAllSelection = (selected: boolean) => {
+        if (!selected) {
+            setSelectedTaskIds(new Set());
+            return;
+        }
+
+        const selectableIds = filteredTasks
+            .filter(task => isTaskSelectable(task))
+            .map(task => task.id);
+        const cappedIds = selectableIds.slice(0, BULK_SELECTION_LIMIT);
+        setSelectedTaskIds(new Set(cappedIds));
+        if (selectableIds.length > BULK_SELECTION_LIMIT) {
+            toast.warning(`Selected the first ${BULK_SELECTION_LIMIT} editable tasks. Refine filters to update more.`);
+        }
+    };
+
+    const handleBulkStatusApply = async (nextStatus: string) => {
+        if (selectedTasks.length === 0 || isApplyingBulkStatus) return;
+
+        const normalizedStatus = taskStatusRegistry.normalize(nextStatus);
+        const candidates = selectedTasks.slice(0, BULK_SELECTION_LIMIT);
+        const previousStatuses = new Map(candidates.map(task => [task.id, taskStatusRegistry.normalize(task.status)]));
+        const editableTasks: Task[] = [];
+        const failureReasons: string[] = [];
+
+        candidates.forEach(task => {
+            if (isTaskSelectable(task)) {
+                editableTasks.push(task);
+            } else {
+                failureReasons.push('no permission');
+            }
+        });
+
+        editableTasks.forEach(task => {
+            patchTask(task.id, { status: normalizedStatus as Task['status'] });
+        });
+
+        setIsApplyingBulkStatus(true);
+        try {
+            const results = await runWithConcurrency(editableTasks, BULK_STATUS_CONCURRENCY, async (task) => {
+                const previousStatus = previousStatuses.get(task.id) || taskStatusRegistry.normalize(task.status);
+                const payload = taskStatusRegistry.defaultFills?.(normalizedStatus, { previousStatus }) || {};
+                try {
+                    const updated = await taskStatusRegistry.update(task.id, normalizedStatus, payload);
+                    return { task, ok: true as const, updated };
+                } catch (error) {
+                    return { task, ok: false as const, error };
+                }
+            });
+
+            let updatedCount = 0;
+            let failedCount = failureReasons.length;
+
+            results.forEach(result => {
+                if (result.ok) {
+                    updatedCount += 1;
+                    handleStatusCommitted(result.task.id, normalizedStatus, result.updated);
+                    return;
+                }
+                failedCount += 1;
+                failureReasons.push(getBulkErrorMessage(result.error));
+                const previousStatus = previousStatuses.get(result.task.id) || taskStatusRegistry.normalize(result.task.status);
+                patchTask(result.task.id, { status: previousStatus as Task['status'] });
+            });
+
+            const distinctReasons = Array.from(new Set(failureReasons.filter(Boolean)));
+            const reasonSuffix = distinctReasons.length > 0 ? ` (${distinctReasons.slice(0, 2).join(', ')})` : '';
+            if (failedCount === 0) {
+                toast.success(`${updatedCount} updated`);
+            } else if (updatedCount > 0) {
+                toast.warning(`${updatedCount} updated, ${failedCount} failed${reasonSuffix}`);
+            } else {
+                toast.error(`0 updated, ${failedCount} failed${reasonSuffix}`);
+            }
+            setSelectedTaskIds(new Set());
+        } finally {
+            setIsApplyingBulkStatus(false);
+        }
+    };
 
     return (
         <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
@@ -283,16 +444,29 @@ export default function TasksPage() {
                     onTaskClick={(id) => router.push(`/work/tasks/${id}`)}
                 />
             ) : (
-                <TaskTable
-                    tasks={filteredTasks}
-                    isLoading={isLoading}
-                    columnVisibility={columnVisibility}
-                    onColumnVisibilityChange={setColumnVisibility}
-                    hasStatusEditPermission={hasPermission(taskStatusRegistry.editPermission)}
-                    onStatusOptimisticChange={(taskId, nextStatus) => patchTask(taskId, { status: nextStatus as Task['status'] })}
-                    onStatusCommitted={handleStatusCommitted}
-                    onStatusRolledBack={(taskId, previousStatus) => patchTask(taskId, { status: previousStatus as Task['status'] })}
-                />
+                <>
+                    <BulkStatusActionBar
+                        artifactType="task"
+                        selectedCount={selectedTaskIds.size}
+                        isApplying={isApplyingBulkStatus}
+                        onApplyStatus={handleBulkStatusApply}
+                        onClear={() => setSelectedTaskIds(new Set())}
+                    />
+                    <TaskTable
+                        tasks={filteredTasks}
+                        isLoading={isLoading}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
+                        hasStatusEditPermission={hasTaskStatusEditPermission}
+                        selectedTaskIds={selectedTaskIds}
+                        selectionLimit={BULK_SELECTION_LIMIT}
+                        onToggleTaskSelection={handleToggleTaskSelection}
+                        onToggleAllSelection={handleToggleAllSelection}
+                        onStatusOptimisticChange={(taskId, nextStatus) => patchTask(taskId, { status: nextStatus as Task['status'] })}
+                        onStatusCommitted={handleStatusCommitted}
+                        onStatusRolledBack={(taskId, previousStatus) => patchTask(taskId, { status: previousStatus as Task['status'] })}
+                    />
+                </>
             )}
         </div>
     );

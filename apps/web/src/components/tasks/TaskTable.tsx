@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
@@ -16,6 +16,7 @@ import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusControl } from '@/components/shared/StatusControl';
+import { canEditStatus } from '@/lib/statusRegistry';
 
 export const HIDEABLE_TASK_COLUMNS: { id: string; header: string }[] = [
     { id: 'project_name',       header: 'Project' },
@@ -40,6 +41,10 @@ interface TaskTableProps {
     onStatusOptimisticChange?: (taskId: string, nextStatus: string, previousStatus: string) => void;
     onStatusCommitted?: (taskId: string, nextStatus: string, updated: unknown) => void;
     onStatusRolledBack?: (taskId: string, previousStatus: string, nextStatus: string, error: unknown) => void;
+    selectedTaskIds?: ReadonlySet<string>;
+    selectionLimit?: number;
+    onToggleTaskSelection?: (taskId: string, selected: boolean) => void;
+    onToggleAllSelection?: (selected: boolean) => void;
 }
 
 function buildTaskTooltip(task: Task): string {
@@ -51,6 +56,38 @@ function buildTaskTooltip(task: Task): string {
 }
 
 const columnHelper = createColumnHelper<Task>();
+const EMPTY_SELECTED_TASK_IDS = new Set<string>();
+
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    disabled,
+    onChange,
+}: {
+    checked: boolean;
+    indeterminate: boolean;
+    disabled: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    const ref = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            aria-label="Select all filtered tasks"
+            checked={checked}
+            disabled={disabled}
+            onClick={event => event.stopPropagation()}
+            onChange={event => onChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+    );
+}
 
 export function TaskTable({
     tasks,
@@ -63,6 +100,10 @@ export function TaskTable({
     onStatusOptimisticChange,
     onStatusCommitted,
     onStatusRolledBack,
+    selectedTaskIds = EMPTY_SELECTED_TASK_IDS,
+    selectionLimit = 50,
+    onToggleTaskSelection,
+    onToggleAllSelection,
 }: TaskTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [internalVisibility, setInternalVisibility] = useState<VisibilityState>({
@@ -71,8 +112,66 @@ export function TaskTable({
     });
     const columnVisibility = controlledVisibility ?? internalVisibility;
     const setColumnVisibility = onColumnVisibilityChange ?? setInternalVisibility;
+    const selectionEnabled = Boolean(onToggleTaskSelection);
+    const selectableTaskIds = useMemo(
+        () => tasks
+            .filter(task => canEditStatus(task._can?.edit, hasStatusEditPermission))
+            .map(task => task.id),
+        [tasks, hasStatusEditPermission]
+    );
+    const cappedSelectableTaskIds = useMemo(
+        () => selectableTaskIds.slice(0, selectionLimit),
+        [selectableTaskIds, selectionLimit]
+    );
+    const selectedVisibleCount = cappedSelectableTaskIds.filter(id => selectedTaskIds.has(id)).length;
+    const allVisibleSelected = cappedSelectableTaskIds.length > 0 && selectedVisibleCount === cappedSelectableTaskIds.length;
+    const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+    const selectionAtLimit = selectedTaskIds.size >= selectionLimit;
 
-    const columns = useMemo(() => [
+    const columns = useMemo(() => {
+        const selectionColumn = columnHelper.display({
+            id: 'select',
+            header: () => (
+                <SelectAllCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected}
+                    disabled={!onToggleAllSelection || cappedSelectableTaskIds.length === 0}
+                    onChange={(checked) => onToggleAllSelection?.(checked)}
+                />
+            ),
+            enableHiding: false,
+            enableSorting: false,
+            cell: (info) => {
+                const task = info.row.original;
+                const checked = selectedTaskIds.has(task.id);
+                const editable = canEditStatus(task._can?.edit, hasStatusEditPermission);
+                const disabledReason = !editable
+                    ? "You don't have permission to select this task"
+                    : !checked && selectionAtLimit
+                        ? `Selection is limited to ${selectionLimit} tasks`
+                        : '';
+                const checkbox = (
+                    <input
+                        type="checkbox"
+                        data-testid={`select-task-${task.id}`}
+                        aria-label={`Select task ${task.task_id}`}
+                        checked={checked}
+                        disabled={Boolean(disabledReason)}
+                        onChange={event => onToggleTaskSelection?.(task.id, event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                );
+
+                if (!disabledReason) return checkbox;
+                return (
+                    <SimpleTooltip content={disabledReason} position="top">
+                        <span className="inline-flex cursor-not-allowed">{checkbox}</span>
+                    </SimpleTooltip>
+                );
+            },
+        });
+
+        const dataColumns = [
         columnHelper.accessor('task_id', {
             id: 'task_id',
             header: 'ID',
@@ -195,7 +294,24 @@ export function TaskTable({
                 </Link>
             ),
         }),
-    ], [hasStatusEditPermission, onStatusOptimisticChange, onStatusCommitted, onStatusRolledBack]);
+        ];
+
+        return selectionEnabled ? [selectionColumn, ...dataColumns] : dataColumns;
+    }, [
+        allVisibleSelected,
+        cappedSelectableTaskIds.length,
+        hasStatusEditPermission,
+        onStatusOptimisticChange,
+        onStatusCommitted,
+        onStatusRolledBack,
+        onToggleAllSelection,
+        onToggleTaskSelection,
+        selectedTaskIds,
+        selectionAtLimit,
+        selectionEnabled,
+        selectionLimit,
+        someVisibleSelected,
+    ]);
 
     const table = useReactTable({
         data: tasks,
@@ -242,7 +358,7 @@ export function TaskTable({
                     .tasks-table-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 5px; }
                     .tasks-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
                 `}</style>
-                <table className="w-full text-sm tasks-table-scroll" style={{ minWidth: 1100 }}>
+                <table className="w-full text-sm tasks-table-scroll" style={{ minWidth: selectionEnabled ? 1140 : 1100 }}>
                     <thead>
                         <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
                             {table.getHeaderGroups()[0].headers.map((header, i) => (
@@ -257,7 +373,7 @@ export function TaskTable({
                                                 : 'px-3',
                                         header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200' : '',
                                     ].join(' ')}
-                                    style={i === 0 ? { minWidth: 90 } : {}}
+                                    style={i === 0 ? { minWidth: selectionEnabled ? 48 : 90 } : {}}
                                     onClick={header.column.getToggleSortingHandler()}
                                 >
                                     {header.isPlaceholder ? null : (
@@ -309,10 +425,11 @@ export function TaskTable({
                              </tr>
                          ) : (
                             table.getRowModel().rows.map(row => (
-                                <tr
-                                    key={row.id}
-                                    className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group"
-                                >
+	                                <tr
+	                                    key={row.id}
+                                        data-testid={`task-row-${row.original.id}`}
+	                                    className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group"
+	                                >
                                     {row.getVisibleCells().map((cell, ci) => (
                                         <td
                                             key={cell.id}
