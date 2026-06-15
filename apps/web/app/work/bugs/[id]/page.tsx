@@ -25,6 +25,8 @@ const BUG_AUTO_DETAIL_EXCLUDE = [
     'title',
     'status',
     'bug_id',
+    'project_name',
+    'tuleap_artifact_id',
     'description',
     'dev_fix_description',
     'qc_verification_notes',
@@ -37,7 +39,6 @@ const BUG_AUTO_DETAIL_LABELS = {
     reported_date: 'Reported',
     created_at: 'Created',
     updated_at: 'Last Updated',
-    project_name: 'Project',
 };
 
 function formatEffortHours(value: unknown) {

@@ -256,6 +256,7 @@ export default function TestCaseDetailPage() {
                             'title',
                             'status',
                             'test_case_id',
+                            'project_name',
                             'description',
                             'preconditions',
                             'test_steps',
@@ -268,9 +269,21 @@ export default function TestCaseDetailPage() {
                             estimated_duration_minutes: 'Est. Duration',
                             linked_requirement_id: 'Requirement',
                             suite_title: 'Suite Title',
+                            tuleap_artifact_id: 'Tuleap',
                         }}
                         formatters={{
                             estimated_duration_minutes: (v) => (v == null ? null : `${v} min`),
+                            tuleap_artifact_id: (v) =>
+                                v == null ? null : (
+                                    <a
+                                        href={testCase.tuleap_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                                    >
+                                        Artifact #{String(v)}
+                                    </a>
+                                ),
                         }}
                     />
 

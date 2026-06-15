@@ -387,7 +387,7 @@ export default function TestSuiteDetailPage() {
                     <AutoDetailsCard
                         record={{ ...suite }}
                         title="Overview"
-                        exclude={['name', 'status', 'suite_id', 'description', 'test_cases']}
+                        exclude={['name', 'status', 'suite_id', 'project_name', 'description', 'test_cases']}
                         labels={{
                             test_case_count: 'Cases',
                             last_run_pass_rate: 'Pass Rate',
@@ -396,6 +396,7 @@ export default function TestSuiteDetailPage() {
                             updated_at: 'Last Updated',
                         }}
                         formatters={{
+                            test_case_count: (v) => String(v ?? testCases.length),
                             last_run_pass_rate: (v) => (v == null ? null : `${Math.round(Number(v) * 100)}%`),
                         }}
                     />
