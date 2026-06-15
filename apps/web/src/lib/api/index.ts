@@ -1095,13 +1095,16 @@ export const testSuitesApi = {
         test_type?: string;
         automation_status?: string;
         category?: string;
+        suite_title?: string;
+        created_by?: string;
+        tags?: string;
+        match_suite_title?: boolean;
     }) => {
         const cleanParams: Record<string, string> = {};
         if (params) {
             Object.entries(params).forEach(([key, value]) => {
-                if (value !== undefined && value !== null && value !== '') {
-                    cleanParams[key] = String(value);
-                }
+                if (value === undefined || value === null || value === '') return;
+                cleanParams[key] = typeof value === 'boolean' ? String(value) : String(value);
             });
         }
         const query = new URLSearchParams(cleanParams).toString();

@@ -283,7 +283,16 @@ export default function EditTestSuitePage() {
     const [loadingAvail, setLoadingAvail]     = useState(false);
     const [selectedIds, setSelectedIds]       = useState<Set<string>>(new Set());
     const [addingCases, setAddingCases]       = useState(false);
-    const [caseSearch, setCaseSearch]         = useState('');
+    const [pickerTab, setPickerTab]           = useState<'suggested' | 'all' | 'search'>('suggested');
+    const [searchFilters, setSearchFilters]   = useState({
+        suite_title: '',
+        title: '',
+        priority: '',
+        status: '',
+        category: '',
+        created_by: '',
+        tags: '',
+    });
 
     // Scroll-tracking for section nav
     useEffect(() => {
@@ -354,16 +363,45 @@ export default function EditTestSuitePage() {
         }
     };
 
-    const handleOpenAddPanel = async () => {
-        if (showAddPanel) { setShowAddPanel(false); return; }
-        setShowAddPanel(true);
-        if (availableCases.length > 0) return;
+    const loadAvailableCases = useCallback(async (mode: 'suggested' | 'all' | 'search') => {
         setLoadingAvail(true);
         try {
-            const res = await testSuitesApi.availableTestCases(id, { limit: 200 }) as any;
+            let params: any = { limit: 200 };
+            if (mode === 'suggested') {
+                params = { ...params, match_suite_title: true };
+            } else if (mode === 'search') {
+                const trimmed: Record<string, string> = {};
+                Object.entries(searchFilters).forEach(([k, v]) => {
+                    if (v && String(v).trim() !== '') trimmed[k] = String(v).trim();
+                });
+                params = { ...params, ...trimmed };
+            }
+            const res = await testSuitesApi.availableTestCases(id, params) as any;
             setAvailableCases(Array.isArray(res.data) ? res.data : []);
         } catch { /* ignore */ }
         finally { setLoadingAvail(false); }
+    }, [id, searchFilters]);
+
+    const handleOpenAddPanel = async () => {
+        if (showAddPanel) { setShowAddPanel(false); return; }
+        setShowAddPanel(true);
+        setSelectedIds(new Set());
+        await loadAvailableCases(pickerTab);
+    };
+
+    const handleSwitchTab = async (tab: 'suggested' | 'all' | 'search') => {
+        if (tab === pickerTab) return;
+        setPickerTab(tab);
+        setSelectedIds(new Set());
+        if (showAddPanel) {
+            await loadAvailableCases(tab);
+        }
+    };
+
+    const handleReloadSearch = async () => {
+        if (!showAddPanel) return;
+        setSelectedIds(new Set());
+        await loadAvailableCases('search');
     };
 
     const handleAddCases = async () => {
@@ -374,7 +412,6 @@ export default function EditTestSuitePage() {
             setSelectedIds(new Set());
             setAvailableCases([]);
             setShowAddPanel(false);
-            setCaseSearch('');
             await loadSuite();
         } catch (err: any) {
             toast.error(err.message || 'Failed to add test cases');
@@ -411,9 +448,7 @@ export default function EditTestSuitePage() {
 
     const passRate = suite?.last_run_pass_rate != null ? `${Math.round(suite.last_run_pass_rate * 100)}%` : null;
     const lastRun  = suite?.last_run_date ? format(new Date(suite.last_run_date), 'dd MMM, yyyy') : null;
-    const filteredAvailable = availableCases.filter(tc =>
-        !caseSearch || tc.title?.toLowerCase().includes(caseSearch.toLowerCase()) || tc.test_case_id?.toLowerCase().includes(caseSearch.toLowerCase())
-    );
+    const filteredAvailable = availableCases;
 
     return (
         <div className="max-w-[1400px] mx-auto px-6 py-6">
@@ -560,25 +595,139 @@ export default function EditTestSuitePage() {
                                         )}
                                     </div>
 
-                                    {/* Search */}
-                                    <div className="relative mb-3">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                                            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                                        </svg>
-                                        <input
-                                            type="text"
-                                            placeholder="Search by ID or title…"
-                                            value={caseSearch}
-                                            onChange={e => setCaseSearch(e.target.value)}
-                                            className="w-full h-8 pl-8 pr-3 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
-                                        />
+                                    {/* Tabs */}
+                                    <div className="flex items-center gap-1 mb-3 border-b border-violet-200/40 dark:border-violet-800/40">
+                                        {(['suggested', 'all', 'search'] as const).map(tab => {
+                                            const label = tab === 'suggested' ? 'Suggested' : tab === 'all' ? 'All' : 'Search';
+                                            const isActive = pickerTab === tab;
+                                            return (
+                                                <button
+                                                    key={tab}
+                                                    type="button"
+                                                    onClick={() => handleSwitchTab(tab)}
+                                                    className={
+                                                        'h-8 px-3 text-xs font-semibold uppercase tracking-wider transition-all border-b-2 -mb-px ' +
+                                                        (isActive
+                                                            ? 'border-violet-500 text-violet-700 dark:text-violet-300'
+                                                            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200')
+                                                    }
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
+
+                                    {pickerTab === 'suggested' && (
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                                            Test cases whose <span className="font-mono">suite_title</span> matches this suite&rsquo;s name (normalised: lower, trimmed, internal whitespace collapsed).
+                                        </p>
+                                    )}
+
+                                    {pickerTab === 'search' && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Suite Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={searchFilters.suite_title}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, suite_title: e.target.value }))}
+                                                    placeholder="Exact match"
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Title contains</label>
+                                                <input
+                                                    type="text"
+                                                    value={searchFilters.title}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, title: e.target.value }))}
+                                                    placeholder="Login…"
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Priority</label>
+                                                <select
+                                                    value={searchFilters.priority}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, priority: e.target.value }))}
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-violet-500 transition-all"
+                                                >
+                                                    <option value="">Any</option>
+                                                    <option value="critical">Critical</option>
+                                                    <option value="high">High</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="low">Low</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Status</label>
+                                                <select
+                                                    value={searchFilters.status}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, status: e.target.value }))}
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-violet-500 transition-all"
+                                                >
+                                                    <option value="">Any</option>
+                                                    <option value="None">None</option>
+                                                    <option value="Not Run">Not Run</option>
+                                                    <option value="Review">Review</option>
+                                                    <option value="Pass">Pass</option>
+                                                    <option value="Fail">Fail</option>
+                                                    <option value="Blocked">Blocked</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                                                <input
+                                                    type="text"
+                                                    value={searchFilters.category}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, category: e.target.value }))}
+                                                    placeholder="Exact match"
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Created by (UUID)</label>
+                                                <input
+                                                    type="text"
+                                                    value={searchFilters.created_by}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, created_by: e.target.value }))}
+                                                    placeholder="UUID"
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">Tags (comma-separated, any match)</label>
+                                                <input
+                                                    type="text"
+                                                    value={searchFilters.tags}
+                                                    onChange={e => setSearchFilters(s => ({ ...s, tags: e.target.value }))}
+                                                    placeholder="login, smoke"
+                                                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleReloadSearch}
+                                                    disabled={loadingAvail}
+                                                    className="h-7 px-3 text-xs rounded-lg bg-violet-600 text-white font-semibold shadow-sm hover:bg-violet-700 disabled:opacity-50"
+                                                >
+                                                    {loadingAvail ? 'Searching…' : 'Apply filters'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {loadingAvail ? (
                                         <div className="flex items-center justify-center py-6"><Spinner size="sm" /></div>
                                     ) : filteredAvailable.length === 0 ? (
                                         <p className="text-xs text-slate-400 text-center py-4">
-                                            {caseSearch ? 'No matching test cases.' : 'No additional test cases available to add.'}
+                                            {pickerTab === 'suggested'
+                                                ? 'No test cases with a matching suite_title in this project.'
+                                                : pickerTab === 'search'
+                                                    ? 'No test cases match your filters.'
+                                                    : 'No additional test cases available to add.'}
                                         </p>
                                     ) : (
                                         <>
@@ -612,7 +761,12 @@ export default function EditTestSuitePage() {
                                                             className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 flex-shrink-0"
                                                         />
                                                         <span className="font-mono text-[11px] font-semibold text-violet-600 dark:text-violet-300 flex-shrink-0 w-20">{tc.test_case_id}</span>
-                                                        <span className="text-xs text-slate-700 dark:text-slate-200 flex-1 truncate">{tc.title}</span>
+                                                        <span className="text-xs text-slate-700 dark:text-slate-200 flex-1 truncate">
+                                                            {tc.title}
+                                                            {tc.suite_title && (
+                                                                <span className="ml-2 text-[10px] text-slate-400 font-mono">⟶ {tc.suite_title}</span>
+                                                            )}
+                                                        </span>
                                                         {tc.priority && <PriorityBadge priority={tc.priority} />}
                                                     </label>
                                                 ))}

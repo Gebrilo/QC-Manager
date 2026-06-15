@@ -358,6 +358,8 @@ router.get('/:id/available-test-cases', requireAuth, blockContributors, requireP
         const {
             page = 1, limit = 50, search, status, priority,
             test_type, automation_status, category,
+            suite_title, created_by, tags,
+            match_suite_title,
         } = req.query;
 
         const pageNum = Math.max(1, parseInt(page));
@@ -365,7 +367,7 @@ router.get('/:id/available-test-cases', requireAuth, blockContributors, requireP
         const offset = (pageNum - 1) * limitNum;
 
         const suiteResult = await pool.query(
-            'SELECT id, project_id FROM test_suites WHERE id = $1 AND deleted_at IS NULL',
+            'SELECT id, project_id, name FROM test_suites WHERE id = $1 AND deleted_at IS NULL',
             [id]
         );
         if (suiteResult.rows.length === 0) {
@@ -395,6 +397,30 @@ router.get('/:id/available-test-cases', requireAuth, blockContributors, requireP
         if (test_type) { whereClauses.push(`tc.test_type = $${pn++}`); params.push(test_type); }
         if (automation_status) { whereClauses.push(`tc.automation_status = $${pn++}`); params.push(automation_status); }
         if (category) { whereClauses.push(`tc.category = $${pn++}`); params.push(category); }
+        if (suite_title) {
+            whereClauses.push(`tc.suite_title = $${pn++}`);
+            params.push(suite_title);
+        }
+        if (created_by) {
+            whereClauses.push(`tc.created_by = $${pn++}`);
+            params.push(created_by);
+        }
+        if (tags) {
+            const tagList = String(tags).split(',').map(t => t.trim()).filter(Boolean);
+            if (tagList.length > 0) {
+                whereClauses.push(`tc.tags && $${pn++}::text[]`);
+                params.push(tagList);
+            }
+        }
+        if (match_suite_title === 'true' || match_suite_title === true) {
+            // Normalized exact match: suite name vs test case suite_title.
+            // normalize = lower + trim + collapse internal whitespace.
+            whereClauses.push(
+                `lower(regexp_replace(trim(tc.suite_title), '\\s+', ' ', 'g')) = ` +
+                `lower(regexp_replace(trim($${pn++}), '\\s+', ' ', 'g'))`
+            );
+            params.push(suiteResult.rows[0].name || '');
+        }
 
         const whereStr = whereClauses.join(' AND ');
         const countResult = await pool.query(
@@ -405,7 +431,7 @@ router.get('/:id/available-test-cases', requireAuth, blockContributors, requireP
         const dataResult = await pool.query(
             `SELECT
                 tc.id, tc.test_case_id, tc.title, tc.status, tc.priority,
-                tc.test_type, tc.automation_status, tc.category, tc.updated_at
+                tc.test_type, tc.automation_status, tc.category, tc.suite_title, tc.tags, tc.created_by, tc.updated_at
              FROM test_case tc
              WHERE ${whereStr}
              ORDER BY tc.test_case_id ASC, tc.title ASC
