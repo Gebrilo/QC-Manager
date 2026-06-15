@@ -2371,6 +2371,9 @@ const runMigrations = async () => {
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS linked_bug_ids UUID[] DEFAULT '{}'",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES app_user(id) ON DELETE SET NULL",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS created_by_user_id UUID REFERENCES app_user(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS owner_team_id UUID REFERENCES teams(id) ON DELETE SET NULL",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS visibility_scope VARCHAR(20)",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES app_user(id) ON DELETE SET NULL",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'pending'",
@@ -2436,6 +2439,8 @@ const runMigrations = async () => {
             "CREATE INDEX IF NOT EXISTS idx_test_case_sync_status ON test_case(sync_status) WHERE sync_status != 'synced'",
             "CREATE INDEX IF NOT EXISTS idx_test_case_assigned_to ON test_case(assigned_to) WHERE deleted_at IS NULL",
             "CREATE INDEX IF NOT EXISTS idx_test_case_created_by ON test_case(created_by) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_owner_team_id ON test_case(owner_team_id) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_visibility_scope ON test_case(visibility_scope) WHERE deleted_at IS NULL",
             "CREATE INDEX IF NOT EXISTS idx_test_case_test_case_id ON test_case(test_case_id) WHERE deleted_at IS NULL",
             "CREATE INDEX IF NOT EXISTS idx_test_case_suite_title_norm ON test_case (project_id, lower(regexp_replace(trim(suite_title), '\\s+', ' ', 'g'))) WHERE suite_title IS NOT NULL AND deleted_at IS NULL",
         ];
@@ -2853,7 +2858,7 @@ const runMigrations = async () => {
                 has_deleted_at BOOLEAN;
                 where_clause TEXT;
             BEGIN
-                FOREACH artifact_table IN ARRAY ARRAY['bugs','tasks','test_cases','test_executions','test_suites','user_stories']
+                FOREACH artifact_table IN ARRAY ARRAY['bugs','tasks','test_case','test_cases','test_executions','test_suites','user_stories']
                 LOOP
                     IF to_regclass(format('public.%I', artifact_table)) IS NULL THEN CONTINUE; END IF;
                     EXECUTE format('ALTER TABLE %I
@@ -3016,7 +3021,7 @@ const runMigrations = async () => {
             DO $$
             DECLARE artifact_table TEXT;
             BEGIN
-                FOREACH artifact_table IN ARRAY ARRAY['bugs','tasks','test_cases','test_executions','test_suites','user_stories']
+                FOREACH artifact_table IN ARRAY ARRAY['bugs','tasks','test_case','test_cases','test_executions','test_suites','user_stories']
                 LOOP
                     IF to_regclass(format('public.%I', artifact_table)) IS NULL THEN CONTINUE; END IF;
                     EXECUTE format('UPDATE %I a SET owner_team_id = p.team_id FROM projects p
