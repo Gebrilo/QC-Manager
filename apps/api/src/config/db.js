@@ -1167,24 +1167,8 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_project_id ON test_result(project_id) WHERE deleted_at IS NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_result_executed_at ON test_result(executed_at) WHERE deleted_at IS NULL`);
 
-        await client.query(`
-            CREATE OR REPLACE VIEW v_latest_test_results AS
-            SELECT DISTINCT ON (tr.project_id, tr.test_case_id)
-                tr.id,
-                tr.test_case_id,
-                tr.test_case_title,
-                tr.project_id,
-                tr.status,
-                tr.executed_at,
-                tr.notes,
-                tr.tester_name,
-                p.project_name,
-                CURRENT_DATE - tr.executed_at AS days_since_execution
-            FROM test_result tr
-            LEFT JOIN projects p ON tr.project_id = p.id
-            WHERE tr.deleted_at IS NULL
-            ORDER BY tr.project_id, tr.test_case_id, tr.executed_at DESC, tr.created_at DESC
-        `);
+        // v_latest_test_results is defined later (after the test_execution.test_case_title
+        // ALTER) so a fresh-DB bootstrap has the column available — see below.
 
         // =====================================================
         // GOVERNANCE VIEWS
@@ -1314,49 +1298,46 @@ const runMigrations = async () => {
                     AND tr.started_at >= CURRENT_DATE - INTERVAL '14 days'
                     AND tr.started_at <  CURRENT_DATE - INTERVAL '7 days'
                 GROUP BY tr.project_id
+            ),
+            flag_calc AS (
+                SELECT
+                    p.id AS project_id, p.project_name, p.status AS project_status,
+                    COALESCE(lm.pass_rate, 0)     AS latest_pass_rate_pct,
+                    COALESCE(lm.not_run_pct, 0)   AS latest_not_run_pct,
+                    COALESCE(lm.failed, 0)        AS latest_failed_count,
+                    lm.days_since_execution       AS days_since_latest_execution,
+                    COALESCE(lm.total_executions, 0) AS total_test_cases,
+                    COALESCE(rw.pass_rate, 0)     AS recent_pass_rate,
+                    COALESCE(pw.pass_rate, 0)     AS previous_pass_rate,
+                    COALESCE(rw.pass_rate,0) - COALESCE(pw.pass_rate,0) AS pass_rate_change,
+                    ARRAY_REMOVE(ARRAY[
+                        CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 'LOW_PASS_RATE' END,
+                        CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 'HIGH_NOT_RUN' END,
+                        CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 'STALE_TESTS' END,
+                        CASE WHEN COALESCE(lm.failed,0)>10 THEN 'HIGH_FAILURE_COUNT' END,
+                        CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 'DECLINING_TREND' END,
+                        CASE WHEN lm.total_executions IS NULL THEN 'NO_TESTS' END
+                    ], NULL) AS risk_flags
+                FROM projects p
+                LEFT JOIN latest_metrics lm ON lm.project_id = p.id
+                LEFT JOIN recent_week rw ON rw.project_id = p.id
+                LEFT JOIN prev_week pw ON pw.project_id = p.id
+                WHERE p.deleted_at IS NULL
             )
             SELECT
-                p.id AS project_id, p.project_name, p.status AS project_status,
-                COALESCE(lm.pass_rate, 0)     AS latest_pass_rate_pct,
-                COALESCE(lm.not_run_pct, 0)   AS latest_not_run_pct,
-                COALESCE(lm.failed, 0)        AS latest_failed_count,
-                lm.days_since_execution       AS days_since_latest_execution,
-                COALESCE(lm.total_executions, 0) AS total_test_cases,
-                COALESCE(rw.pass_rate, 0)     AS recent_pass_rate,
-                COALESCE(pw.pass_rate, 0)     AS previous_pass_rate,
-                COALESCE(rw.pass_rate,0) - COALESCE(pw.pass_rate,0) AS pass_rate_change,
+                fc.project_id, fc.project_name, fc.project_status,
+                fc.latest_pass_rate_pct, fc.latest_not_run_pct, fc.latest_failed_count,
+                fc.days_since_latest_execution, fc.total_test_cases,
+                fc.recent_pass_rate, fc.previous_pass_rate, fc.pass_rate_change,
                 7 AS recent_execution_days,
-                ARRAY_REMOVE(ARRAY[
-                    CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 'LOW_PASS_RATE' END,
-                    CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 'HIGH_NOT_RUN' END,
-                    CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 'STALE_TESTS' END,
-                    CASE WHEN COALESCE(lm.failed,0)>10 THEN 'HIGH_FAILURE_COUNT' END,
-                    CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 'DECLINING_TREND' END,
-                    CASE WHEN lm.total_executions IS NULL THEN 'NO_TESTS' END
-                ], NULL) AS risk_flags,
-                (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
-                 CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
-                 CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
-                 CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
-                 CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) AS risk_flag_count,
+                fc.risk_flags,
+                COALESCE(array_length(fc.risk_flags, 1), 0) AS risk_flag_count,
                 CASE
-                    WHEN (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
-                          CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) >= 2 THEN 'CRITICAL'
-                    WHEN (CASE WHEN lm.total_executions IS NULL OR COALESCE(lm.pass_rate,0)<80 THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.not_run_pct,0)>20 THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.days_since_execution,999)>14 OR lm.total_executions IS NULL THEN 1 ELSE 0 END +
-                          CASE WHEN COALESCE(lm.failed,0)>10 THEN 1 ELSE 0 END +
-                          CASE WHEN (COALESCE(rw.pass_rate,0)-COALESCE(pw.pass_rate,0))<-10 THEN 1 ELSE 0 END) >= 1 THEN 'WARNING'
+                    WHEN COALESCE(array_length(fc.risk_flags, 1), 0) >= 2 THEN 'CRITICAL'
+                    WHEN COALESCE(array_length(fc.risk_flags, 1), 0) >= 1 THEN 'WARNING'
                     ELSE 'NORMAL'
                 END AS risk_level
-            FROM projects p
-            LEFT JOIN latest_metrics lm ON lm.project_id = p.id
-            LEFT JOIN recent_week rw ON rw.project_id = p.id
-            LEFT JOIN prev_week pw ON pw.project_id = p.id
-            WHERE p.deleted_at IS NULL
+            FROM flag_calc fc
         `);
 
         await client.query(`
@@ -1894,6 +1875,35 @@ const runMigrations = async () => {
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
         await client.query(`ALTER TABLE test_execution ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES app_user(id) ON DELETE SET NULL`);
         await client.query(`ALTER TABLE test_execution ALTER COLUMN test_case_id DROP NOT NULL`);
+
+        // Defined here (not up in the views block) because it depends on test_execution
+        // columns added by the ALTERs just above (test_case_title, executed_at, executed_by).
+        // Rewired from the empty test_result table to the live test_run/test_execution
+        // pipeline: latest execution per (project, test_case). Status is mapped back to the
+        // published passed/failed vocabulary so consumers' filters/badges keep working;
+        // tester_name resolves from app_user via executed_by. DROP+CREATE (not CREATE OR
+        // REPLACE) because column types change vs the old view; nothing depends on it.
+        await client.query(`
+            DROP VIEW IF EXISTS v_latest_test_results;
+            CREATE VIEW v_latest_test_results AS
+            SELECT DISTINCT ON (tr.project_id, te.test_case_id)
+                te.id,
+                te.test_case_id::text AS test_case_id,
+                te.test_case_title,
+                tr.project_id,
+                CASE te.status WHEN 'pass' THEN 'passed' WHEN 'fail' THEN 'failed' ELSE te.status END AS status,
+                COALESCE(te.executed_at, tr.started_at)::date AS executed_at,
+                te.notes,
+                au.name AS tester_name,
+                p.project_name,
+                CURRENT_DATE - COALESCE(te.executed_at, tr.started_at)::date AS days_since_execution
+            FROM test_run tr
+            JOIN test_execution te ON te.test_run_id = tr.id
+            LEFT JOIN projects p ON tr.project_id = p.id
+            LEFT JOIN app_user au ON au.id = te.executed_by
+            WHERE tr.deleted_at IS NULL
+            ORDER BY tr.project_id, te.test_case_id, COALESCE(te.executed_at, tr.started_at) DESC, te.created_at DESC
+        `);
         await client.query(`
             DO $$
             DECLARE
@@ -3328,105 +3338,123 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
-            CREATE OR REPLACE VIEW v_test_execution_trends AS
+            -- Rewired to the live test_run/test_execution pipeline. Daily aggregate per
+            -- (project, execution_date), keyed on the execution timestamp (falling back to the
+            -- run start). Status FILTERs use the test_execution vocabulary; rejected is always 0.
+            DROP VIEW IF EXISTS v_test_execution_trends;
+            CREATE VIEW v_test_execution_trends AS
             SELECT
                 tr.project_id,
                 p.project_name,
-                tr.executed_at AS execution_date,
-                COUNT(DISTINCT tr.test_case_id) AS tests_executed,
-                COUNT(*) FILTER (WHERE tr.status = 'passed') AS passed_count,
-                COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
-                COUNT(*) FILTER (WHERE tr.status = 'not_run') AS not_run_count,
-                COUNT(*) FILTER (WHERE tr.status = 'blocked') AS blocked_count,
-                COUNT(*) FILTER (WHERE tr.status = 'rejected') AS rejected_count,
+                COALESCE(te.executed_at, tr.started_at)::date AS execution_date,
+                COUNT(DISTINCT te.test_case_id) AS tests_executed,
+                COUNT(*) FILTER (WHERE te.status = 'pass') AS passed_count,
+                COUNT(*) FILTER (WHERE te.status = 'fail') AS failed_count,
+                COUNT(*) FILTER (WHERE te.status = 'not_run') AS not_run_count,
+                COUNT(*) FILTER (WHERE te.status = 'blocked') AS blocked_count,
+                0 AS rejected_count,
                 CASE
                     WHEN COUNT(*) > 0 THEN
-                        ROUND((COUNT(*) FILTER (WHERE tr.status = 'passed')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+                        ROUND((COUNT(*) FILTER (WHERE te.status = 'pass')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
                     ELSE 0
                 END AS pass_rate_pct
-            FROM test_result tr
+            FROM test_run tr
+            JOIN test_execution te ON te.test_run_id = tr.id
             LEFT JOIN projects p ON tr.project_id = p.id
             WHERE tr.deleted_at IS NULL
-            GROUP BY tr.project_id, p.project_name, tr.executed_at
-            ORDER BY tr.project_id, tr.executed_at DESC
+            GROUP BY tr.project_id, p.project_name, COALESCE(te.executed_at, tr.started_at)::date
+            ORDER BY tr.project_id, execution_date DESC
         `);
 
         await client.query(`
-            CREATE OR REPLACE VIEW v_test_case_history AS
+            -- Rewired to the live test_run/test_execution pipeline. Per (project, test_case)
+            -- run history across all non-deleted runs. latest_status is mapped back to the
+            -- passed/failed vocabulary for consumers.
+            DROP VIEW IF EXISTS v_test_case_history;
+            CREATE VIEW v_test_case_history AS
+            WITH exec AS (
+                SELECT te.test_case_id, tr.project_id, te.test_case_title, te.status,
+                       COALESCE(te.executed_at, tr.started_at) AS executed_ts,
+                       te.created_at
+                FROM test_run tr
+                JOIN test_execution te ON te.test_run_id = tr.id
+                WHERE tr.deleted_at IS NULL
+            )
             SELECT
-                tr.test_case_id,
-                tr.project_id,
+                e.test_case_id::text AS test_case_id,
+                e.project_id,
                 p.project_name,
-                MAX(tr.test_case_title) AS test_case_title,
-                MAX(tr.executed_at) AS last_executed_at,
-                CURRENT_DATE - MAX(tr.executed_at) AS days_since_last_run,
+                MAX(e.test_case_title) AS test_case_title,
+                MAX(e.executed_ts)::date AS last_executed_at,
+                CURRENT_DATE - MAX(e.executed_ts)::date AS days_since_last_run,
                 COUNT(*) AS total_executions,
-                COUNT(*) FILTER (WHERE tr.status = 'passed') AS total_passed,
-                COUNT(*) FILTER (WHERE tr.status = 'failed') AS total_failed,
-                COUNT(*) FILTER (WHERE tr.status = 'not_run') AS total_not_run,
-                COUNT(*) FILTER (WHERE tr.status = 'blocked') AS total_blocked,
-                COUNT(*) FILTER (WHERE tr.status = 'rejected') AS total_rejected,
+                COUNT(*) FILTER (WHERE e.status = 'pass') AS total_passed,
+                COUNT(*) FILTER (WHERE e.status = 'fail') AS total_failed,
+                COUNT(*) FILTER (WHERE e.status = 'not_run') AS total_not_run,
+                COUNT(*) FILTER (WHERE e.status = 'blocked') AS total_blocked,
+                0 AS total_rejected,
                 CASE
                     WHEN COUNT(*) > 0 THEN
-                        ROUND((COUNT(*) FILTER (WHERE tr.status = 'passed')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+                        ROUND((COUNT(*) FILTER (WHERE e.status = 'pass')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
                     ELSE 0
                 END AS overall_pass_rate_pct,
-                (SELECT status FROM test_result
-                 WHERE test_case_id = tr.test_case_id
-                   AND project_id = tr.project_id
-                   AND deleted_at IS NULL
-                 ORDER BY executed_at DESC, created_at DESC
+                (SELECT CASE e2.status WHEN 'pass' THEN 'passed' WHEN 'fail' THEN 'failed' ELSE e2.status END
+                 FROM exec e2
+                 WHERE e2.test_case_id = e.test_case_id
+                   AND e2.project_id = e.project_id
+                 ORDER BY e2.executed_ts DESC, e2.created_at DESC
                  LIMIT 1) AS latest_status
-            FROM test_result tr
-            LEFT JOIN projects p ON tr.project_id = p.id
-            WHERE tr.deleted_at IS NULL
-            GROUP BY tr.test_case_id, tr.project_id, p.project_name
+            FROM exec e
+            LEFT JOIN projects p ON e.project_id = p.id
+            GROUP BY e.test_case_id, e.project_id, p.project_name
         `);
 
         await client.query(`
-            CREATE OR REPLACE VIEW v_project_quality_metrics AS
-            WITH latest_date AS (
-                SELECT project_id, MAX(executed_at) AS latest_execution_date
-                FROM test_result
+            -- Rewired to the live test_run/test_execution pipeline. "Latest" = most recent
+            -- run per project (DISTINCT ON, same as v_release_readiness). Status FILTERs use
+            -- the test_execution vocabulary; rejected is always 0. tasks_with_tests keeps the
+            -- original all-or-nothing semantics (every task counts once the project has any run).
+            DROP VIEW IF EXISTS v_project_quality_metrics;
+            CREATE VIEW v_project_quality_metrics AS
+            WITH latest_run AS (
+                SELECT DISTINCT ON (project_id) project_id, id AS test_run_id, started_at
+                FROM test_run
                 WHERE deleted_at IS NULL
-                GROUP BY project_id
+                ORDER BY project_id, started_at DESC
             ),
-            latest_results AS (
-                SELECT tr.project_id, tr.test_case_id, tr.status, tr.executed_at
-                FROM test_result tr
-                INNER JOIN latest_date ld
-                    ON tr.project_id = ld.project_id
-                    AND tr.executed_at = ld.latest_execution_date
-                WHERE tr.deleted_at IS NULL
+            latest_exec AS (
+                SELECT te.test_case_id, te.status, lr.project_id, lr.started_at
+                FROM latest_run lr
+                JOIN test_execution te ON te.test_run_id = lr.test_run_id
             )
             SELECT
                 p.id AS project_id,
                 p.project_name,
                 p.status AS project_status,
-                ld.latest_execution_date,
-                CURRENT_DATE - ld.latest_execution_date AS days_since_latest_execution,
-                (SELECT COUNT(DISTINCT test_case_id)
-                 FROM test_result
-                 WHERE project_id = p.id AND deleted_at IS NULL) AS total_test_cases,
-                COUNT(DISTINCT lr.test_case_id) AS latest_tests_executed,
-                COUNT(*) FILTER (WHERE lr.status = 'passed') AS latest_passed_count,
-                COUNT(*) FILTER (WHERE lr.status = 'failed') AS latest_failed_count,
-                COUNT(*) FILTER (WHERE lr.status = 'not_run') AS latest_not_run_count,
-                COUNT(*) FILTER (WHERE lr.status = 'blocked') AS latest_blocked_count,
-                COUNT(*) FILTER (WHERE lr.status = 'rejected') AS latest_rejected_count,
+                MAX(le.started_at)::date AS latest_execution_date,
+                CURRENT_DATE - MAX(le.started_at)::date AS days_since_latest_execution,
+                (SELECT COUNT(DISTINCT te2.test_case_id)
+                 FROM test_run tr2 JOIN test_execution te2 ON te2.test_run_id = tr2.id
+                 WHERE tr2.project_id = p.id AND tr2.deleted_at IS NULL) AS total_test_cases,
+                COUNT(DISTINCT le.test_case_id) AS latest_tests_executed,
+                COUNT(*) FILTER (WHERE le.status = 'pass') AS latest_passed_count,
+                COUNT(*) FILTER (WHERE le.status = 'fail') AS latest_failed_count,
+                COUNT(*) FILTER (WHERE le.status = 'not_run') AS latest_not_run_count,
+                COUNT(*) FILTER (WHERE le.status = 'blocked') AS latest_blocked_count,
+                0 AS latest_rejected_count,
                 CASE
-                    WHEN COUNT(*) > 0 THEN
-                        ROUND((COUNT(*) FILTER (WHERE lr.status = 'passed')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+                    WHEN COUNT(le.*) > 0 THEN
+                        ROUND((COUNT(*) FILTER (WHERE le.status = 'pass')::NUMERIC / COUNT(le.*)::NUMERIC) * 100, 2)
                     ELSE 0
                 END AS latest_pass_rate_pct,
                 CASE
-                    WHEN COUNT(*) > 0 THEN
-                        ROUND((COUNT(*) FILTER (WHERE lr.status = 'not_run')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+                    WHEN COUNT(le.*) > 0 THEN
+                        ROUND((COUNT(*) FILTER (WHERE le.status = 'not_run')::NUMERIC / COUNT(le.*)::NUMERIC) * 100, 2)
                     ELSE 0
                 END AS latest_not_run_pct,
                 CASE
-                    WHEN COUNT(*) > 0 THEN
-                        ROUND((COUNT(*) FILTER (WHERE lr.status = 'failed')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+                    WHEN COUNT(le.*) > 0 THEN
+                        ROUND((COUNT(*) FILTER (WHERE le.status = 'fail')::NUMERIC / COUNT(le.*)::NUMERIC) * 100, 2)
                     ELSE 0
                 END AS latest_fail_rate_pct,
                 COALESCE(
@@ -3435,8 +3463,8 @@ const runMigrations = async () => {
                      WHERE t.project_id = p.id
                        AND t.deleted_at IS NULL
                        AND EXISTS (
-                           SELECT 1 FROM test_result tr
-                           WHERE tr.project_id = p.id AND tr.deleted_at IS NULL
+                           SELECT 1 FROM test_run tr3
+                           WHERE tr3.project_id = p.id AND tr3.deleted_at IS NULL
                        )),
                     0
                 ) AS tasks_with_tests,
@@ -3449,8 +3477,8 @@ const runMigrations = async () => {
                                  FROM tasks t
                                  WHERE t.project_id = p.id AND t.deleted_at IS NULL
                                    AND EXISTS (
-                                       SELECT 1 FROM test_result tr
-                                       WHERE tr.project_id = p.id AND tr.deleted_at IS NULL
+                                       SELECT 1 FROM test_run tr3
+                                       WHERE tr3.project_id = p.id AND tr3.deleted_at IS NULL
                                    )),
                                 0
                             )::NUMERIC /
@@ -3460,10 +3488,9 @@ const runMigrations = async () => {
                     ELSE 0
                 END AS test_coverage_pct
             FROM projects p
-            LEFT JOIN latest_date ld ON p.id = ld.project_id
-            LEFT JOIN latest_results lr ON p.id = lr.project_id
+            LEFT JOIN latest_exec le ON le.project_id = p.id
             WHERE p.deleted_at IS NULL
-            GROUP BY p.id, p.project_name, p.status, ld.latest_execution_date
+            GROUP BY p.id, p.project_name, p.status
         `);
 
         await client.query(`
