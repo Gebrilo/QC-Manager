@@ -1394,11 +1394,16 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, re
         return res.status(400).json({ error: 'Invalid status value' });
       }
       const statusParam = pn;
-      updates.push(`status = $${pn++}`);
+      // Cast the status param to ::text at every use. The `status` column is
+      // VARCHAR, so `status = $n` deduces $n as `character varying`, while
+      // `status IS DISTINCT FROM $n` / `$n <> 'not_run'` deduce it as `text`.
+      // Two deductions for one placeholder => Postgres "inconsistent types
+      // deduced for parameter $1". Pinning every use to ::text keeps it single.
+      updates.push(`status = $${pn++}::text`);
       params.push(status);
-      updates.push(`executed_by = CASE WHEN status IS DISTINCT FROM $${statusParam} AND $${statusParam} <> 'not_run' THEN $${pn++} ELSE executed_by END`);
+      updates.push(`executed_by = CASE WHEN status IS DISTINCT FROM $${statusParam}::text AND $${statusParam}::text <> 'not_run' THEN $${pn++} ELSE executed_by END`);
       params.push(req.user?.id || null);
-      updates.push(`executed_at = CASE WHEN status IS DISTINCT FROM $${statusParam} AND $${statusParam} <> 'not_run' THEN CURRENT_TIMESTAMP ELSE executed_at END`);
+      updates.push(`executed_at = CASE WHEN status IS DISTINCT FROM $${statusParam}::text AND $${statusParam}::text <> 'not_run' THEN CURRENT_TIMESTAMP ELSE executed_at END`);
     }
 
     if (assigned_to !== undefined) {
