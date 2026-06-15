@@ -22,6 +22,7 @@ import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { taskStatusRegistry } from '@/lib/statusRegistry';
 import { QCCard, SectionLabel } from '@/components/shared/DetailCard';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -346,6 +347,29 @@ export default function TaskDetailPage() {
                             </button>
                         </div>
                     </QCCard>
+
+                    <AutoDetailsCard
+                        record={task as unknown as Record<string, unknown>}
+                        title="More Details"
+                        exclude={[
+                            'task_name',
+                            'status',
+                            'task_id',
+                            'project_name',
+                            'description',
+                            'notes',
+                            'total_est_hrs',
+                            'total_actual_hrs',
+                            'overall_completion_pct',
+                            'resource1_name',
+                            'resource2_name',
+                            'expected_start_date',
+                            'actual_start_date',
+                            'deadline',
+                            'completed_date',
+                            'tuleap_url',
+                        ]}
+                    />
                 </div>
             </div>
 
