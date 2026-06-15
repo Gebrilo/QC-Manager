@@ -13,8 +13,8 @@ import { ConfirmDialog, useConfirm } from '@/components/ui/ConfirmDialog';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testSuiteStatusRegistry } from '@/lib/statusRegistry';
-import { formatDistanceToNow } from 'date-fns';
-import { QCCard, SectionLabel, EditIcon, TrashIcon, DetailRow } from '@/components/shared/DetailCard';
+import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
 function getPriorityBadgeVariant(priority: string): 'danger' | 'warning' | 'default' | 'success' {
     const map: Record<string, 'danger' | 'warning' | 'default' | 'success'> = {
@@ -194,13 +194,6 @@ export default function TestSuiteDetailPage() {
     }
 
     const testCases = suite.test_cases || [];
-    const passRate = suite.last_run_pass_rate != null ? Math.round(suite.last_run_pass_rate * 100) : null;
-    const passRateClass = passRate == null
-        ? undefined
-        : passRate >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-        : passRate >= 50 ? 'text-amber-600 dark:text-amber-400'
-        : 'text-rose-600 dark:text-rose-400';
-
     const quickActionClass = 'w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors flex items-center gap-2';
 
     return (
@@ -391,16 +384,22 @@ export default function TestSuiteDetailPage() {
 
                 {/* Right column (1/3) */}
                 <div className="space-y-5">
-                    <QCCard>
-                        <SectionLabel>Overview</SectionLabel>
-                        <div className="space-y-0">
-                            <DetailRow label="Cases" value={String(suite.test_case_count ?? testCases.length)} />
-                            {passRate !== null && <DetailRow label="Pass Rate" value={`${passRate}%`} valueClass={passRateClass} />}
-                            <DetailRow label="Created By" value={suite.created_by_name} />
-                            <DetailRow label="Created" value={formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })} />
-                            <DetailRow label="Last Updated" value={formatDistanceToNow(new Date(suite.updated_at), { addSuffix: true })} />
-                        </div>
-                    </QCCard>
+                    <AutoDetailsCard
+                        record={{ ...suite }}
+                        title="Overview"
+                        exclude={['name', 'status', 'suite_id', 'project_name', 'description', 'test_cases']}
+                        labels={{
+                            test_case_count: 'Cases',
+                            last_run_pass_rate: 'Pass Rate',
+                            created_by_name: 'Created By',
+                            created_at: 'Created',
+                            updated_at: 'Last Updated',
+                        }}
+                        formatters={{
+                            test_case_count: (v) => String(v ?? testCases.length),
+                            last_run_pass_rate: (v) => (v == null ? null : `${Math.round(Number(v) * 100)}%`),
+                        }}
+                    />
 
                     <QCCard>
                         <SectionLabel>Quick Actions</SectionLabel>

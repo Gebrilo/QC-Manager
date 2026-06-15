@@ -19,7 +19,8 @@ import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testCaseStatusRegistry } from '@/lib/statusRegistry';
-import { QCCard, SectionLabel, EditIcon, TrashIcon, DetailRow } from '@/components/shared/DetailCard';
+import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
@@ -249,35 +250,51 @@ export default function TestCaseDetailPage() {
                         syncFn={(id) => testCasesApi.sync(id)}
                     />
 
-                    <QCCard>
-                        <SectionLabel>Details</SectionLabel>
-                        <div className="space-y-0">
-                            <DetailRow label="Category" value={testCase.category ? <span className="capitalize">{testCase.category}</span> : null} />
-                            <DetailRow label="Suite Title" value={testCase.suite_title} />
-                            <DetailRow label="Component" value={testCase.component} />
-                            <DetailRow label="Assigned To" value={testCase.assigned_to_name || 'Unassigned'} />
-                            <DetailRow label="Est. Duration" value={testCase.estimated_duration_minutes ? `${testCase.estimated_duration_minutes} min` : null} />
-                            <DetailRow label="Requirement" value={testCase.linked_requirement_id} />
-                            {testCase.tuleap_artifact_id && (
-                                <DetailRow
-                                    label="Tuleap"
-                                    value={
-                                        <a href={testCase.tuleap_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                                            Artifact #{testCase.tuleap_artifact_id}
-                                        </a>
-                                    }
-                                />
-                            )}
-                        </div>
-                        {testCase.tags && testCase.tags.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Tags</div>
-                                <div className="flex flex-wrap gap-1">
-                                    {testCase.tags.map(t => <Badge key={t} variant="default">{t}</Badge>)}
-                                </div>
+                    <AutoDetailsCard
+                        record={testCase as unknown as Record<string, unknown>}
+                        exclude={[
+                            'title',
+                            'status',
+                            'test_case_id',
+                            'project_name',
+                            'description',
+                            'preconditions',
+                            'test_steps',
+                            'expected_result',
+                            'tags',
+                            'tuleap_url',
+                        ]}
+                        labels={{
+                            assigned_to_name: 'Assigned To',
+                            estimated_duration_minutes: 'Est. Duration',
+                            linked_requirement_id: 'Requirement',
+                            suite_title: 'Suite Title',
+                            tuleap_artifact_id: 'Tuleap',
+                        }}
+                        formatters={{
+                            estimated_duration_minutes: (v) => (v == null ? null : `${v} min`),
+                            tuleap_artifact_id: (v) =>
+                                v == null ? null : (
+                                    <a
+                                        href={testCase.tuleap_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                                    >
+                                        Artifact #{String(v)}
+                                    </a>
+                                ),
+                        }}
+                    />
+
+                    {testCase.tags && testCase.tags.length > 0 && (
+                        <QCCard>
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Tags</div>
+                            <div className="flex flex-wrap gap-1">
+                                {testCase.tags.map(t => <Badge key={t} variant="default">{t}</Badge>)}
                             </div>
-                        )}
-                    </QCCard>
+                        </QCCard>
+                    )}
                 </div>
             </div>
 

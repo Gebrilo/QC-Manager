@@ -16,9 +16,40 @@ import { SyncPanel } from '@/components/shared/SyncPanel';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { bugStatusRegistry } from '@/lib/statusRegistry';
-import { QCCard, SectionLabel, EditIcon, TrashIcon, DetailRow } from '@/components/shared/DetailCard';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
+import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+
+const BUG_AUTO_DETAIL_EXCLUDE = [
+    'title',
+    'status',
+    'bug_id',
+    'project_name',
+    'tuleap_artifact_id',
+    'description',
+    'dev_fix_description',
+    'qc_verification_notes',
+    'tuleap_url',
+];
+
+const BUG_AUTO_DETAIL_LABELS = {
+    service_name: 'Service',
+    bug_type: 'Type',
+    reported_date: 'Reported',
+    created_at: 'Created',
+    updated_at: 'Last Updated',
+};
+
+function formatEffortHours(value: unknown) {
+    if (value === null || value === undefined || value === '') return null;
+    return `${value}h`;
+}
+
+function formatBugSource(value: unknown) {
+    if (value === null || value === undefined || value === '') return null;
+    return value === 'TEST_CASE' ? 'Test Case' : 'Exploratory';
+}
 
 export default function BugDetailPage() {
     const params = useParams();
@@ -223,26 +254,6 @@ export default function BugDetailPage() {
         { label: 'QC Verification Notes', value: bug.qc_verification_notes },
     ].filter(f => f.value);
 
-    const metaFields = [
-        { label: 'Severity', value: bug.severity },
-        { label: 'Priority', value: bug.priority },
-        { label: 'Source', value: bug.source === 'TEST_CASE' ? 'Test Case' : 'Exploratory' },
-        { label: 'Environment', value: bug.environment },
-        { label: 'Service', value: bug.service_name },
-        { label: 'Component', value: bug.component },
-        { label: 'Type', value: bug.bug_type },
-        { label: 'Initial Effort', value: bug.initial_effort != null ? `${bug.initial_effort}h` : undefined },
-        { label: 'Remaining Effort', value: bug.remaining_effort != null ? `${bug.remaining_effort}h` : undefined },
-        { label: 'CC', value: bug.cc?.length ? bug.cc.join(', ') : undefined },
-        { label: 'Assigned To', value: bug.assigned_to },
-        { label: 'Reported By', value: bug.reported_by },
-        { label: 'Updated By', value: bug.updated_by },
-        { label: 'Project', value: bug.project_name },
-        { label: 'Reported', value: bug.reported_date ? new Date(bug.reported_date).toLocaleDateString() : undefined },
-        { label: 'Created', value: bug.created_at ? new Date(bug.created_at).toLocaleDateString() : undefined },
-        { label: 'Last Updated', value: bug.updated_at ? new Date(bug.updated_at).toLocaleDateString() : undefined },
-    ].filter(f => f.value);
-
     return (
         <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
 
@@ -353,14 +364,16 @@ export default function BugDetailPage() {
                         syncFn={(id) => bugsApi.sync(id)}
                     />
 
-                    <QCCard>
-                        <SectionLabel>Details</SectionLabel>
-                        <div className="space-y-0">
-                            {metaFields.map(({ label, value }) => (
-                                <DetailRow key={label} label={label} value={<span className="capitalize">{value}</span>} />
-                            ))}
-                        </div>
-                    </QCCard>
+                    <AutoDetailsCard
+                        record={{ ...bug }}
+                        exclude={BUG_AUTO_DETAIL_EXCLUDE}
+                        labels={BUG_AUTO_DETAIL_LABELS}
+                        formatters={{
+                            initial_effort: formatEffortHours,
+                            remaining_effort: formatEffortHours,
+                            source: formatBugSource,
+                        }}
+                    />
                 </div>
             </div>
 
