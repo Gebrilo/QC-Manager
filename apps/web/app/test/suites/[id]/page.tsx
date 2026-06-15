@@ -13,7 +13,8 @@ import { ConfirmDialog, useConfirm } from '@/components/ui/ConfirmDialog';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testSuiteStatusRegistry } from '@/lib/statusRegistry';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { QCCard, SectionLabel, EditIcon, TrashIcon, DetailRow } from '@/components/shared/DetailCard';
 
 function getPriorityBadgeVariant(priority: string): 'danger' | 'warning' | 'default' | 'success' {
     const map: Record<string, 'danger' | 'warning' | 'default' | 'success'> = {
@@ -194,168 +195,237 @@ export default function TestSuiteDetailPage() {
 
     const testCases = suite.test_cases || [];
     const passRate = suite.last_run_pass_rate != null ? Math.round(suite.last_run_pass_rate * 100) : null;
+    const passRateClass = passRate == null
+        ? undefined
+        : passRate >= 80 ? 'text-emerald-600 dark:text-emerald-400'
+        : passRate >= 50 ? 'text-amber-600 dark:text-amber-400'
+        : 'text-rose-600 dark:text-rose-400';
+
+    const quickActionClass = 'w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors flex items-center gap-2';
 
     return (
         <>
-        <div className="max-w-5xl mx-auto py-8 px-4">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/test/suites"><Button variant="ghost" size="sm">Back</Button></Link>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{suite.suite_id}</h1>
-                    <StatusControl
-                        artifactType="test_suite"
-                        artifactId={suite.id}
-                        value={suite.status || 'draft'}
-                        canEdit={suite._can?.edit}
-                        hasFallbackPermission={hasPermission(testSuiteStatusRegistry.editPermission)}
-                        size="md"
-                        align="left"
-                        onOptimisticChange={(nextStatus) => patchSuite({ status: nextStatus as TestSuite['status'] })}
-                        onChangeCommitted={handleStatusCommitted}
-                        onChangeRolledBack={(previousStatus) => patchSuite({ status: previousStatus as TestSuite['status'] })}
-                    />
+        <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                        onClick={() => router.push('/test/suites')}
+                        className="mt-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                    >
+                        ← Back
+                    </button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" dir="auto">
+                                {suite.name}
+                            </h1>
+                            <StatusControl
+                                artifactType="test_suite"
+                                artifactId={suite.id}
+                                value={suite.status || 'draft'}
+                                canEdit={suite._can?.edit}
+                                hasFallbackPermission={hasPermission(testSuiteStatusRegistry.editPermission)}
+                                size="md"
+                                align="left"
+                                onOptimisticChange={(nextStatus) => patchSuite({ status: nextStatus as TestSuite['status'] })}
+                                onChangeCommitted={handleStatusCommitted}
+                                onChangeRolledBack={(previousStatus) => patchSuite({ status: previousStatus as TestSuite['status'] })}
+                            />
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                            <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">
+                                {suite.suite_id}
+                            </span>
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                            <span>{suite.project_name || 'No Project'}</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <Link href={`/test/runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
-                    <Button variant="outline" onClick={handleLoadAvailableCases}>+ Add Cases</Button>
-                    <Button variant="outline" onClick={handleClone} disabled={cloning}>{cloning ? 'Cloning...' : 'Clone'}</Button>
-                    <Link href={`/test/suites/${id}/edit`}><Button variant="outline">Edit</Button></Link>
-                    <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link href={`/test/suites/${id}/edit`}>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <EditIcon />
+                            Edit Suite
+                        </Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDelete}
+                        className="gap-1.5 text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                    >
+                        <TrashIcon />
+                        Delete
+                    </Button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6 mb-6">
-                <div>
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{suite.name}</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {suite.project_name && <Badge variant="info">{suite.project_name}</Badge>}
-                        {passRate !== null && <Badge variant={passRate >= 80 ? 'success' : passRate >= 50 ? 'warning' : 'danger'}>{passRate}% pass rate</Badge>}
-                    </div>
-                </div>
+            {/* ── Two-column layout ───────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-5">
 
-                {suite.description && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{suite.description}</p>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-slate-200 dark:border-slate-800 pt-4">
-                    <div><span className="text-gray-500 dark:text-gray-400">Cases</span><br /><span className="text-slate-900 dark:text-white font-medium">{suite.test_case_count ?? testCases.length}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Created By</span><br /><span className="text-slate-900 dark:text-white">{suite.created_by_name || '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Created</span><br /><span className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Last Updated</span><br /><span className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(suite.updated_at), { addSuffix: true })}</span></div>
-                </div>
-            </div>
-
-            {showAddCases && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-900/50 p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Add Test Cases</h3>
-                        <Button variant="ghost" size="sm" onClick={() => { setShowAddCases(false); setSelectedCaseIds(new Set()); }}>Cancel</Button>
-                    </div>
-                    {availableCases.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">No additional active test cases available to add.</p>
-                    ) : (
-                        <>
-                            <div className="mb-2">
-                                <label className="flex items-center gap-3 p-2 rounded-lg cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedCaseIds.size === availableCases.length}
-                                        ref={(el) => { if (el) el.indeterminate = selectedCaseIds.size > 0 && selectedCaseIds.size < availableCases.length; }}
-                                        onChange={() => {
-                                            if (selectedCaseIds.size === availableCases.length) {
-                                                setSelectedCaseIds(new Set());
-                                            } else {
-                                                setSelectedCaseIds(new Set(availableCases.map(tc => tc.id)));
-                                            }
-                                        }}
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Select all ({availableCases.length})</span>
-                                </label>
-                            </div>
-                            <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
-                                {availableCases.map((tc) => (
-                                    <label key={tc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                                        <input type="checkbox" checked={selectedCaseIds.has(tc.id)} onChange={() => toggleCaseSelection(tc.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                        <span className="font-mono text-xs text-gray-500">{tc.test_case_id}</span>
-                                        <span className="text-sm text-slate-900 dark:text-white flex-1 truncate">{tc.title}</span>
-                                        {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
-                                    </label>
-                                ))}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Button onClick={handleAddCases} disabled={addingCases || selectedCaseIds.size === 0}>
-                                    {addingCases ? 'Adding...' : `Add ${selectedCaseIds.size} Case${selectedCaseIds.size !== 1 ? 's' : ''}`}
-                                </Button>
-                                <span className="text-sm text-gray-500">{selectedCaseIds.size} selected</span>
-                            </div>
-                        </>
+                {/* Left (2/3) */}
+                <div className="col-span-2 space-y-5">
+                    {suite.description && (
+                        <QCCard>
+                            <SectionLabel>Description</SectionLabel>
+                            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap" dir="auto">
+                                {suite.description}
+                            </p>
+                        </QCCard>
                     )}
-                </div>
-            )}
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Test Cases ({testCases.length})</h3>
+                    {showAddCases && (
+                        <QCCard className="border-blue-200 dark:border-blue-900/50">
+                            <div className="flex items-center justify-between mb-4">
+                                <SectionLabel>Add Test Cases</SectionLabel>
+                                <Button variant="ghost" size="sm" onClick={() => { setShowAddCases(false); setSelectedCaseIds(new Set()); }}>Cancel</Button>
+                            </div>
+                            {availableCases.length === 0 ? (
+                                <p className="text-slate-500 dark:text-slate-400 text-sm">No additional active test cases available to add.</p>
+                            ) : (
+                                <>
+                                    <div className="mb-2">
+                                        <label className="flex items-center gap-3 p-2 rounded-lg cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedCaseIds.size === availableCases.length}
+                                                ref={(el) => { if (el) el.indeterminate = selectedCaseIds.size > 0 && selectedCaseIds.size < availableCases.length; }}
+                                                onChange={() => {
+                                                    if (selectedCaseIds.size === availableCases.length) {
+                                                        setSelectedCaseIds(new Set());
+                                                    } else {
+                                                        setSelectedCaseIds(new Set(availableCases.map(tc => tc.id)));
+                                                    }
+                                                }}
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Select all ({availableCases.length})</span>
+                                        </label>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
+                                        {availableCases.map((tc) => (
+                                            <label key={tc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                                <input type="checkbox" checked={selectedCaseIds.has(tc.id)} onChange={() => toggleCaseSelection(tc.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                <span className="font-mono text-xs text-slate-500">{tc.test_case_id}</span>
+                                                <span className="text-sm text-slate-900 dark:text-white flex-1 truncate">{tc.title}</span>
+                                                {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Button onClick={handleAddCases} disabled={addingCases || selectedCaseIds.size === 0}>
+                                            {addingCases ? 'Adding...' : `Add ${selectedCaseIds.size} Case${selectedCaseIds.size !== 1 ? 's' : ''}`}
+                                        </Button>
+                                        <span className="text-sm text-slate-500">{selectedCaseIds.size} selected</span>
+                                    </div>
+                                </>
+                            )}
+                        </QCCard>
+                    )}
+
+                    <QCCard className="p-0 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Test Cases ({testCases.length})</div>
+                        </div>
+                        {testCases.length === 0 ? (
+                            <div className="p-8 text-center">
+                                <p className="text-slate-500 dark:text-slate-400">No test cases in this suite yet. Use &quot;Add Cases&quot; to add some.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase w-12">#</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">ID</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Title</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Priority</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Type</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                        {testCases.map((tc, idx) => (
+                                            <tr key={tc.junction_id || tc.id} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                                                <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{tc.sort_order || idx + 1}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                        {tc.test_case_id_display || tc.test_case_id}
+                                                    </Link>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Link href={`/test/cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                                        {tc.title}
+                                                    </Link>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    {tc.status && <Badge variant={getTestCaseStatusVariant(tc.status)}>{tc.status}</Badge>}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 capitalize">
+                                                    {tc.test_type || '—'}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => handleRemoveCase(tc.id)}
+                                                        disabled={removingCaseId === tc.id}
+                                                        className="text-rose-600 dark:text-rose-400 hover:underline text-sm disabled:opacity-50"
+                                                    >
+                                                        {removingCaseId === tc.id ? 'Removing...' : 'Remove'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </QCCard>
                 </div>
-                {testCases.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <p className="text-gray-500 dark:text-gray-400">No test cases in this suite yet. Click &quot;+ Add Cases&quot; to add some.</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-12">#</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">ID</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Title</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Priority</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {testCases.map((tc, idx) => (
-                                    <tr key={tc.junction_id || tc.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{tc.sort_order || idx + 1}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
-                                                {tc.test_case_id_display || tc.test_case_id}
-                                            </Link>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Link href={`/test/cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
-                                                {tc.title}
-                                            </Link>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            {tc.priority && <Badge variant={getPriorityBadgeVariant(tc.priority)}>{tc.priority}</Badge>}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            {tc.status && <Badge variant={getTestCaseStatusVariant(tc.status)}>{tc.status}</Badge>}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 capitalize">
-                                            {tc.test_type || '\u2014'}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <button
-                                                onClick={() => handleRemoveCase(tc.id)}
-                                                disabled={removingCaseId === tc.id}
-                                                className="text-red-600 dark:text-red-400 hover:underline text-sm disabled:opacity-50"
-                                            >
-                                                {removingCaseId === tc.id ? 'Removing...' : 'Remove'}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+
+                {/* Right column (1/3) */}
+                <div className="space-y-5">
+                    <QCCard>
+                        <SectionLabel>Overview</SectionLabel>
+                        <div className="space-y-0">
+                            <DetailRow label="Cases" value={String(suite.test_case_count ?? testCases.length)} />
+                            {passRate !== null && <DetailRow label="Pass Rate" value={`${passRate}%`} valueClass={passRateClass} />}
+                            <DetailRow label="Created By" value={suite.created_by_name} />
+                            <DetailRow label="Created" value={formatDistanceToNow(new Date(suite.created_at), { addSuffix: true })} />
+                            <DetailRow label="Last Updated" value={formatDistanceToNow(new Date(suite.updated_at), { addSuffix: true })} />
+                        </div>
+                    </QCCard>
+
+                    <QCCard>
+                        <SectionLabel>Quick Actions</SectionLabel>
+                        <div className="space-y-1">
+                            <Link href={`/test/runs/create?suite_id=${id}`} className={quickActionClass}>
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
+                                Start Test Run
+                            </Link>
+                            <button onClick={handleLoadAvailableCases} className={quickActionClass}>
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                                {showAddCases ? 'Hide Add Cases' : 'Add Cases'}
+                            </button>
+                            <button onClick={handleClone} disabled={cloning} className={`${quickActionClass} disabled:opacity-50`}>
+                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                </svg>
+                                {cloning ? 'Cloning...' : 'Clone Suite'}
+                            </button>
+                        </div>
+                    </QCCard>
+                </div>
             </div>
         </div>
         <ConfirmDialog

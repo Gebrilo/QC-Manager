@@ -19,6 +19,7 @@ import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testCaseStatusRegistry } from '@/lib/statusRegistry';
+import { QCCard, SectionLabel, EditIcon, TrashIcon, DetailRow } from '@/components/shared/DetailCard';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
@@ -98,141 +99,189 @@ export default function TestCaseDetailPage() {
         return map[p] || 'default';
     };
 
+    const bodyFields = [
+        { label: 'Description', value: testCase.description },
+        { label: 'Preconditions', value: testCase.preconditions },
+        { label: 'Test Steps', value: testCase.test_steps },
+        { label: 'Expected Result', value: testCase.expected_result },
+    ].filter(f => f.value);
+
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
-	            <div className="flex items-center justify-between mb-6">
-	                <div className="flex items-center gap-4">
-	                    <Link href="/test/cases"><Button variant="ghost" size="sm">Back</Button></Link>
-	                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{testCase.test_case_id}</h1>
-	                    <StatusControl
-	                        artifactType="test_case"
-	                        artifactId={testCase.id}
-	                        value={testCase.status || 'None'}
-	                        canEdit={testCase._can?.edit}
-	                        hasFallbackPermission={hasPermission(testCaseStatusRegistry.editPermission)}
-	                        size="md"
-	                        align="left"
-	                        onOptimisticChange={(nextStatus) => patchTestCase({ status: nextStatus as TestCase['status'] })}
-	                        onChangeCommitted={handleStatusCommitted}
-	                        onChangeRolledBack={(previousStatus) => patchTestCase({ status: previousStatus as TestCase['status'] })}
-	                    />
-	                </div>
-                <div className="flex gap-3">
-                    <Link href={`/test/cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
-                    <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+        <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                        onClick={() => router.push('/test/cases')}
+                        className="mt-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                    >
+                        ← Back
+                    </button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" dir="auto">
+                                {testCase.title}
+                            </h1>
+                            <StatusControl
+                                artifactType="test_case"
+                                artifactId={testCase.id}
+                                value={testCase.status || 'None'}
+                                canEdit={testCase._can?.edit}
+                                hasFallbackPermission={hasPermission(testCaseStatusRegistry.editPermission)}
+                                size="md"
+                                align="left"
+                                onOptimisticChange={(nextStatus) => patchTestCase({ status: nextStatus as TestCase['status'] })}
+                                onChangeCommitted={handleStatusCommitted}
+                                onChangeRolledBack={(previousStatus) => patchTestCase({ status: previousStatus as TestCase['status'] })}
+                            />
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                            <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">
+                                {testCase.test_case_id}
+                            </span>
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                            <span>{testCase.project_name || 'No Project'}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant={getPriorityBadgeVariant(testCase.priority)}>{testCase.priority}</Badge>
+                            {testCase.severity && <Badge variant="info">{testCase.severity}</Badge>}
+                            {testCase.automation_status && <Badge variant="default">{testCase.automation_status.replace('_', ' ')}</Badge>}
+                            {testCase.test_type && <Badge variant="default">{testCase.test_type}</Badge>}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link href={`/test/cases/${id}/edit`}>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <EditIcon />
+                            Edit Case
+                        </Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDelete}
+                        className="gap-1.5 text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                    >
+                        <TrashIcon />
+                        Delete
+                    </Button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
-                <div>
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{testCase.title}</h2>
-	                    <div className="flex flex-wrap gap-2">
-	                        <Badge variant={getPriorityBadgeVariant(testCase.priority)}>{testCase.priority}</Badge>
-                        {testCase.severity && <Badge variant="info">{testCase.severity}</Badge>}
-                        {testCase.automation_status && <Badge variant="default">{testCase.automation_status.replace('_', ' ')}</Badge>}
-                        {testCase.test_type && <Badge variant="default">{testCase.test_type}</Badge>}
-                    </div>
-                </div>
+            {/* ── Two-column layout ───────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-5">
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    <div><span className="text-gray-500 dark:text-gray-400">Project</span><br /><span className="text-slate-900 dark:text-white">{testCase.project_name || '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Category</span><br /><span className="text-slate-900 dark:text-white capitalize">{testCase.category || '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Suite Title</span><br /><span className="text-slate-900 dark:text-white">{testCase.suite_title || '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Component</span><br /><span className="text-slate-900 dark:text-white">{testCase.component || '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Assigned To</span><br /><span className="text-slate-900 dark:text-white">{testCase.assigned_to_name || 'Unassigned'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Est. Duration</span><br /><span className="text-slate-900 dark:text-white">{testCase.estimated_duration_minutes ? `${testCase.estimated_duration_minutes} min` : '\u2014'}</span></div>
-                    <div><span className="text-gray-500 dark:text-gray-400">Linked Requirement</span><br /><span className="text-slate-900 dark:text-white">{testCase.linked_requirement_id || '\u2014'}</span></div>
-                    {testCase.tags && testCase.tags.length > 0 && (
-                        <div className="col-span-2 md:col-span-3"><span className="text-gray-500 dark:text-gray-400">Tags</span><br /><div className="flex gap-1 mt-1">{testCase.tags.map(t => <Badge key={t} variant="default">{t}</Badge>)}</div></div>
+                {/* Left (2/3) */}
+                <div className="col-span-2 space-y-5">
+                    {bodyFields.length > 0 ? (
+                        bodyFields.map(({ label, value }) => (
+                            <QCCard key={label}>
+                                <SectionLabel>{label}</SectionLabel>
+                                <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap" dir="auto">
+                                    {value}
+                                </p>
+                            </QCCard>
+                        ))
+                    ) : (
+                        <QCCard>
+                            <SectionLabel>Description</SectionLabel>
+                            <p className="text-sm text-slate-400 italic">No description provided.</p>
+                        </QCCard>
                     )}
-                    {testCase.tuleap_artifact_id && (
-                        <div><span className="text-gray-500 dark:text-gray-400">Tuleap</span><br /><a href={testCase.tuleap_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Artifact #{testCase.tuleap_artifact_id}</a></div>
-                    )}
-                </div>
 
-                {testCase.description && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Description</h3>
-                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{testCase.description}</p>
-                    </div>
-                )}
-
-                {testCase.preconditions && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Preconditions</h3>
-                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{testCase.preconditions}</p>
-                    </div>
-                )}
-
-                {testCase.test_steps && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Test Steps</h3>
-                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{testCase.test_steps}</p>
-                    </div>
-                )}
-
-                {testCase.expected_result && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Expected Result</h3>
-                        <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">{testCase.expected_result}</p>
-                    </div>
-                )}
-
-                <SyncPanel
-                    status={testCase.sync_status as any}
-                    lastAttemptedAt={testCase.last_sync_attempted_at}
-                    error={testCase.last_sync_error}
-                    tuleapUrl={testCase.tuleap_url}
-                    artifactType="test_case"
-                    artifactId={testCase.id}
-                    syncFn={(id) => testCasesApi.sync(id)}
-                />
-
-                {testCase.execution_history && testCase.execution_history.length > 0 && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Execution History</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
-                                        <th className="pb-2 pr-4">Date</th>
-                                        <th className="pb-2 pr-4">Run</th>
-                                        <th className="pb-2 pr-4">Status</th>
-                                        <th className="pb-2">Tester</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {testCase.execution_history.map((ex) => (
-                                        <tr key={ex.id}>
-                                            <td className="py-2 pr-4 text-slate-900 dark:text-white">{ex.executed_at ? format(new Date(ex.executed_at), 'yyyy-MM-dd') : '\u2014'}</td>
-                                            <td className="py-2 pr-4 text-slate-900 dark:text-white">{ex.test_run_name || ex.run_id || '\u2014'}</td>
-                                            <td className="py-2 pr-4"><Badge variant={ex.status === 'passed' ? 'success' : ex.status === 'failed' ? 'danger' : 'default'}>{ex.status}</Badge></td>
-                                            <td className="py-2 text-slate-900 dark:text-white">{ex.executed_by_name || '\u2014'}</td>
+                    {testCase.execution_history && testCase.execution_history.length > 0 && (
+                        <QCCard>
+                            <SectionLabel>Execution History</SectionLabel>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-xs text-slate-500 dark:text-slate-400">
+                                            <th className="pb-2 pr-4">Date</th>
+                                            <th className="pb-2 pr-4">Run</th>
+                                            <th className="pb-2 pr-4">Status</th>
+                                            <th className="pb-2">Tester</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {testCase.execution_history.map((ex) => (
+                                            <tr key={ex.id}>
+                                                <td className="py-2 pr-4 text-slate-900 dark:text-white">{ex.executed_at ? format(new Date(ex.executed_at), 'yyyy-MM-dd') : '—'}</td>
+                                                <td className="py-2 pr-4 text-slate-900 dark:text-white">{ex.test_run_name || ex.run_id || '—'}</td>
+                                                <td className="py-2 pr-4"><Badge variant={ex.status === 'passed' ? 'success' : ex.status === 'failed' ? 'danger' : 'default'}>{ex.status}</Badge></td>
+                                                <td className="py-2 text-slate-900 dark:text-white">{ex.executed_by_name || '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </QCCard>
+                    )}
 
-                {testCase.activity && testCase.activity.length > 0 && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Activity</h3>
-                        <div className="space-y-2">
-                            {testCase.activity.map((entry, i) => (
-                                <div key={i} className="text-sm">
-                                    <span className="text-gray-500 dark:text-gray-400">{formatDistanceToNow(new Date(entry.performed_at), { addSuffix: true })}</span>
-                                    {' \u2014 '}
-                                    <span className="text-slate-900 dark:text-white">{entry.change_summary || entry.action}</span>
-                                    {entry.performed_by_email && <span className="text-gray-500"> by {entry.performed_by_email}</span>}
-                                </div>
-                            ))}
+                    {testCase.activity && testCase.activity.length > 0 && (
+                        <QCCard>
+                            <SectionLabel>Activity</SectionLabel>
+                            <div className="space-y-2">
+                                {testCase.activity.map((entry, i) => (
+                                    <div key={i} className="text-sm">
+                                        <span className="text-slate-500 dark:text-slate-400">{formatDistanceToNow(new Date(entry.performed_at), { addSuffix: true })}</span>
+                                        {' — '}
+                                        <span className="text-slate-900 dark:text-white">{entry.change_summary || entry.action}</span>
+                                        {entry.performed_by_email && <span className="text-slate-500"> by {entry.performed_by_email}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </QCCard>
+                    )}
+                </div>
+
+                {/* Right column (1/3) */}
+                <div className="space-y-5">
+                    <SyncPanel
+                        status={testCase.sync_status as any}
+                        lastAttemptedAt={testCase.last_sync_attempted_at}
+                        error={testCase.last_sync_error}
+                        tuleapUrl={testCase.tuleap_url}
+                        artifactType="test_case"
+                        artifactId={testCase.id}
+                        syncFn={(id) => testCasesApi.sync(id)}
+                    />
+
+                    <QCCard>
+                        <SectionLabel>Details</SectionLabel>
+                        <div className="space-y-0">
+                            <DetailRow label="Category" value={testCase.category ? <span className="capitalize">{testCase.category}</span> : null} />
+                            <DetailRow label="Suite Title" value={testCase.suite_title} />
+                            <DetailRow label="Component" value={testCase.component} />
+                            <DetailRow label="Assigned To" value={testCase.assigned_to_name || 'Unassigned'} />
+                            <DetailRow label="Est. Duration" value={testCase.estimated_duration_minutes ? `${testCase.estimated_duration_minutes} min` : null} />
+                            <DetailRow label="Requirement" value={testCase.linked_requirement_id} />
+                            {testCase.tuleap_artifact_id && (
+                                <DetailRow
+                                    label="Tuleap"
+                                    value={
+                                        <a href={testCase.tuleap_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            Artifact #{testCase.tuleap_artifact_id}
+                                        </a>
+                                    }
+                                />
+                            )}
                         </div>
-                    </div>
-                )}
+                        {testCase.tags && testCase.tags.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Tags</div>
+                                <div className="flex flex-wrap gap-1">
+                                    {testCase.tags.map(t => <Badge key={t} variant="default">{t}</Badge>)}
+                                </div>
+                            </div>
+                        )}
+                    </QCCard>
+                </div>
             </div>
 
+            {/* ── Linked Artifacts ────────────────────────────────────── */}
             <TestCaseLinkedArtifactsSections testCase={testCase} />
         </div>
     );
@@ -349,7 +398,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
     ], [testCase.id]);
 
     return (
-        <div className="mt-6 space-y-4">
+        <div className="space-y-4">
             {sections.map(section => (
                 <LinkedArtifactsSection key={section.title} config={section} projectId={testCase.project_id || null} />
             ))}

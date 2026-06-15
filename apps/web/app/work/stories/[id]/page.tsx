@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { storyStatusRegistry } from '@/lib/statusRegistry';
+import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 
 export default function UserStoryDetailPage() {
     const params = useParams();
@@ -105,73 +106,119 @@ export default function UserStoryDetailPage() {
     const displayId = story.tuleap_artifact_id ? `US-${story.tuleap_artifact_id}` : id.slice(0, 8);
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => router.back()}>
-                        Back
-                    </Button>
-                    <div>
-	                        <div className="flex items-center gap-3">
-	                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
-	                            <StatusControl
-	                                artifactType="user_story"
-	                                artifactId={story.id}
-	                                value={story.status || 'Draft'}
-	                                canEdit={story._can?.edit}
-	                                hasFallbackPermission={hasPermission(storyStatusRegistry.editPermission)}
-	                                size="md"
-	                                align="left"
-	                                onOptimisticChange={(nextStatus) => patchStory({ status: nextStatus })}
-	                                onChangeCommitted={handleStatusCommitted}
-	                                onChangeRolledBack={(previousStatus) => patchStory({ status: previousStatus })}
-	                            />
-	                        </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            {displayId} - {story.project_name || 'No Project'}
-                        </p>
+        <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                        onClick={() => router.back()}
+                        className="mt-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                    >
+                        ← Back
+                    </button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" dir="auto">
+                                {title}
+                            </h1>
+                            <StatusControl
+                                artifactType="user_story"
+                                artifactId={story.id}
+                                value={story.status || 'Draft'}
+                                canEdit={story._can?.edit}
+                                hasFallbackPermission={hasPermission(storyStatusRegistry.editPermission)}
+                                size="md"
+                                align="left"
+                                onOptimisticChange={(nextStatus) => patchStory({ status: nextStatus })}
+                                onChangeCommitted={handleStatusCommitted}
+                                onChangeRolledBack={(previousStatus) => patchStory({ status: previousStatus })}
+                            />
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                            {story.tuleap_url ? (
+                                <a
+                                    href={story.tuleap_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono font-semibold text-violet-600 dark:text-violet-300 hover:underline"
+                                >
+                                    {displayId}
+                                </a>
+                            ) : (
+                                <span className="font-mono font-semibold text-violet-600 dark:text-violet-300">
+                                    {displayId}
+                                </span>
+                            )}
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                            <span>{story.project_name || 'No Project'}</span>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}>
-                        <Button variant="outline">Edit</Button>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <EditIcon />
+                            Edit Story
+                        </Button>
                     </Link>
                     <Button
                         variant="outline"
+                        size="sm"
                         onClick={handleDelete}
-                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
+                        className="gap-1.5 text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-900/20"
                     >
+                        <TrashIcon />
                         Delete
                     </Button>
                 </div>
             </div>
 
-            <div className="glass-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h3 className="text-sm uppercase tracking-wider text-slate-400 mb-2">Description</h3>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                        {story.description || 'No description provided.'}
-                    </p>
+            {/* ── Two-column layout ───────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-5">
+
+                {/* Left (2/3) */}
+                <div className="col-span-2 space-y-5">
+                    <QCCard>
+                        <SectionLabel>Description</SectionLabel>
+                        {story.description ? (
+                            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap" dir="auto">
+                                {story.description}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">No description provided.</p>
+                        )}
+                    </QCCard>
+
+                    <QCCard>
+                        <SectionLabel>Acceptance Criteria</SectionLabel>
+                        {story.acceptance_criteria ? (
+                            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap" dir="auto">
+                                {story.acceptance_criteria}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">No acceptance criteria provided.</p>
+                        )}
+                    </QCCard>
                 </div>
-                {story.acceptance_criteria && (
-                    <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-                        <h3 className="text-sm uppercase tracking-wider text-slate-400 mb-2">Acceptance Criteria</h3>
-                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{story.acceptance_criteria}</p>
-                    </div>
-                )}
+
+                {/* Right column (1/3) */}
+                <div className="space-y-5">
+                    <SyncPanel
+                        status={story.sync_status}
+                        lastAttemptedAt={story.last_sync_attempted_at}
+                        error={story.last_sync_error}
+                        tuleapUrl={story.tuleap_url}
+                        artifactType="user_story"
+                        artifactId={story.id}
+                        syncFn={(id) => userStoriesApi.sync(id)}
+                    />
+                </div>
             </div>
 
+            {/* ── Linked Artifacts ────────────────────────────────────── */}
             <UserStoryLinkedArtifactsSections story={story} />
-
-            <SyncPanel
-                status={story.sync_status}
-                lastAttemptedAt={story.last_sync_attempted_at}
-                error={story.last_sync_error}
-                tuleapUrl={story.tuleap_url}
-                artifactType="user_story"
-                artifactId={story.id}
-                syncFn={(id) => userStoriesApi.sync(id)}
-            />
 
             <AttachmentSection
                 artifactType="user_story"

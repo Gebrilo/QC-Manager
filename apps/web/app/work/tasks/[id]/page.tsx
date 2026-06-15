@@ -21,23 +21,7 @@ import Link from 'next/link';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { taskStatusRegistry } from '@/lib/statusRegistry';
-
-// ── Local primitives ────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-    return <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">{children}</div>;
-}
-
-function QCCard({ className = '', children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-    return (
-        <div
-            className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm ${className}`}
-            {...props}
-        >
-            {children}
-        </div>
-    );
-}
+import { QCCard, SectionLabel } from '@/components/shared/DetailCard';
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
