@@ -352,4 +352,26 @@ describe('POST /test-cases/bulk-import — suite_title persistence', () => {
         // Whitespace-only row should land as NULL.
         expect(inserts[1].params[stColIdx]).toBeNull();
     });
+
+    test('category is NOT populated from suite_title (front-end mapping changed in #214)', async () => {
+        const res = await request(makeApp())
+            .post('/test-cases/bulk-import')
+            .send({
+                project_id: '11111111-1111-1111-1111-111111111111',
+                test_cases: [
+                    { title: 'Suite only', suite_title: 'Auth / Login' },
+                ],
+            });
+        expect(res.status).toBe(200);
+        const inserts = queries.filter(q => /INSERT INTO test_case/i.test(q.sql));
+        expect(inserts.length).toBe(1);
+        const colList = inserts[0].sql.match(/INSERT INTO test_case\s*\(([^)]+)\)/i);
+        const cols = colList[1].split(',').map(s => s.trim());
+        const stColIdx = cols.indexOf('suite_title');
+        const catColIdx = cols.indexOf('category');
+        // suite_title holds the suite grouping.
+        expect(inserts[0].params[stColIdx]).toBe('Auth / Login');
+        // category is the schema default ('other') — NOT the suite value.
+        expect(inserts[0].params[catColIdx]).toBe('other');
+    });
 });
