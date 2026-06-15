@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatFieldValue, humanizeLabel, isUuid } from './detailFields';
+import { buildAutoDetailFields, formatFieldValue, humanizeLabel, isUuid } from './detailFields';
 
 describe('humanizeLabel', () => {
     it('title-cases snake_case keys', () => {
@@ -67,5 +67,41 @@ describe('formatFieldValue', () => {
 
     it('skips plain objects', () => {
         expect(formatFieldValue({ a: 1 })).toBeNull();
+    });
+});
+
+describe('buildAutoDetailFields', () => {
+    it('skips denylisted keys', () => {
+        const rows = buildAutoDetailFields({ _can: {}, deleted_at: 'x', title: 'T' });
+        expect(rows).toEqual([{ key: 'title', label: 'Title', value: 'T' }]);
+    });
+
+    it('hides UUID values', () => {
+        const rows = buildAutoDetailFields({
+            id: '7f3a9c2e-1b2c-4d5e-8f90-1a2b3c4d5e6f',
+            name: 'x',
+        });
+        expect(rows.map(row => row.key)).toEqual(['name']);
+    });
+
+    it('hides empty values', () => {
+        const rows = buildAutoDetailFields({ a: null, b: '', c: 'v' });
+        expect(rows.map(row => row.key)).toEqual(['c']);
+    });
+
+    it('honours the exclude list', () => {
+        const rows = buildAutoDetailFields({ a: '1', b: '2' }, { exclude: ['a'] });
+        expect(rows.map(row => row.key)).toEqual(['b']);
+    });
+
+    it('applies label overrides', () => {
+        const rows = buildAutoDetailFields({ a: '1' }, { labels: { a: 'Alpha' } });
+        expect(rows[0].label).toBe('Alpha');
+    });
+
+    it('applies value formatters, skipping null results', () => {
+        const formatters = { effort: (value: unknown) => (value == null ? null : `${value}h`) };
+        expect(buildAutoDetailFields({ effort: 5 }, { formatters })[0].value).toBe('5h');
+        expect(buildAutoDetailFields({ effort: null }, { formatters })).toEqual([]);
     });
 });

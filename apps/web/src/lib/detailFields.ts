@@ -1,4 +1,5 @@
 import { stripHtml } from '@/lib/stripHtml';
+import type { ReactNode } from 'react';
 
 const ACRONYMS: Record<string, string> = {
     id: 'ID',
@@ -54,4 +55,57 @@ export function formatFieldValue(value: unknown): string | null {
 
     const stripped = stripHtml(str);
     return stripped === '' ? null : stripped;
+}
+
+export const GLOBAL_FIELD_DENYLIST = new Set<string>([
+    '_can',
+    'deleted_at',
+    'embedding',
+    'tsv',
+    'search_vector',
+    'sync_status',
+    'last_sync_attempted_at',
+    'last_sync_error',
+    'last_sync_at',
+]);
+
+export interface AutoDetailField {
+    key: string;
+    label: string;
+    value: ReactNode;
+}
+
+export interface BuildAutoDetailFieldsOptions {
+    exclude?: string[];
+    labels?: Record<string, string>;
+    formatters?: Record<string, (value: unknown) => ReactNode | null>;
+}
+
+export function buildAutoDetailFields(
+    record: Record<string, unknown> | null | undefined,
+    options: BuildAutoDetailFieldsOptions = {},
+): AutoDetailField[] {
+    if (!record) return [];
+
+    const exclude = new Set(options.exclude ?? []);
+    const labels = options.labels ?? {};
+    const formatters = options.formatters ?? {};
+    const rows: AutoDetailField[] = [];
+
+    for (const [key, raw] of Object.entries(record)) {
+        if (GLOBAL_FIELD_DENYLIST.has(key)) continue;
+        if (exclude.has(key)) continue;
+        if (isUuid(raw)) continue;
+
+        const formatted = formatters[key] ? formatters[key](raw) : formatFieldValue(raw);
+        if (formatted === null || formatted === undefined || formatted === '') continue;
+
+        rows.push({
+            key,
+            label: labels[key] ?? humanizeLabel(key),
+            value: formatted,
+        });
+    }
+
+    return rows;
 }
