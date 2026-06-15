@@ -117,6 +117,7 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.testcases.
         const {
             page = 1, limit = 25, search, project_id, status, priority,
             test_type, automation_status, assigned_to, sync_status,
+            category, suite_title, created_by, tags, match_suite_title,
             sort_by = 'created_at', sort_order = 'desc',
         } = req.query;
 
@@ -139,6 +140,33 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.testcases.
         if (automation_status) { query += ` AND automation_status = $${pn++}`; params.push(automation_status); }
         if (assigned_to) { query += ` AND assigned_to = $${pn++}`; params.push(assigned_to); }
         if (sync_status) { query += ` AND sync_status = $${pn++}`; params.push(sync_status); }
+        if (category) { query += ` AND category = $${pn++}`; params.push(category); }
+        if (suite_title) {
+            query += ` AND suite_title = $${pn++}`;
+            params.push(suite_title);
+        }
+        if (created_by) {
+            query += ` AND created_by = $${pn++}`;
+            params.push(created_by);
+        }
+        if (tags) {
+            const tagList = String(tags).split(',').map(t => t.trim()).filter(Boolean);
+            if (tagList.length > 0) {
+                query += ` AND tags && $${pn++}::text[]`;
+                params.push(tagList);
+            }
+        }
+        if (match_suite_title === 'true' || match_suite_title === true) {
+            // Caller-supplied suite name to match (normalised exact match).
+            // Required so we don't match against the suite's own name (no suite
+            // exists yet at create time).
+            const matchName = String(req.query.suite_name || '').trim();
+            if (matchName) {
+                query += ` AND lower(regexp_replace(trim(suite_title), '\\s+', ' ', 'g')) = ` +
+                         `lower(regexp_replace(trim($${pn++}), '\\s+', ' ', 'g'))`;
+                params.push(matchName);
+            }
+        }
 
         if (search) {
             query += ` AND (title ILIKE $${pn} OR description ILIKE $${pn} OR test_case_id ILIKE $${pn})`;

@@ -1,15 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { testSuitesApi, fetchApi } from '@/lib/api';
+import { testSuitesApi, testCasesApi, fetchApi } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 
 interface ProjectOption {
     id: string;
     project_name: string;
     project_id: string;
+}
+
+interface CaseRow {
+    id: string;
+    test_case_id: string;
+    title: string;
+    priority?: string;
+    status?: string;
+    suite_title?: string;
+    category?: string;
+    tags?: string[];
 }
 
 // ── Design primitives ────────────────────────────────────────────────────────
@@ -92,10 +104,272 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 const selectCls =
     'w-full h-10 pl-3.5 pr-9 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all appearance-none cursor-pointer';
 
+function PriorityBadge({ priority }: { priority?: string }) {
+    if (!priority) return null;
+    const cls: Record<string, string> = {
+        critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+        high:     'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        medium:   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        low:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    };
+    return (
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${cls[priority.toLowerCase()] ?? 'bg-slate-100 text-slate-600'}`}>
+            {priority}
+        </span>
+    );
+}
+
+// ── Picker panel (Suggested / All / Search) ─────────────────────────────────
+
+type PickerTab = 'suggested' | 'all' | 'search';
+
+function TestCasePicker({
+    projectId,
+    suiteName,
+    selectedIds,
+    setSelectedIds,
+}: {
+    projectId: string;
+    suiteName: string;
+    selectedIds: Set<string>;
+    setSelectedIds: (next: Set<string>) => void;
+}) {
+    const toast = useToast();
+    const [tab, setTab] = useState<PickerTab>('suggested');
+    const [rows, setRows] = useState<CaseRow[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [searchFilters, setSearchFilters] = useState({
+        suite_title: '',
+        title: '',
+        priority: '',
+        status: '',
+        category: '',
+        created_by: '',
+        tags: '',
+    });
+
+    const load = useCallback(async (mode: PickerTab) => {
+        if (!projectId) { setRows([]); return; }
+        setLoading(true);
+        try {
+            let params: any = { project_id: projectId, limit: 200 };
+            if (mode === 'suggested') {
+                params = { ...params, match_suite_title: true, suite_name: suiteName };
+            } else if (mode === 'search') {
+                const trimmed: Record<string, string> = {};
+                Object.entries(searchFilters).forEach(([k, v]) => {
+                    if (v && String(v).trim() !== '') trimmed[k] = String(v).trim();
+                });
+                params = { ...params, ...trimmed };
+            }
+            const res = await testCasesApi.list(params) as any;
+            setRows(Array.isArray(res.data) ? res.data : []);
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to load test cases');
+        } finally {
+            setLoading(false);
+        }
+    }, [projectId, suiteName, searchFilters, toast]);
+
+    useEffect(() => {
+        load(tab);
+        // load is included in deps; we re-run when tab changes via the effect below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
+
+    // Auto-refresh Suggested when name+project are both set.
+    useEffect(() => {
+        if (tab === 'suggested' && projectId && suiteName.trim()) {
+            load('suggested');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suiteName, projectId]);
+
+    const toggle = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelectedIds(next);
+    };
+
+    const toggleAll = () => {
+        if (selectedIds.size === rows.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(rows.map(r => r.id)));
+        }
+    };
+
+    return (
+        <div className="rounded-xl border border-violet-200/60 dark:border-violet-700/40 bg-violet-50/40 dark:bg-violet-900/10 p-4">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    Add test cases{selectedIds.size > 0 ? ` (${selectedIds.size} selected)` : ''}
+                </h3>
+            </div>
+
+            {!projectId && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 py-3 text-center">
+                    Select a project first to browse test cases.
+                </p>
+            )}
+
+            {projectId && (
+                <>
+                    <div className="flex items-center gap-1 mb-3 border-b border-violet-200/40 dark:border-violet-800/40">
+                        {(['suggested', 'all', 'search'] as const).map(t => {
+                            const label = t === 'suggested' ? 'Suggested' : t === 'all' ? 'All' : 'Search';
+                            const isActive = tab === t;
+                            return (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setTab(t)}
+                                    className={
+                                        'h-8 px-3 text-xs font-semibold uppercase tracking-wider transition-all border-b-2 -mb-px ' +
+                                        (isActive
+                                            ? 'border-violet-500 text-violet-700 dark:text-violet-300'
+                                            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200')
+                                    }
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {tab === 'suggested' && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                            Test cases whose <span className="font-mono">suite_title</span> matches the typed suite name
+                            (normalised: lower, trimmed, internal whitespace collapsed).
+                            {!suiteName.trim() && <span className="italic"> Type a suite name above to see matches.</span>}
+                        </p>
+                    )}
+
+                    {tab === 'search' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                            {(['suite_title', 'title', 'priority', 'status', 'category', 'created_by', 'tags'] as const).map(f => {
+                                if (f === 'priority' || f === 'status') {
+                                    return (
+                                        <div key={f}>
+                                            <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">{f === 'priority' ? 'Priority' : 'Status'}</label>
+                                            <select
+                                                value={searchFilters[f]}
+                                                onChange={e => setSearchFilters(s => ({ ...s, [f]: e.target.value }))}
+                                                className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-violet-500 transition-all"
+                                            >
+                                                <option value="">Any</option>
+                                                {f === 'priority' ? (
+                                                    <>
+                                                        <option value="critical">Critical</option>
+                                                        <option value="high">High</option>
+                                                        <option value="medium">Medium</option>
+                                                        <option value="low">Low</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="None">None</option>
+                                                        <option value="Not Run">Not Run</option>
+                                                        <option value="Review">Review</option>
+                                                        <option value="Pass">Pass</option>
+                                                        <option value="Fail">Fail</option>
+                                                        <option value="Blocked">Blocked</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div key={f}>
+                                        <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                            {f === 'suite_title' ? 'Suite Title' :
+                                             f === 'title' ? 'Title contains' :
+                                             f === 'category' ? 'Category' :
+                                             f === 'created_by' ? 'Created by (UUID)' :
+                                             'Tags (comma-separated, any match)'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={searchFilters[f]}
+                                            onChange={e => setSearchFilters(s => ({ ...s, [f]: e.target.value }))}
+                                            placeholder={f === 'tags' ? 'login, smoke' : ''}
+                                            className="w-full h-8 px-2.5 rounded-lg text-xs bg-white/60 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                        />
+                                    </div>
+                                );
+                            })}
+                            <div className="sm:col-span-2 flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => load('search')}
+                                    disabled={loading}
+                                    className="h-7 px-3 text-xs rounded-lg bg-violet-600 text-white font-semibold shadow-sm hover:bg-violet-700 disabled:opacity-50"
+                                >
+                                    {loading ? 'Searching…' : 'Apply filters'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {loading ? (
+                        <div className="flex items-center justify-center py-6"><Spinner size="sm" /></div>
+                    ) : rows.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-4">
+                            {tab === 'suggested'
+                                ? 'No test cases with a matching suite_title in this project.'
+                                : tab === 'search'
+                                    ? 'No test cases match your filters.'
+                                    : 'No test cases available in this project.'}
+                        </p>
+                    ) : (
+                        <>
+                            <div className="mb-2 px-1">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.size === rows.length && rows.length > 0}
+                                        ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < rows.length; }}
+                                        onChange={toggleAll}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                    />
+                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Select all ({rows.length})
+                                    </span>
+                                </label>
+                            </div>
+                            <div className="max-h-56 overflow-y-auto space-y-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50 bg-white/60 dark:bg-slate-900/40 divide-y divide-slate-100 dark:divide-slate-800">
+                                {rows.map(row => (
+                                    <label key={row.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-violet-50/60 dark:hover:bg-violet-900/10 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(row.id)}
+                                            onChange={() => toggle(row.id)}
+                                            className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 flex-shrink-0"
+                                        />
+                                        <span className="font-mono text-[11px] font-semibold text-violet-600 dark:text-violet-300 flex-shrink-0 w-20">{row.test_case_id}</span>
+                                        <span className="text-xs text-slate-700 dark:text-slate-200 flex-1 truncate">
+                                            {row.title}
+                                            {row.suite_title && (
+                                                <span className="ml-2 text-[10px] text-slate-400 font-mono">⟶ {row.suite_title}</span>
+                                            )}
+                                        </span>
+                                        <PriorityBadge priority={row.priority} />
+                                    </label>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CreateTestSuitePage() {
     const router = useRouter();
+    const toast = useToast();
     const [projects, setProjects] = useState<ProjectOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -105,9 +379,15 @@ export default function CreateTestSuitePage() {
     const [description, setDescription] = useState('');
     const [projectId, setProjectId] = useState('');
     const [status, setStatus] = useState('draft');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const [nameError, setNameError] = useState('');
     const [projectError, setProjectError] = useState('');
+
+    // Use a ref to avoid lint warnings about stale closures inside the
+    // picker (the picker reads the latest value of selectedIds).
+    const selectedIdsRef = useRef(selectedIds);
+    selectedIdsRef.current = selectedIds;
 
     useEffect(() => {
         fetchApi('/projects?status=active&limit=100')
@@ -118,6 +398,12 @@ export default function CreateTestSuitePage() {
             .catch(console.error)
             .finally(() => setLoading(false));
     }, []);
+
+    // When the project changes, drop the prior selection (those cases may be
+    // in a different project; the create endpoint will reject them anyway).
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [projectId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -137,11 +423,14 @@ export default function CreateTestSuitePage() {
                 description: description.trim() || undefined,
                 project_id: projectId,
                 status: status as 'draft' | 'active' | 'archived',
-            });
+                test_case_ids: Array.from(selectedIds),
+            } as any);
             router.push('/test/suites');
             router.refresh();
         } catch (err: any) {
-            setError(err.message || 'Failed to create test suite');
+            const msg = err.message || 'Failed to create test suite';
+            setError(msg);
+            toast.error(msg);
         } finally {
             setSubmitting(false);
         }
@@ -179,7 +468,7 @@ export default function CreateTestSuitePage() {
                             <span className="text-slate-300 dark:text-slate-600">/</span>
                             <span className="text-slate-500 dark:text-slate-300 font-medium">New</span>
                         </div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
                             New Test Suite
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
@@ -299,6 +588,26 @@ export default function CreateTestSuitePage() {
                         placeholder="Describe the purpose and scope of this test suite..."
                         rows={4}
                         className={textareaCls}
+                    />
+                </div>
+            </SectionCard>
+
+            <SectionCard
+                icon={
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M10 2v7.5L4 18a2 2 0 0 0 1.7 3h12.6A2 2 0 0 0 20 18l-6-8.5V2M8 2h8" />
+                    </svg>
+                }
+                accent="emerald"
+                title="Test cases"
+                description="Pick cases to link to this suite. Selected cases are added on create."
+            >
+                <div className="col-span-full">
+                    <TestCasePicker
+                        projectId={projectId}
+                        suiteName={name}
+                        selectedIds={selectedIds}
+                        setSelectedIds={setSelectedIds}
                     />
                 </div>
             </SectionCard>
