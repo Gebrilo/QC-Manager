@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { TestSuite, TestSuiteListResponse } from '@/types';
+import { SuiteStatus, TestSuite, TestSuiteListResponse } from '@/types';
 import { testSuitesApi, projectsApi, type Project } from '@/lib/api';
+import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { BulkStatusActionBar } from '@/components/shared/BulkStatusActionBar';
+import { useToast } from '@/components/ui/Toast';
 import { formatDistanceToNow } from 'date-fns';
 import {
     useReactTable,
@@ -15,21 +19,10 @@ import {
 } from '@tanstack/react-table';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { canEditStatus, testSuiteStatusRegistry } from '@/lib/statusRegistry';
 
-// ── Pill colour maps ────────────────────────────────────────────────────────
-const STATUS_PILL: Record<string, string> = {
-    active:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    draft:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    archived: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-};
-
-function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
-    return (
-        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
-            {children}
-        </span>
-    );
-}
+const BULK_SELECTION_LIMIT = 50;
+const BULK_STATUS_CONCURRENCY = 5;
 
 function GlassSelect({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
     return (
@@ -48,11 +41,68 @@ function GlassSelect({ value, onChange, children }: { value: string; onChange: (
     );
 }
 
+function getBulkErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'unknown error';
+}
+
+async function runWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+) {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    disabled,
+    onChange,
+}: {
+    checked: boolean;
+    indeterminate: boolean;
+    disabled: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    const ref = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            aria-label="Select all filtered test suites"
+            checked={checked}
+            disabled={disabled}
+            onClick={event => event.stopPropagation()}
+            onChange={event => onChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+    );
+}
+
 const columnHelper = createColumnHelper<TestSuite>();
 
 export default function TestSuitesPage() {
     const { hasPermission } = useAuth();
     const confirmAction = useConfirm();
+    const toast = useToast();
+    const hasSuiteStatusEditPermission = hasPermission(testSuiteStatusRegistry.editPermission);
     const [suites, setSuites] = useState<TestSuite[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,6 +115,8 @@ export default function TestSuitesPage() {
     const [sortBy] = useState('created_at');
     const [sortOrder] = useState<'asc' | 'desc'>('desc');
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [selectedSuiteIds, setSelectedSuiteIds] = useState<Set<string>>(new Set());
+    const [isApplyingBulkStatus, setIsApplyingBulkStatus] = useState(false);
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
@@ -109,6 +161,171 @@ export default function TestSuitesPage() {
     const hasAnyFilter = !!(search || projectFilter || status);
     const canCreateSuite = hasPermission('qc.testsuites.create') || hasPermission('qc.testsuites.view');
 
+    useEffect(() => {
+        const visibleIds = new Set(suites.map(suite => suite.id));
+        setSelectedSuiteIds(prev => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (visibleIds.has(id)) {
+                    next.add(id);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [suites]);
+
+    const patchSuite = useCallback((suiteId: string, patch: Partial<TestSuite>) => {
+        setSuites(prev => prev.map(suite => suite.id === suiteId ? { ...suite, ...patch } : suite));
+    }, []);
+
+    const handleStatusCommitted = useCallback((suiteId: string, _nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestSuite>;
+        setSuites(prev => prev.map(suite => (
+            suite.id === suiteId ? { ...suite, ...next, _can: next._can ?? suite._can } : suite
+        )));
+    }, []);
+
+    const suiteById = useMemo(() => new Map(suites.map(suite => [suite.id, suite])), [suites]);
+    const selectedSuites = useMemo(
+        () => Array.from(selectedSuiteIds)
+            .map(id => suiteById.get(id))
+            .filter((suite): suite is TestSuite => Boolean(suite)),
+        [selectedSuiteIds, suiteById]
+    );
+
+    const isSuiteSelectable = useCallback(
+        (suite: TestSuite) => canEditStatus(suite._can?.edit, hasSuiteStatusEditPermission),
+        [hasSuiteStatusEditPermission]
+    );
+
+    const handleToggleSuiteSelection = useCallback((suiteId: string, selected: boolean) => {
+        const suite = suiteById.get(suiteId);
+        if (!suite) return;
+        if (selected && !isSuiteSelectable(suite)) {
+            toast.warning("You don't have permission to select this test suite");
+            return;
+        }
+        if (selected && !selectedSuiteIds.has(suiteId) && selectedSuiteIds.size >= BULK_SELECTION_LIMIT) {
+            toast.warning(`Selection is limited to ${BULK_SELECTION_LIMIT} test suites`);
+            return;
+        }
+        setSelectedSuiteIds(prev => {
+            const next = new Set(prev);
+            if (selected) {
+                next.add(suiteId);
+            } else {
+                next.delete(suiteId);
+            }
+            return next;
+        });
+    }, [isSuiteSelectable, selectedSuiteIds, suiteById, toast]);
+
+    const handleToggleAllSelection = useCallback((selected: boolean) => {
+        if (!selected) {
+            setSelectedSuiteIds(new Set());
+            return;
+        }
+
+        const selectableIds = suites
+            .filter(suite => isSuiteSelectable(suite))
+            .map(suite => suite.id);
+        const cappedIds = selectableIds.slice(0, BULK_SELECTION_LIMIT);
+        setSelectedSuiteIds(new Set(cappedIds));
+        if (selectableIds.length > BULK_SELECTION_LIMIT) {
+            toast.warning(`Selected the first ${BULK_SELECTION_LIMIT} editable test suites. Refine filters to update more.`);
+        }
+    }, [isSuiteSelectable, suites, toast]);
+
+    const handleBulkStatusApply = useCallback(async (nextStatus: string) => {
+        if (selectedSuites.length === 0 || isApplyingBulkStatus) return;
+
+        const normalizedStatus = testSuiteStatusRegistry.normalize(nextStatus) as SuiteStatus;
+        const candidates = selectedSuites.slice(0, BULK_SELECTION_LIMIT);
+        const previousStatuses = new Map(candidates.map(suite => [suite.id, testSuiteStatusRegistry.normalize(suite.status || '') as SuiteStatus]));
+        const editableSuites: TestSuite[] = [];
+        const failureReasons: string[] = [];
+
+        candidates.forEach(suite => {
+            if (isSuiteSelectable(suite)) {
+                editableSuites.push(suite);
+            } else {
+                failureReasons.push('no permission');
+            }
+        });
+
+        editableSuites.forEach(suite => {
+            patchSuite(suite.id, { status: normalizedStatus });
+        });
+
+        setIsApplyingBulkStatus(true);
+        try {
+            const results = await runWithConcurrency(editableSuites, BULK_STATUS_CONCURRENCY, async (suite) => {
+                const previousStatus = previousStatuses.get(suite.id) || testSuiteStatusRegistry.normalize(suite.status || '');
+                const payload = testSuiteStatusRegistry.defaultFills?.(normalizedStatus, { previousStatus }) || {};
+                try {
+                    const updated = await testSuiteStatusRegistry.update(suite.id, normalizedStatus, payload);
+                    return { suite, ok: true as const, updated };
+                } catch (error) {
+                    return { suite, ok: false as const, error };
+                }
+            });
+
+            let updatedCount = 0;
+            let failedCount = failureReasons.length;
+
+            results.forEach(result => {
+                if (result.ok) {
+                    updatedCount += 1;
+                    handleStatusCommitted(result.suite.id, normalizedStatus, result.updated);
+                    return;
+                }
+                failedCount += 1;
+                failureReasons.push(getBulkErrorMessage(result.error));
+                const previousStatus = previousStatuses.get(result.suite.id) || testSuiteStatusRegistry.normalize(result.suite.status || '');
+                patchSuite(result.suite.id, { status: previousStatus as SuiteStatus });
+            });
+
+            const distinctReasons = Array.from(new Set(failureReasons.filter(Boolean)));
+            const reasonSuffix = distinctReasons.length > 0 ? ` (${distinctReasons.slice(0, 2).join(', ')})` : '';
+            if (failedCount === 0) {
+                toast.success(`${updatedCount} updated`);
+            } else if (updatedCount > 0) {
+                toast.warning(`${updatedCount} updated, ${failedCount} failed${reasonSuffix}`);
+            } else {
+                toast.error(`0 updated, ${failedCount} failed${reasonSuffix}`);
+            }
+            setSelectedSuiteIds(new Set());
+        } finally {
+            setIsApplyingBulkStatus(false);
+        }
+    }, [
+        handleStatusCommitted,
+        isApplyingBulkStatus,
+        isSuiteSelectable,
+        patchSuite,
+        selectedSuites,
+        toast,
+    ]);
+
+    const selectableSuiteIds = useMemo(
+        () => suites
+            .filter(suite => canEditStatus(suite._can?.edit, hasSuiteStatusEditPermission))
+            .map(suite => suite.id),
+        [suites, hasSuiteStatusEditPermission]
+    );
+    const cappedSelectableSuiteIds = useMemo(
+        () => selectableSuiteIds.slice(0, BULK_SELECTION_LIMIT),
+        [selectableSuiteIds]
+    );
+    const selectedVisibleCount = cappedSelectableSuiteIds.filter(id => selectedSuiteIds.has(id)).length;
+    const allVisibleSelected = cappedSelectableSuiteIds.length > 0 && selectedVisibleCount === cappedSelectableSuiteIds.length;
+    const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+    const selectionAtLimit = selectedSuiteIds.size >= BULK_SELECTION_LIMIT;
+
     const handleDeleteSuite = useCallback(async (suite: TestSuite) => {
         if (suite._can?.delete === false) return;
         const confirmed = await confirmAction({
@@ -125,9 +342,50 @@ export default function TestSuitesPage() {
         } catch (error) {
             console.error('Failed to delete test suite:', error);
         }
-    }, [confirm]);
+    }, [confirmAction]);
 
     const columns = useMemo(() => [
+        columnHelper.display({
+            id: 'select',
+            header: () => (
+                <SelectAllCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected}
+                    disabled={cappedSelectableSuiteIds.length === 0}
+                    onChange={handleToggleAllSelection}
+                />
+            ),
+            enableHiding: false,
+            enableSorting: false,
+            cell: (info) => {
+                const suite = info.row.original;
+                const checked = selectedSuiteIds.has(suite.id);
+                const selectable = canEditStatus(suite._can?.edit, hasSuiteStatusEditPermission);
+                const disabledReason = !selectable
+                    ? "You don't have permission to select this test suite"
+                    : !checked && selectionAtLimit
+                        ? `Selection is limited to ${BULK_SELECTION_LIMIT} test suites`
+                        : '';
+                const checkbox = (
+                    <input
+                        type="checkbox"
+                        data-testid={`select-test-suite-${suite.id}`}
+                        aria-label={`Select test suite ${suite.suite_id}`}
+                        checked={checked}
+                        disabled={Boolean(disabledReason)}
+                        onChange={event => handleToggleSuiteSelection(suite.id, event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                );
+
+                if (!disabledReason) return checkbox;
+                return (
+                    <SimpleTooltip content={disabledReason} position="top">
+                        <span className="inline-flex cursor-not-allowed">{checkbox}</span>
+                    </SimpleTooltip>
+                );
+            },
+        }),
         columnHelper.accessor('suite_id', {
             id: 'suite_id',
             header: 'ID',
@@ -170,8 +428,19 @@ export default function TestSuitesPage() {
             id: 'status',
             header: 'Status',
             cell: (info) => {
-                const v = info.getValue();
-                return <Pill tone={STATUS_PILL[v] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}>{v}</Pill>;
+                const suite = info.row.original;
+                return (
+                    <StatusControl
+                        artifactType="test_suite"
+                        artifactId={suite.id}
+                        value={info.getValue() || 'draft'}
+                        canEdit={suite._can?.edit}
+                        hasFallbackPermission={hasSuiteStatusEditPermission}
+                        onOptimisticChange={(next) => patchSuite(suite.id, { status: next as SuiteStatus })}
+                        onChangeCommitted={(next, updated) => handleStatusCommitted(suite.id, next, updated)}
+                        onChangeRolledBack={(previous) => patchSuite(suite.id, { status: previous as SuiteStatus })}
+                    />
+                );
             },
         }),
         columnHelper.accessor('test_case_count', {
@@ -230,7 +499,19 @@ export default function TestSuitesPage() {
                 );
             },
         }),
-    ], [handleDeleteSuite]);
+    ], [
+        allVisibleSelected,
+        cappedSelectableSuiteIds.length,
+        handleDeleteSuite,
+        handleStatusCommitted,
+        handleToggleAllSelection,
+        handleToggleSuiteSelection,
+        hasSuiteStatusEditPermission,
+        patchSuite,
+        selectedSuiteIds,
+        selectionAtLimit,
+        someVisibleSelected,
+    ]);
 
     const table = useReactTable({
         data: suites,
@@ -303,9 +584,10 @@ export default function TestSuitesPage() {
                 </GlassSelect>
                 <GlassSelect value={status} onChange={setStatus}>
                     <option value="">All Statuses</option>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
+                    {testSuiteStatusRegistry.statuses.map(s => {
+                        const option = testSuiteStatusRegistry.getOption(s);
+                        return <option key={s} value={s}>{option.label}</option>;
+                    })}
                 </GlassSelect>
                 {hasAnyFilter && (
                     <button
@@ -321,6 +603,13 @@ export default function TestSuitesPage() {
             </div>
 
             {/* ── Table ──────────────────────────────────────────────── */}
+            <BulkStatusActionBar
+                artifactType="test_suite"
+                selectedCount={selectedSuiteIds.size}
+                isApplying={isApplyingBulkStatus}
+                onApplyStatus={handleBulkStatusApply}
+                onClear={() => setSelectedSuiteIds(new Set())}
+            />
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
@@ -344,7 +633,7 @@ export default function TestSuitesPage() {
                         .ts-table-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 5px; }
                         .ts-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
                     `}</style>
-                    <table className="w-full text-sm ts-table-scroll" style={{ minWidth: 1050 }}>
+                    <table className="w-full text-sm ts-table-scroll" style={{ minWidth: 1100 }}>
                         <thead>
                             <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
                                 {table.getHeaderGroups()[0].headers.map((header, i) => (
@@ -359,7 +648,7 @@ export default function TestSuitesPage() {
                                                     : 'px-3',
                                             header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200' : '',
                                         ].join(' ')}
-                                        style={i === 0 ? { minWidth: 90 } : {}}
+                                        style={i === 0 ? { minWidth: 48 } : {}}
                                         onClick={header.column.getToggleSortingHandler()}
                                     >
                                         {header.isPlaceholder ? null : (
@@ -387,7 +676,7 @@ export default function TestSuitesPage() {
                                 </tr>
                             ) : (
                                 table.getRowModel().rows.map(row => (
-                                    <tr key={row.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
+                                    <tr key={row.id} data-testid={`test-suite-row-${row.original.id}`} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
                                         {row.getVisibleCells().map((cell, ci) => (
                                             <td
                                                 key={cell.id}

@@ -10,14 +10,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { ConfirmDialog, useConfirm } from '@/components/ui/ConfirmDialog';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { testSuiteStatusRegistry } from '@/lib/statusRegistry';
 import { formatDistanceToNow, format } from 'date-fns';
-
-function getSuiteStatusVariant(status: string): 'success' | 'warning' | 'default' {
-    const map: Record<string, 'success' | 'warning' | 'default'> = {
-        active: 'success', draft: 'warning', archived: 'default',
-    };
-    return map[status] || 'default';
-}
 
 function getPriorityBadgeVariant(priority: string): 'danger' | 'warning' | 'default' | 'success' {
     const map: Record<string, 'danger' | 'warning' | 'default' | 'success'> = {
@@ -39,6 +35,7 @@ export default function TestSuiteDetailPage() {
     const id = params.id as string;
     const toast = useToast();
     const confirmAction = useConfirm();
+    const { hasPermission } = useAuth();
 
     const [suite, setSuite] = useState<(TestSuite & { test_cases?: SuiteTestCase[] }) | null>(null);
     const [loading, setLoading] = useState(true);
@@ -158,6 +155,16 @@ export default function TestSuiteDetailPage() {
         setSelectedCaseIds(next);
     };
 
+    const patchSuite = (patch: Partial<TestSuite>) => {
+        setSuite(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestSuite>;
+        setSuite(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
+    };
+
     if (loading) {
         return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
     }
@@ -195,6 +202,18 @@ export default function TestSuiteDetailPage() {
                 <div className="flex items-center gap-4">
                     <Link href="/test/suites"><Button variant="ghost" size="sm">Back</Button></Link>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{suite.suite_id}</h1>
+                    <StatusControl
+                        artifactType="test_suite"
+                        artifactId={suite.id}
+                        value={suite.status || 'draft'}
+                        canEdit={suite._can?.edit}
+                        hasFallbackPermission={hasPermission(testSuiteStatusRegistry.editPermission)}
+                        size="md"
+                        align="left"
+                        onOptimisticChange={(nextStatus) => patchSuite({ status: nextStatus as TestSuite['status'] })}
+                        onChangeCommitted={handleStatusCommitted}
+                        onChangeRolledBack={(previousStatus) => patchSuite({ status: previousStatus as TestSuite['status'] })}
+                    />
                 </div>
                 <div className="flex gap-3">
                     <Link href={`/test/runs/create?suite_id=${id}`}><Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-none">Start Test Run</Button></Link>
@@ -209,7 +228,6 @@ export default function TestSuiteDetailPage() {
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{suite.name}</h2>
                     <div className="flex flex-wrap gap-2">
-                        <Badge variant={getSuiteStatusVariant(suite.status)}>{suite.status}</Badge>
                         {suite.project_name && <Badge variant="info">{suite.project_name}</Badge>}
                         {passRate !== null && <Badge variant={passRate >= 80 ? 'success' : passRate >= 50 ? 'warning' : 'danger'}>{passRate}% pass rate</Badge>}
                     </div>

@@ -1,6 +1,6 @@
-import { bugsApi, tasksApi, testCasesApi, userStoriesApi } from '@/lib/api';
+import { bugsApi, tasksApi, testCasesApi, testSuitesApi, userStoriesApi } from '@/lib/api';
 
-export type StatusArtifactType = 'task' | 'user_story' | 'bug' | 'test_case';
+export type StatusArtifactType = 'task' | 'user_story' | 'bug' | 'test_case' | 'test_suite';
 
 export interface StatusOption {
     value: string;
@@ -271,6 +271,38 @@ const testCaseStatusOptions: Record<string, StatusOption> = {
     },
 };
 
+const testSuiteStatusOrder = ['draft', 'active', 'archived'] as const;
+
+function normalizeTestSuiteStatus(status: string) {
+    if (!status) return 'draft';
+    const trimmed = status.trim().toLowerCase();
+    return testSuiteStatusOrder.includes(trimmed as typeof testSuiteStatusOrder[number]) ? trimmed : 'draft';
+}
+
+const testSuiteStatusOptions: Record<string, StatusOption> = {
+    draft: {
+        value: 'draft',
+        label: 'Draft',
+        dotClass: 'bg-amber-500',
+        pillClass: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800',
+        borderClass: 'border-amber-300 dark:border-amber-600',
+    },
+    active: {
+        value: 'active',
+        label: 'Active',
+        dotClass: 'bg-emerald-500',
+        pillClass: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800',
+        borderClass: 'border-emerald-300 dark:border-emerald-700',
+    },
+    archived: {
+        value: 'archived',
+        label: 'Archived',
+        dotClass: 'bg-slate-500',
+        pillClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        borderClass: 'border-slate-300 dark:border-slate-600',
+    },
+};
+
 export const taskStatusRegistry: StatusRegistryEntry = {
     artifactType: 'task',
     label: 'Task',
@@ -336,11 +368,25 @@ export const testCaseStatusRegistry: StatusRegistryEntry = {
     update: (id, status, payload) => testCasesApi.update(id, { ...payload, status } as any),
 };
 
+export const testSuiteStatusRegistry: StatusRegistryEntry = {
+    artifactType: 'test_suite',
+    label: 'Test Suite',
+    statuses: testSuiteStatusOrder,
+    editPermission: 'qc.testsuites.edit',
+    normalize: normalizeTestSuiteStatus,
+    getOption: (status: string) => {
+        const normalized = normalizeTestSuiteStatus(status);
+        return testSuiteStatusOptions[normalized] || testSuiteStatusOptions.draft;
+    },
+    update: (id, status, payload) => testSuitesApi.update(id, { ...payload, status } as any),
+};
+
 export const statusRegistry: Record<StatusArtifactType, StatusRegistryEntry> = {
     task: taskStatusRegistry,
     user_story: storyStatusRegistry,
     bug: bugStatusRegistry,
     test_case: testCaseStatusRegistry,
+    test_suite: testSuiteStatusRegistry,
 };
 
 export function canEditStatus(rowCanEdit: boolean | undefined, hasFallbackPermission: boolean) {
