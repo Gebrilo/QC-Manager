@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { projectsApi } from '@/lib/api';
@@ -10,6 +10,11 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { AllResultsPanel } from '@/components/testing/AllResultsPanel';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { BulkStatusActionBar } from '@/components/shared/BulkStatusActionBar';
+import { SimpleTooltip } from '@/components/ui/Tooltip';
+import { useToast } from '@/components/ui/Toast';
+import { canEditStatus, testRunStatusRegistry } from '@/lib/statusRegistry';
 import { Upload } from 'lucide-react';
 
 interface Project {
@@ -59,6 +64,8 @@ interface UploadResult {
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const BULK_SELECTION_LIMIT = 50;
+const BULK_STATUS_CONCURRENCY = 5;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
@@ -82,7 +89,7 @@ function TestRunHistorySkeleton() {
             <table className="w-full">
                 <thead className="bg-slate-50 dark:bg-slate-700/50">
                     <tr>
-                        {['Run ID', 'Name', 'Project', 'Total', 'Pass', 'Fail', 'Blocked', 'Pass Rate', 'Date', 'Actions'].map((header) => (
+                        {['', 'Run ID', 'Name', 'Status', 'Project', 'Total', 'Pass', 'Fail', 'Blocked', 'Pass Rate', 'Date', 'Actions'].map((header) => (
                             <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 {header}
                             </th>
@@ -92,8 +99,10 @@ function TestRunHistorySkeleton() {
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {Array.from({ length: 6 }).map((_, rowIndex) => (
                         <tr key={rowIndex}>
+                            <td className="px-4 py-4"><Skeleton className="h-4 w-4 rounded" /></td>
                             <td className="px-4 py-4"><Skeleton className="h-5 w-20" /></td>
                             <td className="px-4 py-4"><Skeleton className="h-5 w-40" /></td>
+                            <td className="px-4 py-4"><Skeleton className="h-6 w-24 rounded-full" /></td>
                             <td className="px-4 py-4"><Skeleton className="h-5 w-32" /></td>
                             <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
                             <td className="px-4 py-4"><Skeleton className="mx-auto h-5 w-10" /></td>
@@ -110,9 +119,65 @@ function TestRunHistorySkeleton() {
     );
 }
 
+function getBulkErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'unknown error';
+}
+
+async function runWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+) {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    disabled,
+    onChange,
+}: {
+    checked: boolean;
+    indeterminate: boolean;
+    disabled: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    const ref = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            aria-label="Select all filtered test runs"
+            checked={checked}
+            disabled={disabled}
+            onChange={event => onChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+    );
+}
+
 export default function TestExecutionsPage() {
     const router = useRouter();
     const { hasPermission } = useAuth();
+    const toast = useToast();
+    const hasTestRunStatusEditPermission = hasPermission(testRunStatusRegistry.editPermission);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [testRuns, setTestRuns] = useState<TestRun[]>([]);
@@ -135,6 +200,8 @@ export default function TestExecutionsPage() {
     const [deleting, setDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState<'upload' | 'history' | 'results'>('upload');
     const [resultsProjectId, setResultsProjectId] = useState<string | undefined>(undefined);
+    const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set());
+    const [isApplyingBulkStatus, setIsApplyingBulkStatus] = useState(false);
 
     // Load projects and recent uploads
     useEffect(() => {
@@ -186,6 +253,173 @@ export default function TestExecutionsPage() {
 
         setFilteredRuns(filtered);
     }, [testRuns, searchQuery, filterProject]);
+
+    useEffect(() => {
+        const visibleIds = new Set(filteredRuns.map(run => run.id));
+        setSelectedRunIds(prev => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (visibleIds.has(id)) {
+                    next.add(id);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [filteredRuns]);
+
+    const patchRun = useCallback((runId: string, patch: Partial<TestRun>) => {
+        const applyPatch = (run: TestRun) => run.id === runId ? { ...run, ...patch } : run;
+        setTestRuns(prev => prev.map(applyPatch));
+        setFilteredRuns(prev => prev.map(applyPatch));
+    }, []);
+
+    const handleStatusCommitted = useCallback((runId: string, _nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestRun>;
+        const mergeRun = (run: TestRun) => run.id === runId ? { ...run, ...next, _can: next._can ?? run._can } : run;
+        setTestRuns(prev => prev.map(mergeRun));
+        setFilteredRuns(prev => prev.map(mergeRun));
+    }, []);
+
+    const runById = useMemo(() => new Map(filteredRuns.map(run => [run.id, run])), [filteredRuns]);
+    const selectedRuns = useMemo(
+        () => Array.from(selectedRunIds)
+            .map(id => runById.get(id))
+            .filter((run): run is TestRun => Boolean(run)),
+        [selectedRunIds, runById]
+    );
+
+    const isRunSelectable = useCallback(
+        (run: TestRun) => canEditStatus(run._can?.edit, hasTestRunStatusEditPermission),
+        [hasTestRunStatusEditPermission]
+    );
+
+    const handleToggleRunSelection = useCallback((runId: string, selected: boolean) => {
+        const run = runById.get(runId);
+        if (!run) return;
+        if (selected && !isRunSelectable(run)) {
+            toast.warning("You don't have permission to select this test run");
+            return;
+        }
+        if (selected && !selectedRunIds.has(runId) && selectedRunIds.size >= BULK_SELECTION_LIMIT) {
+            toast.warning(`Selection is limited to ${BULK_SELECTION_LIMIT} test runs`);
+            return;
+        }
+        setSelectedRunIds(prev => {
+            const next = new Set(prev);
+            if (selected) {
+                next.add(runId);
+            } else {
+                next.delete(runId);
+            }
+            return next;
+        });
+    }, [isRunSelectable, runById, selectedRunIds, toast]);
+
+    const handleToggleAllSelection = useCallback((selected: boolean) => {
+        if (!selected) {
+            setSelectedRunIds(new Set());
+            return;
+        }
+
+        const selectableIds = filteredRuns
+            .filter(run => isRunSelectable(run))
+            .map(run => run.id);
+        const cappedIds = selectableIds.slice(0, BULK_SELECTION_LIMIT);
+        setSelectedRunIds(new Set(cappedIds));
+        if (selectableIds.length > BULK_SELECTION_LIMIT) {
+            toast.warning(`Selected the first ${BULK_SELECTION_LIMIT} editable test runs. Refine filters to update more.`);
+        }
+    }, [filteredRuns, isRunSelectable, toast]);
+
+    const handleBulkStatusApply = useCallback(async (nextStatus: string) => {
+        if (selectedRuns.length === 0 || isApplyingBulkStatus) return;
+
+        const normalizedStatus = testRunStatusRegistry.normalize(nextStatus);
+        const candidates = selectedRuns.slice(0, BULK_SELECTION_LIMIT);
+        const previousStatuses = new Map(candidates.map(run => [run.id, testRunStatusRegistry.normalize(run.status || '')]));
+        const editableRuns: TestRun[] = [];
+        const failureReasons: string[] = [];
+
+        candidates.forEach(run => {
+            if (isRunSelectable(run)) {
+                editableRuns.push(run);
+            } else {
+                failureReasons.push('no permission');
+            }
+        });
+
+        editableRuns.forEach(run => {
+            patchRun(run.id, { status: normalizedStatus });
+        });
+
+        setIsApplyingBulkStatus(true);
+        try {
+            const results = await runWithConcurrency(editableRuns, BULK_STATUS_CONCURRENCY, async (run) => {
+                const previousStatus = previousStatuses.get(run.id) || testRunStatusRegistry.normalize(run.status || '');
+                const payload = testRunStatusRegistry.defaultFills?.(normalizedStatus, { previousStatus }) || {};
+                try {
+                    const updated = await testRunStatusRegistry.update(run.id, normalizedStatus, payload);
+                    return { run, ok: true as const, updated };
+                } catch (error) {
+                    return { run, ok: false as const, error };
+                }
+            });
+
+            let updatedCount = 0;
+            let failedCount = failureReasons.length;
+
+            results.forEach(result => {
+                if (result.ok) {
+                    updatedCount += 1;
+                    handleStatusCommitted(result.run.id, normalizedStatus, result.updated);
+                    return;
+                }
+                failedCount += 1;
+                failureReasons.push(getBulkErrorMessage(result.error));
+                const previousStatus = previousStatuses.get(result.run.id) || testRunStatusRegistry.normalize(result.run.status || '');
+                patchRun(result.run.id, { status: previousStatus });
+            });
+
+            const distinctReasons = Array.from(new Set(failureReasons.filter(Boolean)));
+            const reasonSuffix = distinctReasons.length > 0 ? ` (${distinctReasons.slice(0, 2).join(', ')})` : '';
+            if (failedCount === 0) {
+                toast.success(`${updatedCount} updated`);
+            } else if (updatedCount > 0) {
+                toast.warning(`${updatedCount} updated, ${failedCount} failed${reasonSuffix}`);
+            } else {
+                toast.error(`0 updated, ${failedCount} failed${reasonSuffix}`);
+            }
+            setSelectedRunIds(new Set());
+        } finally {
+            setIsApplyingBulkStatus(false);
+        }
+    }, [
+        handleStatusCommitted,
+        isApplyingBulkStatus,
+        isRunSelectable,
+        patchRun,
+        selectedRuns,
+        toast,
+    ]);
+
+    const selectableRunIds = useMemo(
+        () => filteredRuns
+            .filter(run => canEditStatus(run._can?.edit, hasTestRunStatusEditPermission))
+            .map(run => run.id),
+        [filteredRuns, hasTestRunStatusEditPermission]
+    );
+    const cappedSelectableRunIds = useMemo(
+        () => selectableRunIds.slice(0, BULK_SELECTION_LIMIT),
+        [selectableRunIds]
+    );
+    const selectedVisibleCount = cappedSelectableRunIds.filter(id => selectedRunIds.has(id)).length;
+    const allVisibleSelected = cappedSelectableRunIds.length > 0 && selectedVisibleCount === cappedSelectableRunIds.length;
+    const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+    const selectionAtLimit = selectedRunIds.size >= BULK_SELECTION_LIMIT;
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -862,12 +1096,31 @@ export default function TestExecutionsPage() {
                             )}
                         </div>
                     ) : (
+                        <>
+                        <div className="px-6 pt-4">
+                            <BulkStatusActionBar
+                                artifactType="test_run"
+                                selectedCount={selectedRunIds.size}
+                                isApplying={isApplyingBulkStatus}
+                                onApplyStatus={handleBulkStatusApply}
+                                onClear={() => setSelectedRunIds(new Set())}
+                            />
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-slate-50 dark:bg-slate-700/50">
                                     <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                            <SelectAllCheckbox
+                                                checked={allVisibleSelected}
+                                                indeterminate={someVisibleSelected}
+                                                disabled={cappedSelectableRunIds.length === 0}
+                                                onChange={handleToggleAllSelection}
+                                            />
+                                        </th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Run ID</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider">Pass</th>
@@ -881,13 +1134,50 @@ export default function TestExecutionsPage() {
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                     {filteredRuns.map(run => {
                                         const canDelete = run._can?.delete !== false;
+                                        const checked = selectedRunIds.has(run.id);
+                                        const selectable = canEditStatus(run._can?.edit, hasTestRunStatusEditPermission);
+                                        const disabledReason = !selectable
+                                            ? "You don't have permission to select this test run"
+                                            : !checked && selectionAtLimit
+                                                ? `Selection is limited to ${BULK_SELECTION_LIMIT} test runs`
+                                                : '';
+                                        const checkbox = (
+                                            <input
+                                                type="checkbox"
+                                                data-testid={`select-test-run-${run.id}`}
+                                                aria-label={`Select test run ${run.run_id}`}
+                                                checked={checked}
+                                                disabled={Boolean(disabledReason)}
+                                                onChange={event => handleToggleRunSelection(run.id, event.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                            />
+                                        );
                                         return (
-                                        <tr key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                        <tr key={run.id} data-testid={`test-run-row-${run.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                            <td className="px-4 py-4">
+                                                {disabledReason ? (
+                                                    <SimpleTooltip content={disabledReason} position="top">
+                                                        <span className="inline-flex cursor-not-allowed">{checkbox}</span>
+                                                    </SimpleTooltip>
+                                                ) : checkbox}
+                                            </td>
                                             <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
                                             <td className="px-4 py-4 text-sm font-medium max-w-xs truncate">
                                                 <Link href={`/test/runs/${run.id}`} className="text-slate-900 dark:text-white hover:text-violet-700 dark:hover:text-violet-300 transition-colors">
                                                     {run.name}
                                                 </Link>
+                                            </td>
+                                            <td className="px-4 py-4 text-sm">
+                                                <StatusControl
+                                                    artifactType="test_run"
+                                                    artifactId={run.id}
+                                                    value={run.status || 'in_progress'}
+                                                    canEdit={run._can?.edit}
+                                                    hasFallbackPermission={hasTestRunStatusEditPermission}
+                                                    onOptimisticChange={(next) => patchRun(run.id, { status: next })}
+                                                    onChangeCommitted={(next, updated) => handleStatusCommitted(run.id, next, updated)}
+                                                    onChangeRolledBack={(previous) => patchRun(run.id, { status: previous })}
+                                                />
                                             </td>
                                             <td className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">{run.project_name || '-'}</td>
                                             <td className="px-4 py-4 text-sm text-center font-semibold text-slate-700 dark:text-slate-300">{run.total_cases}</td>
@@ -941,6 +1231,7 @@ export default function TestExecutionsPage() {
                                 </tbody>
                             </table>
                         </div>
+                        </>
                     )}
                 </section>
                 )}

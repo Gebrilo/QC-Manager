@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { fetchApi } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { testRunStatusRegistry } from '@/lib/statusRegistry';
 import { formatDistanceToNow, format } from 'date-fns';
 
 interface TestRunDetail {
@@ -38,6 +41,12 @@ interface TestRunDetail {
         not_run_pct: number;
     };
     executions: TestRunExecutionItem[];
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 interface TestRunExecutionItem {
@@ -81,6 +90,7 @@ export default function TestRunDetailPage() {
     const router = useRouter();
     const id = params.id as string;
     const toast = useToast();
+    const { hasPermission } = useAuth();
 
     const [run, setRun] = useState<TestRunDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -147,6 +157,16 @@ export default function TestRunDetailPage() {
         setSelectedIds(next);
     };
 
+    const patchRun = (patch: Partial<TestRunDetail>) => {
+        setRun(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleRunStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestRunDetail>;
+        setRun(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
+    };
+
     const selectAll = () => {
         if (!run) return;
         if (selectedIds.size === run.executions.length) {
@@ -184,9 +204,22 @@ export default function TestRunDetailPage() {
                 <div className="flex items-center gap-4">
                     <Link href="/test/runs"><Button variant="ghost" size="sm">Back</Button></Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{run.run_id}: {run.name}</h1>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{run.run_id}: {run.name}</h1>
+                            <StatusControl
+                                artifactType="test_run"
+                                artifactId={run.id}
+                                value={run.status || 'in_progress'}
+                                canEdit={run._can?.edit}
+                                hasFallbackPermission={hasPermission(testRunStatusRegistry.editPermission)}
+                                size="md"
+                                align="left"
+                                onOptimisticChange={(nextStatus) => patchRun({ status: nextStatus })}
+                                onChangeCommitted={handleRunStatusCommitted}
+                                onChangeRolledBack={(previousStatus) => patchRun({ status: previousStatus })}
+                            />
+                        </div>
                         <div className="flex gap-2 mt-1">
-                            <Badge variant={run.status === 'completed' ? 'success' : run.status === 'in_progress' ? 'warning' : 'default'}>{run.status}</Badge>
                             {run.source && <Badge variant="info">Source: {run.source}</Badge>}
                             {run.environment && <Badge variant="default">{run.environment}</Badge>}
                             {run.version_tag && <Badge variant="default">v{run.version_tag}</Badge>}

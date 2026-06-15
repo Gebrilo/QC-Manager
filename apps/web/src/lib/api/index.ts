@@ -1175,6 +1175,12 @@ export const testRunsApi = {
             body: JSON.stringify(data),
         }),
 
+    update: (id: string, data: Partial<Pick<TestRun, 'name' | 'description' | 'status'>>) =>
+        fetchApi<TestRun>(`/test-executions/test-runs/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
     getProgress: (id: string) =>
         fetchApi<TestRunProgress>(`/test-executions/test-runs/${id}/progress`),
 
