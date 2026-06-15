@@ -214,7 +214,7 @@ function RoadmapCard({ item }: { item: RoadmapItem }) {
                 {date && <span className="font-mono text-[11px] text-slate-400">{date}</span>}
             </div>
             <h3 className="mb-1 text-[15px] font-bold leading-snug text-slate-900">{item.title}</h3>
-            <p className="text-[13px] leading-relaxed text-slate-600">{item.description}</p>
+            <p className="text-[13px] leading-relaxed text-slate-600 whitespace-pre-line">{item.description}</p>
         </div>
     );
 }
