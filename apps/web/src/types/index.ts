@@ -336,6 +336,12 @@ export interface TestCase {
     execution_count?: number;
     execution_history?: TestCaseExecution[];
     activity?: TestCaseActivityEntry[];
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 export interface TestCaseExecution {

@@ -1,6 +1,6 @@
-import { bugsApi, tasksApi, userStoriesApi } from '@/lib/api';
+import { bugsApi, tasksApi, testCasesApi, userStoriesApi } from '@/lib/api';
 
-export type StatusArtifactType = 'task' | 'user_story' | 'bug';
+export type StatusArtifactType = 'task' | 'user_story' | 'bug' | 'test_case';
 
 export interface StatusOption {
     value: string;
@@ -217,6 +217,60 @@ const bugStatusOptions: Record<string, StatusOption> = {
     },
 };
 
+const testCaseStatusOrder = ['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked'] as const;
+
+function normalizeTestCaseStatus(status: string) {
+    if (!status) return 'None';
+    const trimmed = status.trim();
+    const canonical = testCaseStatusOrder.find(option => option.toLowerCase() === trimmed.toLowerCase());
+    return canonical || 'None';
+}
+
+const testCaseStatusOptions: Record<string, StatusOption> = {
+    None: {
+        value: 'None',
+        label: 'None',
+        dotClass: 'bg-slate-400',
+        pillClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        borderClass: 'border-slate-300 dark:border-slate-600',
+    },
+    'Not Run': {
+        value: 'Not Run',
+        label: 'Not Run',
+        dotClass: 'bg-slate-500',
+        pillClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        borderClass: 'border-slate-300 dark:border-slate-600',
+    },
+    Review: {
+        value: 'Review',
+        label: 'Review',
+        dotClass: 'bg-amber-500',
+        pillClass: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800',
+        borderClass: 'border-amber-300 dark:border-amber-600',
+    },
+    Pass: {
+        value: 'Pass',
+        label: 'Pass',
+        dotClass: 'bg-emerald-500',
+        pillClass: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800',
+        borderClass: 'border-emerald-300 dark:border-emerald-700',
+    },
+    Fail: {
+        value: 'Fail',
+        label: 'Fail',
+        dotClass: 'bg-rose-500',
+        pillClass: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800',
+        borderClass: 'border-rose-300 dark:border-rose-700',
+    },
+    Blocked: {
+        value: 'Blocked',
+        label: 'Blocked',
+        dotClass: 'bg-red-500',
+        pillClass: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800',
+        borderClass: 'border-red-300 dark:border-red-700',
+    },
+};
+
 export const taskStatusRegistry: StatusRegistryEntry = {
     artifactType: 'task',
     label: 'Task',
@@ -269,10 +323,24 @@ export const bugStatusRegistry: StatusRegistryEntry = {
     },
 };
 
+export const testCaseStatusRegistry: StatusRegistryEntry = {
+    artifactType: 'test_case',
+    label: 'Test Case',
+    statuses: testCaseStatusOrder,
+    editPermission: 'qc.testcases.edit',
+    normalize: normalizeTestCaseStatus,
+    getOption: (status: string) => {
+        const normalized = normalizeTestCaseStatus(status);
+        return testCaseStatusOptions[normalized] || testCaseStatusOptions.None;
+    },
+    update: (id, status, payload) => testCasesApi.update(id, { ...payload, status } as any),
+};
+
 export const statusRegistry: Record<StatusArtifactType, StatusRegistryEntry> = {
     task: taskStatusRegistry,
     user_story: storyStatusRegistry,
     bug: bugStatusRegistry,
+    test_case: testCaseStatusRegistry,
 };
 
 export function canEditStatus(rowCanEdit: boolean | undefined, hasFallbackPermission: boolean) {

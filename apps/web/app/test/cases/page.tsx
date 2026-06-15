@@ -1,11 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { TestCase, TestCaseListResponse } from '@/types';
 import { testCasesApi, projectsApi, type Project } from '@/lib/api';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { BulkStatusActionBar } from '@/components/shared/BulkStatusActionBar';
+import { useToast } from '@/components/ui/Toast';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { canEditStatus, testCaseStatusRegistry } from '@/lib/statusRegistry';
 import { stripHtml } from '@/lib/stripHtml';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -26,12 +31,8 @@ const PRIORITY_PILL: Record<string, string> = {
     low:      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
 };
 
-const STATUS_PILL: Record<string, string> = {
-    active:     'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    draft:      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    deprecated: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-    archived:   'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-};
+const BULK_SELECTION_LIMIT = 50;
+const BULK_STATUS_CONCURRENCY = 5;
 
 const RESULT_PILL: Record<string, string> = {
     passed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
@@ -64,6 +65,61 @@ function GlassSelect({ value, onChange, children }: { value: string; onChange: (
     );
 }
 
+function getBulkErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'unknown error';
+}
+
+async function runWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+) {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    disabled,
+    onChange,
+}: {
+    checked: boolean;
+    indeterminate: boolean;
+    disabled: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    const ref = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            aria-label="Select all filtered test cases"
+            checked={checked}
+            disabled={disabled}
+            onClick={event => event.stopPropagation()}
+            onChange={event => onChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+    );
+}
+
 const columnHelper = createColumnHelper<TestCase>();
 
 function buildTestCaseTooltip(tc: TestCase): string {
@@ -76,6 +132,9 @@ function buildTestCaseTooltip(tc: TestCase): string {
 }
 
 export default function TestCasesPage() {
+    const { hasPermission } = useAuth();
+    const toast = useToast();
+    const hasTestCaseStatusEditPermission = hasPermission(testCaseStatusRegistry.editPermission);
     const [testCases, setTestCases] = useState<TestCase[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,6 +151,8 @@ export default function TestCasesPage() {
     const [sortBy] = useState('created_at');
     const [sortOrder] = useState<'asc' | 'desc'>('desc');
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<Set<string>>(new Set());
+    const [isApplyingBulkStatus, setIsApplyingBulkStatus] = useState(false);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({ sync_status: false });
 
     useEffect(() => {
@@ -140,7 +201,203 @@ export default function TestCasesPage() {
 
     const hasAnyFilter = !!(search || projectFilter || status || priority || testType || automationStatus || syncStatus);
 
+    useEffect(() => {
+        const visibleIds = new Set(testCases.map(testCase => testCase.id));
+        setSelectedTestCaseIds(prev => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (visibleIds.has(id)) {
+                    next.add(id);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [testCases]);
+
+    const patchTestCase = (testCaseId: string, patch: Partial<TestCase>) => {
+        setTestCases(prev => prev.map(testCase => testCase.id === testCaseId ? { ...testCase, ...patch } : testCase));
+    };
+
+    const handleStatusCommitted = (testCaseId: string, _nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestCase>;
+        setTestCases(prev => prev.map(testCase => (
+            testCase.id === testCaseId ? { ...testCase, ...next, _can: next._can ?? testCase._can } : testCase
+        )));
+    };
+
+    const testCaseById = useMemo(() => new Map(testCases.map(testCase => [testCase.id, testCase])), [testCases]);
+    const selectedTestCases = useMemo(
+        () => Array.from(selectedTestCaseIds)
+            .map(id => testCaseById.get(id))
+            .filter((testCase): testCase is TestCase => Boolean(testCase)),
+        [selectedTestCaseIds, testCaseById]
+    );
+
+    const isTestCaseSelectable = (testCase: TestCase) => canEditStatus(testCase._can?.edit, hasTestCaseStatusEditPermission);
+
+    const handleToggleTestCaseSelection = (testCaseId: string, selected: boolean) => {
+        const testCase = testCaseById.get(testCaseId);
+        if (!testCase) return;
+        if (selected && !isTestCaseSelectable(testCase)) {
+            toast.warning("You don't have permission to select this test case");
+            return;
+        }
+        if (selected && !selectedTestCaseIds.has(testCaseId) && selectedTestCaseIds.size >= BULK_SELECTION_LIMIT) {
+            toast.warning(`Selection is limited to ${BULK_SELECTION_LIMIT} test cases`);
+            return;
+        }
+        setSelectedTestCaseIds(prev => {
+            const next = new Set(prev);
+            if (selected) {
+                next.add(testCaseId);
+            } else {
+                next.delete(testCaseId);
+            }
+            return next;
+        });
+    };
+
+    const handleToggleAllSelection = (selected: boolean) => {
+        if (!selected) {
+            setSelectedTestCaseIds(new Set());
+            return;
+        }
+
+        const selectableIds = testCases
+            .filter(testCase => isTestCaseSelectable(testCase))
+            .map(testCase => testCase.id);
+        const cappedIds = selectableIds.slice(0, BULK_SELECTION_LIMIT);
+        setSelectedTestCaseIds(new Set(cappedIds));
+        if (selectableIds.length > BULK_SELECTION_LIMIT) {
+            toast.warning(`Selected the first ${BULK_SELECTION_LIMIT} editable test cases. Refine filters to update more.`);
+        }
+    };
+
+    const handleBulkStatusApply = async (nextStatus: string) => {
+        if (selectedTestCases.length === 0 || isApplyingBulkStatus) return;
+
+        const normalizedStatus = testCaseStatusRegistry.normalize(nextStatus) as TestCase['status'];
+        const candidates = selectedTestCases.slice(0, BULK_SELECTION_LIMIT);
+        const previousStatuses = new Map(candidates.map(testCase => [testCase.id, testCaseStatusRegistry.normalize(testCase.status || '') as TestCase['status']]));
+        const editableTestCases: TestCase[] = [];
+        const failureReasons: string[] = [];
+
+        candidates.forEach(testCase => {
+            if (isTestCaseSelectable(testCase)) {
+                editableTestCases.push(testCase);
+            } else {
+                failureReasons.push('no permission');
+            }
+        });
+
+        editableTestCases.forEach(testCase => {
+            patchTestCase(testCase.id, { status: normalizedStatus });
+        });
+
+        setIsApplyingBulkStatus(true);
+        try {
+            const results = await runWithConcurrency(editableTestCases, BULK_STATUS_CONCURRENCY, async (testCase) => {
+                const previousStatus = previousStatuses.get(testCase.id) || testCaseStatusRegistry.normalize(testCase.status || '');
+                const payload = testCaseStatusRegistry.defaultFills?.(normalizedStatus, { previousStatus }) || {};
+                try {
+                    const updated = await testCaseStatusRegistry.update(testCase.id, normalizedStatus, payload);
+                    return { testCase, ok: true as const, updated };
+                } catch (error) {
+                    return { testCase, ok: false as const, error };
+                }
+            });
+
+            let updatedCount = 0;
+            let failedCount = failureReasons.length;
+
+            results.forEach(result => {
+                if (result.ok) {
+                    updatedCount += 1;
+                    handleStatusCommitted(result.testCase.id, normalizedStatus, result.updated);
+                    return;
+                }
+                failedCount += 1;
+                failureReasons.push(getBulkErrorMessage(result.error));
+                const previousStatus = previousStatuses.get(result.testCase.id) || testCaseStatusRegistry.normalize(result.testCase.status || '');
+                patchTestCase(result.testCase.id, { status: previousStatus as TestCase['status'] });
+            });
+
+            const distinctReasons = Array.from(new Set(failureReasons.filter(Boolean)));
+            const reasonSuffix = distinctReasons.length > 0 ? ` (${distinctReasons.slice(0, 2).join(', ')})` : '';
+            if (failedCount === 0) {
+                toast.success(`${updatedCount} updated`);
+            } else if (updatedCount > 0) {
+                toast.warning(`${updatedCount} updated, ${failedCount} failed${reasonSuffix}`);
+            } else {
+                toast.error(`0 updated, ${failedCount} failed${reasonSuffix}`);
+            }
+            setSelectedTestCaseIds(new Set());
+        } finally {
+            setIsApplyingBulkStatus(false);
+        }
+    };
+
+    const selectableTestCaseIds = useMemo(
+        () => testCases
+            .filter(testCase => canEditStatus(testCase._can?.edit, hasTestCaseStatusEditPermission))
+            .map(testCase => testCase.id),
+        [testCases, hasTestCaseStatusEditPermission]
+    );
+    const cappedSelectableTestCaseIds = useMemo(
+        () => selectableTestCaseIds.slice(0, BULK_SELECTION_LIMIT),
+        [selectableTestCaseIds]
+    );
+    const selectedVisibleCount = cappedSelectableTestCaseIds.filter(id => selectedTestCaseIds.has(id)).length;
+    const allVisibleSelected = cappedSelectableTestCaseIds.length > 0 && selectedVisibleCount === cappedSelectableTestCaseIds.length;
+    const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+    const selectionAtLimit = selectedTestCaseIds.size >= BULK_SELECTION_LIMIT;
+
     const columns = useMemo(() => [
+        columnHelper.display({
+            id: 'select',
+            header: () => (
+                <SelectAllCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected}
+                    disabled={cappedSelectableTestCaseIds.length === 0}
+                    onChange={handleToggleAllSelection}
+                />
+            ),
+            enableHiding: false,
+            enableSorting: false,
+            cell: (info) => {
+                const testCase = info.row.original;
+                const checked = selectedTestCaseIds.has(testCase.id);
+                const selectable = canEditStatus(testCase._can?.edit, hasTestCaseStatusEditPermission);
+                const disabledReason = !selectable
+                    ? "You don't have permission to select this test case"
+                    : !checked && selectionAtLimit
+                        ? `Selection is limited to ${BULK_SELECTION_LIMIT} test cases`
+                        : '';
+                const checkbox = (
+                    <input
+                        type="checkbox"
+                        data-testid={`select-test-case-${testCase.id}`}
+                        aria-label={`Select test case ${testCase.test_case_id}`}
+                        checked={checked}
+                        disabled={Boolean(disabledReason)}
+                        onChange={event => handleToggleTestCaseSelection(testCase.id, event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                );
+
+                if (!disabledReason) return checkbox;
+                return (
+                    <SimpleTooltip content={disabledReason} position="top">
+                        <span className="inline-flex cursor-not-allowed">{checkbox}</span>
+                    </SimpleTooltip>
+                );
+            },
+        }),
         columnHelper.accessor('test_case_id', {
             id: 'test_case_id',
             header: 'ID',
@@ -193,8 +450,19 @@ export default function TestCasesPage() {
             id: 'status',
             header: 'Status',
             cell: (info) => {
-                const v = info.getValue();
-                return <Pill tone={STATUS_PILL[v] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}>{v}</Pill>;
+                const testCase = info.row.original;
+                return (
+                    <StatusControl
+                        artifactType="test_case"
+                        artifactId={testCase.id}
+                        value={info.getValue() || 'None'}
+                        canEdit={testCase._can?.edit}
+                        hasFallbackPermission={hasTestCaseStatusEditPermission}
+                        onOptimisticChange={(next) => patchTestCase(testCase.id, { status: next as TestCase['status'] })}
+                        onChangeCommitted={(next, updated) => handleStatusCommitted(testCase.id, next, updated)}
+                        onChangeRolledBack={(previous) => patchTestCase(testCase.id, { status: previous as TestCase['status'] })}
+                    />
+                );
             },
         }),
         columnHelper.accessor('automation_status', {
@@ -251,7 +519,18 @@ export default function TestCasesPage() {
                 </div>
             ),
         }),
-    ], []);
+    ], [
+        allVisibleSelected,
+        cappedSelectableTestCaseIds.length,
+        handleStatusCommitted,
+        handleToggleAllSelection,
+        handleToggleTestCaseSelection,
+        hasTestCaseStatusEditPermission,
+        patchTestCase,
+        selectedTestCaseIds,
+        selectionAtLimit,
+        someVisibleSelected,
+    ]);
 
     const table = useReactTable({
         data: testCases,
@@ -343,9 +622,10 @@ export default function TestCasesPage() {
                 </GlassSelect>
                 <GlassSelect value={status} onChange={setStatus}>
                     <option value="">All Statuses</option>
-                    {['draft', 'active', 'deprecated', 'archived'].map(s => (
-                        <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                    ))}
+                    {testCaseStatusRegistry.statuses.map(s => {
+                        const option = testCaseStatusRegistry.getOption(s);
+                        return <option key={s} value={s}>{option.label}</option>;
+                    })}
                 </GlassSelect>
                 <GlassSelect value={priority} onChange={setPriority}>
                     <option value="">All Priorities</option>
@@ -406,6 +686,13 @@ export default function TestCasesPage() {
             </div>
 
             {/* ── Table ──────────────────────────────────────────────── */}
+            <BulkStatusActionBar
+                artifactType="test_case"
+                selectedCount={selectedTestCaseIds.size}
+                isApplying={isApplyingBulkStatus}
+                onApplyStatus={handleBulkStatusApply}
+                onClear={() => setSelectedTestCaseIds(new Set())}
+            />
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
@@ -429,7 +716,7 @@ export default function TestCasesPage() {
                         .tc-table-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 5px; }
                         .tc-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
                     `}</style>
-                    <table className="w-full text-sm tc-table-scroll" style={{ minWidth: 1200 }}>
+                    <table className="w-full text-sm tc-table-scroll" style={{ minWidth: 1240 }}>
                         <thead>
                             <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
                                 {table.getHeaderGroups()[0].headers.map((header, i) => (
@@ -444,7 +731,7 @@ export default function TestCasesPage() {
                                                     : 'px-3',
                                             header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200' : '',
                                         ].join(' ')}
-                                        style={i === 0 ? { minWidth: 90 } : {}}
+	                                        style={i === 0 ? { minWidth: 48 } : {}}
                                         onClick={header.column.getToggleSortingHandler()}
                                     >
                                         {header.isPlaceholder ? null : (
@@ -471,8 +758,8 @@ export default function TestCasesPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                table.getRowModel().rows.map(row => (
-                                    <tr key={row.id} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
+	                                table.getRowModel().rows.map(row => (
+	                                    <tr key={row.id} data-testid={`test-case-row-${row.original.id}`} className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group">
                                         {row.getVisibleCells().map((cell, ci) => (
                                             <td
                                                 key={cell.id}

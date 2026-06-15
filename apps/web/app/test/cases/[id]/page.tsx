@@ -16,12 +16,16 @@ import {
     type LinkedArtifactsSectionConfig,
 } from '@/components/shared/LinkedArtifactsSection';
 import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { testCaseStatusRegistry } from '@/lib/statusRegistry';
 
 export default function TestCaseDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const confirmAction = useConfirm();
+    const { hasPermission } = useAuth();
 
     const [testCase, setTestCase] = useState<(TestCase & { execution_history?: TestCaseExecution[]; activity?: TestCaseActivityEntry[] }) | null>(null);
     const [loading, setLoading] = useState(true);
@@ -52,6 +56,16 @@ export default function TestCaseDetailPage() {
         }
     };
 
+    const patchTestCase = (patch: Partial<TestCase>) => {
+        setTestCase(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<TestCase>;
+        setTestCase(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
+    };
+
     if (loading) {
         return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
     }
@@ -79,11 +93,6 @@ export default function TestCaseDetailPage() {
         );
     }
 
-    const getStatusBadgeVariant = (s: string): 'success' | 'warning' | 'danger' | 'default' => {
-        const map: Record<string, 'success' | 'warning' | 'danger' | 'default'> = { active: 'success', draft: 'warning', deprecated: 'danger', archived: 'default' };
-        return map[s] || 'default';
-    };
-
     const getPriorityBadgeVariant = (p: string): 'danger' | 'warning' | 'default' | 'success' => {
         const map: Record<string, 'danger' | 'warning' | 'default' | 'success'> = { critical: 'danger', high: 'warning', medium: 'default', low: 'success' };
         return map[p] || 'default';
@@ -91,11 +100,23 @@ export default function TestCaseDetailPage() {
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/test/cases"><Button variant="ghost" size="sm">Back</Button></Link>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{testCase.test_case_id}</h1>
-                </div>
+	            <div className="flex items-center justify-between mb-6">
+	                <div className="flex items-center gap-4">
+	                    <Link href="/test/cases"><Button variant="ghost" size="sm">Back</Button></Link>
+	                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{testCase.test_case_id}</h1>
+	                    <StatusControl
+	                        artifactType="test_case"
+	                        artifactId={testCase.id}
+	                        value={testCase.status || 'None'}
+	                        canEdit={testCase._can?.edit}
+	                        hasFallbackPermission={hasPermission(testCaseStatusRegistry.editPermission)}
+	                        size="md"
+	                        align="left"
+	                        onOptimisticChange={(nextStatus) => patchTestCase({ status: nextStatus as TestCase['status'] })}
+	                        onChangeCommitted={handleStatusCommitted}
+	                        onChangeRolledBack={(previousStatus) => patchTestCase({ status: previousStatus as TestCase['status'] })}
+	                    />
+	                </div>
                 <div className="flex gap-3">
                     <Link href={`/test/cases/${id}/edit`}><Button variant="outline">Edit</Button></Link>
                     <Button variant="destructive" onClick={handleDelete}>Delete</Button>
@@ -105,9 +126,8 @@ export default function TestCaseDetailPage() {
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{testCase.title}</h2>
-                    <div className="flex flex-wrap gap-2">
-                        <Badge variant={getStatusBadgeVariant(testCase.status)}>{testCase.status}</Badge>
-                        <Badge variant={getPriorityBadgeVariant(testCase.priority)}>{testCase.priority}</Badge>
+	                    <div className="flex flex-wrap gap-2">
+	                        <Badge variant={getPriorityBadgeVariant(testCase.priority)}>{testCase.priority}</Badge>
                         {testCase.severity && <Badge variant="info">{testCase.severity}</Badge>}
                         {testCase.automation_status && <Badge variant="default">{testCase.automation_status.replace('_', ' ')}</Badge>}
                         {testCase.test_type && <Badge variant="default">{testCase.test_type}</Badge>}
