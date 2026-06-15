@@ -22,8 +22,6 @@ const {
     replaceTaskAssignments,
     getTaskAssignments,
     getTaskAssignmentSummary,
-    sumActualHrs,
-    totalActualHrs,
     primaryOf,
 } = require('../services/assignments/taskAssignments');
 
@@ -160,34 +158,12 @@ async function ensureResourceInTeam(resourceId, teamId, label) {
     return result.rows.length === 0 ? `${label} does not belong to your team` : null;
 }
 
-// Status transition validation
-const VALID_TRANSITIONS = {
-    'Todo': ['In Progress', 'Canceled'],
-    'Backlog': ['In Progress', 'Canceled'],
-    'In Progress': ['Done', 'Canceled'],
-    'Blocked': ['In Progress', 'Canceled'],
-    'Done': [],
-    'Canceled': []
-};
-
 function validateStatusTransition(currentStatus, newStatus, data) {
     if (currentStatus === newStatus) return { valid: true };
-
-    const allowedTransitions = VALID_TRANSITIONS[currentStatus];
-    if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
-        return {
-            valid: false,
-            error: `Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed transitions: ${allowedTransitions?.join(', ') || 'none (terminal state)'}`
-        };
-    }
 
     if (newStatus === 'Done') {
         if (!data.completed_date) {
             return { valid: false, error: 'completed_date is required when marking task as Done' };
-        }
-        const totalActual = data.totalActualHrs || 0;
-        if (totalActual <= 0) {
-            return { valid: false, error: 'Task must have actual hours recorded before marking as Done' };
         }
     }
 
@@ -527,17 +503,11 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
 
         // Status transition check
         if (data.status && data.status !== original.status) {
-            // Done-gate total = sum of actual_hrs across the desired assignment set,
-            // or the current junction sum when the patch does not touch assignments.
-            const totalActual = desiredAssignments
-                ? totalActualHrs(desiredAssignments)
-                : await sumActualHrs(db.query.bind(db), id);
             const validation = validateStatusTransition(
                 original.status,
                 data.status,
                 {
                     completed_date: data.completed_date || original.completed_date,
-                    totalActualHrs: totalActual,
                 }
             );
             if (!validation.valid) {

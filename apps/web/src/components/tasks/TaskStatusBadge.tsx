@@ -1,40 +1,16 @@
-import { Badge } from '@/components/ui/Badge';
+import { taskStatusRegistry } from '@/lib/statusRegistry';
 
 interface TaskStatusBadgeProps {
     status: string;
 }
 
 export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
-    let variant: 'default' | 'complete' | 'inprogress' | 'cancelled' | 'backlog' | 'ontrack' | 'atrisk' | 'notasks' = 'default';
+    const option = taskStatusRegistry.getOption(status);
 
-    // Normalize: in_progress -> In Progress, pending -> Pending, etc.
-    const normalizedStatus = status ? status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown';
-
-    switch (normalizedStatus) {
-        case 'Done':
-        case 'Completed':
-            variant = 'complete';
-            break;
-        case 'In Progress':
-        case 'Running':
-            variant = 'inprogress';
-            break;
-        case 'Canceled':
-        case 'Cancelled':
-        case 'Failed':
-            variant = 'cancelled';
-            break;
-        case 'Blocked':
-            variant = 'cancelled';
-            break;
-        case 'Todo':
-        case 'Backlog':
-        case 'Pending':
-            variant = 'backlog';
-            break;
-        default:
-            variant = 'default';
-    }
-
-    return <Badge variant={variant}>{normalizedStatus}</Badge>;
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium whitespace-nowrap ${option.pillClass}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${option.dotClass}`} aria-hidden />
+            {option.label}
+        </span>
+    );
 }

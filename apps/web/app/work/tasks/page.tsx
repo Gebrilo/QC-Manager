@@ -11,11 +11,10 @@ import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { taskStatusRegistry } from '@/lib/statusRegistry';
 
 interface Project { id: string; project_id: string; project_name: string; }
 interface Resource { id: string; resource_name: string; }
-
-const STATUS_OPTIONS = ['Backlog', 'In Progress', 'Done', 'Cancelled'];
 
 const PRIORITY_COLORS: Record<string, string> = {
     High:   'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
@@ -23,12 +22,15 @@ const PRIORITY_COLORS: Record<string, string> = {
     Low:    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
 };
 
-const TASK_BOARD_COLUMNS = [
-    { status: 'Backlog',     label: 'Backlog',     badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',      border: 'border-slate-300 dark:border-slate-600' },
-    { status: 'In Progress', label: 'In Progress', badge: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', border: 'border-indigo-300 dark:border-indigo-600' },
-    { status: 'Done',        label: 'Done',        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-600' },
-    { status: 'Cancelled',   label: 'Cancelled',   badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',        border: 'border-rose-300 dark:border-rose-600' },
-];
+const TASK_BOARD_COLUMNS = taskStatusRegistry.statuses.map(status => {
+    const option = taskStatusRegistry.getOption(status);
+    return {
+        status,
+        label: option.label,
+        badge: option.pillClass,
+        border: option.borderClass || 'border-slate-300 dark:border-slate-600',
+    };
+});
 
 function GlassSelect({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
     return (
@@ -54,7 +56,6 @@ export default function TasksPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { user } = useAuth();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState('');
@@ -77,6 +78,19 @@ export default function TasksPage() {
     const handleViewChange = (mode: 'table' | 'board') => {
         setViewMode(mode);
         if (typeof window !== 'undefined') localStorage.setItem('tasks_view_mode', mode);
+    };
+
+    const patchTask = (taskId: string, patch: Partial<Task>) => {
+        setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...patch } : task));
+    };
+
+    const handleStatusCommitted = (taskId: string, _nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        setTasks(prev => prev.map(task => {
+            if (task.id !== taskId) return task;
+            const next = updated as Partial<Task>;
+            return { ...task, ...next, _can: next._can ?? task._can };
+        }));
     };
 
     useEffect(() => {
@@ -111,7 +125,7 @@ export default function TasksPage() {
                 if (!matchesSearch) return false;
             }
             if (selectedProject && task.project_id !== selectedProject) return false;
-            if (selectedStatus && task.status !== selectedStatus) return false;
+            if (selectedStatus && taskStatusRegistry.normalize(task.status) !== selectedStatus) return false;
             if (selectedAssignee && task.resource1_id !== selectedAssignee && task.resource2_id !== selectedAssignee) return false;
             if (selectedPriority && task.priority !== selectedPriority) return false;
             return true;
@@ -120,8 +134,8 @@ export default function TasksPage() {
 
     const stats = useMemo(() => ({
         total:       tasks.length,
-        inProgress:  tasks.filter(t => t.status === 'In Progress').length,
-        done:        tasks.filter(t => t.status === 'Done').length,
+        inProgress:  tasks.filter(t => taskStatusRegistry.normalize(t.status) === 'In Progress').length,
+        done:        tasks.filter(t => taskStatusRegistry.normalize(t.status) === 'Done').length,
         highPriority: tasks.filter(t => t.priority === 'High').length,
     }), [tasks]);
 
@@ -201,7 +215,10 @@ export default function TasksPage() {
                 </GlassSelect>
                 <GlassSelect value={selectedStatus} onChange={setSelectedStatus}>
                     <option value="">All Statuses</option>
-                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {taskStatusRegistry.statuses.map(s => {
+                        const option = taskStatusRegistry.getOption(s);
+                        return <option key={s} value={s}>{option.label}</option>;
+                    })}
                 </GlassSelect>
                 <GlassSelect value={selectedAssignee} onChange={setSelectedAssignee}>
                     <option value="">All Assignees</option>
@@ -271,6 +288,10 @@ export default function TasksPage() {
                     isLoading={isLoading}
                     columnVisibility={columnVisibility}
                     onColumnVisibilityChange={setColumnVisibility}
+                    hasStatusEditPermission={hasPermission(taskStatusRegistry.editPermission)}
+                    onStatusOptimisticChange={(taskId, nextStatus) => patchTask(taskId, { status: nextStatus as Task['status'] })}
+                    onStatusCommitted={handleStatusCommitted}
+                    onStatusRolledBack={(taskId, previousStatus) => patchTask(taskId, { status: previousStatus as Task['status'] })}
                 />
             )}
         </div>
@@ -279,8 +300,11 @@ export default function TasksPage() {
 
 function TaskBoardView({ tasks, filteredTasks, isLoading, onTaskClick }: { tasks: Task[]; filteredTasks: Task[]; isLoading: boolean; onTaskClick: (id: string) => void }) {
     const grouped = useMemo(() => {
-        const g: Record<string, Task[]> = { Backlog: [], 'In Progress': [], Done: [], Cancelled: [] };
-        tasks.forEach(t => { if (g[t.status]) g[t.status].push(t); });
+        const g = Object.fromEntries(taskStatusRegistry.statuses.map(status => [status, [] as Task[]])) as Record<string, Task[]>;
+        tasks.forEach(t => {
+            const status = taskStatusRegistry.normalize(t.status);
+            if (g[status]) g[status].push(t);
+        });
         return g;
     }, [tasks]);
 

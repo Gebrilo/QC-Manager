@@ -137,6 +137,12 @@ export interface Task {
     total_actual_hrs?: number;
     overall_completion_pct?: number;
     created_at?: string;
+    _can?: {
+        edit?: boolean;
+        delete?: boolean;
+        assign?: boolean;
+        comment?: boolean;
+    };
 }
 
 export interface TaskAssignment {

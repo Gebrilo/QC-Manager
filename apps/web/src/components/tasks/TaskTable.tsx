@@ -11,11 +11,11 @@ import {
     VisibilityState,
 } from '@tanstack/react-table';
 import { Task } from '@/types';
-import { TaskStatusBadge } from './TaskStatusBadge';
 import Link from 'next/link';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { StatusControl } from '@/components/shared/StatusControl';
 
 export const HIDEABLE_TASK_COLUMNS: { id: string; header: string }[] = [
     { id: 'project_name',       header: 'Project' },
@@ -36,6 +36,10 @@ interface TaskTableProps {
         offset: number;
     };
     onPageChange?: (offset: number) => void;
+    hasStatusEditPermission?: boolean;
+    onStatusOptimisticChange?: (taskId: string, nextStatus: string, previousStatus: string) => void;
+    onStatusCommitted?: (taskId: string, nextStatus: string, updated: unknown) => void;
+    onStatusRolledBack?: (taskId: string, previousStatus: string, nextStatus: string, error: unknown) => void;
 }
 
 function buildTaskTooltip(task: Task): string {
@@ -55,6 +59,10 @@ export function TaskTable({
     onColumnVisibilityChange,
     pagination,
     onPageChange,
+    hasStatusEditPermission = false,
+    onStatusOptimisticChange,
+    onStatusCommitted,
+    onStatusRolledBack,
 }: TaskTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [internalVisibility, setInternalVisibility] = useState<VisibilityState>({
@@ -117,7 +125,21 @@ export function TaskTable({
         columnHelper.accessor('status', {
             id: 'status',
             header: 'Status',
-            cell: (info) => <TaskStatusBadge status={info.getValue()} />,
+            cell: (info) => {
+                const task = info.row.original;
+                return (
+                    <StatusControl
+                        artifactType="task"
+                        artifactId={task.id}
+                        value={info.getValue()}
+                        canEdit={task._can?.edit}
+                        hasFallbackPermission={hasStatusEditPermission}
+                        onOptimisticChange={(next, previous) => onStatusOptimisticChange?.(task.id, next, previous)}
+                        onChangeCommitted={(next, updated) => onStatusCommitted?.(task.id, next, updated)}
+                        onChangeRolledBack={(previous, next, error) => onStatusRolledBack?.(task.id, previous, next, error)}
+                    />
+                );
+            },
         }),
         columnHelper.accessor('expected_start_date', {
             id: 'expected_start_date',
@@ -173,7 +195,7 @@ export function TaskTable({
                 </Link>
             ),
         }),
-    ], []);
+    ], [hasStatusEditPermission, onStatusOptimisticChange, onStatusCommitted, onStatusRolledBack]);
 
     const table = useReactTable({
         data: tasks,

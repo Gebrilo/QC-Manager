@@ -18,41 +18,11 @@ import { tasksApi } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
-
-// ── Status pill config ──────────────────────────────────────────────────────
-
-const STATUS_STYLE: Record<string, { dot: string; pill: string }> = {
-    'Done':        { dot: 'bg-emerald-500', pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
-    'In Progress': { dot: 'bg-blue-500',    pill: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-    'Backlog':     { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
-    'To Do':       { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
-    'Blocked':     { dot: 'bg-rose-500',    pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
-    'Cancelled':   { dot: 'bg-slate-400',   pill: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
-};
-
-const PROGRESS_GRADIENT: Record<string, string> = {
-    'Done':        'from-emerald-500 to-emerald-400',
-    'In Progress': 'from-blue-500 to-blue-400',
-    'Blocked':     'from-rose-500 to-rose-400',
-};
-
-const PROGRESS_TEXT: Record<string, string> = {
-    'Done':        'text-emerald-500 dark:text-emerald-400',
-    'In Progress': 'text-blue-500 dark:text-blue-400',
-    'Blocked':     'text-rose-500 dark:text-rose-400',
-};
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { taskStatusRegistry } from '@/lib/statusRegistry';
 
 // ── Local primitives ────────────────────────────────────────────────────────
-
-function StatusPill({ status }: { status: string }) {
-    const s = STATUS_STYLE[status] ?? STATUS_STYLE['Backlog'];
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${s.pill}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-            {status}
-        </span>
-    );
-}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">{children}</div>;
@@ -77,6 +47,7 @@ export default function TaskDetailPage() {
     const router = useRouter();
     const toast = useToast();
     const confirmAction = useConfirm();
+    const { hasPermission } = useAuth();
     const [task, setTask] = useState<Task | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -117,8 +88,22 @@ export default function TaskDetailPage() {
 
     const status = task.status || '';
     const progress = Number(task.overall_completion_pct || 0);
-    const progressGradient = PROGRESS_GRADIENT[status] ?? 'from-slate-400 to-slate-300';
-    const progressTextColor = PROGRESS_TEXT[status] ?? 'text-slate-500';
+    const statusOption = taskStatusRegistry.getOption(status);
+    const progressGradient = statusOption.progressGradient || 'from-slate-400 to-slate-300';
+    const progressTextColor = statusOption.progressTextClass || 'text-slate-500';
+
+    const patchTask = (patch: Partial<Task>) => {
+        setTask(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        setTask(prev => {
+            if (!prev) return prev;
+            const next = updated as Partial<Task>;
+            return { ...prev, ...next, _can: next._can ?? prev._can };
+        });
+    };
 
     return (
         <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
@@ -137,7 +122,18 @@ export default function TaskDetailPage() {
                             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" dir="auto">
                                 {task.task_name}
                             </h1>
-                            <StatusPill status={status} />
+                            <StatusControl
+                                artifactType="task"
+                                artifactId={task.id}
+                                value={status}
+                                canEdit={task._can?.edit}
+                                hasFallbackPermission={hasPermission(taskStatusRegistry.editPermission)}
+                                size="md"
+                                align="left"
+                                onOptimisticChange={(nextStatus) => patchTask({ status: nextStatus as Task['status'] })}
+                                onChangeCommitted={handleStatusCommitted}
+                                onChangeRolledBack={(previousStatus) => patchTask({ status: previousStatus as Task['status'] })}
+                            />
                         </div>
                         <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                             {task.tuleap_url ? (
