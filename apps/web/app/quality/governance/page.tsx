@@ -164,6 +164,7 @@ export default function GovernanceDashboardPage() {
     const critCount   = summary?.critical_risk_count ?? 0;
     const warnCount   = summary?.warning_risk_count ?? 0;
     const totalProjects = summary?.total_projects ?? 0;
+    const hasLiveData = trendData.some(d => d.passRate !== null && d.totalTests > 0);
 
     return (
         <div className="max-w-[1440px] mx-auto px-6 py-7 space-y-6 pb-12">
@@ -206,10 +207,17 @@ export default function GovernanceDashboardPage() {
                 title="Global Quality Trend (30 Days)"
                 subtitle="Pass rate over time"
                 action={
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100/70 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live data
-                    </span>
+                    hasLiveData ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100/70 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Live data
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100/70 text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Limited data
+                        </span>
+                    )
                 }
             >
                 <div className="h-[260px] w-full">
