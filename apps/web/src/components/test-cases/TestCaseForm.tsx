@@ -26,6 +26,7 @@ const testCaseSchema = z.object({
     test_type: z.enum(['functional', 'regression', 'smoke', 'integration', 'performance', 'security', 'usability', 'exploratory', 'automated']).default('functional'),
     category: z.string().max(50).optional().default(''),
     component: z.string().max(100).optional().default(''),
+    suite_title: z.string().max(255).optional().default(''),
     automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
     status: z.enum(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']).default('Not Run'),
     estimated_duration_minutes: z.coerce.number().int().min(0).max(480).optional().nullable(),
@@ -62,6 +63,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
             test_type: ((initialData?.test_type as string) || 'functional') as FormData['test_type'],
             category: (initialData?.category as string) || '',
             component: (initialData?.component as string) || '',
+            suite_title: (initialData?.suite_title as string) || '',
             automation_status: ((initialData?.automation_status as string) || 'manual') as FormData['automation_status'],
             status: ((initialData?.status as string) || 'Not Run') as FormData['status'],
             estimated_duration_minutes: initialData?.estimated_duration_minutes != null ? Number(initialData.estimated_duration_minutes) : null,
@@ -86,6 +88,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                 test_type: data.test_type,
                 category: data.category || 'other',
                 component: data.component || undefined,
+                suite_title: data.suite_title || undefined,
                 automation_status: data.automation_status,
                 status: data.status,
                 estimated_duration_minutes: data.estimated_duration_minutes || undefined,
@@ -205,6 +208,12 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
                     label="Component"
                     {...register('component')}
                     placeholder="e.g. Login Module"
+                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+                <Input
+                    label="Suite Title"
+                    {...register('suite_title')}
+                    placeholder="e.g. Authentication / Login"
                     className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
                 <div>

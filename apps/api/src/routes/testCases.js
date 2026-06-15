@@ -75,6 +75,10 @@ const testCaseCreateSchema = z.object({
     test_type: z.enum(['functional', 'regression', 'smoke', 'integration', 'performance', 'security', 'usability', 'exploratory', 'automated']).default('functional'),
     category: z.string().max(50).default('other'),
     component: z.string().max(100).optional(),
+    suite_title: z.preprocess(
+        (v) => (typeof v === 'string' ? v.trim() || null : v),
+        z.string().max(255).nullable().optional()
+    ),
     automation_status: z.enum(['manual', 'automated', 'partial', 'to_automate']).default('manual'),
     status: z.enum(['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked']).default('Not Run'),
     estimated_duration_minutes: z.number().int().min(0).max(480).optional(),
@@ -219,16 +223,16 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.testcases
 
         const result = await client.query(
             `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
-                priority, severity, test_type, category, component, automation_status, status,
+                priority, severity, test_type, category, component, suite_title, automation_status, status,
                 estimated_duration_minutes, tags, project_id, assigned_to,
                 linked_requirement_id, linked_bug_ids, created_by, updated_by, sync_status,
                 owner_team_id, visibility_scope, created_by_user_id)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending',$22,$23,$24)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'pending',$23,$24,$25)
             RETURNING *`,
             [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
              validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
              validatedData.severity, validatedData.test_type, validatedData.category,
-             validatedData.component || null, validatedData.automation_status, validatedData.status,
+             validatedData.component || null, validatedData.suite_title || null, validatedData.automation_status, validatedData.status,
              validatedData.estimated_duration_minutes || null, validatedData.tags, validatedData.project_id,
              assignedToUserId, validatedData.linked_requirement_id || null,
              validatedData.linked_bug_ids, req.user?.id || null, req.user?.id || null,
@@ -312,7 +316,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.testc
         }
 
         const updatableFields = ['title','description','preconditions','test_steps','expected_result',
-            'priority','severity','test_type','category','component','automation_status','status',
+            'priority','severity','test_type','category','component','suite_title','automation_status','status',
             'estimated_duration_minutes','tags','project_id','assigned_to','linked_requirement_id','linked_bug_ids'];
         const updates = []; const params = []; let pn = 1; const changedFields = [];
 
@@ -481,13 +485,13 @@ router.post('/bulk-import', requireAuth, blockContributors, requirePermission('q
 
                 const result = await client.query(
                     `INSERT INTO test_case (test_case_id, title, description, preconditions, test_steps, expected_result,
-                        priority, severity, test_type, category, component, automation_status, status, tags, project_id, created_by, updated_by)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                        priority, severity, test_type, category, component, suite_title, automation_status, status, tags, project_id, created_by, updated_by)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
                     RETURNING id, test_case_id, title`,
                     [testCaseId, validatedData.title, validatedData.description || null, validatedData.preconditions || null,
                      validatedData.test_steps || null, validatedData.expected_result || null, validatedData.priority,
                      validatedData.severity, validatedData.test_type, validatedData.category,
-                     validatedData.component || null, validatedData.automation_status, validatedData.status,
+                     validatedData.component || null, validatedData.suite_title || null, validatedData.automation_status, validatedData.status,
                      validatedData.tags, project_id, req.user?.id || null, req.user?.id || null]);
                 results.success.push({ row: i + 1, id: result.rows[0].id, test_case_id: result.rows[0].test_case_id, title: result.rows[0].title });
             } catch (error) { results.errors.push({ row: i + 1, title: testCase.title || 'N/A', error: error.message }); }

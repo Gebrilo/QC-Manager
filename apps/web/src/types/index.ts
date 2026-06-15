@@ -299,6 +299,7 @@ export interface TestCase {
     test_type?: TestCaseType;
     category?: TestCategory;
     component?: string;
+    suite_title?: string | null;
     automation_status?: AutomationStatus;
     status: TestCaseStatus;
     estimated_duration_minutes?: number;

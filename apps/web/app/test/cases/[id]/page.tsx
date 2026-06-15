@@ -117,6 +117,7 @@ export default function TestCaseDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                     <div><span className="text-gray-500 dark:text-gray-400">Project</span><br /><span className="text-slate-900 dark:text-white">{testCase.project_name || '\u2014'}</span></div>
                     <div><span className="text-gray-500 dark:text-gray-400">Category</span><br /><span className="text-slate-900 dark:text-white capitalize">{testCase.category || '\u2014'}</span></div>
+                    <div><span className="text-gray-500 dark:text-gray-400">Suite Title</span><br /><span className="text-slate-900 dark:text-white">{testCase.suite_title || '\u2014'}</span></div>
                     <div><span className="text-gray-500 dark:text-gray-400">Component</span><br /><span className="text-slate-900 dark:text-white">{testCase.component || '\u2014'}</span></div>
                     <div><span className="text-gray-500 dark:text-gray-400">Assigned To</span><br /><span className="text-slate-900 dark:text-white">{testCase.assigned_to_name || 'Unassigned'}</span></div>
                     <div><span className="text-gray-500 dark:text-gray-400">Est. Duration</span><br /><span className="text-slate-900 dark:text-white">{testCase.estimated_duration_minutes ? `${testCase.estimated_duration_minutes} min` : '\u2014'}</span></div>

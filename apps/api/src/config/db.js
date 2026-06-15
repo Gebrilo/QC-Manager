@@ -2370,6 +2370,7 @@ const runMigrations = async () => {
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS is_regression BOOLEAN DEFAULT FALSE",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS execution_count INTEGER DEFAULT 0",
             "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS note TEXT",
+            "ALTER TABLE test_case ADD COLUMN IF NOT EXISTS suite_title VARCHAR(255)",
         ];
         for (const sql of tcAlterColumns) {
             await client.query(sql);
@@ -2426,6 +2427,7 @@ const runMigrations = async () => {
             "CREATE INDEX IF NOT EXISTS idx_test_case_assigned_to ON test_case(assigned_to) WHERE deleted_at IS NULL",
             "CREATE INDEX IF NOT EXISTS idx_test_case_created_by ON test_case(created_by) WHERE deleted_at IS NULL",
             "CREATE INDEX IF NOT EXISTS idx_test_case_test_case_id ON test_case(test_case_id) WHERE deleted_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_test_case_suite_title_norm ON test_case (project_id, lower(regexp_replace(trim(suite_title), '\\s+', ' ', 'g'))) WHERE suite_title IS NOT NULL AND deleted_at IS NULL",
         ];
         for (const sql of tcIndexes) {
             await client.query(sql);
@@ -2447,6 +2449,7 @@ const runMigrations = async () => {
                 tc.severity,
                 tc.test_type,
                 tc.category,
+                tc.suite_title,
                 tc.component,
                 tc.automation_status,
                 tc.status,
