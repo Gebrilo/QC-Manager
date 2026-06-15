@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { humanizeLabel } from './detailFields';
+import { formatFieldValue, humanizeLabel, isUuid } from './detailFields';
 
 describe('humanizeLabel', () => {
     it('title-cases snake_case keys', () => {
@@ -16,5 +16,56 @@ describe('humanizeLabel', () => {
 
     it('handles single words', () => {
         expect(humanizeLabel('priority')).toBe('Priority');
+    });
+});
+
+describe('isUuid', () => {
+    it('detects UUID strings', () => {
+        expect(isUuid('7f3a9c2e-1b2c-4d5e-8f90-1a2b3c4d5e6f')).toBe(true);
+    });
+
+    it('rejects non-UUIDs', () => {
+        expect(isUuid('BUG-123')).toBe(false);
+        expect(isUuid('140')).toBe(false);
+        expect(isUuid(42)).toBe(false);
+        expect(isUuid(null)).toBe(false);
+    });
+});
+
+describe('formatFieldValue', () => {
+    it('skips empty values', () => {
+        expect(formatFieldValue(null)).toBeNull();
+        expect(formatFieldValue(undefined)).toBeNull();
+        expect(formatFieldValue('')).toBeNull();
+        expect(formatFieldValue('   ')).toBeNull();
+    });
+
+    it('formats booleans', () => {
+        expect(formatFieldValue(true)).toBe('Yes');
+        expect(formatFieldValue(false)).toBe('No');
+    });
+
+    it('joins primitive arrays and skips empty/object arrays', () => {
+        expect(formatFieldValue(['a', 'b'])).toBe('a, b');
+        expect(formatFieldValue([])).toBeNull();
+        expect(formatFieldValue([{ x: 1 }])).toBeNull();
+    });
+
+    it('stringifies numbers including zero', () => {
+        expect(formatFieldValue(42)).toBe('42');
+        expect(formatFieldValue(0)).toBe('0');
+    });
+
+    it('formats ISO date strings', () => {
+        expect(formatFieldValue('2026-06-14')).toContain('2026');
+        expect(formatFieldValue('2026-06-14T10:30:00Z')).toContain('2026');
+    });
+
+    it('strips HTML from strings', () => {
+        expect(formatFieldValue('<b>hi</b>')).toBe('hi');
+    });
+
+    it('skips plain objects', () => {
+        expect(formatFieldValue({ a: 1 })).toBeNull();
     });
 });
