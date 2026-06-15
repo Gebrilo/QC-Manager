@@ -19,6 +19,7 @@ import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { storyStatusRegistry } from '@/lib/statusRegistry';
 import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
 export default function UserStoryDetailPage() {
     const params = useParams();
@@ -213,6 +214,11 @@ export default function UserStoryDetailPage() {
                         artifactType="user_story"
                         artifactId={story.id}
                         syncFn={(id) => userStoriesApi.sync(id)}
+                    />
+
+                    <AutoDetailsCard
+                        record={story as unknown as Record<string, unknown>}
+                        exclude={['title', 'status', 'description', 'acceptance_criteria', 'tuleap_url']}
                     />
                 </div>
             </div>
