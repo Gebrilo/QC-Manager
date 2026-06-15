@@ -11,9 +11,12 @@ import { useToast } from '@/components/ui/Toast';
 interface ReleaseControlProps {
     projectId: string;
     projectHealth: any; // Ideally typed, but keeping loose for integration flexibility
+    // Execution coverage % for the latest run. null when no executions exist yet
+    // (gate is shown as N/A rather than counted as a failure).
+    executionCoveragePct?: number | null;
 }
 
-export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps) {
+export function ReleaseControl({ projectId, projectHealth, executionCoveragePct = null }: ReleaseControlProps) {
     const toast = useToast();
     const [gates, setGates] = useState<any>(null);
     const [approvals, setApprovals] = useState<any[]>([]);
@@ -56,10 +59,19 @@ export function ReleaseControl({ projectId, projectHealth }: ReleaseControlProps
     const gatesEvaluation = gates && projectHealth ? [
         { name: 'Pass Rate', ...evaluateGate(parseFloat(projectHealth.latest_pass_rate_pct || '0'), gates.min_pass_rate, 'min') },
         { name: 'Critical Defects', ...evaluateGate(projectHealth.blocking_issue_count || 0, gates.max_critical_defects, 'max') },
-        { name: 'Test Coverage', passed: null as unknown as boolean, metric: null as unknown as number, threshold: gates.min_test_coverage },
+        {
+            name: 'Test Coverage',
+            // Evaluate against real execution coverage when available; otherwise N/A
+            // (no executions recorded yet) so it does not block the release.
+            ...(executionCoveragePct === null
+                ? { passed: null as unknown as boolean, metric: null as unknown as number, threshold: gates.min_test_coverage }
+                : evaluateGate(executionCoveragePct, gates.min_test_coverage, 'min')),
+        },
     ] : [];
 
-    const allPassed = gatesEvaluation.every(g => g.passed);
+    // A gate blocks the release only when it has been evaluated and failed (passed === false).
+    // N/A gates (passed === null, "not yet tracked") do not block.
+    const allPassed = gatesEvaluation.length > 0 && gatesEvaluation.every(g => g.passed !== false);
 
     const handleSubmit = async () => {
         if (!version) {
