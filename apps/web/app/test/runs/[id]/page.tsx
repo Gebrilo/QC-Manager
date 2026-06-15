@@ -13,8 +13,9 @@ import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testRunStatusRegistry } from '@/lib/statusRegistry';
 import { formatDistanceToNow, format } from 'date-fns';
+import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
-interface TestRunDetail {
+interface TestRunDetail extends Record<string, unknown> {
     id: string;
     run_id: string;
     name: string;
@@ -280,6 +281,28 @@ export default function TestRunDetailPage() {
                 {run.suite_id && (
                     <span>Suite: <Link href={`/test/suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
                 )}
+            </div>
+
+            <div className="mb-4">
+                <AutoDetailsCard
+                    record={run}
+                    exclude={[
+                        'run_id',
+                        'name',
+                        'status',
+                        'description',
+                        'metrics',
+                        'executions',
+                        'project_name',
+                        'created_by_name',
+                        'started_at',
+                        'completed_at',
+                        'suite_id',
+                        'source',
+                        'environment',
+                        'version_tag',
+                    ]}
+                />
             </div>
 
             {selectedIds.size > 0 && (
