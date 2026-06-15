@@ -82,6 +82,20 @@ const ROLE_FIXTURES = {
             scope: { team_id: 'team-x', team_type: 'qc', pm_of_projects: [] },
         },
     },
+    team_editor: {
+        user: { id: 'u-editor', email: 'editor@x.io', role: 'team_manager' },
+        resolved: {
+            effectivePermissions: new Set(['qc.tasks.view_team', 'qc.tasks.edit_team']),
+            scope: { team_id: 'team-x', team_type: 'qc', pm_of_projects: [] },
+        },
+    },
+    team_viewer: {
+        user: { id: 'u-viewer', email: 'viewer@x.io', role: 'viewer' },
+        resolved: {
+            effectivePermissions: new Set(['qc.tasks.view_team']),
+            scope: { team_id: 'team-x', team_type: 'qc', pm_of_projects: [] },
+        },
+    },
 };
 
 function setRole(name) {
@@ -224,5 +238,37 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
         wireQueries({ callerResourceId: null, ownedResources: [] });
         const res = await request(makeApp()).get('/tasks/task-1');
         expect(res.status).toBe(403);
+    });
+
+    test('team editor gets _can.edit=true while team viewer gets _can.edit=false', async () => {
+        const teamTask = {
+            id: 'task-team',
+            project_id: 'p-1',
+            resource1_id: null,
+            resource2_id: null,
+            owner_team_id: 'team-x',
+            visibility_scope: 'team',
+            created_by_user_id: 'someone-else',
+            assigned_to: null,
+        };
+
+        queryHandler = async (sql) => {
+            if (/FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) return { rows: [teamTask] };
+            if (/SELECT tra\.\*, res\.resource_name[\s\S]*FROM task_resource_assignment tra/.test(sql)) return { rows: [] };
+            if (/SELECT tra\.resource_id, r\.user_id, au\.team_id/.test(sql)) return { rows: [] };
+            if (/SELECT 1 FROM artifact_access/i.test(sql)) return { rows: [] };
+            return { rows: [] };
+        };
+
+        setRole('team_editor');
+        const editorRes = await request(makeApp()).get('/tasks/task-team');
+        expect(editorRes.status).toBe(200);
+        expect(editorRes.body._can.edit).toBe(true);
+
+        queries.length = 0;
+        setRole('team_viewer');
+        const viewerRes = await request(makeApp()).get('/tasks/task-team');
+        expect(viewerRes.status).toBe(200);
+        expect(viewerRes.body._can.edit).toBe(false);
     });
 });

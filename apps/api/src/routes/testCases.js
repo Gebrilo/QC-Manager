@@ -9,6 +9,7 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 const { auditLog } = require('../middleware/audit');
+const { decorateRows } = require('../services/access/enforcement');
 
 const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
 
@@ -195,9 +196,10 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.testcases.
         params.push(limitNum, offset);
 
         const result = await pool.query(query, params);
+        const data = await decorateRows(req, 'test_case', result.rows);
 
         res.json({
-            data: result.rows,
+            data,
             pagination: { page: pageNum, limit: limitNum, total, total_pages: Math.ceil(total / limitNum) },
             stats: {
                 active: parseInt(sr.active_count) || 0,
@@ -213,6 +215,7 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.testcas
         const { id } = req.params;
         const result = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Test case not found' });
+        const [testCase] = await decorateRows(req, 'test_case', result.rows);
 
         const executionsResult = await pool.query(
             `SELECT te.id, te.status, te.notes, te.executed_at, te.duration_seconds, te.defect_ids,
@@ -226,7 +229,7 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.testcas
             `SELECT action, changed_fields, change_summary, performed_by_email, performed_at
              FROM test_case_history WHERE test_case_id = $1 ORDER BY performed_at DESC LIMIT 20`, [id]);
 
-        res.json({ ...result.rows[0], execution_history: executionsResult.rows, activity: historyResult.rows });
+        res.json({ ...testCase, execution_history: executionsResult.rows, activity: historyResult.rows });
     } catch (error) { next(error); }
 });
 

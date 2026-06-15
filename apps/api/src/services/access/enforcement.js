@@ -106,6 +106,7 @@ async function appendListFilter(req, artifactType, whereClauses, params, opts = 
 }
 
 async function decorateRows(req, artifactType, rows, opts = {}) {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
     if (!hasAccessActor(req) || !canEvaluateAccessEngine()) return rows.map(row => ({ ...row, _can: {} }));
 
     const resolvedUser = await RoleResolver.resolve(req.user, req);

@@ -10,6 +10,7 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createBugSchema, updateBugSchema } = require('../schemas/bug');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
+const { decorateRows } = require('../services/access/enforcement');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
@@ -262,12 +263,13 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
             countParams.push(source);
         }
         const countResult = await pool.query(countQuery, countParams);
+        const data = await decorateRows(req, 'bug', result.rows);
 
         res.json({
             success: true,
             count: result.rows.length,
             total: parseInt(countResult.rows[0].count),
-            data: result.rows
+            data
         });
     } catch (error) {
         console.error('Error fetching bugs:', error);
@@ -307,9 +309,10 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.vi
             });
         }
 
+        const [bug] = await decorateRows(req, 'bug', result.rows);
         res.json({
             success: true,
-            data: result.rows[0]
+            data: bug
         });
     } catch (error) {
         console.error('Error fetching bug:', error);
@@ -338,11 +341,12 @@ router.get('/by-project/:projectId', requireAuth, blockContributors, requirePerm
             ORDER BY b.reported_date DESC NULLS LAST, b.created_at DESC
         `;
         const result = await pool.query(query, [projectId]);
+        const data = await decorateRows(req, 'bug', result.rows);
 
         res.json({
             success: true,
             count: result.rows.length,
-            data: result.rows
+            data
         });
     } catch (error) {
         console.error('Error fetching project bugs:', error);

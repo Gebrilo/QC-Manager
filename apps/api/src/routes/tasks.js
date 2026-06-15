@@ -82,6 +82,26 @@ async function resolveTaskAccessAssigneeResourceId(taskId, user, req) {
     return rows[0].resource_id;
 }
 
+async function decorateTaskRows(req, rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return decorateRows(req, 'task', rows || []);
+    }
+
+    const assigneeResourceByTaskId = new Map();
+    await Promise.all(rows.map(async (row) => {
+        assigneeResourceByTaskId.set(
+            row.id,
+            await resolveTaskAccessAssigneeResourceId(row.id, req.user, req)
+        );
+    }));
+
+    return decorateRows(req, 'task', rows, {
+        artifact: (row) => ({
+            assignee_resource_id: assigneeResourceByTaskId.get(row.id) || row.resource1_id || row.resource2_id || null,
+        }),
+    });
+}
+
 async function tryEmitAndWriteback(task, config, mode) {
     const summary = await getTaskAssignmentSummary(db.query.bind(db), task.id);
     // Tuleap's assigned_to bind expects the username (e.g. 'belal.z'), NOT the
@@ -212,7 +232,8 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.tasks.view
                  ORDER BY created_at DESC`,
                 [relatedId]
             );
-            return res.json(result.rows);
+            const data = await decorateTaskRows(req, result.rows);
+            return res.json(data);
         }
 
         const where = ['1=1'];
@@ -226,12 +247,14 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.tasks.view
             // via buildListFilter, so reaching this branch means a non-authed
             // path. Return the existing unfiltered view.
             const result = await db.query(`SELECT * FROM v_tasks_with_metrics ORDER BY created_at DESC`);
-            return res.json(result.rows);
+            const data = await decorateTaskRows(req, result.rows);
+            return res.json(data);
         }
 
         const sql = `SELECT v.* FROM v_tasks_with_metrics v WHERE ${where.join(' AND ')} ORDER BY v.created_at DESC`;
         const result = await db.query(sql, params);
-        res.json(result.rows);
+        const data = await decorateTaskRows(req, result.rows);
+        res.json(data);
     } catch (err) {
         next(err);
     }
@@ -258,7 +281,10 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.tasks.v
         });
         if (!enforcement.allowed) return; // enforceArtifact already wrote 403
 
-        res.json({ ...task, assignments: assignmentRows });
+        const [decoratedTask] = await decorateRows(req, 'task', [task], {
+            artifact: { assignee_resource_id: assigneeResourceId },
+        });
+        res.json({ ...decoratedTask, assignments: assignmentRows });
     } catch (err) {
         next(err);
     }
