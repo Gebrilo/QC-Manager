@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugsApi, type Bug, bugLinksApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import {
     LinkedArtifactsSection,
     type LinkedArtifactsSectionConfig,
@@ -14,20 +13,15 @@ import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { stripHtml } from '@/lib/stripHtml';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { SyncPanel } from '@/components/shared/SyncPanel';
-
-const STATUS_VARIANT: Record<string, 'default' | 'info' | 'ontrack' | 'inprogress' | 'success' | 'complete' | 'secondary'> = {
-    New: 'info',
-    Open: 'ontrack',
-    Assigned: 'inprogress',
-    Fixed: 'success',
-    Verified: 'complete',
-    Closed: 'secondary',
-};
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { bugStatusRegistry } from '@/lib/statusRegistry';
 
 export default function BugDetailPage() {
     const params = useParams();
     const id = (params?.id as string) || '';
     const router = useRouter();
+    const { hasPermission } = useAuth();
     const [bug, setBug] = useState<Bug | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -174,6 +168,16 @@ export default function BugDetailPage() {
         }
     };
 
+    const patchBug = (patch: Partial<Bug>) => {
+        setBug(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<Bug>;
+        setBug(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
+    };
+
     if (isLoading) return (
         <div className="max-w-5xl mx-auto py-8 px-4 animate-pulse space-y-6">
             <div className="flex items-center gap-4">
@@ -219,12 +223,21 @@ export default function BugDetailPage() {
                             {bug.bug_id || id}{bug.tuleap_artifact_id ? ` · Tuleap #${bug.tuleap_artifact_id}` : ''}
                         </p>
                     </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Badge variant={STATUS_VARIANT[status] || 'default'}>
-                        {status}
-                    </Badge>
-                    <Link href={`/work/bugs/${bug.id}/edit`}>
+	                </div>
+	                <div className="flex items-center gap-3">
+	                    <StatusControl
+	                        artifactType="bug"
+	                        artifactId={bug.id}
+	                        value={status}
+	                        canEdit={bug._can?.edit}
+	                        hasFallbackPermission={hasPermission(bugStatusRegistry.editPermission)}
+	                        size="md"
+	                        align="left"
+	                        onOptimisticChange={(nextStatus) => patchBug({ status: nextStatus })}
+	                        onChangeCommitted={handleStatusCommitted}
+	                        onChangeRolledBack={(previousStatus) => patchBug({ status: previousStatus })}
+	                    />
+	                    <Link href={`/work/bugs/${bug.id}/edit`}>
                         <Button variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                             Edit
                         </Button>

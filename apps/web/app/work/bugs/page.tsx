@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugsApi, type Bug } from '@/lib/api';
@@ -8,6 +8,10 @@ import { projectsApi, type Project } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
+import { StatusControl } from '@/components/shared/StatusControl';
+import { BulkStatusActionBar } from '@/components/shared/BulkStatusActionBar';
+import { useToast } from '@/components/ui/Toast';
+import { bugStatusRegistry, canEditStatus } from '@/lib/statusRegistry';
 import {
     useReactTable,
     getCoreRowModel,
@@ -27,17 +31,8 @@ const SEV_PILL: Record<string, string> = {
     'None':            'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500',
 };
 
-const STATUS_PILL: Record<string, string> = {
-    New:         'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
-    'In Progress':'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    Assigned:    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-    Reopened:    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    Blocked:     'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    Fixed:       'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-    Verified:    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-    Duplicate:   'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-    Closed:      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-};
+const BULK_SELECTION_LIMIT = 50;
+const BULK_STATUS_CONCURRENCY = 5;
 
 const SOURCE_PILL: Record<string, string> = {
     TEST_CASE:   'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
@@ -85,6 +80,61 @@ function GlassSelect({
     );
 }
 
+function getBulkErrorMessage(error: unknown) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return 'unknown error';
+}
+
+async function runWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    worker: (item: T) => Promise<R>
+) {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    disabled,
+    onChange,
+}: {
+    checked: boolean;
+    indeterminate: boolean;
+    disabled: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    const ref = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            aria-label="Select all filtered bugs"
+            checked={checked}
+            disabled={disabled}
+            onClick={event => event.stopPropagation()}
+            onChange={event => onChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+    );
+}
+
 const columnHelper = createColumnHelper<Bug>();
 
 export default function BugsPage() {
@@ -99,7 +149,9 @@ function BugsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { hasPermission } = useAuth();
+    const bulkToast = useToast();
     const canDelete = hasPermission('qc.bugs.delete');
+    const hasBugStatusEditPermission = hasPermission(bugStatusRegistry.editPermission);
 
     const [bugs, setBugs] = useState<Bug[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
@@ -118,6 +170,8 @@ function BugsContent() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [selectedBugIds, setSelectedBugIds] = useState<Set<string>>(new Set());
+    const [isApplyingBulkStatus, setIsApplyingBulkStatus] = useState(false);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
         submitted_by_resource_name: false,
         updated_by: false,
@@ -207,6 +261,146 @@ function BugsContent() {
     }, [bugs, filter]);
 
     useEffect(() => {
+        const visibleBugIds = new Set(filtered.map(bug => bug.id));
+        setSelectedBugIds(prev => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (visibleBugIds.has(id)) {
+                    next.add(id);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [filtered]);
+
+    const patchBug = (bugId: string, patch: Partial<Bug>) => {
+        setBugs(prev => prev.map(bug => bug.id === bugId ? { ...bug, ...patch } : bug));
+    };
+
+    const handleStatusCommitted = (bugId: string, _nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<Bug>;
+        setBugs(prev => prev.map(bug => (
+            bug.id === bugId ? { ...bug, ...next, _can: next._can ?? bug._can } : bug
+        )));
+    };
+
+    const bugById = useMemo(() => new Map(bugs.map(bug => [bug.id, bug])), [bugs]);
+    const selectedBugs = useMemo(
+        () => Array.from(selectedBugIds)
+            .map(id => bugById.get(id))
+            .filter((bug): bug is Bug => Boolean(bug)),
+        [selectedBugIds, bugById]
+    );
+
+    const isBugSelectable = (bug: Bug) => canEditStatus(bug._can?.edit, hasBugStatusEditPermission);
+
+    const handleToggleBugSelection = (bugId: string, selected: boolean) => {
+        const bug = bugById.get(bugId);
+        if (!bug) return;
+        if (selected && !isBugSelectable(bug)) {
+            bulkToast.warning("You don't have permission to select this bug");
+            return;
+        }
+        if (selected && !selectedBugIds.has(bugId) && selectedBugIds.size >= BULK_SELECTION_LIMIT) {
+            bulkToast.warning(`Selection is limited to ${BULK_SELECTION_LIMIT} bugs`);
+            return;
+        }
+        setSelectedBugIds(prev => {
+            const next = new Set(prev);
+            if (selected) {
+                next.add(bugId);
+            } else {
+                next.delete(bugId);
+            }
+            return next;
+        });
+    };
+
+    const handleToggleAllSelection = (selected: boolean) => {
+        if (!selected) {
+            setSelectedBugIds(new Set());
+            return;
+        }
+
+        const selectableIds = filtered
+            .filter(bug => isBugSelectable(bug))
+            .map(bug => bug.id);
+        const cappedIds = selectableIds.slice(0, BULK_SELECTION_LIMIT);
+        setSelectedBugIds(new Set(cappedIds));
+        if (selectableIds.length > BULK_SELECTION_LIMIT) {
+            bulkToast.warning(`Selected the first ${BULK_SELECTION_LIMIT} editable bugs. Refine filters to update more.`);
+        }
+    };
+
+    const handleBulkStatusApply = async (nextStatus: string) => {
+        if (selectedBugs.length === 0 || isApplyingBulkStatus) return;
+
+        const normalizedStatus = bugStatusRegistry.normalize(nextStatus);
+        const candidates = selectedBugs.slice(0, BULK_SELECTION_LIMIT);
+        const previousStatuses = new Map(candidates.map(bug => [bug.id, bugStatusRegistry.normalize(bug.status || '')]));
+        const editableBugs: Bug[] = [];
+        const failureReasons: string[] = [];
+
+        candidates.forEach(bug => {
+            if (isBugSelectable(bug)) {
+                editableBugs.push(bug);
+            } else {
+                failureReasons.push('no permission');
+            }
+        });
+
+        editableBugs.forEach(bug => {
+            patchBug(bug.id, { status: normalizedStatus });
+        });
+
+        setIsApplyingBulkStatus(true);
+        try {
+            const results = await runWithConcurrency(editableBugs, BULK_STATUS_CONCURRENCY, async (bug) => {
+                const previousStatus = previousStatuses.get(bug.id) || bugStatusRegistry.normalize(bug.status || '');
+                const payload = bugStatusRegistry.defaultFills?.(normalizedStatus, { previousStatus }) || {};
+                try {
+                    const updated = await bugStatusRegistry.update(bug.id, normalizedStatus, payload);
+                    return { bug, ok: true as const, updated };
+                } catch (error) {
+                    return { bug, ok: false as const, error };
+                }
+            });
+
+            let updatedCount = 0;
+            let failedCount = failureReasons.length;
+
+            results.forEach(result => {
+                if (result.ok) {
+                    updatedCount += 1;
+                    handleStatusCommitted(result.bug.id, normalizedStatus, result.updated);
+                    return;
+                }
+                failedCount += 1;
+                failureReasons.push(getBulkErrorMessage(result.error));
+                const previousStatus = previousStatuses.get(result.bug.id) || bugStatusRegistry.normalize(result.bug.status || '');
+                patchBug(result.bug.id, { status: previousStatus });
+            });
+
+            const distinctReasons = Array.from(new Set(failureReasons.filter(Boolean)));
+            const reasonSuffix = distinctReasons.length > 0 ? ` (${distinctReasons.slice(0, 2).join(', ')})` : '';
+            if (failedCount === 0) {
+                bulkToast.success(`${updatedCount} updated`);
+            } else if (updatedCount > 0) {
+                bulkToast.warning(`${updatedCount} updated, ${failedCount} failed${reasonSuffix}`);
+            } else {
+                bulkToast.error(`0 updated, ${failedCount} failed${reasonSuffix}`);
+            }
+            setSelectedBugIds(new Set());
+        } finally {
+            setIsApplyingBulkStatus(false);
+        }
+    };
+
+    useEffect(() => {
         if (!toast) return;
         const t = setTimeout(() => setToast(null), 4000);
         return () => clearTimeout(t);
@@ -228,7 +422,63 @@ function BugsContent() {
         }
     };
 
+    const selectableBugIds = useMemo(
+        () => filtered
+            .filter(bug => canEditStatus(bug._can?.edit, hasBugStatusEditPermission))
+            .map(bug => bug.id),
+        [filtered, hasBugStatusEditPermission]
+    );
+    const cappedSelectableBugIds = useMemo(
+        () => selectableBugIds.slice(0, BULK_SELECTION_LIMIT),
+        [selectableBugIds]
+    );
+    const selectedVisibleCount = cappedSelectableBugIds.filter(id => selectedBugIds.has(id)).length;
+    const allVisibleSelected = cappedSelectableBugIds.length > 0 && selectedVisibleCount === cappedSelectableBugIds.length;
+    const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+    const selectionAtLimit = selectedBugIds.size >= BULK_SELECTION_LIMIT;
+
     const columns = useMemo(() => [
+        columnHelper.display({
+            id: 'select',
+            header: () => (
+                <SelectAllCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected}
+                    disabled={cappedSelectableBugIds.length === 0}
+                    onChange={handleToggleAllSelection}
+                />
+            ),
+            enableHiding: false,
+            enableSorting: false,
+            cell: (info) => {
+                const bug = info.row.original;
+                const checked = selectedBugIds.has(bug.id);
+                const selectable = canEditStatus(bug._can?.edit, hasBugStatusEditPermission);
+                const disabledReason = !selectable
+                    ? "You don't have permission to select this bug"
+                    : !checked && selectionAtLimit
+                        ? `Selection is limited to ${BULK_SELECTION_LIMIT} bugs`
+                        : '';
+                const checkbox = (
+                    <input
+                        type="checkbox"
+                        data-testid={`select-bug-${bug.id}`}
+                        aria-label={`Select bug ${bug.bug_id}`}
+                        checked={checked}
+                        disabled={Boolean(disabledReason)}
+                        onChange={event => handleToggleBugSelection(bug.id, event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                );
+
+                if (!disabledReason) return checkbox;
+                return (
+                    <SimpleTooltip content={disabledReason} position="top">
+                        <span className="inline-flex cursor-not-allowed">{checkbox}</span>
+                    </SimpleTooltip>
+                );
+            },
+        }),
         columnHelper.accessor('bug_id', {
             id: 'bug_id',
             header: 'ID',
@@ -290,8 +540,21 @@ function BugsContent() {
             id: 'status',
             header: 'Status',
             cell: (info) => {
-                const v = info.getValue();
-                return <Pill tone={STATUS_PILL[v] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}>{v}</Pill>;
+                const bug = info.row.original;
+                return (
+                    <StatusControl
+                        artifactType="bug"
+                        artifactId={bug.id}
+                        value={info.getValue() || 'New'}
+                        canEdit={bug._can?.edit}
+                        hasFallbackPermission={hasBugStatusEditPermission}
+                        onOptimisticChange={(next, previous) => {
+                            patchBug(bug.id, { status: next });
+                        }}
+                        onChangeCommitted={(next, updated) => handleStatusCommitted(bug.id, next, updated)}
+                        onChangeRolledBack={(previous) => patchBug(bug.id, { status: previous })}
+                    />
+                );
             },
         }),
         columnHelper.accessor('project_name', {
@@ -351,7 +614,19 @@ function BugsContent() {
                 </button>
             ),
         })] : []),
-    ], [canDelete]);
+    ], [
+        allVisibleSelected,
+        canDelete,
+        cappedSelectableBugIds.length,
+        handleStatusCommitted,
+        handleToggleAllSelection,
+        handleToggleBugSelection,
+        hasBugStatusEditPermission,
+        patchBug,
+        selectedBugIds,
+        selectionAtLimit,
+        someVisibleSelected,
+    ]);
 
     const table = useReactTable({
         data: filtered,
@@ -466,9 +741,10 @@ function BugsContent() {
                 {/* Status */}
                 <GlassSelect value={statusFilter} onChange={v => setStatusFilter(v)}>
                     <option value="">All Statuses</option>
-                    {['New', 'In Progress', 'Assigned', 'Reopened', 'Blocked', 'Fixed', 'Verified', 'Duplicate', 'Closed'].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                    ))}
+                    {bugStatusRegistry.statuses.map(s => {
+                        const option = bugStatusRegistry.getOption(s);
+                        return <option key={s} value={s}>{option.label}</option>;
+                    })}
                 </GlassSelect>
 
                 {/* Severity */}
@@ -539,6 +815,13 @@ function BugsContent() {
             </div>
 
             {/* ── Table ──────────────────────────────────────────────── */}
+            <BulkStatusActionBar
+                artifactType="bug"
+                selectedCount={selectedBugIds.size}
+                isApplying={isApplyingBulkStatus}
+                onApplyStatus={handleBulkStatusApply}
+                onClear={() => setSelectedBugIds(new Set())}
+            />
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
 
                 {/* Table header bar */}
@@ -569,7 +852,7 @@ function BugsContent() {
                         .bugs-table-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 5px; }
                         .bugs-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
                     `}</style>
-                    <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1200 }}>
+                    <table className="w-full text-sm bugs-table-scroll" style={{ minWidth: 1240 }}>
                         <thead>
                             <tr className="bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
                                 {table.getHeaderGroups()[0].headers.map((header, i) => (
@@ -584,7 +867,7 @@ function BugsContent() {
                                                     : 'px-3',
                                             header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200' : '',
                                         ].join(' ')}
-                                        style={i === 0 ? { minWidth: 90 } : {}}
+	                                        style={i === 0 ? { minWidth: 48 } : {}}
                                         onClick={header.column.getToggleSortingHandler()}
                                     >
                                         {header.isPlaceholder ? null : (
@@ -618,10 +901,11 @@ function BugsContent() {
                                 </tr>
                             ) : (
                                 table.getRowModel().rows.map(row => (
-                                    <tr
-                                        key={row.id}
-                                        className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group"
-                                    >
+	                                    <tr
+	                                        key={row.id}
+                                            data-testid={`bug-row-${row.original.id}`}
+	                                        className="hover:bg-violet-50/40 dark:hover:bg-violet-900/10 transition-colors group"
+	                                    >
                                         {row.getVisibleCells().map((cell, ci) => (
                                             <td
                                                 key={cell.id}
