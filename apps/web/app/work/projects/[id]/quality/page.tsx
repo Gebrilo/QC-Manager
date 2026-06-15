@@ -180,7 +180,15 @@ export default function ProjectQualityDetailsPage() {
               <p className="text-slate-500">Review quality gates and authorize releases.</p>
             </div>
             {/* Dynamically import or just render if imported */}
-            <ReleaseControl projectId={projectId} projectHealth={project} />
+            <ReleaseControl
+              projectId={projectId}
+              projectHealth={project}
+              executionCoveragePct={
+                executionProgress.length > 0 && executionProgress[0].total_in_scope > 0
+                  ? parseFloat(executionProgress[0].execution_coverage_pct)
+                  : null
+              }
+            />
           </div>
         )}
 

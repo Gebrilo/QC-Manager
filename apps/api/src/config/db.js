@@ -3467,138 +3467,141 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
+            -- Rewired from the empty test_result table to the live test_run/test_execution
+            -- pipeline (same source as v_release_readiness). Scope = latest run per project.
+            -- status domain here is pass/fail/blocked/not_run (test_execution), not the
+            -- passed/failed/rejected labels test_result used. requirement_id / module_name /
+            -- estimated_hrs do not exist on test_execution, so requirement coverage is reported
+            -- as 0/NULL until that data model is added.
             CREATE OR REPLACE VIEW v_execution_progress AS
-            WITH latest AS (
-                SELECT project_id, MAX(executed_at) AS latest_date
-                FROM test_result
+            WITH latest_run AS (
+                SELECT DISTINCT ON (project_id) project_id, id AS test_run_id
+                FROM test_run
                 WHERE deleted_at IS NULL
-                GROUP BY project_id
+                ORDER BY project_id, started_at DESC
             ),
-            latest_results AS (
-                SELECT tr.*
-                FROM test_result tr
-                JOIN latest l ON tr.project_id = l.project_id AND tr.executed_at = l.latest_date
-                WHERE tr.deleted_at IS NULL
+            latest_exec AS (
+                SELECT te.id, te.test_case_id, te.status, lr.project_id
+                FROM latest_run lr
+                JOIN test_execution te ON te.test_run_id = lr.test_run_id
             )
             SELECT
                 p.id AS project_id,
                 p.project_name,
-                COUNT(lr.id)::INTEGER AS total_in_scope,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'passed')::INTEGER AS passed_count,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'failed')::INTEGER AS failed_count,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'blocked')::INTEGER AS blocked_count,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'not_run')::INTEGER AS not_run_count,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'rejected')::INTEGER AS rejected_count,
+                COUNT(le.id)::INTEGER AS total_in_scope,
+                COUNT(le.id) FILTER (WHERE le.status = 'pass')::INTEGER AS passed_count,
+                COUNT(le.id) FILTER (WHERE le.status = 'fail')::INTEGER AS failed_count,
+                COUNT(le.id) FILTER (WHERE le.status = 'blocked')::INTEGER AS blocked_count,
+                COUNT(le.id) FILTER (WHERE le.status = 'not_run')::INTEGER AS not_run_count,
+                0::INTEGER AS rejected_count,
                 CASE
-                    WHEN COUNT(lr.id) > 0 THEN
+                    WHEN COUNT(le.id) > 0 THEN
                         ROUND(
-                            COUNT(lr.id) FILTER (WHERE lr.status IN ('passed','failed','blocked'))::NUMERIC
-                            / COUNT(lr.id) * 100, 2)
+                            COUNT(le.id) FILTER (WHERE le.status IN ('pass','fail','blocked'))::NUMERIC
+                            / COUNT(le.id) * 100, 2)
                     ELSE 0
                 END AS gross_progress_pct,
                 CASE
-                    WHEN COUNT(lr.id) > 0 THEN
+                    WHEN COUNT(le.id) > 0 THEN
                         ROUND(
-                            COUNT(lr.id) FILTER (WHERE lr.status IN ('passed','failed'))::NUMERIC
-                            / COUNT(lr.id) * 100, 2)
+                            COUNT(le.id) FILTER (WHERE le.status IN ('pass','fail'))::NUMERIC
+                            / COUNT(le.id) * 100, 2)
                     ELSE 0
                 END AS net_progress_pct,
-                (SELECT COUNT(DISTINCT test_case_id)::INTEGER
-                 FROM test_result WHERE project_id = p.id AND deleted_at IS NULL) AS total_planned_tests,
-                COUNT(DISTINCT lr.test_case_id) FILTER (WHERE lr.status != 'not_run')::INTEGER AS executed_tests,
+                COUNT(DISTINCT le.test_case_id)::INTEGER AS total_planned_tests,
+                COUNT(DISTINCT le.test_case_id) FILTER (WHERE le.status != 'not_run')::INTEGER AS executed_tests,
                 CASE
-                    WHEN (SELECT COUNT(DISTINCT test_case_id) FROM test_result
-                          WHERE project_id = p.id AND deleted_at IS NULL) > 0 THEN
+                    WHEN COUNT(DISTINCT le.test_case_id) > 0 THEN
                         ROUND(
-                            COUNT(DISTINCT lr.test_case_id) FILTER (WHERE lr.status != 'not_run')::NUMERIC
-                            / (SELECT COUNT(DISTINCT test_case_id) FROM test_result
-                               WHERE project_id = p.id AND deleted_at IS NULL) * 100, 2)
+                            COUNT(DISTINCT le.test_case_id) FILTER (WHERE le.status != 'not_run')::NUMERIC
+                            / COUNT(DISTINCT le.test_case_id) * 100, 2)
                     ELSE 0
                 END AS execution_coverage_pct,
-                COUNT(DISTINCT lr.requirement_id) FILTER (WHERE lr.requirement_id IS NOT NULL)::INTEGER AS covered_requirements,
-                (SELECT COUNT(DISTINCT requirement_id)::INTEGER FROM test_result
-                 WHERE project_id = p.id AND deleted_at IS NULL AND requirement_id IS NOT NULL) AS total_requirements,
-                CASE
-                    WHEN (SELECT COUNT(DISTINCT requirement_id) FROM test_result
-                          WHERE project_id = p.id AND deleted_at IS NULL AND requirement_id IS NOT NULL) > 0 THEN
-                        ROUND(
-                            COUNT(DISTINCT lr.requirement_id) FILTER (WHERE lr.requirement_id IS NOT NULL)::NUMERIC
-                            / (SELECT COUNT(DISTINCT requirement_id) FROM test_result
-                               WHERE project_id = p.id AND deleted_at IS NULL AND requirement_id IS NOT NULL) * 100, 2)
-                    ELSE NULL
-                END AS requirement_coverage_pct
+                0::INTEGER AS covered_requirements,
+                0::INTEGER AS total_requirements,
+                NULL::NUMERIC AS requirement_coverage_pct
             FROM projects p
-            LEFT JOIN latest l ON p.id = l.project_id
-            LEFT JOIN latest_results lr ON p.id = lr.project_id
+            LEFT JOIN latest_exec le ON le.project_id = p.id
             WHERE p.deleted_at IS NULL
             GROUP BY p.id, p.project_name
         `);
 
         await client.query(`
+            -- Rewired to the live test_run/test_execution pipeline (latest run per project).
+            -- test_execution has no module_name / estimated_hrs columns, so every execution
+            -- rolls up under a single 'Unassigned' module and the hour estimates are 0 until
+            -- a module/effort model exists on executions.
             CREATE OR REPLACE VIEW v_blocked_test_analysis AS
-            WITH latest AS (
-                SELECT project_id, MAX(executed_at) AS latest_date
-                FROM test_result
+            WITH latest_run AS (
+                SELECT DISTINCT ON (project_id) project_id, id AS test_run_id
+                FROM test_run
                 WHERE deleted_at IS NULL
-                GROUP BY project_id
+                ORDER BY project_id, started_at DESC
             ),
-            latest_results AS (
-                SELECT tr.*
-                FROM test_result tr
-                JOIN latest l ON tr.project_id = l.project_id AND tr.executed_at = l.latest_date
-                WHERE tr.deleted_at IS NULL
+            latest_exec AS (
+                SELECT te.id, te.status, lr.project_id
+                FROM latest_run lr
+                JOIN test_execution te ON te.test_run_id = lr.test_run_id
             )
             SELECT
                 p.id AS project_id,
                 p.project_name,
-                COALESCE(lr.module_name, 'Unassigned') AS module_name,
-                COUNT(lr.id)::INTEGER AS total_tests,
-                COUNT(lr.id) FILTER (WHERE lr.status = 'blocked')::INTEGER AS blocked_count,
+                'Unassigned'::VARCHAR AS module_name,
+                COUNT(le.id)::INTEGER AS total_tests,
+                COUNT(le.id) FILTER (WHERE le.status = 'blocked')::INTEGER AS blocked_count,
                 CASE
-                    WHEN COUNT(lr.id) > 0 THEN
-                        ROUND(COUNT(lr.id) FILTER (WHERE lr.status = 'blocked')::NUMERIC / COUNT(lr.id) * 100, 2)
+                    WHEN COUNT(le.id) > 0 THEN
+                        ROUND(COUNT(le.id) FILTER (WHERE le.status = 'blocked')::NUMERIC / COUNT(le.id) * 100, 2)
                     ELSE 0
                 END AS blocked_pct,
                 CASE
-                    WHEN COUNT(lr.id) > 0
-                     AND COUNT(lr.id) FILTER (WHERE lr.status = 'blocked')::NUMERIC / COUNT(lr.id) >= 0.50
+                    WHEN COUNT(le.id) > 0
+                     AND COUNT(le.id) FILTER (WHERE le.status = 'blocked')::NUMERIC / COUNT(le.id) >= 0.50
                     THEN TRUE ELSE FALSE
                 END AS pivot_required,
-                COALESCE(SUM(lr.estimated_hrs) FILTER (WHERE lr.is_retest = TRUE), 0) AS retest_hrs,
-                COALESCE(SUM(lr.estimated_hrs) FILTER (WHERE lr.status = 'blocked'), 0) AS blocked_hrs
+                0::NUMERIC AS retest_hrs,
+                0::NUMERIC AS blocked_hrs
             FROM projects p
-            LEFT JOIN latest l ON p.id = l.project_id
-            LEFT JOIN latest_results lr ON p.id = lr.project_id
+            LEFT JOIN latest_exec le ON le.project_id = p.id
             WHERE p.deleted_at IS NULL
-            GROUP BY p.id, p.project_name, COALESCE(lr.module_name, 'Unassigned')
-            ORDER BY p.project_name, COALESCE(lr.module_name, 'Unassigned')
+            GROUP BY p.id, p.project_name
+            ORDER BY p.project_name
         `);
 
         await client.query(`
+            -- Rewired: tests-run denominator now comes from the latest test_run's executions
+            -- (status pass/fail/blocked) instead of the empty test_result table.
             CREATE OR REPLACE VIEW v_test_effectiveness AS
+            WITH latest_run AS (
+                SELECT DISTINCT ON (project_id) project_id, id AS test_run_id
+                FROM test_run
+                WHERE deleted_at IS NULL
+                ORDER BY project_id, started_at DESC
+            ),
+            tests_run AS (
+                SELECT lr.project_id, COUNT(DISTINCT te.test_case_id) AS total_tests_run
+                FROM latest_run lr
+                JOIN test_execution te ON te.test_run_id = lr.test_run_id
+                WHERE te.status IN ('pass','fail','blocked')
+                GROUP BY lr.project_id
+            )
             SELECT
                 p.id AS project_id,
                 p.project_name,
                 COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE' AND b.deleted_at IS NULL)::INTEGER AS defects_from_testing,
-                (SELECT COUNT(DISTINCT test_case_id)::INTEGER
-                 FROM test_result
-                 WHERE project_id = p.id AND deleted_at IS NULL
-                   AND status IN ('passed', 'failed', 'blocked')) AS total_tests_run,
+                COALESCE(trun.total_tests_run, 0)::INTEGER AS total_tests_run,
                 CASE
-                    WHEN (SELECT COUNT(DISTINCT test_case_id) FROM test_result
-                          WHERE project_id = p.id AND deleted_at IS NULL
-                            AND status IN ('passed','failed','blocked')) > 0 THEN
+                    WHEN COALESCE(trun.total_tests_run, 0) > 0 THEN
                         ROUND(
                             COUNT(b.id) FILTER (WHERE b.source = 'TEST_CASE' AND b.deleted_at IS NULL)::NUMERIC
-                            / (SELECT COUNT(DISTINCT test_case_id) FROM test_result
-                               WHERE project_id = p.id AND deleted_at IS NULL
-                                 AND status IN ('passed','failed','blocked')) * 100, 2)
+                            / trun.total_tests_run * 100, 2)
                     ELSE 0
                 END AS effectiveness_pct
             FROM projects p
             LEFT JOIN bugs b ON b.project_id = p.id
+            LEFT JOIN tests_run trun ON trun.project_id = p.id
             WHERE p.deleted_at IS NULL
-            GROUP BY p.id, p.project_name
+            GROUP BY p.id, p.project_name, trun.total_tests_run
         `);
 
         console.log('Database migrations completed successfully');
