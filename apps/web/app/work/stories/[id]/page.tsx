@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { taskTestCaseLinksApi, tasksApi, tuleapApi, userStoriesApi, type UserStory } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { SyncPanel } from '@/components/shared/SyncPanel';
 import {
@@ -16,16 +15,9 @@ import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
-
-function getStatusBadgeVariant(status: string | undefined): 'info' | 'warning' | 'default' | 'success' {
-    switch (status) {
-        case 'Draft': return 'info';
-        case 'Changes': return 'warning';
-        case 'Review': return 'default';
-        case 'Approved': return 'success';
-        default: return 'default';
-    }
-}
+import { StatusControl } from '@/components/shared/StatusControl';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { storyStatusRegistry } from '@/lib/statusRegistry';
 
 export default function UserStoryDetailPage() {
     const params = useParams();
@@ -33,6 +25,7 @@ export default function UserStoryDetailPage() {
     const router = useRouter();
     const toast = useToast();
     const confirmAction = useConfirm();
+    const { hasPermission } = useAuth();
     const [story, setStory] = useState<UserStory | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -72,6 +65,16 @@ export default function UserStoryDetailPage() {
         }
     };
 
+    const patchStory = (patch: Partial<UserStory>) => {
+        setStory(prev => prev ? { ...prev, ...patch } : prev);
+    };
+
+    const handleStatusCommitted = (_nextStatus: string, updated: unknown) => {
+        if (!updated || typeof updated !== 'object') return;
+        const next = updated as Partial<UserStory>;
+        setStory(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
+    };
+
     if (isLoading) {
         return <div className="flex justify-center p-12"><Spinner size="lg" /></div>;
     }
@@ -109,10 +112,21 @@ export default function UserStoryDetailPage() {
                         Back
                     </Button>
                     <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
-                            {story.status && <Badge variant={getStatusBadgeVariant(story.status)}>{story.status}</Badge>}
-                        </div>
+	                        <div className="flex items-center gap-3">
+	                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+	                            <StatusControl
+	                                artifactType="user_story"
+	                                artifactId={story.id}
+	                                value={story.status || 'Draft'}
+	                                canEdit={story._can?.edit}
+	                                hasFallbackPermission={hasPermission(storyStatusRegistry.editPermission)}
+	                                size="md"
+	                                align="left"
+	                                onOptimisticChange={(nextStatus) => patchStory({ status: nextStatus })}
+	                                onChangeCommitted={handleStatusCommitted}
+	                                onChangeRolledBack={(previousStatus) => patchStory({ status: previousStatus })}
+	                            />
+	                        </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                             {displayId} - {story.project_name || 'No Project'}
                         </p>

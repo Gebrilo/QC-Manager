@@ -1,6 +1,6 @@
-import { tasksApi } from '@/lib/api';
+import { tasksApi, userStoriesApi } from '@/lib/api';
 
-export type StatusArtifactType = 'task';
+export type StatusArtifactType = 'task' | 'user_story';
 
 export interface StatusOption {
     value: string;
@@ -94,6 +94,44 @@ const taskStatusOptions: Record<string, StatusOption> = {
     },
 };
 
+const storyStatusOrder = ['Draft', 'Changes', 'Review', 'Approved'] as const;
+
+function normalizeStoryStatus(status: string) {
+    if (!status) return 'Draft';
+    return storyStatusOrder.includes(status as typeof storyStatusOrder[number]) ? status : 'Draft';
+}
+
+const storyStatusOptions: Record<string, StatusOption> = {
+    Draft: {
+        value: 'Draft',
+        label: 'Draft',
+        dotClass: 'bg-sky-500',
+        pillClass: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800',
+        borderClass: 'border-sky-300 dark:border-sky-700',
+    },
+    Changes: {
+        value: 'Changes',
+        label: 'Changes',
+        dotClass: 'bg-amber-500',
+        pillClass: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800',
+        borderClass: 'border-amber-300 dark:border-amber-600',
+    },
+    Review: {
+        value: 'Review',
+        label: 'Review',
+        dotClass: 'bg-slate-500',
+        pillClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        borderClass: 'border-slate-300 dark:border-slate-600',
+    },
+    Approved: {
+        value: 'Approved',
+        label: 'Approved',
+        dotClass: 'bg-emerald-500',
+        pillClass: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800',
+        borderClass: 'border-emerald-300 dark:border-emerald-600',
+    },
+};
+
 export const taskStatusRegistry: StatusRegistryEntry = {
     artifactType: 'task',
     label: 'Task',
@@ -114,8 +152,25 @@ export const taskStatusRegistry: StatusRegistryEntry = {
     update: (id, status, payload) => tasksApi.update(id, { ...payload, status } as any),
 };
 
+export const storyStatusRegistry: StatusRegistryEntry = {
+    artifactType: 'user_story',
+    label: 'User Story',
+    statuses: storyStatusOrder,
+    editPermission: 'qc.projects.edit',
+    normalize: normalizeStoryStatus,
+    getOption: (status: string) => {
+        const normalized = normalizeStoryStatus(status);
+        return storyStatusOptions[normalized] || storyStatusOptions.Draft;
+    },
+    update: async (id, status, payload) => {
+        const response = await userStoriesApi.update(id, { ...payload, status });
+        return response.data ?? response;
+    },
+};
+
 export const statusRegistry: Record<StatusArtifactType, StatusRegistryEntry> = {
     task: taskStatusRegistry,
+    user_story: storyStatusRegistry,
 };
 
 export function canEditStatus(rowCanEdit: boolean | undefined, hasFallbackPermission: boolean) {
