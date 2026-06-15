@@ -30,6 +30,42 @@ const upload = multer({
 });
 
 const VALID_TYPES = ['bug', 'user_story', 'task'];
+const ARTIFACT_TABLES = {
+    bug: 'bugs',
+    user_story: 'user_stories',
+    task: 'tasks',
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TULEAP_ID_RE = /^\d+$/;
+
+function httpError(status, message) {
+    const err = new Error(message);
+    err.status = status;
+    return err;
+}
+
+async function resolveArtifactId(artifactType, artifactId) {
+    if (UUID_RE.test(artifactId)) return artifactId;
+    if (!TULEAP_ID_RE.test(artifactId)) {
+        throw httpError(400, 'artifactId must be a QC UUID or Tuleap artifact id');
+    }
+
+    const table = ARTIFACT_TABLES[artifactType];
+    const result = await db.pool.query(
+        `SELECT id FROM ${table} WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [parseInt(artifactId, 10)]
+    );
+    if (result.rows.length === 0) {
+        throw httpError(404, 'Artifact not found');
+    }
+    return result.rows[0].id;
+}
+
+function sendHttpError(res, err) {
+    if (!err.status) return false;
+    res.status(err.status).json({ error: err.message });
+    return true;
+}
 
 router.post('/staged', requireAuth, upload.single('file'), async (req, res, next) => {
     try {
@@ -100,6 +136,7 @@ router.get('/:artifactType/:artifactId', requireAuth, async (req, res, next) => 
     try {
         const { artifactType, artifactId } = req.params;
         if (!VALID_TYPES.includes(artifactType)) return res.status(400).json({ error: 'Invalid artifact type' });
+        const resolvedArtifactId = await resolveArtifactId(artifactType, artifactId);
         const result = await db.pool.query(
             `SELECT aa.id, aa.original_name, aa.mime_type, aa.size_bytes, aa.created_at,
                     u.name AS uploaded_by_name
@@ -107,10 +144,13 @@ router.get('/:artifactType/:artifactId', requireAuth, async (req, res, next) => 
              LEFT JOIN app_user u ON u.id = aa.uploaded_by
              WHERE aa.artifact_type = $1 AND aa.artifact_id = $2
              ORDER BY aa.created_at ASC`,
-            [artifactType, artifactId]
+            [artifactType, resolvedArtifactId]
         );
         res.json(result.rows);
-    } catch (err) { next(err); }
+    } catch (err) {
+        if (sendHttpError(res, err)) return;
+        next(err);
+    }
 });
 
 router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), async (req, res, next) => {
@@ -118,10 +158,11 @@ router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), as
         const { artifactType, artifactId } = req.params;
         if (!VALID_TYPES.includes(artifactType)) return res.status(400).json({ error: 'Invalid artifact type' });
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
+        const resolvedArtifactId = await resolveArtifactId(artifactType, artifactId);
 
         await storage.ensureArtifactBucketExists();
         const uniqueName = `${uuidv4()}_${req.file.originalname}`;
-        const storagePath = `${artifactType}/${artifactId}/${uniqueName}`;
+        const storagePath = `${artifactType}/${resolvedArtifactId}/${uniqueName}`;
         await storage.uploadArtifactFile(storagePath, req.file.buffer, req.file.mimetype);
 
         const result = await db.pool.query(
@@ -129,11 +170,12 @@ router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), as
                (artifact_type, artifact_id, original_name, filename, mime_type, size_bytes, storage_path, uploaded_by)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id, original_name, mime_type, size_bytes, created_at`,
-            [artifactType, artifactId, req.file.originalname, uniqueName, req.file.mimetype, req.file.size, storagePath, req.user.id]
+            [artifactType, resolvedArtifactId, req.file.originalname, uniqueName, req.file.mimetype, req.file.size, storagePath, req.user.id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.message && err.message.includes('not allowed')) return res.status(400).json({ error: err.message });
+        if (sendHttpError(res, err)) return;
         next(err);
     }
 });

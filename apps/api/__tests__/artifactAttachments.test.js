@@ -91,15 +91,79 @@ describe('GET /attachments/:type/:id', () => {
         mockQuery.mockResolvedValueOnce({
             rows: [{ id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size_bytes: 1024, created_at: '2026-05-23', uploaded_by_name: 'Alice' }],
         });
-        const res = await request(makeApp()).get('/attachments/bug/artifact-uuid');
+        const res = await request(makeApp()).get('/attachments/bug/11111111-1111-4111-8111-111111111111');
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(1);
         expect(res.body[0].original_name).toBe('doc.pdf');
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+        expect(mockQuery.mock.calls[0][1]).toEqual(['bug', '11111111-1111-4111-8111-111111111111']);
+    });
+
+    test('resolves numeric Tuleap artifact id before listing attachments', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: '22222222-2222-4222-8222-222222222222' }] })
+            .mockResolvedValueOnce({
+                rows: [{ id: 'att-1', original_name: 'story.pdf', mime_type: 'application/pdf', size_bytes: 512, created_at: '2026-06-15', uploaded_by_name: 'Alice' }],
+            });
+
+        const res = await request(makeApp()).get('/attachments/user_story/52');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(1);
+        expect(mockQuery.mock.calls[0][0]).toMatch(/FROM user_stories/);
+        expect(mockQuery.mock.calls[0][1]).toEqual([52]);
+        expect(mockQuery.mock.calls[1][1]).toEqual(['user_story', '22222222-2222-4222-8222-222222222222']);
+    });
+
+    test('returns 404 when numeric Tuleap artifact id is unknown', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(makeApp()).get('/attachments/user_story/999999');
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toMatch(/Artifact not found/);
+    });
+
+    test('returns 400 for malformed artifact id', async () => {
+        const res = await request(makeApp()).get('/attachments/user_story/not-a-uuid');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/QC UUID or Tuleap artifact id/);
+        expect(mockQuery).not.toHaveBeenCalled();
     });
 
     test('returns 400 for invalid artifact type', async () => {
         const res = await request(makeApp()).get('/attachments/unknown_type/some-uuid');
         expect(res.status).toBe(400);
+    });
+});
+
+// ── POST /:type/:id ───────────────────────────────────────────────────────────
+
+describe('POST /attachments/:type/:id', () => {
+    test('resolves numeric Tuleap artifact id before uploading attachment', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: '22222222-2222-4222-8222-222222222222' }] })
+            .mockResolvedValueOnce({
+                rows: [{ id: 'att-1', original_name: 'test.png', mime_type: 'image/png', size_bytes: 2048, created_at: '2026-06-15' }],
+            });
+
+        const res = await request(makeApp())
+            .post('/attachments/user_story/52')
+            .attach('file', Buffer.from('data'), 'test.png');
+
+        expect(res.status).toBe(201);
+        expect(storage.uploadArtifactFile).toHaveBeenCalledWith(
+            expect.stringContaining('user_story/22222222-2222-4222-8222-222222222222/'),
+            expect.any(Buffer),
+            'image/png'
+        );
+        expect(mockQuery.mock.calls[0][0]).toMatch(/FROM user_stories/);
+        expect(mockQuery.mock.calls[0][1]).toEqual([52]);
+        expect(mockQuery.mock.calls[1][1]).toEqual(expect.arrayContaining([
+            'user_story',
+            '22222222-2222-4222-8222-222222222222',
+        ]));
     });
 });
 
