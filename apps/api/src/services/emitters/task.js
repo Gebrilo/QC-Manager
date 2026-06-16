@@ -150,7 +150,18 @@ async function emitToTuleap(unified, config, mode, deps = {}) {
     if (mode === 'update') {
       const artifactId = unified.tuleap?.artifact_id;
       if (!artifactId) throw new Error('tuleap.artifact_id required for update');
-      await client.put(`/artifacts/${artifactId}`, { values });
+      try {
+        await client.put(`/artifacts/${artifactId}`, { values });
+      } catch (updateErr) {
+        if (updateErr.status === 400 && /transition/i.test(updateErr.message)) {
+          const { status: _s, ...restPayload } = mappedPayload;
+          const retryValues = await buildTuleapValues(restPayload, trackerId, registry);
+          await client.put(`/artifacts/${artifactId}`, { values: retryValues });
+          console.warn(`[emit:task] retry_without_status artifact_id=${artifactId} — workflow transition rejected`);
+        } else {
+          throw updateErr;
+        }
+      }
       console.log(`[emit:task] tuleap_update_ok artifact_id=${artifactId} project=${config.qc_project_id}`);
 
       try {
