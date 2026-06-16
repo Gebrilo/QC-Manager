@@ -326,7 +326,11 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
 
 function filterFields(resolvedUser, artifactType, row) {
     if (artifactType !== 'test_case') return row;
-    if (resolvedUser && resolvedUser.effectivePermissions && resolvedUser.effectivePermissions.has('qc.testcases.view_steps')) {
+    const perms = resolvedUser && resolvedUser.effectivePermissions;
+    // Honor the '*' wildcard (admin/superuser) the same way canPerform and the
+    // route-level permission checks do — otherwise admins lose the test_case
+    // body fields on every GET even though they can view everything.
+    if (perms && (perms.has('*') || perms.has('qc.testcases.view_steps'))) {
         return row;
     }
     const clone = { ...row };
