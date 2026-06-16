@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -62,21 +62,23 @@ const fieldCls =
 const textareaCls =
     'w-full px-3.5 py-3 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all resize-y leading-relaxed';
 
-function SelectField({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
-    return (
-        <div className="relative">
-            <select className={`${fieldCls} appearance-none pr-9`} {...props}>
-                {children}
-            </select>
-            <svg
-                width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            >
-                <path d="M6 9l6 6 6-6" />
-            </svg>
-        </div>
-    );
-}
+const SelectField = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }>(
+    function SelectField({ children, ...props }, ref) {
+        return (
+            <div className="relative">
+                <select ref={ref} className={`${fieldCls} appearance-none pr-9`} {...props}>
+                    {children}
+                </select>
+                <svg
+                    width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                >
+                    <path d="M6 9l6 6 6-6" />
+                </svg>
+            </div>
+        );
+    }
+);
 
 // ── Section card ────────────────────────────────────────────────────────────
 

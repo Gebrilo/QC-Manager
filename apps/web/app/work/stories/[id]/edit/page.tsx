@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { shouldRestoreAsyncSelectValue } from '@/lib/forms/asyncSelect';
 import Link from 'next/link';
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -68,24 +69,27 @@ const readonlyCls =
 const textareaCls =
     'w-full px-3.5 py-3 rounded-lg bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all resize-y leading-relaxed';
 
-function SelectField({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
-    return (
-        <div className="relative">
-            <select
-                className={`${fieldCls} appearance-none pr-9`}
-                {...props}
-            >
-                {children}
-            </select>
-            <svg
-                width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            >
-                <path d="M6 9l6 6 6-6" />
-            </svg>
-        </div>
-    );
-}
+const SelectField = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }>(
+    function SelectField({ children, ...props }, ref) {
+        return (
+            <div className="relative">
+                <select
+                    ref={ref}
+                    className={`${fieldCls} appearance-none pr-9`}
+                    {...props}
+                >
+                    {children}
+                </select>
+                <svg
+                    width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                >
+                    <path d="M6 9l6 6 6-6" />
+                </svg>
+            </div>
+        );
+    }
+);
 
 // ── Section card ────────────────────────────────────────────────────────────
 
@@ -309,13 +313,14 @@ function EditForm({
     const [activeSection, setActiveSection] = useState('story-general');
     const [storyUUID, setStoryUUID] = useState<string | null>(null);
 
-    const { resources: tuleapResources } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const defaultAssignedTo = (artifact as any).assigned_to || '';
 
     useEffect(() => {
         setStoryUUID(artifactId);
     }, [artifactId]);
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, setValue, getFieldState, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
             title: stripHtml(
@@ -339,6 +344,20 @@ function EditForm({
 
     const statusValue = watch('status');
     const priorityValue = watch('priority');
+
+    useEffect(() => {
+        if (tuleapLoaded && shouldRestoreAsyncSelectValue(
+            defaultAssignedTo,
+            tuleapResources.map(r => r.tuleap_username),
+            getFieldState('assigned_to').isDirty
+        )) {
+            setValue('assigned_to', defaultAssignedTo, {
+                shouldDirty: false,
+                shouldTouch: false,
+                shouldValidate: false,
+            });
+        }
+    }, [defaultAssignedTo, getFieldState, setValue, tuleapLoaded, tuleapResources]);
 
     // Scroll-spy for section nav
     useEffect(() => {

@@ -11,6 +11,7 @@ import { bugsApi, projectsApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { shouldRestoreAsyncSelectValue } from '@/lib/forms/asyncSelect';
 import type { Bug } from '@/lib/api';
 
 const bugSchema = z.object({
@@ -374,12 +375,13 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
     const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
     const { activeId, scrollTo } = useSectionNav(SECTIONS.map(s => s.id));
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
+    const defaultAssignedTo = (initialData?.assigned_to as string) || '';
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});
     }, []);
 
-    const { register, handleSubmit, watch, formState: { errors, isDirty } } = useForm<FormData>({
+    const { register, handleSubmit, watch, setValue, getFieldState, formState: { errors, isDirty } } = useForm<FormData>({
         resolver: zodResolver(bugSchema) as any,
         defaultValues: {
             title: stripHtml((initialData?.title as string) || (initialData?.bugTitle as string)),
@@ -403,6 +405,20 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
     });
 
     const currentStatus = watch('status') || (initialData?.status as string) || 'New';
+
+    useEffect(() => {
+        if (tuleapLoaded && shouldRestoreAsyncSelectValue(
+            defaultAssignedTo,
+            tuleapResources.map(r => r.tuleap_username),
+            getFieldState('assigned_to').isDirty
+        )) {
+            setValue('assigned_to', defaultAssignedTo, {
+                shouldDirty: false,
+                shouldTouch: false,
+                shouldValidate: false,
+            });
+        }
+    }, [defaultAssignedTo, getFieldState, setValue, tuleapLoaded, tuleapResources]);
 
     const [showSyncToast, setShowSyncToast] = useState<string | null>(null);
 

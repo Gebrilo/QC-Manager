@@ -10,6 +10,7 @@ import { projectsApi, testCasesApi, type Project } from '@/lib/api';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { TestCase } from '@/types';
 import { stripHtml } from '@/lib/stripHtml';
+import { shouldRestoreAsyncSelectValue } from '@/lib/forms/asyncSelect';
 import { Spinner } from '@/components/ui/Spinner';
 import { format } from 'date-fns';
 
@@ -308,6 +309,8 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
     const [projects, setProjects] = useState<Project[]>([]);
     const [projectsError, setProjectsError] = useState<string | null>(null);
     const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const defaultProjectId = testCase.project_id || '';
+    const defaultAssignedTo = testCase.assigned_to || '';
 
     useEffect(() => {
         projectsApi.list()
@@ -315,7 +318,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
             .catch((err) => setProjectsError(err.message || 'Failed to load projects'));
     }, []);
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, setValue, getFieldState, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
             title: stripHtml(testCase.title),
@@ -340,6 +343,34 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
     });
 
     const statusValue = watch('status');
+
+    useEffect(() => {
+        if (shouldRestoreAsyncSelectValue(
+            defaultProjectId,
+            projects.map(project => project.id),
+            getFieldState('project_id').isDirty
+        )) {
+            setValue('project_id', defaultProjectId, {
+                shouldDirty: false,
+                shouldTouch: false,
+                shouldValidate: false,
+            });
+        }
+    }, [defaultProjectId, getFieldState, projects, setValue]);
+
+    useEffect(() => {
+        if (tuleapLoaded && shouldRestoreAsyncSelectValue(
+            defaultAssignedTo,
+            tuleapResources.map(resource => resource.user_id || resource.id),
+            getFieldState('assigned_to').isDirty
+        )) {
+            setValue('assigned_to', defaultAssignedTo, {
+                shouldDirty: false,
+                shouldTouch: false,
+                shouldValidate: false,
+            });
+        }
+    }, [defaultAssignedTo, getFieldState, setValue, tuleapLoaded, tuleapResources]);
 
     // ── Scroll-spy for section nav ─────────────────────────────────────────
     useEffect(() => {

@@ -69,7 +69,7 @@ export default function EditBugPage() {
 
     const initialData = {
         title: bug.title || '',
-        steps_to_reproduce: bug.description || '',
+        steps_to_reproduce: (bug as any).steps_to_reproduce || '',
         status: bug.status || 'New',
         assigned_to: bug.assigned_to || '',
         severity: bug.severity || 'None',
