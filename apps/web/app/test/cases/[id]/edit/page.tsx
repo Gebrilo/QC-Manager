@@ -308,7 +308,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
     const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
     const [projects, setProjects] = useState<Project[]>([]);
     const [projectsError, setProjectsError] = useState<string | null>(null);
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources(testCase.project_id, 'test_case');
     const defaultProjectId = testCase.project_id || '';
     const defaultAssignedTo = testCase.assigned_to || '';
 

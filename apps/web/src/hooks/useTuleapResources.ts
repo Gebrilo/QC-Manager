@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { resourcesApi, type Resource } from '@/lib/api';
+import { useState, useEffect, useMemo } from 'react';
+import { resourcesApi, tuleapApi, type Resource } from '@/lib/api';
 
 export interface TuleapResource {
     id: string;
@@ -14,9 +14,10 @@ export interface UseTuleapResourcesResult {
     loaded: boolean;
 }
 
-export function useTuleapResources(): UseTuleapResourcesResult {
+export function useTuleapResources(projectId?: string, trackerType?: string): UseTuleapResourcesResult {
     const [resources, setResources] = useState<TuleapResource[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [allowedLabels, setAllowedLabels] = useState<Set<string> | null>(null);
 
     useEffect(() => {
         resourcesApi.list()
@@ -36,5 +37,28 @@ export function useTuleapResources(): UseTuleapResourcesResult {
             .finally(() => setLoaded(true));
     }, []);
 
-    return { resources, loaded };
+    useEffect(() => {
+        if (!projectId || !trackerType) {
+            setAllowedLabels(null);
+            return;
+        }
+        let cancelled = false;
+        tuleapApi.getBindLabels(projectId, trackerType)
+            .then(res => {
+                if (cancelled) return;
+                const labels = res.data?.fields?.assigned_to;
+                setAllowedLabels(labels ? new Set(labels) : null);
+            })
+            .catch(() => { if (!cancelled) setAllowedLabels(null); });
+        return () => { cancelled = true; };
+    }, [projectId, trackerType]);
+
+    const filtered = useMemo(
+        () => allowedLabels
+            ? resources.filter(r => allowedLabels.has(r.tuleap_username))
+            : resources,
+        [resources, allowedLabels]
+    );
+
+    return { resources: filtered, loaded };
 }

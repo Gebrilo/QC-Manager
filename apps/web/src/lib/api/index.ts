@@ -2033,6 +2033,10 @@ export const tuleapApi = {
         fetchApi<Array<{ id: number; username: string; display_name: string; email: string | null }>>(
             `/tuleap-webhook/users${query ? `?query=${encodeURIComponent(query)}` : ''}`
         ),
+    getBindLabels: (projectId: string, trackerType?: string) =>
+        fetchApi<{ success: boolean; data: { tracker_id: number | null; fields: Record<string, string[]> } }>(
+            `/tuleap-webhook/projects/${projectId}/bind-labels${trackerType ? `?tracker_type=${trackerType}` : ''}`
+        ),
 };
 
 export interface TuleapSyncConfig {

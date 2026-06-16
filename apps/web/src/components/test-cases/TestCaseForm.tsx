@@ -48,7 +48,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources(projectId, 'test_case');
 
     const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(testCaseSchema) as any,

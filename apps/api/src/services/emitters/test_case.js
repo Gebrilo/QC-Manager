@@ -22,13 +22,29 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
 
     let shape;
     if (['sb', 'rb', 'msb', 'cb'].includes(field.type)) {
+      if (fieldValue === '') continue;
       if (Array.isArray(fieldValue)) {
-        const boundIds = await Promise.all(
-          fieldValue.map(v => registry.resolveBindValue(trackerId, tuleapFieldName, v).then(b => b.id))
-        );
+        const boundIds = [];
+        for (const value of fieldValue) {
+          try {
+            const bound = await registry.resolveBindValue(trackerId, tuleapFieldName, value);
+            boundIds.push(bound.id);
+          } catch (err) {
+            if (field.required) throw err;
+            console.log(`[emit:test_case] skip optional bind '${value}' for '${tuleapFieldName}' — ${err.message}`);
+          }
+        }
+        if (boundIds.length === 0) continue;
         shape = { bind_value_ids: boundIds };
       } else {
-        const bound = await registry.resolveBindValue(trackerId, tuleapFieldName, fieldValue);
+        let bound;
+        try {
+          bound = await registry.resolveBindValue(trackerId, tuleapFieldName, fieldValue);
+        } catch (err) {
+          if (field.required) throw err;
+          console.log(`[emit:test_case] skip optional bind '${fieldValue}' for '${tuleapFieldName}' — ${err.message}`);
+          continue;
+        }
         shape = { bind_value_ids: [bound.id] };
       }
     } else if (field.type === 'art_link') {
@@ -36,6 +52,17 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry) {
       const links = raw.map(id => Number(id)).filter(id => !isNaN(id)).map(id => ({ id }));
       if (links.length === 0) continue;
       shape = { links };
+    } else if (field.type === 'int') {
+      const n = parseInt(fieldValue, 10);
+      if (Number.isNaN(n)) {
+        console.log(`[emit:test_case] skip non-numeric int '${tuleapFieldName}'='${fieldValue}'`);
+        continue;
+      }
+      shape = { value: n };
+    } else if (field.type === 'float' || field.type === 'computed') {
+      const n = Number(fieldValue);
+      if (Number.isNaN(n)) continue;
+      shape = { value: n };
     } else {
       shape = { value: fieldValue };
     }

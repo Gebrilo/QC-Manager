@@ -372,7 +372,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources(selectedProjectId, 'bug');
     const { activeId, scrollTo } = useSectionNav(SECTIONS.map(s => s.id));
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
     const defaultAssignedTo = (initialData?.assigned_to as string) || '';

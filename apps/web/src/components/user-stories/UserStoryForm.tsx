@@ -47,7 +47,7 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources(selectedProjectId, 'user_story');
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {});

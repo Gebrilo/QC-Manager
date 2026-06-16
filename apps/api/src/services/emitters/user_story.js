@@ -69,6 +69,17 @@ async function buildTuleapValues(tuleapPayload, trackerId, registry, mode = 'upd
         .filter(Boolean);
       if (links.length === 0) continue;
       shape = { links };
+    } else if (field.type === 'int') {
+      const n = parseInt(fieldValue, 10);
+      if (Number.isNaN(n)) {
+        console.log(`[emit:user_story] skip non-numeric int '${tuleapFieldName}'='${fieldValue}'`);
+        continue;
+      }
+      shape = { value: n };
+    } else if (field.type === 'float' || field.type === 'computed') {
+      const n = Number(fieldValue);
+      if (Number.isNaN(n)) continue;
+      shape = { value: n };
     } else {
       shape = { value: fieldValue };
     }

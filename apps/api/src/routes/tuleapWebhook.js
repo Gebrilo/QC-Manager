@@ -780,6 +780,49 @@ router.get('/config/discover/:trackerId', async (req, res) => {
 });
 
 // =====================================================
+// GET /tuleap-webhook/projects/:projectId/bind-labels
+// Returns bind value labels for list-type fields (e.g. assigned_to)
+// for the project's configured tracker. Used by the frontend to
+// populate assignee pickers with only valid Tuleap bind values.
+// =====================================================
+router.get('/projects/:projectId/bind-labels', requireAuth, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const trackerType = (req.query.tracker_type || 'bug').toString();
+
+        const result = await pool.query(
+            `SELECT tuleap_tracker_id FROM tuleap_sync_config
+             WHERE qc_project_id = $1 AND tracker_type = $2 AND is_active = true
+             LIMIT 1`,
+            [projectId, trackerType]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json({ success: true, data: { tracker_id: null, fields: {} } });
+        }
+
+        const trackerId = result.rows[0].tuleap_tracker_id;
+        const { defaultRegistry } = require('../services/tuleapFieldRegistry');
+        const fields = await defaultRegistry._load(trackerId);
+
+        const bindFields = {};
+        for (const [name, field] of fields) {
+            if (['sb', 'rb', 'msb', 'cb'].includes(field.type) && Array.isArray(field.values)) {
+                bindFields[name] = field.values.map(v => v.label);
+            }
+        }
+
+        return res.json({ success: true, data: { tracker_id: trackerId, fields: bindFields } });
+    } catch (err) {
+        console.error('Error fetching bind labels:', err);
+        return res.status(err.status || 500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+});
+
+// =====================================================
 // GET /tuleap-webhook/resources
 // Get resources for mapping (used by n8n to lookup assignees)
 // =====================================================

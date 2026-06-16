@@ -200,7 +200,7 @@ function CreateUserStoryContent() {
     const [activeSection, setActiveSection] = useState('story-general');
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
-    const { resources: tuleapResources } = useTuleapResources();
+    const { resources: tuleapResources } = useTuleapResources(selectedProjectId, 'user_story');
 
     useEffect(() => {
         projectsApi.list().then(setProjects).catch(() => {}).finally(() => setIsLoading(false));

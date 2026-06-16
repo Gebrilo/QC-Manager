@@ -313,7 +313,7 @@ function EditForm({
     const [activeSection, setActiveSection] = useState('story-general');
     const [storyUUID, setStoryUUID] = useState<string | null>(null);
 
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources((artifact as any).project_id, 'user_story');
     const defaultAssignedTo = (artifact as any).assigned_to || '';
 
     useEffect(() => {

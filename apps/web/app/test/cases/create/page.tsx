@@ -210,7 +210,6 @@ export default function CreateTestCasePage() {
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [syncWarning, setSyncWarning] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
-    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources();
 
     useEffect(() => {
         fetchApi('/projects?status=active&limit=100')
@@ -236,7 +235,7 @@ export default function CreateTestCasePage() {
         return () => window.removeEventListener('scroll', handler);
     }, []);
 
-    const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
             project_id: '',
@@ -259,6 +258,8 @@ export default function CreateTestCasePage() {
             linked_requirement_id: '',
         },
     });
+
+    const { resources: tuleapResources, loaded: tuleapLoaded } = useTuleapResources(watch('project_id'), 'test_case');
 
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
