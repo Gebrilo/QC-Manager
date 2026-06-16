@@ -11,7 +11,7 @@ const { buildAccessDefaults, materializeAclGrants } = require('../services/acces
 const { auditLog } = require('../middleware/audit');
 const { decorateRows } = require('../services/access/enforcement');
 
-const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Passed', 'Fail': 'Failed', 'Blocked': 'Blocked' };
+const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Pass', 'Fail': 'Fail', 'Blocked': 'Blocked' };
 
 async function resolveTestCaseSyncConfig(projectId) {
     const result = await pool.query(
