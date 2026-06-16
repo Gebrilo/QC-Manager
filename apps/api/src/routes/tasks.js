@@ -310,8 +310,6 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
             }
         }
 
-        const notes = data.notes || data.description || null;
-
         const accessDefaults = await buildAccessDefaults({
             creator: req.user ? { id: req.user.id } : null,
             artifactType: 'task',
@@ -322,21 +320,22 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
 
         const query = `
             INSERT INTO tasks (
-                task_id, project_id, task_name, status, priority,
+                task_id, project_id, task_name, description, status, priority,
                 estimate_days,
                 deadline, tags, notes, completed_date,
                 expected_start_date, actual_start_date,
                 owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15
+                $12, $13, $14, $15, $16
             ) RETURNING *
         `;
 
         const values = [
-            data.task_id, data.project_id, data.task_name, data.status, canSetPriority ? data.priority : 'Medium',
+            data.task_id, data.project_id, data.task_name, data.description || null,
+            data.status, canSetPriority ? data.priority : 'Medium',
             data.estimate_days,
-            data.deadline, data.tags, notes, data.completed_date,
+            data.deadline, data.tags, data.notes || null, data.completed_date,
             data.expected_start_date || null, data.actual_start_date || null,
             accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ];
@@ -529,6 +528,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         const keyMap = {
             project_id: 'project_id',
             task_name: 'task_name',
+            description: 'description',
             status: 'status',
             priority: 'priority',
             estimate_days: 'estimate_days',
@@ -542,10 +542,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
         };
 
         for (const [key, value] of Object.entries(data)) {
-            if (key === 'description' && !data.notes) {
-                fields.push(`notes = $${idx++}`);
-                values.push(value);
-            } else if (key in keyMap) {
+            if (key in keyMap) {
                 fields.push(`${keyMap[key]} = $${idx++}`);
                 values.push(value);
             }

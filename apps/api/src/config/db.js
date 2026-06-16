@@ -1677,6 +1677,13 @@ const runMigrations = async () => {
                 ADD COLUMN IF NOT EXISTS tuleap_tracker_id INTEGER
         `);
 
+        await client.query(`
+            UPDATE tasks
+               SET description = notes
+             WHERE description IS NULL
+               AND notes IS NOT NULL
+        `);
+
         // =====================================================
         // ADR 0009 — Normalize task assignment (one Primary + many Secondaries)
         //   Phase 1: task_resource_assignment junction (source of truth).

@@ -42,6 +42,28 @@ jest.mock('../src/access/RoleResolver', () => ({
     canonicalRole: (role) => (role === 'manager' ? 'team_manager' : role),
 }));
 
+jest.mock('../src/services/accessDefaults', () => ({
+    buildAccessDefaults: jest.fn().mockResolvedValue({
+        owner_team_id: 'team-x',
+        visibility_scope: 'team',
+        default_acl_grants: [],
+    }),
+    materializeAclGrants: jest.fn().mockResolvedValue(0),
+}));
+
+jest.mock('../src/middleware/audit', () => ({
+    auditLog: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/utils/n8n', () => ({
+    triggerWorkflow: jest.fn(),
+}));
+
+jest.mock('../src/services/notifications/dispatcher', () => ({
+    dispatchTaskAssignment: jest.fn().mockResolvedValue(undefined),
+    dispatchFromAudit: jest.fn().mockResolvedValue(undefined),
+}));
+
 const roleResolver = require('../src/access/RoleResolver');
 
 const express = require('express');
@@ -111,6 +133,78 @@ beforeEach(() => {
     jest.clearAllMocks();
     queries.length = 0;
     queryHandler = async () => ({ rows: [] });
+});
+
+const PROJECT_ID = '11111111-1111-4111-8111-111111111111';
+
+describe('POST/PATCH /tasks — description column mapping', () => {
+    function wireTaskWriteQueries(row) {
+        queryHandler = async (sql) => {
+            if (/INSERT INTO tasks/i.test(sql)) return { rows: [row] };
+            if (/SELECT \* FROM tasks WHERE id = \$1/.test(sql)) return { rows: [row] };
+            if (/UPDATE tasks SET description = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(sql)) {
+                return { rows: [{ ...row, description: 'Updated task details' }] };
+            }
+            if (/FROM tuleap_sync_config/.test(sql)) return { rows: [] };
+            if (/UPDATE tasks SET sync_status = 'standalone'/.test(sql)) return { rows: [row] };
+            if (/SELECT \* FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) return { rows: [row] };
+            if (/FROM task_resource_assignment tra\s+JOIN resources res/.test(sql)) return { rows: [] };
+            return { rows: [] };
+        };
+    }
+
+    test('create persists description in tasks.description without copying it into notes', async () => {
+        setRole('admin');
+        wireTaskWriteQueries({
+            id: 'task-created',
+            project_id: PROJECT_ID,
+            task_name: 'Mapped task',
+            description: 'Task details',
+            notes: null,
+        });
+
+        const res = await request(makeApp())
+            .post('/tasks')
+            .send({
+                task_id: 'TSK-MAPPED-1',
+                project_id: PROJECT_ID,
+                task_name: 'Mapped task',
+                description: 'Task details',
+            });
+
+        expect(res.status).toBe(201);
+        const insert = queries.find(q => /INSERT INTO tasks/i.test(q.sql));
+        expect(insert).toBeDefined();
+        expect(insert.sql).toMatch(/task_name, description, status/);
+        expect(insert.sql).toMatch(/tags, notes, completed_date/);
+        expect(insert.params[3]).toBe('Task details');
+        expect(insert.params[9]).toBeNull();
+    });
+
+    test('update maps description patches to tasks.description, not notes', async () => {
+        setRole('admin');
+        wireTaskWriteQueries({
+            id: 'task-1',
+            project_id: PROJECT_ID,
+            task_name: 'Mapped task',
+            status: 'Todo',
+            owner_team_id: 'team-x',
+            visibility_scope: 'team',
+            created_by_user_id: 'u-admin',
+            description: 'Old task details',
+            notes: 'Existing notes',
+        });
+
+        const res = await request(makeApp())
+            .patch('/tasks/task-1')
+            .send({ description: 'Updated task details' });
+
+        expect(res.status).toBe(200);
+        const update = queries.find(q => /UPDATE tasks SET description = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(q.sql));
+        expect(update).toBeDefined();
+        expect(update.sql).not.toMatch(/notes =/);
+        expect(update.params).toEqual(['Updated task details', 'task-1']);
+    });
 });
 
 describe('GET /tasks — list filter wiring', () => {
