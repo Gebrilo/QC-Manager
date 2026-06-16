@@ -236,6 +236,9 @@ export default function TestCaseDetailPage() {
                             </div>
                         </QCCard>
                     )}
+
+                    {/* Linked Artifacts */}
+                    <TestCaseLinkedArtifactsSections testCase={testCase} />
                 </div>
 
                 {/* Right column (1/3) */}
@@ -297,9 +300,6 @@ export default function TestCaseDetailPage() {
                     )}
                 </div>
             </div>
-
-            {/* ── Linked Artifacts ────────────────────────────────────── */}
-            <TestCaseLinkedArtifactsSections testCase={testCase} />
         </div>
     );
 }
@@ -415,7 +415,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
     ], [testCase.id]);
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {sections.map(section => (
                 <LinkedArtifactsSection key={section.title} config={section} projectId={testCase.project_id || null} />
             ))}

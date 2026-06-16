@@ -350,6 +350,18 @@ export default function BugDetailPage() {
                             <p className="text-sm text-slate-400 italic">No description provided.</p>
                         </QCCard>
                     )}
+
+                    {/* Linked Artifacts */}
+                    {sections.map(section => (
+                        <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
+                    ))}
+
+                    {/* Attachments */}
+                    <AttachmentSection
+                        artifactType="bug"
+                        artifactId={bug.id}
+                        tempId={null}
+                    />
                 </div>
 
                 {/* Right column (1/3) */}
@@ -376,19 +388,6 @@ export default function BugDetailPage() {
                     />
                 </div>
             </div>
-
-            {/* ── Linked Artifacts ────────────────────────────────────── */}
-            <div className="space-y-4">
-                {sections.map(section => (
-                    <LinkedArtifactsSection key={section.title} config={section} projectId={projectId} />
-                ))}
-            </div>
-
-            <AttachmentSection
-                artifactType="bug"
-                artifactId={bug.id}
-                tempId={null}
-            />
         </div>
     );
 }

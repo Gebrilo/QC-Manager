@@ -202,6 +202,16 @@ export default function UserStoryDetailPage() {
                             <p className="text-sm text-slate-400 italic">No acceptance criteria provided.</p>
                         )}
                     </QCCard>
+
+                    {/* Linked Artifacts */}
+                    <UserStoryLinkedArtifactsSections story={story} />
+
+                    {/* Attachments */}
+                    <AttachmentSection
+                        artifactType="user_story"
+                        artifactId={story.id}
+                        tempId={null}
+                    />
                 </div>
 
                 {/* Right column (1/3) */}
@@ -222,15 +232,6 @@ export default function UserStoryDetailPage() {
                     />
                 </div>
             </div>
-
-            {/* ── Linked Artifacts ────────────────────────────────────── */}
-            <UserStoryLinkedArtifactsSections story={story} />
-
-            <AttachmentSection
-                artifactType="user_story"
-                artifactId={story.id}
-                tempId={null}
-            />
         </div>
     );
 }
@@ -316,7 +317,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
     ], [story.id]);
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {sections.map(section => (
                 <LinkedArtifactsSection key={section.title} config={section} projectId={story.project_id || null} />
             ))}
