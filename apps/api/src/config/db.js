@@ -1749,7 +1749,7 @@ const runMigrations = async () => {
                 test_case_id VARCHAR(50) NOT NULL,
                 title VARCHAR(500) NOT NULL,
                 description TEXT,
-                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                status VARCHAR(50) NOT NULL DEFAULT 'Not Run',
                 priority VARCHAR(20) DEFAULT 'medium',
                 category VARCHAR(50) DEFAULT 'other',
                 project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
@@ -1758,7 +1758,7 @@ const runMigrations = async () => {
                 tuleap_tracker_id INTEGER,
                 tuleap_url TEXT,
                 synced_from_tuleap BOOLEAN DEFAULT FALSE,
-                last_tuleap_sync TIMESTAMP WITH TIME ZONE,
+                last_tuleap_sync TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 pending_links JSONB DEFAULT '[]'::jsonb,
                 raw_tuleap_payload JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -2414,6 +2414,14 @@ const runMigrations = async () => {
                 IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_sync_status_check') THEN
                     ALTER TABLE test_case ADD CONSTRAINT test_case_sync_status_check
                         CHECK (sync_status IN ('synced','pending','failed','standalone'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'test_case_status_check') THEN
+                    ALTER TABLE test_case ADD CONSTRAINT test_case_status_check
+                        CHECK (status IN ('None','Not Run','Review','Pass','Fail','Blocked'));
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'valid_task_status') THEN
+                    ALTER TABLE tasks ADD CONSTRAINT valid_task_status
+                        CHECK (status IN ('Todo','In Progress','Blocked','Done','Canceled'));
                 END IF;
             END $$;
         `);

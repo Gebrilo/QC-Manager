@@ -31,10 +31,10 @@ const TRACKER_DEFS: { key: TrackerType; label: string; dot: string; active: stri
 ];
 
 const QC_STATUSES: Record<TrackerType, string[]> = {
-    bug:        ['open', 'in_progress', 'resolved', 'closed'],
-    task:       ['Backlog', 'In Progress', 'Done', 'Cancelled'],
-    user_story: ['Backlog', 'In Progress', 'Done', 'Cancelled'],
-    test_case:  ['draft', 'active', 'deprecated', 'archived'],
+    bug:        ['New', 'In Progress', 'Assigned', 'Verified', 'Reopened', 'Fixed', 'Blocked', 'Duplicate', 'Closed'],
+    task:       ['Todo', 'In Progress', 'Blocked', 'Done', 'Canceled'],
+    user_story: ['Draft', 'Changes', 'Review', 'Approved'],
+    test_case:  ['None', 'Not Run', 'Review', 'Pass', 'Fail', 'Blocked'],
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -47,10 +47,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 const DEFAULT_STATUS_TONES: Record<TrackerType, string[]> = {
-    bug:        ['slate','blue','amber','violet','emerald','slate','rose'],
-    task:       ['slate','amber','rose','emerald'],
+    bug:        ['slate','blue','violet','amber','rose','emerald','rose','slate','blue'],
+    task:       ['slate','amber','rose','emerald','slate'],
     user_story: ['slate','amber','violet','emerald'],
-    test_case:  ['slate','emerald','rose'],
+    test_case:  ['slate','emerald','amber','blue','rose','rose'],
 };
 
 // ── icon primitives ──────────────────────────────────────────────────────────
