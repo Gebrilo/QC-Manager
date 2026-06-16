@@ -7,6 +7,7 @@ const {
   materializeAclGrants,
 } = require('../accessDefaults');
 const { auditLog } = require('../../middleware/audit');
+const { hasUnsyncedLocalEdit } = require('./localEditGuard');
 
 const VALID_BUG_ACTIONS = new Set(['sync', 'delete']);
 
@@ -85,6 +86,12 @@ async function handleSync(unified, config, deps) {
 
     if (skipUpdate) {
       return { action: 'skipped', id: row.id };
+    }
+
+    // QC edit wins until synced: don't let inbound Tuleap data overwrite a row
+    // that still holds an unsynced local edit (sync_status pending/failed).
+    if (hasUnsyncedLocalEdit(row)) {
+      return { action: 'skipped_local_edit', id: row.id };
     }
 
     const result = await updateBug(row.id, unified, config, projectId, source, resolvedTestCases, query);

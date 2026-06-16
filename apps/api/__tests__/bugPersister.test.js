@@ -100,6 +100,32 @@ describe('bug persister — dispatchAction', () => {
     expect(updateCall).toBeDefined();
   });
 
+  it.each(['failed', 'pending'])(
+    'skips overwriting a row with an unsynced local edit (sync_status=%s)',
+    async (syncStatus) => {
+      const unified = {
+        artifact_type: 'bug',
+        action: 'sync',
+        project_id: 'proj-1',
+        common: { title: 'Tuleap stale title', status: 'In Progress' },
+        fields: { severity: 'high' },
+        tuleap: { artifact_id: 67890 },
+      };
+
+      resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
+      query.mockResolvedValueOnce({
+        rows: [{ id: 'existing-uuid', tuleap_artifact_id: 67890, deleted_at: null, sync_status: syncStatus }],
+      });
+
+      const result = await dispatchAction(unified, config, { query });
+
+      expect(result.action).toBe('skipped_local_edit');
+      expect(result.id).toBe('existing-uuid');
+      const updateCall = query.mock.calls.find(c => /UPDATE bugs SET/i.test(c[0]));
+      expect(updateCall).toBeUndefined();
+    }
+  );
+
   it('soft-deletes a bug on delete action', async () => {
     const unified = {
       artifact_type: 'bug',

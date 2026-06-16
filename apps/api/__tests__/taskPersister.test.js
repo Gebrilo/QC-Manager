@@ -54,6 +54,31 @@ describe('task persister — dispatchAction', () => {
     expect(insertCall[0]).toContain('last_sync_error');
   });
 
+  it.each(['failed', 'pending'])(
+    'skips overwriting a task with an unsynced local edit (sync_status=%s)',
+    async (syncStatus) => {
+      const unified = {
+        artifact_type: 'task',
+        action: 'sync',
+        project_id: 'proj-1',
+        common: { title: 'Tuleap stale task', status: 'Done' },
+        fields: {},
+        tuleap: { artifact_id: 12345 },
+      };
+
+      resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
+      query.mockResolvedValueOnce({
+        rows: [{ id: 'existing-uuid', tuleap_artifact_id: 12345, deleted_at: null, sync_status: syncStatus }],
+      });
+
+      const result = await dispatchAction(unified, config, { query });
+
+      expect(result.action).toBe('skipped_local_edit');
+      expect(result.id).toBe('existing-uuid');
+      expect(query.mock.calls.find(c => /UPDATE tasks SET/i.test(c[0]))).toBeUndefined();
+    }
+  );
+
   it('updates an existing task by tuleap_artifact_id', async () => {
     const unified = {
       artifact_type: 'task',

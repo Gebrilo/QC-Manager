@@ -52,6 +52,31 @@ describe('test_case persister — dispatchAction', () => {
     expect(insertCall[0]).toContain('last_sync_error');
   });
 
+  it.each(['failed', 'pending'])(
+    'skips overwriting a test case with an unsynced local edit (sync_status=%s)',
+    async (syncStatus) => {
+      const unified = {
+        artifact_type: 'test_case',
+        action: 'sync',
+        project_id: 'proj-1',
+        common: { title: 'Tuleap stale test', status: 'deprecated' },
+        fields: {},
+        tuleap: { artifact_id: 6001 },
+      };
+
+      resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
+      query.mockResolvedValueOnce({
+        rows: [{ id: 'existing-uuid', tuleap_artifact_id: 6001, deleted_at: null, sync_status: syncStatus }],
+      });
+
+      const result = await dispatchAction(unified, config, { query });
+
+      expect(result.action).toBe('skipped_local_edit');
+      expect(result.id).toBe('existing-uuid');
+      expect(query.mock.calls.find(c => /UPDATE test_case SET/i.test(c[0]))).toBeUndefined();
+    }
+  );
+
   it('updates an existing test case by tuleap_artifact_id', async () => {
     const unified = {
       artifact_type: 'test_case',

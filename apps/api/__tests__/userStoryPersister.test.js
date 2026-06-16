@@ -65,6 +65,31 @@ describe('user_story persister — dispatchAction', () => {
     expect(insertCall[0]).toContain('last_sync_error');
   });
 
+  it.each(['failed', 'pending'])(
+    'skips overwriting a user story with an unsynced local edit (sync_status=%s)',
+    async (syncStatus) => {
+      const unified = {
+        artifact_type: 'user_story',
+        action: 'sync',
+        project_id: 'proj-1',
+        common: { title: 'Tuleap stale story', status: 'Approved' },
+        fields: { requirement_version: '2' },
+        tuleap: { artifact_id: 5001 },
+      };
+
+      resolveLinks.mockResolvedValueOnce({ resolved: [], pending: [] });
+      query.mockResolvedValueOnce({
+        rows: [{ id: 'existing-uuid', tuleap_artifact_id: 5001, deleted_at: null, sync_status: syncStatus }],
+      });
+
+      const result = await dispatchAction(unified, config, { query });
+
+      expect(result.action).toBe('skipped_local_edit');
+      expect(result.id).toBe('existing-uuid');
+      expect(query.mock.calls.find(c => /UPDATE user_stories SET/i.test(c[0]))).toBeUndefined();
+    }
+  );
+
   it('updates an existing user story by tuleap_artifact_id', async () => {
     const unified = {
       artifact_type: 'user_story',

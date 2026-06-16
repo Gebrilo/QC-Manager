@@ -6,6 +6,7 @@ const {
 } = require('../accessDefaults');
 const { applyTuleapPrimary, getTaskAssignmentSummary } = require('../assignments/taskAssignments');
 const { auditLog } = require('../../middleware/audit');
+const { hasUnsyncedLocalEdit } = require('./localEditGuard');
 
 // ADR 0009 §3 — Tracker Config setting: on reassignment, demote the previous
 // primary to SECONDARY when it logged effort (default), else remove it.
@@ -203,6 +204,11 @@ async function handleSync(unified, config, { query }) {
 
   if (existing.rows.length > 0) {
     const task = existing.rows[0];
+
+    // QC edit wins until synced: skip inbound overwrite of an unsynced local edit.
+    if (hasUnsyncedLocalEdit(task)) {
+      return { action: 'skipped_local_edit', id: task.id };
+    }
 
     const assignedResourceId = common.assigned_to ? await resolveResourceByName(common.assigned_to, query) : null;
 

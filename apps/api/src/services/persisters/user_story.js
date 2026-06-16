@@ -4,6 +4,7 @@ const {
   buildAccessDefaults,
   materializeAclGrants,
 } = require('../accessDefaults');
+const { hasUnsyncedLocalEdit } = require('./localEditGuard');
 
 const VALID_USER_STORY_ACTIONS = new Set(['sync', 'delete']);
 
@@ -64,11 +65,15 @@ async function handleSync(unified, config, { query }) {
   });
 
   const existing = await query(
-    'SELECT id, deleted_at FROM user_stories WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL',
+    'SELECT id, deleted_at, sync_status FROM user_stories WHERE tuleap_artifact_id = $1 AND deleted_at IS NULL',
     [tuleapArtifactId]
   );
 
   if (existing.rows.length > 0) {
+    // QC edit wins until synced: skip inbound overwrite of an unsynced local edit.
+    if (hasUnsyncedLocalEdit(existing.rows[0])) {
+      return { action: 'skipped_local_edit', id: existing.rows[0].id };
+    }
     const result = await updateUserStory(existing.rows[0].id, unified, query);
     return { action: 'updated', id: result.rows[0].id, data: result.rows[0] };
   }
