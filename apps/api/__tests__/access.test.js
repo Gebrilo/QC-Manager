@@ -356,6 +356,30 @@ describe('AccessEngine.filterFields', () => {
         expect(out.expected_results).toBe('pass');
     });
 
+    test('keeps test_case body fields when user has the * wildcard (admin)', () => {
+        // Regression: admins resolve to effectivePermissions = {'*'} (catalog
+        // role admin → permissions:['*']). filterFields must honor the wildcard
+        // the same way canPerform/route checks do, otherwise admins lose
+        // description/preconditions/test_steps/expected_result on every GET while
+        // they briefly reappear after a status PATCH (which skips decorateRows).
+        const out = filterFields(
+            { effectivePermissions: new Set(['*']) },
+            'test_case',
+            {
+                id: 'tc1',
+                title: 'x',
+                description: 'desc',
+                preconditions: 'pre',
+                test_steps: 'do thing',
+                expected_result: 'pass',
+            }
+        );
+        expect(out.description).toBe('desc');
+        expect(out.preconditions).toBe('pre');
+        expect(out.test_steps).toBe('do thing');
+        expect(out.expected_result).toBe('pass');
+    });
+
     test('non-test_case artifacts pass through unchanged', () => {
         const row = { id: 'b1', title: 'bug', severity: 'Major impact' };
         expect(filterFields({ effectivePermissions: new Set() }, 'bug', row)).toEqual(row);
