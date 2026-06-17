@@ -8,6 +8,7 @@ const router = express.Router();
 const db = require('../config/db');
 const pool = db.pool;
 const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
+const { classifyWorkloadBalance } = require('../services/metrics/workloadBalance');
 
 // =====================================================
 // GET /governance/release-readiness
@@ -272,35 +273,19 @@ router.get('/workload-balance', requireAuth, blockContributors, requirePermissio
 
         const result = await pool.query(query, params);
 
-        // Transform data to ensure correct types and balance_status
+        // Transform data to ensure correct types and balance_status.
+        // total_tests holds the count of COMPLETED test runs (see v_workload_balance).
         const transformedData = result.rows.map(row => {
             const totalTasks = parseInt(row.total_tasks, 10) || 0;
-            const totalTests = parseInt(row.total_tests, 10) || 0;
-
-            // Recalculate balance_status based on actual values
-            let balanceStatus = row.balance_status;
-            if (totalTasks === 0) {
-                balanceStatus = 'NO_TASKS';
-            } else if (totalTests === 0) {
-                balanceStatus = 'NO_TESTS';
-            } else {
-                const ratio = totalTests / totalTasks;
-                if (ratio >= 2) {
-                    balanceStatus = 'OVER_TESTED';
-                } else if (ratio >= 0.5) {
-                    balanceStatus = 'BALANCED';
-                } else {
-                    balanceStatus = 'UNDER_TESTED';
-                }
-            }
+            const totalRuns = parseInt(row.total_tests, 10) || 0;
 
             return {
                 project_id: row.project_id,
                 project_name: row.project_name,
                 total_tasks: totalTasks,
-                total_tests: totalTests,
+                total_tests: totalRuns,
                 tests_per_task_ratio: row.tests_per_task_ratio,
-                balance_status: balanceStatus
+                balance_status: classifyWorkloadBalance(totalRuns, totalTasks)
             };
         });
 
