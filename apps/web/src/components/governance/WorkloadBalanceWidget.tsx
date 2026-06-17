@@ -35,7 +35,7 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
         <div className={className}>
             <div className="flex items-center gap-2 mb-4">
                 <InfoTooltip
-                    content="Compares the number of tasks vs test cases to identify under-tested areas. Balanced projects typically have at least 0.5 tests per task."
+                    content="Compares completed test runs against the number of tasks. A project is balanced at roughly one completed run per task (ratio 0.9–1.1); above 1.1 is over, below 0.9 is under."
                     position="top"
                 />
                 <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Workload Balance</span>
@@ -43,13 +43,14 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
             <div className="space-y-4">
                 {data.map((item) => {
                     const total = parseInt(String(item.total_tasks), 10) || 0;
-                    const tested = parseInt(String(item.total_tests), 10) || 0;
-                    // Cap coverage visualization at 100% even if ratio > 100%
-                    const ratio = total > 0 ? (tested / total) * 100 : 0;
+                    const runs = parseInt(String(item.total_tests), 10) || 0;
+                    // runs-per-task as a percentage; cap the bar fill at 100% even when over-tested
+                    const ratio = total > 0 ? (runs / total) * 100 : 0;
                     const displayRatio = Math.min(ratio, 100);
 
                     let statusColor = "bg-slate-200";
                     if (item.balance_status === 'BALANCED') statusColor = "bg-emerald-500";
+                    if (item.balance_status === 'OVER_TESTED') statusColor = "bg-sky-500";
                     if (item.balance_status === 'UNDER_TESTED') statusColor = "bg-amber-500";
                     if (item.balance_status === 'NO_TESTS') statusColor = "bg-rose-500";
 
@@ -57,7 +58,7 @@ export const WorkloadBalanceWidget: React.FC<Props> = ({ className }) => {
                         <div key={item.project_id} className="space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="font-medium text-slate-700 dark:text-slate-300">{item.project_name}</span>
-                                <span className="text-slate-500">{tested} tests / {total} tasks</span>
+                                <span className="text-slate-500">{runs} run{runs !== 1 ? 's' : ''} / {total} task{total !== 1 ? 's' : ''}</span>
                             </div>
                             <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                 <div
