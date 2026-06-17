@@ -1176,19 +1176,22 @@ const runMigrations = async () => {
 
         await client.query(`
             CREATE OR REPLACE VIEW v_workload_balance AS
+            -- "total_tests" is the count of COMPLETED test runs per project.
+            -- Balance compares completed runs to tasks: ~1:1 is balanced.
+            -- Bands MUST match classifyWorkloadBalance() in services/metrics/workloadBalance.js.
             SELECT
                 p.id AS project_id,
                 p.project_name,
                 COALESCE(t.task_count, 0) AS total_tasks,
-                COALESCE(te.test_count, 0) AS total_tests,
+                COALESCE(te.run_count, 0) AS total_tests,
                 CASE WHEN COALESCE(t.task_count, 0) = 0 THEN NULL
-                     ELSE ROUND(COALESCE(te.test_count, 0)::NUMERIC / t.task_count, 2)
+                     ELSE ROUND(COALESCE(te.run_count, 0)::NUMERIC / t.task_count, 2)
                 END AS tests_per_task_ratio,
                 CASE
                     WHEN COALESCE(t.task_count, 0) = 0 THEN 'NO_TASKS'
-                    WHEN COALESCE(te.test_count, 0) = 0 THEN 'NO_TESTS'
-                    WHEN COALESCE(te.test_count, 0)::NUMERIC / t.task_count >= 2 THEN 'OVER_TESTED'
-                    WHEN COALESCE(te.test_count, 0)::NUMERIC / t.task_count >= 0.5 THEN 'BALANCED'
+                    WHEN COALESCE(te.run_count, 0) = 0 THEN 'NO_TESTS'
+                    WHEN COALESCE(te.run_count, 0)::NUMERIC / t.task_count > 1.1 THEN 'OVER_TESTED'
+                    WHEN COALESCE(te.run_count, 0)::NUMERIC / t.task_count >= 0.9 THEN 'BALANCED'
                     ELSE 'UNDER_TESTED'
                 END AS balance_status
             FROM projects p
@@ -1196,9 +1199,10 @@ const runMigrations = async () => {
                 SELECT project_id, COUNT(*) AS task_count FROM tasks WHERE deleted_at IS NULL GROUP BY project_id
             ) t ON t.project_id = p.id
             LEFT JOIN (
-                SELECT tr.project_id, COUNT(te.id) AS test_count
-                FROM test_run tr JOIN test_execution te ON te.test_run_id = tr.id
-                WHERE tr.deleted_at IS NULL GROUP BY tr.project_id
+                SELECT tr.project_id, COUNT(*) AS run_count
+                FROM test_run tr
+                WHERE tr.deleted_at IS NULL AND tr.status = 'completed'
+                GROUP BY tr.project_id
             ) te ON te.project_id = p.id
             WHERE p.deleted_at IS NULL
         `);
@@ -1356,8 +1360,8 @@ const runMigrations = async () => {
                 ARRAY_CAT(
                     COALESCE(rr.blocking_issues, '{}'::TEXT[]),
                     ARRAY_REMOVE(ARRAY[
-                        CASE WHEN wb.balance_status = 'NO_TESTS'     THEN 'No test executions recorded' END,
-                        CASE WHEN wb.balance_status = 'UNDER_TESTED' THEN 'Under-tested relative to task count' END
+                        CASE WHEN wb.balance_status = 'NO_TESTS'     THEN 'No completed test runs recorded' END,
+                        CASE WHEN wb.balance_status = 'UNDER_TESTED' THEN 'Fewer completed test runs than tasks' END
                     ], NULL)
                 ) AS action_items,
                 rr.latest_pass_rate_pct,
