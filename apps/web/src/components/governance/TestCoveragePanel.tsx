@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { getTestCoverage, getProjectReadiness } from '@/services/governanceApi';
 
@@ -34,6 +34,19 @@ export function TestCoveragePanel({ projectId }: TestCoveragePanelProps) {
         load();
     }, [projectId]);
 
+    const aggregate = useMemo(() => {
+        if (projectId) return null;
+        const totalTasks = taskCoverage.reduce((s, r) => s + (Number(r.total_tasks) || 0), 0);
+        const tasksWithTests = taskCoverage.reduce((s, r) => s + (Number(r.tasks_with_active_test_cases) || 0), 0);
+        const totalStories = storyCoverage.reduce((s, r) => s + (Number(r.total_user_stories) || 0), 0);
+        const storiesWithTests = storyCoverage.reduce((s, r) => s + (Number(r.user_stories_with_active_test_cases) || 0), 0);
+        const projectCount = taskCoverage.length;
+        const projectsZeroCoverage = taskCoverage.filter(r => (Number(r.tasks_with_active_test_cases) || 0) === 0).length;
+        const taskCoveragePct = totalTasks > 0 ? Math.round((tasksWithTests / totalTasks) * 1000) / 10 : 0;
+        const storyCoveragePct = totalStories > 0 ? Math.round((storiesWithTests / totalStories) * 1000) / 10 : 0;
+        return { totalTasks, tasksWithTests, totalStories, storiesWithTests, projectCount, projectsZeroCoverage, taskCoveragePct, storyCoveragePct };
+    }, [projectId, taskCoverage, storyCoverage]);
+
     if (isLoading) {
         return (
             <div className="animate-pulse space-y-3 py-4">
@@ -50,7 +63,7 @@ export function TestCoveragePanel({ projectId }: TestCoveragePanelProps) {
 
     return (
         <div className="space-y-6">
-            {readiness && (
+            {projectId && readiness && (
                 <div>
                     <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-3">Project Readiness</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
@@ -91,6 +104,37 @@ export function TestCoveragePanel({ projectId }: TestCoveragePanelProps) {
                             {readiness.untriaged_bugs} untriaged bug{readiness.untriaged_bugs !== 1 ? 's' : ''} need attention
                         </p>
                     )}
+                </div>
+            )}
+            {!projectId && aggregate && (
+                <div>
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mb-3">Coverage Overview</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {aggregate.tasksWithTests} / {aggregate.totalTasks}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">{aggregate.taskCoveragePct}% Tasks</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {aggregate.storiesWithTests} / {aggregate.totalStories}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">{aggregate.storyCoveragePct}% Stories</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {aggregate.projectCount}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">Projects</p>
+                        </div>
+                        <div className="text-center">
+                            <p className={`text-2xl font-bold ${aggregate.projectsZeroCoverage === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {aggregate.projectsZeroCoverage} / {aggregate.projectCount}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">Zero Coverage</p>
+                        </div>
+                    </div>
                 </div>
             )}
 
