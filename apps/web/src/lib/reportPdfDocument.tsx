@@ -1,8 +1,25 @@
 import React from 'react';
 import {
-    Document, Page, View, Text, StyleSheet, Svg, Circle, Rect, Path, G, Line,
+    Document, Page, View, Text, StyleSheet, Svg, Circle, Rect, Path, G, Line, Font,
 } from '@react-pdf/renderer';
 import type { ReportDefinition } from '@/components/reports/reportTypes';
+
+// ─── Fonts ──────────────────────────────────────────────────────────────────
+// The PDF "standard 14" fonts (Helvetica/Times/Courier) only carry Latin
+// (WinAnsi) glyphs, so any Arabic text rendered with them collapses to garbled
+// symbols — react-pdf emits the low byte of each code point against the Latin
+// encoding table. Tajawal is a static TTF that covers BOTH Latin and Arabic, so
+// react-pdf embeds a Type0 subset and shapes Arabic (RTL + letter joining)
+// correctly. Served from /public so the browser-side renderer can fetch it.
+Font.register({
+    family: 'Tajawal',
+    fonts: [
+        { src: '/fonts/Tajawal-Regular.ttf', fontWeight: 400 },
+        { src: '/fonts/Tajawal-Bold.ttf', fontWeight: 700 },
+    ],
+});
+// Disable hyphenation: the default callback splits words and breaks Arabic joining.
+Font.registerHyphenationCallback((word) => [word]);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,7 +88,7 @@ const SUMMARY_TEXT_COLOR: Record<string, string> = {
 
 const s = StyleSheet.create({
     page: {
-        fontFamily: 'Helvetica',
+        fontFamily: 'Tajawal',
         fontSize: 9,
         backgroundColor: '#ffffff',
         paddingTop: 40,
@@ -82,44 +99,44 @@ const s = StyleSheet.create({
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
     headerLeft: { flex: 1 },
     headerRight: { alignItems: 'flex-end' },
-    category: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8', marginBottom: 3 },
-    title: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#0f172a' },
+    category: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8', marginBottom: 3 },
+    title: { fontSize: 22, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#0f172a' },
     stamp: { fontSize: 8, color: '#94a3b8', marginTop: 4 },
-    brand: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#4f46e5' },
+    brand: { fontSize: 12, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#4f46e5' },
     brandSub: { fontSize: 7, color: '#94a3b8', marginTop: 2 },
     // Divider
     divider: { height: 3, borderRadius: 2, backgroundColor: '#4f46e5', marginBottom: 10 },
     // Meta row
     metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginBottom: 14 },
     metaItem: { flexDirection: 'row', alignItems: 'center' },
-    metaKey: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8' },
-    metaVal: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#334155', marginLeft: 4 },
+    metaKey: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8' },
+    metaVal: { fontSize: 8, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#334155', marginLeft: 4 },
     // Summary
     summaryBox: { borderRadius: 6, padding: 10, marginBottom: 14 },
-    summaryLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', marginBottom: 4 },
+    summaryLabel: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', marginBottom: 4 },
     summaryText: { fontSize: 9, color: '#334155', lineHeight: 1.6 },
     // KPIs
     kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
     kpiCard: { flex: 1, borderRadius: 7, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', padding: 10 },
-    kpiLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8', marginBottom: 5 },
+    kpiLabel: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8', marginBottom: 5 },
     kpiValueRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
-    kpiValue: { fontSize: 19, fontFamily: 'Helvetica-Bold', color: '#0f172a', lineHeight: 1 },
-    kpiDelta: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', marginLeft: 4, marginBottom: 1 },
+    kpiValue: { fontSize: 19, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#0f172a', lineHeight: 1 },
+    kpiDelta: { fontSize: 7.5, fontFamily: 'Tajawal', fontWeight: 'bold', marginLeft: 4, marginBottom: 1 },
     kpiSub: { fontSize: 7.5, color: '#94a3b8' },
     // Charts row
     chartsRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
     gaugeCard: { flex: 2, borderRadius: 7, borderWidth: 1, borderColor: '#e2e8f0', padding: 10, alignItems: 'center' },
     chartCard: { flex: 3, borderRadius: 7, borderWidth: 1, borderColor: '#e2e8f0', padding: 10 },
-    sectionLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8', marginBottom: 8 },
+    sectionLabel: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8', marginBottom: 8 },
     // Table
-    tableLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8', marginBottom: 6 },
+    tableLabel: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8', marginBottom: 6 },
     tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1.5, borderBottomColor: '#e2e8f0', paddingBottom: 4, marginBottom: 1 },
     tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 5, alignItems: 'center' },
     tableCell: { fontSize: 8.5, color: '#475569' },
-    tableCellBold: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#1e293b' },
-    tableHeaderCell: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8' },
+    tableCellBold: { fontSize: 8.5, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#1e293b' },
+    tableHeaderCell: { fontSize: 7, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#94a3b8' },
     badge: { borderRadius: 10, paddingHorizontal: 5, paddingVertical: 2 },
-    badgeText: { fontSize: 6.5, fontFamily: 'Helvetica-Bold' },
+    badgeText: { fontSize: 6.5, fontFamily: 'Tajawal', fontWeight: 'bold' },
     // Rate bar
     rateBarTrack: { height: 5, borderRadius: 3, backgroundColor: '#f1f5f9', width: 60 },
     rateBarFill: { height: 5, borderRadius: 3 },
@@ -181,7 +198,7 @@ function GaugePdf({ value, label, caption }: { value: number; label: string; cap
                 </Svg>
                 {/* Centered value - overlaid via absolute position */}
                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#0f172a' }}>{pct}%</Text>
+                    <Text style={{ fontSize: 20, fontFamily: 'Tajawal', fontWeight: 'bold', color: '#0f172a' }}>{pct}%</Text>
                 </View>
             </View>
             <Text style={{ fontSize: 7.5, color: '#94a3b8', textAlign: 'center', marginTop: 2 }}>{caption}</Text>
