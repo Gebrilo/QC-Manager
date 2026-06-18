@@ -60,6 +60,9 @@ RUN apk add --no-cache wget && \
 # Copy standalone build output (includes server.js + node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# `output: 'standalone'` does NOT bundle public/, so copy it explicitly —
+# required for runtime-served assets like /fonts/*.ttf used by the report PDF.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Switch to non-root user
 USER nextjs
