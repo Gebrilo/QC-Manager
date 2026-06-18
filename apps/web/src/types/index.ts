@@ -186,6 +186,7 @@ export type ExecutionStatus = 'passed' | 'failed' | 'not_run' | 'blocked' | 'rej
 export interface TestResult {
     id: string; // UUID
     test_case_id: string; // From Excel: TC-001, TEST-LOGIN, etc.
+    test_case_uuid?: string | null; // Canonical QC UUID when backed by test_case/test_execution
     test_case_title?: string;
     project_id: string;
     status: ExecutionStatus;

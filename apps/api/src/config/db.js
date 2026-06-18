@@ -1899,8 +1899,9 @@ const runMigrations = async () => {
             CREATE VIEW v_latest_test_results AS
             SELECT DISTINCT ON (tr.project_id, te.test_case_id)
                 te.id,
-                te.test_case_id::text AS test_case_id,
-                te.test_case_title,
+                te.test_case_id AS test_case_uuid,
+                COALESCE(tc.test_case_id, te.test_case_id::text) AS test_case_id,
+                COALESCE(te.test_case_title, tc.title) AS test_case_title,
                 tr.project_id,
                 CASE te.status WHEN 'pass' THEN 'passed' WHEN 'fail' THEN 'failed' ELSE te.status END AS status,
                 COALESCE(te.executed_at, tr.started_at)::date AS executed_at,
@@ -1910,6 +1911,7 @@ const runMigrations = async () => {
                 CURRENT_DATE - COALESCE(te.executed_at, tr.started_at)::date AS days_since_execution
             FROM test_run tr
             JOIN test_execution te ON te.test_run_id = tr.id
+            LEFT JOIN test_case tc ON te.test_case_id = tc.id
             LEFT JOIN projects p ON tr.project_id = p.id
             LEFT JOIN app_user au ON au.id = te.executed_by
             WHERE tr.deleted_at IS NULL

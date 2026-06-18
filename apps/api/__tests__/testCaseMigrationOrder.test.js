@@ -33,4 +33,15 @@ describe('test_case migration order', () => {
             expect(loop).toContain("'test_case'");
         }
     });
+
+    test('latest test results view exposes display test case ID separately from UUID', () => {
+        const viewIndex = indexOfOrThrow(dbSource, 'CREATE VIEW v_latest_test_results AS');
+        const viewEndIndex = indexOfOrThrow(dbSource.slice(viewIndex), 'ORDER BY tr.project_id');
+        const viewSource = dbSource.slice(viewIndex, viewIndex + viewEndIndex);
+
+        expect(viewSource).toContain('te.test_case_id AS test_case_uuid');
+        expect(viewSource).toContain('COALESCE(tc.test_case_id, te.test_case_id::text) AS test_case_id');
+        expect(viewSource).toContain('LEFT JOIN test_case tc ON te.test_case_id = tc.id');
+        expect(viewSource).not.toContain('te.test_case_id::text AS test_case_id');
+    });
 });
