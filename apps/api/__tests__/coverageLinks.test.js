@@ -32,6 +32,8 @@ jest.mock('../src/access/artifactLoaders', () => ({
         bug: { load: (...args) => mockLoadArtifact('bug', ...args) },
         test_case: { load: (...args) => mockLoadArtifact('test_case', ...args) },
         user_story: { load: (...args) => mockLoadArtifact('user_story', ...args) },
+        test_suite: { load: (...args) => mockLoadArtifact('test_suite', ...args) },
+        test_run: { load: (...args) => mockLoadArtifact('test_run', ...args) },
     },
 }));
 
@@ -48,6 +50,8 @@ describe('Coverage link router', () => {
     const taskId = '11111111-1111-1111-1111-111111111111';
     const testCaseId = '33333333-3333-3333-3333-333333333333';
     const userStoryId = '77777777-7777-7777-7777-777777777777';
+    const testSuiteId = '66666666-6666-6666-6666-666666666666';
+    const testRunId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
     const linkId = '44444444-4444-4444-4444-444444444444';
 
     const artifactById = () => ({
@@ -55,6 +59,8 @@ describe('Coverage link router', () => {
         [taskId]: { type: 'task', id: taskId, display_id: 'TASK-001', title: 'Fix login', project_id: projectId },
         [testCaseId]: { type: 'test_case', id: testCaseId, display_id: 'TC-001', title: 'Login failure', project_id: projectId },
         [userStoryId]: { type: 'user_story', id: userStoryId, display_id: 'US-001', title: 'Login flow', project_id: projectId },
+        [testSuiteId]: { type: 'test_suite', id: testSuiteId, display_id: 'TS-001', title: 'Regression suite', project_id: projectId },
+        [testRunId]: { type: 'test_run', id: testRunId, display_id: 'TR-001', title: 'Regression run', project_id: projectId },
     });
 
     beforeEach(() => {
@@ -64,6 +70,8 @@ describe('Coverage link router', () => {
         app.use('/test-cases', coverageLinks.testCaseSide);
         app.use('/bugs', coverageLinks.bugSide);
         app.use('/user-stories', coverageLinks.userStorySide);
+        app.use('/test-suites', coverageLinks.testSuiteSide);
+        app.use('/test-runs', coverageLinks.testRunSide);
         jest.clearAllMocks();
         mockCanPerform.mockResolvedValue({ allowed: true, branch: 'test' });
         mockLoadArtifact.mockImplementation((_type, id) => artifactById()[id] || null);
@@ -311,6 +319,86 @@ describe('Coverage link router', () => {
                 artifact: expect.objectContaining({ type: 'task', id: taskId, display_id: 'TASK-001' }),
                 counterpart: expect.objectContaining({ type: 'bug', id: bugId, display_id: 'BUG-001' }),
                 direction: 'to',
+            }),
+            'system'
+        );
+    });
+
+    test('supports task to test run links through the generic router', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: linkId,
+                task_id: taskId,
+                test_run_id: testRunId,
+                relationship_type: 'exercised by',
+                source: 'qc',
+                test_run_display_id: 'TR-001',
+                test_run_title: 'Regression run',
+                test_run_status: 'in_progress',
+                test_run_project_id: projectId,
+            }],
+        });
+
+        const listRes = await request(app).get(`/tasks/${taskId}/test-runs`);
+
+        expect(listRes.status).toBe(200);
+        expect(listRes.body.data[0].test_run_id).toBe(testRunId);
+        expect(mockQuery.mock.calls[0][0]).toContain('FROM task_runs');
+
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: linkId,
+                task_id: taskId,
+                test_run_id: testRunId,
+                relationship_type: 'exercised by',
+                source: 'qc',
+            }],
+        });
+
+        const createRes = await request(app)
+            .post(`/tasks/${taskId}/test-runs`)
+            .send({ test_run_id: testRunId, relationship_type: 'exercised by' });
+
+        expect(createRes.status).toBe(201);
+        expect(mockQuery.mock.calls[0][0]).toContain('ON CONFLICT (task_id, test_run_id) DO UPDATE');
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'task',
+            taskId,
+            'CREATE',
+            expect.objectContaining({
+                link_table: 'task_runs',
+                relationship_type: 'exercised by',
+                counterpart: expect.objectContaining({ type: 'test_run', id: testRunId, display_id: 'TR-001' }),
+            }),
+            null,
+            'system'
+        );
+
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: linkId,
+                task_id: taskId,
+                test_run_id: testRunId,
+                relationship_type: 'exercised by',
+                source: 'qc',
+            }],
+        });
+
+        const deleteRes = await request(app).delete(`/tasks/${taskId}/test-runs/${testRunId}`);
+
+        expect(deleteRes.status).toBe(200);
+        expect(mockQuery.mock.calls[0][0]).toContain('DELETE FROM task_runs');
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'test_run',
+            testRunId,
+            'DELETE',
+            null,
+            expect.objectContaining({
+                link_table: 'task_runs',
+                relationship_type: 'exercised by',
+                counterpart: expect.objectContaining({ type: 'task', id: taskId, display_id: 'TASK-001' }),
             }),
             'system'
         );

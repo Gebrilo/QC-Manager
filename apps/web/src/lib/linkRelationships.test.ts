@@ -12,6 +12,10 @@ describe('linkRelationships', () => {
         expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugTasks.map(option => option.value)).toEqual(['blocks', 'is blocked by', 'relates to']);
         expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugUserStories.map(option => option.value)).toEqual(['affects', 'relates to']);
         expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.testCaseUserStories.map(option => option.value)).toEqual(['verifies', 'relates to']);
+        expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storySuites.map(option => option.value)).toEqual(['validated by', 'relates to']);
+        expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storyRuns.map(option => option.value)).toEqual(['validated by', 'relates to']);
+        expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.taskRuns.map(option => option.value)).toEqual(['exercised by', 'relates to']);
+        expect(LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugRuns.map(option => option.value)).toEqual(['found in', 'relates to']);
     });
 
     test('returns inverse labels for opposite-side rendering', () => {
@@ -19,6 +23,8 @@ describe('linkRelationships', () => {
         expect(getInverseRelationshipLabel('is blocked by')).toBe('blocks');
         expect(getDirectionalRelationshipLabel('covers', 'from')).toBe('covers');
         expect(getDirectionalRelationshipLabel('covers', 'to')).toBe('covered by');
+        expect(getDirectionalRelationshipLabel('validated by', 'to')).toBe('validates');
+        expect(getDirectionalRelationshipLabel('exercised by', 'to')).toBe('exercises');
         expect(getDirectionalRelationshipLabel('relates to', 'to')).toBe('relates to');
     });
 });

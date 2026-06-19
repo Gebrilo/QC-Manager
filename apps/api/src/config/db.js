@@ -2113,6 +2113,66 @@ const runMigrations = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_test_case_id ON test_case_user_stories(test_case_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_user_story_id ON test_case_user_stories(user_story_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS story_suites (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_story_id UUID NOT NULL REFERENCES user_stories(id) ON DELETE CASCADE,
+                test_suite_id UUID NOT NULL REFERENCES test_suites(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'validated by',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_story_id, test_suite_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_story_suites_user_story_id ON story_suites(user_story_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_story_suites_test_suite_id ON story_suites(test_suite_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS story_runs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_story_id UUID NOT NULL REFERENCES user_stories(id) ON DELETE CASCADE,
+                test_run_id UUID NOT NULL REFERENCES test_run(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'validated by',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_story_id, test_run_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_story_runs_user_story_id ON story_runs(user_story_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_story_runs_test_run_id ON story_runs(test_run_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS task_runs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                test_run_id UUID NOT NULL REFERENCES test_run(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'exercised by',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(task_id, test_run_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_runs_task_id ON task_runs(task_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_task_runs_test_run_id ON task_runs(test_run_id)`);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bug_runs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
+                test_run_id UUID NOT NULL REFERENCES test_run(id) ON DELETE CASCADE,
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'found in',
+                source VARCHAR(20) NOT NULL DEFAULT 'qc',
+                created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bug_id, test_run_id)
+            )
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_runs_bug_id ON bug_runs(bug_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_runs_test_run_id ON bug_runs(test_run_id)`);
         await client.query(`
             UPDATE bugs
             SET triage_status = 'triaged'

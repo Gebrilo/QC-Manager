@@ -18,6 +18,7 @@ const ARTIFACT_TABLE_BY_TYPE = Object.freeze({
     task: 'tasks',
     test_case: 'test_case',
     test_execution: 'test_execution',
+    test_run: 'test_run',
     test_suite: 'test_suites',
     user_story: 'user_stories',
 });
@@ -27,6 +28,7 @@ const ARTIFACT_PERMISSION_NAMESPACE = Object.freeze({
     task: 'tasks',
     test_case: 'testcases',
     test_execution: 'testexecutions',
+    test_run: 'testexecutions',
     test_suite: 'testsuites',
     user_story: 'user_stories',
 });

@@ -29,7 +29,7 @@ export interface LinkedArtifactRow {
 export interface LinkedArtifactsSectionConfig {
     title: string;
     emptyLabel: string;
-    artifactType?: 'task' | 'test_case' | 'user_story' | 'bug';
+    artifactType?: 'task' | 'test_case' | 'user_story' | 'bug' | 'test_suite' | 'test_run';
     pickerTitle?: string;
     readOnly?: boolean;
     viewPermission?: string;

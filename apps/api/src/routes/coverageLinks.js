@@ -16,6 +16,8 @@ const TABLES = {
     bugs: { table: 'bugs', key: 'bug_id', title: 'title', deleted: true, artifactType: 'bug', notFound: 'Bug not found' },
     test_case: { table: 'test_case', key: 'test_case_id', title: 'title', deleted: true, artifactType: 'test_case', notFound: 'Test case not found' },
     user_stories: { table: 'user_stories', key: null, title: 'title', deleted: true, artifactType: 'user_story', notFound: 'User story not found' },
+    test_suites: { table: 'test_suites', key: 'suite_id', title: 'name', deleted: true, artifactType: 'test_suite', notFound: 'Test suite not found' },
+    test_run: { table: 'test_run', key: 'run_id', title: 'name', deleted: true, artifactType: 'test_run', notFound: 'Test run not found' },
 };
 
 const pairs = [
@@ -24,6 +26,10 @@ const pairs = [
     { table: 'bug_tasks', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'task_id', toRef: 'tasks', toLabel: 'task', relDefault: getDefaultRelationshipType('bug_tasks') },
     { table: 'bug_user_stories', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: getDefaultRelationshipType('bug_user_stories') },
     { table: 'test_case_user_stories', fromCol: 'test_case_id', fromRef: 'test_case', fromLabel: 'test-case', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: getDefaultRelationshipType('test_case_user_stories') },
+    { table: 'story_suites', fromCol: 'user_story_id', fromRef: 'user_stories', fromLabel: 'user-story', toCol: 'test_suite_id', toRef: 'test_suites', toLabel: 'test-suite', relDefault: getDefaultRelationshipType('story_suites') },
+    { table: 'story_runs', fromCol: 'user_story_id', fromRef: 'user_stories', fromLabel: 'user-story', toCol: 'test_run_id', toRef: 'test_run', toLabel: 'test-run', relDefault: getDefaultRelationshipType('story_runs') },
+    { table: 'task_runs', fromCol: 'task_id', fromRef: 'tasks', fromLabel: 'task', toCol: 'test_run_id', toRef: 'test_run', toLabel: 'test-run', relDefault: getDefaultRelationshipType('task_runs') },
+    { table: 'bug_runs', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'test_run_id', toRef: 'test_run', toLabel: 'test-run', relDefault: getDefaultRelationshipType('bug_runs') },
 ];
 
 function displayExpr(alias, ref) {
@@ -50,6 +56,8 @@ function fields(alias, ref, label) {
 
 function pluralPath(label) {
     if (label === 'user-story') return 'user-stories';
+    if (label === 'test-suite') return 'test-suites';
+    if (label === 'test-run') return 'test-runs';
     return `${label}s`;
 }
 
@@ -280,6 +288,8 @@ const taskSide = express.Router();
 const testCaseSide = express.Router();
 const bugSide = express.Router();
 const userStorySide = express.Router();
+const testSuiteSide = express.Router();
+const testRunSide = express.Router();
 
 for (const pair of pairs) {
     if (pair.fromRef === 'tasks') addRoutes(taskSide, pair, 'from');
@@ -290,6 +300,10 @@ for (const pair of pairs) {
     if (pair.toRef === 'bugs') addRoutes(bugSide, pair, 'to');
     if (pair.fromRef === 'user_stories') addRoutes(userStorySide, pair, 'from');
     if (pair.toRef === 'user_stories') addRoutes(userStorySide, pair, 'to');
+    if (pair.fromRef === 'test_suites') addRoutes(testSuiteSide, pair, 'from');
+    if (pair.toRef === 'test_suites') addRoutes(testSuiteSide, pair, 'to');
+    if (pair.fromRef === 'test_run') addRoutes(testRunSide, pair, 'from');
+    if (pair.toRef === 'test_run') addRoutes(testRunSide, pair, 'to');
 }
 
-module.exports = { taskSide, testCaseSide, bugSide, userStorySide };
+module.exports = { taskSide, testCaseSide, bugSide, userStorySide, testSuiteSide, testRunSide };

@@ -146,7 +146,7 @@ async function loadTestCaseArtifact(testCaseId, user, req) {
 // Suites have no `assigned_to` column — only the creator is the owner.
 async function loadTestSuiteArtifact(suiteId, user, req) {
     const s = await db.query(
-        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope
+        `SELECT id, suite_id, name, project_id, owner_team_id, created_by_user_id, visibility_scope
            FROM test_suites WHERE id = $1 AND deleted_at IS NULL`,
         [suiteId]
     );
@@ -156,12 +156,40 @@ async function loadTestSuiteArtifact(suiteId, user, req) {
     return {
         type: 'test_suite',
         id: row.id,
+        display_id: row.suite_id || row.id,
+        title: row.name || null,
         project_id: row.project_id,
         owner_team_id: row.owner_team_id,
         owner_user_id: row.created_by_user_id,
         assignee_user_id: null,
         assignee_resource_id: null,
         visibility_scope: row.visibility_scope,
+    };
+}
+
+// Test runs use the test-executions permission namespace, but are addressed
+// as first-class link targets/sources by the linking UI.
+async function loadTestRunArtifact(runId, user, req) {
+    const r = await db.query(
+        `SELECT id, run_id, name, project_id, created_by, status
+           FROM test_run WHERE id = $1 AND deleted_at IS NULL`,
+        [runId]
+    );
+    if (r.rows.length === 0) return null;
+    const row = r.rows[0];
+
+    return {
+        type: 'test_run',
+        id: row.id,
+        display_id: row.run_id || row.id,
+        title: row.name || null,
+        project_id: row.project_id,
+        owner_team_id: null,
+        owner_user_id: row.created_by || null,
+        assignee_user_id: null,
+        assignee_resource_id: null,
+        visibility_scope: null,
+        status: row.status || null,
     };
 }
 
@@ -339,6 +367,13 @@ const ARTIFACT_GATES = {
     },
     test_suite: {
         load: loadTestSuiteArtifact,
+        canAccess: async (user, artifact, req) => {
+            const r = await canPerform(user, artifact, 'view', req);
+            return !!r.allowed;
+        },
+    },
+    test_run: {
+        load: loadTestRunArtifact,
         canAccess: async (user, artifact, req) => {
             const r = await canPerform(user, artifact, 'view', req);
             return !!r.allowed;

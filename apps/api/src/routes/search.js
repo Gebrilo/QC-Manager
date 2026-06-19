@@ -3,12 +3,14 @@ const router = express.Router();
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
 
-const SEARCHABLE_TYPES = new Set(['task', 'user_story', 'test_case', 'bug']);
+const SEARCHABLE_TYPES = new Set(['task', 'user_story', 'test_case', 'bug', 'test_suite', 'test_run']);
 const TYPE_PERMISSIONS = {
     task: 'page:tasks',
     user_story: 'page:projects',
     test_case: 'page:test-cases',
     bug: 'page:bugs',
+    test_suite: 'page:test-suites',
+    test_run: 'page:test-executions',
 };
 
 async function getAllowedTypes(req, requestedTypes) {
@@ -157,6 +159,62 @@ function buildSearchQuery({ allowedTypes, includeArchived, projectId }) {
                 OR b.title ILIKE $1
                 OR b.description ILIKE $1
                 OR b.tuleap_artifact_id::text ILIKE $1
+              )
+        `);
+    }
+
+    if (allowedTypes.includes('test_suite')) {
+        fragments.push(`
+            SELECT
+                'test_suite' AS type,
+                ts.id::text AS id,
+                COALESCE(ts.suite_id, ts.id::text) AS display_id,
+                ts.name AS title,
+                p.id::text AS project_id,
+                p.project_name,
+                ts.status,
+                ('/test/suites/' || ts.id::text) AS url,
+                CASE
+                    WHEN ts.suite_id ILIKE $1 THEN 10
+                    WHEN ts.name ILIKE $1 THEN 7
+                    ELSE 1
+                END AS rank
+            FROM test_suites ts
+            LEFT JOIN projects p ON p.id = ts.project_id
+            WHERE ${deletedFilter.replaceAll('deleted_at', 'ts.deleted_at')}
+              ${projectFilter.replaceAll('project_id', 'ts.project_id')}
+              AND (
+                ts.suite_id ILIKE $1
+                OR ts.name ILIKE $1
+                OR ts.description ILIKE $1
+              )
+        `);
+    }
+
+    if (allowedTypes.includes('test_run')) {
+        fragments.push(`
+            SELECT
+                'test_run' AS type,
+                tr.id::text AS id,
+                COALESCE(tr.run_id, tr.id::text) AS display_id,
+                tr.name AS title,
+                p.id::text AS project_id,
+                p.project_name,
+                tr.status,
+                ('/test/runs/' || tr.id::text) AS url,
+                CASE
+                    WHEN tr.run_id ILIKE $1 THEN 10
+                    WHEN tr.name ILIKE $1 THEN 7
+                    ELSE 1
+                END AS rank
+            FROM test_run tr
+            LEFT JOIN projects p ON p.id = tr.project_id
+            WHERE ${deletedFilter.replaceAll('deleted_at', 'tr.deleted_at')}
+              ${projectFilter.replaceAll('project_id', 'tr.project_id')}
+              AND (
+                tr.run_id ILIKE $1
+                OR tr.name ILIKE $1
+                OR tr.description ILIKE $1
               )
         `);
     }

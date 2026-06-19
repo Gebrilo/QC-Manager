@@ -4,6 +4,10 @@ const RELATIONSHIP_TYPES_BY_PAIR = Object.freeze({
     bug_tasks: Object.freeze(['blocks', 'is blocked by', 'relates to']),
     bug_user_stories: Object.freeze(['affects', 'relates to']),
     test_case_user_stories: Object.freeze(['verifies', 'relates to']),
+    story_suites: Object.freeze(['validated by', 'relates to']),
+    story_runs: Object.freeze(['validated by', 'relates to']),
+    task_runs: Object.freeze(['exercised by', 'relates to']),
+    bug_runs: Object.freeze(['found in', 'relates to']),
 });
 
 const INVERSE_RELATIONSHIP_LABELS = Object.freeze({
@@ -15,6 +19,10 @@ const INVERSE_RELATIONSHIP_LABELS = Object.freeze({
     'revealed by': 'reveals',
     'found in': 'finds',
     finds: 'found in',
+    'validated by': 'validates',
+    validates: 'validated by',
+    'exercised by': 'exercises',
+    exercises: 'exercised by',
     blocks: 'is blocked by',
     'is blocked by': 'blocks',
     affects: 'affected by',

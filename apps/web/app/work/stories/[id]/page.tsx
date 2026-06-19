@@ -289,6 +289,68 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
             },
         },
         {
+            title: 'Linked Test Suites',
+            emptyLabel: 'No linked test suites yet.',
+            artifactType: 'test_suite',
+            pickerTitle: 'Link test suites to this user story',
+            viewPermission: 'qc.testsuites.view',
+            editPermission: 'qc.projects.view',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storySuites,
+            relationshipDirection: 'from',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listSuitesForUserStory(story.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_suite_id,
+                    displayId: row.test_suite_display_id || row.test_suite_id.slice(0, 8),
+                    title: row.test_suite_title || '(no title)',
+                    status: row.test_suite_status,
+                    href: `/test/suites/${row.test_suite_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'validated by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addSuiteToUserStory(story.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeSuiteFromUserStory(story.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Test Runs',
+            emptyLabel: 'No linked test runs yet.',
+            artifactType: 'test_run',
+            pickerTitle: 'Link test runs to this user story',
+            viewPermission: 'qc.testexecutions.view',
+            editPermission: 'qc.projects.view',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storyRuns,
+            relationshipDirection: 'from',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listRunsForUserStory(story.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_run_id,
+                    displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
+                    title: row.test_run_title || '(no title)',
+                    status: row.test_run_status,
+                    href: `/test/runs/${row.test_run_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'validated by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addRunToUserStory(story.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeRunFromUserStory(story.id, row.artifactId);
+            },
+        },
+        {
             title: 'Linked Bugs',
             emptyLabel: 'No linked bugs yet.',
             artifactType: 'bug',

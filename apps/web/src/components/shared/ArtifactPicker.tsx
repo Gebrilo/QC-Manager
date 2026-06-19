@@ -25,7 +25,7 @@ export interface ArtifactPickerItem {
 
 interface ArtifactPickerProps {
     open: boolean;
-    artifactType: 'task' | 'test_case' | 'user_story' | 'bug';
+    artifactType: 'task' | 'test_case' | 'user_story' | 'bug' | 'test_suite' | 'test_run';
     title: string;
     projectId?: string | null;
     excludeIds?: string[];

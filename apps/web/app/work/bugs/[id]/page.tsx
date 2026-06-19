@@ -101,6 +101,37 @@ export default function BugDetailPage() {
             },
         },
         {
+            title: 'Linked Test Runs',
+            emptyLabel: 'No directly linked test runs yet.',
+            artifactType: 'test_run',
+            pickerTitle: 'Link test runs to this bug',
+            viewPermission: 'qc.testexecutions.view',
+            editPermission: 'qc.bugs.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugRuns,
+            relationshipDirection: 'from',
+            load: async () => {
+                const response = await bugLinksApi.listRuns(id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_run_id,
+                    displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
+                    title: row.test_run_title || '(no title)',
+                    status: row.test_run_status,
+                    href: `/test/runs/${row.test_run_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'found in',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'found in') => {
+                for (const item of items) {
+                    await bugLinksApi.addRun(id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await bugLinksApi.removeRun(id, row.artifactId);
+            },
+        },
+        {
             title: 'Linked Tasks',
             emptyLabel: 'No linked tasks yet.',
             artifactType: 'task',

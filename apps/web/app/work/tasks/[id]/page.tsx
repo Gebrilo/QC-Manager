@@ -452,6 +452,37 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                 await taskTestCaseLinksApi.removeBugFromTask(taskId, row.artifactId);
             },
         },
+        {
+            title: 'Linked Test Runs',
+            emptyLabel: 'No linked test runs yet.',
+            artifactType: 'test_run',
+            pickerTitle: 'Link test runs to this task',
+            viewPermission: 'qc.testexecutions.view',
+            editPermission: 'qc.tasks.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.taskRuns,
+            relationshipDirection: 'from',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listRunsForTask(taskId);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.test_run_id,
+                    displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
+                    title: row.test_run_title || '(no title)',
+                    status: row.test_run_status,
+                    href: `/test/runs/${row.test_run_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'exercised by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'exercised by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addRunToTask(taskId, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeRunFromTask(taskId, row.artifactId);
+            },
+        },
     ], [taskId]);
 
     return (

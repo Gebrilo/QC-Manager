@@ -12,7 +12,12 @@ describe('link relationship vocabulary', () => {
         expect(getAllowedRelationshipTypes('bug_tasks')).toEqual(['blocks', 'is blocked by', 'relates to']);
         expect(getAllowedRelationshipTypes('bug_user_stories')).toEqual(['affects', 'relates to']);
         expect(getAllowedRelationshipTypes('test_case_user_stories')).toEqual(['verifies', 'relates to']);
+        expect(getAllowedRelationshipTypes('story_suites')).toEqual(['validated by', 'relates to']);
+        expect(getAllowedRelationshipTypes('story_runs')).toEqual(['validated by', 'relates to']);
+        expect(getAllowedRelationshipTypes('task_runs')).toEqual(['exercised by', 'relates to']);
+        expect(getAllowedRelationshipTypes('bug_runs')).toEqual(['found in', 'relates to']);
         expect(getDefaultRelationshipType('bug_tasks')).toBe('blocks');
+        expect(getDefaultRelationshipType('task_runs')).toBe('exercised by');
     });
 
     test('validates types against the pair-specific allowed set', () => {
@@ -27,6 +32,8 @@ describe('link relationship vocabulary', () => {
         expect(getInverseRelationshipLabel('is blocked by')).toBe('blocks');
         expect(getInverseRelationshipLabel('covers')).toBe('covered by');
         expect(getInverseRelationshipLabel('verified by')).toBe('verifies');
+        expect(getInverseRelationshipLabel('validated by')).toBe('validates');
+        expect(getInverseRelationshipLabel('exercised by')).toBe('exercises');
         expect(getInverseRelationshipLabel('relates to')).toBe('relates to');
     });
 });

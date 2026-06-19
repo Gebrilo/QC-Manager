@@ -27,6 +27,22 @@ export const LINK_RELATIONSHIP_OPTIONS_BY_PAIR = {
         { value: 'verifies', label: 'verifies' },
         { value: 'relates to', label: 'relates to' },
     ],
+    storySuites: [
+        { value: 'validated by', label: 'validated by' },
+        { value: 'relates to', label: 'relates to' },
+    ],
+    storyRuns: [
+        { value: 'validated by', label: 'validated by' },
+        { value: 'relates to', label: 'relates to' },
+    ],
+    taskRuns: [
+        { value: 'exercised by', label: 'exercised by' },
+        { value: 'relates to', label: 'relates to' },
+    ],
+    bugRuns: [
+        { value: 'found in', label: 'found in' },
+        { value: 'relates to', label: 'relates to' },
+    ],
 } as const satisfies Record<string, LinkRelationshipOption[]>;
 
 const INVERSE_RELATIONSHIP_LABELS: Record<string, string> = {
@@ -38,6 +54,10 @@ const INVERSE_RELATIONSHIP_LABELS: Record<string, string> = {
     'revealed by': 'reveals',
     'found in': 'finds',
     finds: 'found in',
+    'validated by': 'validates',
+    validates: 'validated by',
+    'exercised by': 'exercises',
+    exercises: 'exercised by',
     blocks: 'is blocked by',
     'is blocked by': 'blocks',
     affects: 'affected by',
