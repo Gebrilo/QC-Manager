@@ -2183,6 +2183,18 @@ export const taskTestCaseLinksApi = {
     removeSuiteFromUserStory: (userStoryId: string, testSuiteId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-suites/${testSuiteId}`, { method: 'DELETE' }),
 
+    listUserStoriesForSuite: (testSuiteId: string) =>
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_suite_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-suites/${testSuiteId}/user-stories`),
+
+    addUserStoryToSuite: (testSuiteId: string, userStoryId: string, relationshipType = 'validated by') =>
+        fetchApi<{ data: { id: string; user_story_id: string; test_suite_id: string; relationship_type: string } }>(`/test-suites/${testSuiteId}/user-stories`, {
+            method: 'POST',
+            body: JSON.stringify({ user_story_id: userStoryId, relationship_type: relationshipType }),
+        }),
+
+    removeUserStoryFromSuite: (testSuiteId: string, userStoryId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-suites/${testSuiteId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
+
     listRunsForUserStory: (userStoryId: string) =>
         fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/user-stories/${userStoryId}/test-runs`),
 
@@ -2195,6 +2207,18 @@ export const taskTestCaseLinksApi = {
     removeRunFromUserStory: (userStoryId: string, testRunId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-runs/${testRunId}`, { method: 'DELETE' }),
 
+    listUserStoriesForRun: (testRunId: string) =>
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/user-stories`),
+
+    addUserStoryToRun: (testRunId: string, userStoryId: string, relationshipType = 'validated by') =>
+        fetchApi<{ data: { id: string; user_story_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/user-stories`, {
+            method: 'POST',
+            body: JSON.stringify({ user_story_id: userStoryId, relationship_type: relationshipType }),
+        }),
+
+    removeUserStoryFromRun: (testRunId: string, userStoryId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-executions/test-runs/${testRunId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
+
     listRunsForTask: (taskId: string) =>
         fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/tasks/${taskId}/test-runs`),
 
@@ -2206,6 +2230,18 @@ export const taskTestCaseLinksApi = {
 
     removeRunFromTask: (taskId: string, testRunId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/test-runs/${testRunId}`, { method: 'DELETE' }),
+
+    listTasksForRun: (testRunId: string) =>
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-executions/test-runs/${testRunId}/tasks`),
+
+    addTaskToRun: (testRunId: string, taskId: string, relationshipType = 'exercised by') =>
+        fetchApi<{ data: { id: string; task_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify({ task_id: taskId, relationship_type: relationshipType }),
+        }),
+
+    removeTaskFromRun: (testRunId: string, taskId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-executions/test-runs/${testRunId}/tasks/${taskId}`, { method: 'DELETE' }),
 };
 
 // ============================================================================
@@ -2272,6 +2308,18 @@ export const bugLinksApi = {
 
     removeRun: (bugId: string, testRunId: string) =>
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-runs/${testRunId}`, { method: 'DELETE' }),
+
+    listBugsForRun: (testRunId: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/bugs`),
+
+    addBugToRun: (testRunId: string, bugId: string, relationshipType = 'found in') =>
+        fetchApi<{ data: { id: string; bug_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/bugs`, {
+            method: 'POST',
+            body: JSON.stringify({ bug_id: bugId, relationship_type: relationshipType }),
+        }),
+
+    removeBugFromRun: (testRunId: string, bugId: string) =>
+        fetchApi<{ success: boolean; message: string }>(`/test-executions/test-runs/${testRunId}/bugs/${bugId}`, { method: 'DELETE' }),
 };
 
 // ============================================================================

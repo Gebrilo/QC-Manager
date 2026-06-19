@@ -1,17 +1,22 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { testRunsApi } from '@/lib/api';
+import { bugLinksApi, fetchApi, taskTestCaseLinksApi, testRunsApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
-import { fetchApi } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import {
+    LinkedArtifactsSection,
+    type LinkedArtifactsSectionConfig,
+} from '@/components/shared/LinkedArtifactsSection';
+import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testRunStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { formatDistanceToNow, format } from 'date-fns';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -305,6 +310,8 @@ export default function TestRunDetailPage() {
                 />
             </div>
 
+            <TestRunLinkedArtifactsSections run={run} />
+
             {selectedIds.size > 0 && (
                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-900/50 rounded-xl p-4 mb-4 flex items-center gap-4">
                     <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{selectedIds.size} selected</span>
@@ -394,6 +401,112 @@ export default function TestRunDetailPage() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
+    const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Linked User Stories',
+            emptyLabel: 'No linked user stories yet.',
+            artifactType: 'user_story',
+            pickerTitle: 'Link user stories to this test run',
+            viewPermission: 'qc.projects.view',
+            editPermission: 'qc.testexecutions.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storyRuns,
+            relationshipDirection: 'to',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listUserStoriesForRun(run.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.user_story_id,
+                    displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
+                    title: row.user_story_title || '(no title)',
+                    status: row.user_story_status,
+                    href: `/work/stories/${row.user_story_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'validated by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addUserStoryToRun(run.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeUserStoryFromRun(run.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Tasks',
+            emptyLabel: 'No linked tasks yet.',
+            artifactType: 'task',
+            pickerTitle: 'Link tasks to this test run',
+            viewPermission: 'qc.tasks.view',
+            editPermission: 'qc.testexecutions.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.taskRuns,
+            relationshipDirection: 'to',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listTasksForRun(run.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.task_id,
+                    displayId: row.task_display_id || row.task_id.slice(0, 8),
+                    title: row.task_title || row.task_name || '(no title)',
+                    status: row.task_status,
+                    href: `/work/tasks/${row.task_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'exercised by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'exercised by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addTaskToRun(run.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeTaskFromRun(run.id, row.artifactId);
+            },
+        },
+        {
+            title: 'Linked Bugs',
+            emptyLabel: 'No linked bugs yet.',
+            artifactType: 'bug',
+            pickerTitle: 'Link bugs to this test run',
+            viewPermission: 'qc.bugs.view',
+            editPermission: 'qc.testexecutions.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugRuns,
+            relationshipDirection: 'to',
+            load: async () => {
+                const response = await bugLinksApi.listBugsForRun(run.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.bug_id,
+                    displayId: row.bug_display_id || row.bug_id.slice(0, 8),
+                    title: row.bug_title || '(no title)',
+                    status: row.bug_status,
+                    href: `/work/bugs/${row.bug_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'found in',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'found in') => {
+                for (const item of items) {
+                    await bugLinksApi.addBugToRun(run.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await bugLinksApi.removeBugFromRun(run.id, row.artifactId);
+            },
+        },
+    ], [run.id]);
+
+    return (
+        <div className="mb-6 space-y-4">
+            {sections.map(section => (
+                <LinkedArtifactsSection key={section.title} config={section} projectId={run.project_id || null} />
+            ))}
         </div>
     );
 }

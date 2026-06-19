@@ -202,6 +202,42 @@ describe('resolveNotificationTarget — test_suite', () => {
     });
 });
 
+describe('resolveNotificationTarget — test_run', () => {
+    function mockTestRunFound() {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: 'run-1',
+                run_id: 'TR-001',
+                name: 'Regression run',
+                project_id: 'p1',
+                created_by: 'run-owner',
+                status: 'in_progress',
+            }],
+        });
+    }
+
+    test('ok + href when the user may view the test run', async () => {
+        mockTestRunFound();
+        mockCanPerform.mockResolvedValue({ allowed: true });
+        const out = await resolveNotificationTarget(user, { entity_type: 'test_run', entity_id: 'run-1' }, {});
+        expect(out).toEqual({ status: 'ok', href: '/test/runs/run-1' });
+    });
+
+    test('forbidden + null href when the user may not view the test run', async () => {
+        mockTestRunFound();
+        mockCanPerform.mockResolvedValue({ allowed: false });
+        const out = await resolveNotificationTarget(user, { entity_type: 'test_run', entity_id: 'run-1' }, {});
+        expect(out).toEqual({ status: 'forbidden', href: null });
+    });
+
+    test('gone when the test run no longer exists', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+        const out = await resolveNotificationTarget(user, { entity_type: 'test_run', entity_id: 'run-1' }, {});
+        expect(out).toEqual({ status: 'gone', href: null });
+        expect(mockCanPerform).not.toHaveBeenCalled();
+    });
+});
+
 describe('resolveNotificationTarget — test_execution', () => {
     function mockTestExecutionFound() {
         // The artifact loader runs a JOIN query (test_execution + test_run).

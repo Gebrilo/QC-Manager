@@ -11,6 +11,7 @@ const STATIC_LINK_BUILDERS = {
     user_story: id => `/work/stories/${id}`,
     test_case: id => `/test/cases/${id}`,
     test_suite: id => `/test/suites/${id}`,
+    test_run: id => `/test/runs/${id}`,
     project: id => `/work/projects/${id}`,
     resource: id => `/team/resources/${id}`,
     user: id => `/admin/users?focus=${id}`,

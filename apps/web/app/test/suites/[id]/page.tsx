@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TestSuite, SuiteTestCase } from '@/types';
-import { testSuitesApi } from '@/lib/api';
+import { taskTestCaseLinksApi, testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { ConfirmDialog, useConfirm } from '@/components/ui/ConfirmDialog';
+import {
+    LinkedArtifactsSection,
+    type LinkedArtifactsSectionConfig,
+} from '@/components/shared/LinkedArtifactsSection';
+import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testSuiteStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -380,6 +386,8 @@ export default function TestSuiteDetailPage() {
                             </div>
                         )}
                     </QCCard>
+
+                    <TestSuiteLinkedArtifactsSections suite={suite} />
                 </div>
 
                 {/* Right column (1/3) */}
@@ -444,5 +452,49 @@ export default function TestSuiteDetailPage() {
             />
         </ConfirmDialog>
         </>
+    );
+}
+
+function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite }) {
+    const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Linked User Stories',
+            emptyLabel: 'No linked user stories yet.',
+            artifactType: 'user_story',
+            pickerTitle: 'Link user stories to this test suite',
+            viewPermission: 'qc.projects.view',
+            editPermission: 'qc.testsuites.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.storySuites,
+            relationshipDirection: 'to',
+            load: async () => {
+                const response = await taskTestCaseLinksApi.listUserStoriesForSuite(suite.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.user_story_id,
+                    displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
+                    title: row.user_story_title || '(no title)',
+                    status: row.user_story_status,
+                    href: `/work/stories/${row.user_story_id}`,
+                    source: row.source || 'qc',
+                    relationshipType: row.relationship_type || 'validated by',
+                }));
+            },
+            add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
+                for (const item of items) {
+                    await taskTestCaseLinksApi.addUserStoryToSuite(suite.id, item.id, relationshipType);
+                }
+            },
+            remove: async (row) => {
+                await taskTestCaseLinksApi.removeUserStoryFromSuite(suite.id, row.artifactId);
+            },
+        },
+    ], [suite.id]);
+
+    return (
+        <div className="space-y-5">
+            {sections.map(section => (
+                <LinkedArtifactsSection key={section.title} config={section} projectId={suite.project_id || null} />
+            ))}
+        </div>
     );
 }
