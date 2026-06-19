@@ -1,19 +1,21 @@
 const express = require('express');
 const db = require('../config/db');
 const pool = db.pool;
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth } = require('../middleware/authMiddleware');
 const { auditLog } = require('../middleware/audit');
 const {
     getAllowedRelationshipTypes,
     getDefaultRelationshipType,
     isAllowedRelationshipType,
 } = require('../utils/linkRelationships');
+const { canPerform } = require('../access/AccessEngine');
+const { ARTIFACT_GATES } = require('../access/artifactLoaders');
 
 const TABLES = {
-    tasks: { table: 'tasks', key: 'task_id', title: 'task_name', deleted: true, view: 'qc.tasks.view', edit: 'qc.tasks.edit', notFound: 'Task not found' },
-    bugs: { table: 'bugs', key: 'bug_id', title: 'title', deleted: true, view: 'qc.bugs.view', edit: 'qc.bugs.edit', notFound: 'Bug not found' },
-    test_case: { table: 'test_case', key: 'test_case_id', title: 'title', deleted: true, view: 'qc.testcases.view', edit: 'qc.testcases.edit', notFound: 'Test case not found' },
-    user_stories: { table: 'user_stories', key: null, title: 'title', deleted: true, view: 'qc.projects.view', edit: 'qc.projects.view', notFound: 'User story not found' },
+    tasks: { table: 'tasks', key: 'task_id', title: 'task_name', deleted: true, artifactType: 'task', notFound: 'Task not found' },
+    bugs: { table: 'bugs', key: 'bug_id', title: 'title', deleted: true, artifactType: 'bug', notFound: 'Bug not found' },
+    test_case: { table: 'test_case', key: 'test_case_id', title: 'title', deleted: true, artifactType: 'test_case', notFound: 'Test case not found' },
+    user_stories: { table: 'user_stories', key: null, title: 'title', deleted: true, artifactType: 'user_story', notFound: 'User story not found' },
 };
 
 const pairs = [
@@ -51,11 +53,22 @@ function pluralPath(label) {
     return `${label}s`;
 }
 
-async function getArtifact(ref, id) {
-    const meta = TABLES[ref];
-    const deletedClause = meta.deleted ? 'AND deleted_at IS NULL' : '';
-    const result = await pool.query(`SELECT id, project_id FROM ${meta.table} WHERE id = $1 ${deletedClause}`, [id]);
-    return result.rows[0] || null;
+async function getArtifact(ref, id, user, req) {
+    const gate = ARTIFACT_GATES[TABLES[ref].artifactType];
+    return gate ? gate.load(id, user, req) : null;
+}
+
+async function authorizeArtifact(req, res, artifact, verb) {
+    const result = await canPerform(req.user, artifact, verb, req);
+    if (!result.allowed) {
+        res.status(403).json({ error: 'Access denied', reason: result.reason });
+        return false;
+    }
+    return true;
+}
+
+function isCrossProject(own, other) {
+    return (own.project_id || null) !== (other.project_id || null);
 }
 
 function addRoutes(router, pair, side) {
@@ -72,11 +85,12 @@ function addRoutes(router, pair, side) {
     const ownParam = 'id';
     const otherParam = otherCol.replace(/_id$/, 'Id').replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
-    router.get(`/:${ownParam}/${otherPath}`, requireAuth, requirePermission(ownMeta.view), async (req, res, next) => {
+    router.get(`/:${ownParam}/${otherPath}`, requireAuth, async (req, res, next) => {
         try {
             const ownId = req.params[ownParam];
-            const own = await getArtifact(ownRef, ownId);
+            const own = await getArtifact(ownRef, ownId, req.user, req);
             if (!own) return res.status(404).json({ error: ownMeta.notFound });
+            if (!(await authorizeArtifact(req, res, own, 'view'))) return;
 
             const result = await pool.query(
                 `SELECT lk.id, lk.${pair.fromCol}, lk.${pair.toCol}, lk.relationship_type, lk.source, lk.created_at,
@@ -94,7 +108,7 @@ function addRoutes(router, pair, side) {
         }
     });
 
-    router.post(`/:${ownParam}/${otherPath}`, requireAuth, requirePermission(ownMeta.edit), async (req, res, next) => {
+    router.post(`/:${ownParam}/${otherPath}`, requireAuth, async (req, res, next) => {
         try {
             const ownId = req.params[ownParam];
             const otherId = req.body[otherCol];
@@ -107,11 +121,13 @@ function addRoutes(router, pair, side) {
                 });
             }
 
-            const own = await getArtifact(ownRef, ownId);
+            const own = await getArtifact(ownRef, ownId, req.user, req);
             if (!own) return res.status(404).json({ error: ownMeta.notFound });
-            const other = await getArtifact(otherRef, otherId);
+            if (!(await authorizeArtifact(req, res, own, 'edit'))) return;
+            const other = await getArtifact(otherRef, otherId, req.user, req);
             if (!other) return res.status(404).json({ error: otherMeta.notFound });
-            if (own.project_id && other.project_id && own.project_id !== other.project_id) {
+            if (!(await authorizeArtifact(req, res, other, 'view'))) return;
+            if (isCrossProject(own, other)) {
                 return res.status(422).json({ error: 'Cross-project link rejected' });
             }
 
@@ -138,10 +154,14 @@ function addRoutes(router, pair, side) {
         }
     });
 
-    router.delete(`/:${ownParam}/${otherPath}/:${otherParam}`, requireAuth, requirePermission(ownMeta.edit), async (req, res, next) => {
+    router.delete(`/:${ownParam}/${otherPath}/:${otherParam}`, requireAuth, async (req, res, next) => {
         try {
             const ownId = req.params[ownParam];
             const otherId = req.params[otherParam];
+            const own = await getArtifact(ownRef, ownId, req.user, req);
+            if (!own) return res.status(404).json({ error: ownMeta.notFound });
+            if (!(await authorizeArtifact(req, res, own, 'edit'))) return;
+
             const fromId = isFrom ? ownId : otherId;
             const toId = isFrom ? otherId : ownId;
 
