@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { taskStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { QCCard, SectionLabel } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -396,6 +397,8 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
             pickerTitle: 'Link test cases to this task',
             viewPermission: 'qc.testcases.view',
             editPermission: 'qc.tasks.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.taskTestCases,
+            relationshipDirection: 'from',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listTestCases(taskId);
                 return response.data.map(row => ({
@@ -409,9 +412,9 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                     relationshipType: row.relationship_type || 'covers',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'covers') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addTestCase(taskId, item.id, 'covers');
+                    await taskTestCaseLinksApi.addTestCase(taskId, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -425,6 +428,8 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
             pickerTitle: 'Link bugs to this task',
             viewPermission: 'qc.bugs.view',
             editPermission: 'qc.tasks.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugTasks,
+            relationshipDirection: 'to',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listBugsForTask(taskId);
                 return response.data.map(row => ({
@@ -438,9 +443,9 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                     relationshipType: row.relationship_type || 'blocks',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'blocks') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addBugToTask(taskId, item.id, 'blocks');
+                    await taskTestCaseLinksApi.addBugToTask(taskId, item.id, relationshipType);
                 }
             },
             remove: async (row) => {

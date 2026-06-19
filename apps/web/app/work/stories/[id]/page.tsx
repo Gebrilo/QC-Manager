@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { storyStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -263,6 +264,8 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
             pickerTitle: 'Link test cases to this user story',
             viewPermission: 'qc.testcases.view',
             editPermission: 'qc.projects.view',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.testCaseUserStories,
+            relationshipDirection: 'to',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listTestCasesForUserStory(story.id);
                 return response.data.map(row => ({
@@ -276,9 +279,9 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     relationshipType: row.relationship_type || 'verifies',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'verifies') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addTestCaseToUserStory(story.id, item.id, 'verifies');
+                    await taskTestCaseLinksApi.addTestCaseToUserStory(story.id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -292,6 +295,8 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
             pickerTitle: 'Link bugs to this user story',
             viewPermission: 'qc.bugs.view',
             editPermission: 'qc.projects.view',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugUserStories,
+            relationshipDirection: 'to',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listBugsForUserStory(story.id);
                 return response.data.map(row => ({
@@ -305,9 +310,9 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     relationshipType: row.relationship_type || 'affects',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'affects') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addBugToUserStory(story.id, item.id, 'affects');
+                    await taskTestCaseLinksApi.addBugToUserStory(story.id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {

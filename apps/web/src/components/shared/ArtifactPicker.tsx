@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { searchApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import {
+    getDirectionalRelationshipLabel,
+    type LinkRelationshipDirection,
+    type LinkRelationshipOption,
+} from '@/lib/linkRelationships';
 import { X } from 'lucide-react';
 
 export interface ArtifactPickerItem {
@@ -23,8 +29,10 @@ interface ArtifactPickerProps {
     title: string;
     projectId?: string | null;
     excludeIds?: string[];
+    relationshipOptions?: readonly LinkRelationshipOption[];
+    relationshipDirection?: LinkRelationshipDirection;
     onClose: () => void;
-    onConfirm: (items: ArtifactPickerItem[]) => Promise<void>;
+    onConfirm: (items: ArtifactPickerItem[], relationshipType?: string) => Promise<void>;
 }
 
 export function ArtifactPicker({
@@ -33,6 +41,8 @@ export function ArtifactPicker({
     title,
     projectId,
     excludeIds = [],
+    relationshipOptions = [],
+    relationshipDirection = 'from',
     onClose,
     onConfirm,
 }: ArtifactPickerProps) {
@@ -40,6 +50,7 @@ export function ArtifactPicker({
     const [items, setItems] = useState<ArtifactPickerItem[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [hideLinked, setHideLinked] = useState(true);
+    const [selectedRelationshipType, setSelectedRelationshipType] = useState(relationshipOptions[0]?.value || '');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -52,6 +63,11 @@ export function ArtifactPicker({
             setError(null);
         }
     }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        setSelectedRelationshipType(relationshipOptions[0]?.value || '');
+    }, [open, relationshipOptions]);
 
     useEffect(() => {
         if (!open || query.trim().length < 2) {
@@ -91,6 +107,10 @@ export function ArtifactPicker({
     }, [excludeIds, hideLinked, items]);
 
     const selectedItems = visibleItems.filter(item => selectedIds.includes(item.id));
+    const relationshipSelectOptions = relationshipOptions.map(option => ({
+        value: option.value,
+        label: getDirectionalRelationshipLabel(option.value, relationshipDirection),
+    }));
 
     const toggleSelected = (id: string) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
@@ -101,7 +121,7 @@ export function ArtifactPicker({
         setSubmitting(true);
         setError(null);
         try {
-            await onConfirm(selectedItems);
+            await onConfirm(selectedItems, selectedRelationshipType || relationshipOptions[0]?.value);
             onClose();
         } catch (err: any) {
             setError(err.message || 'Could not add links');
@@ -134,6 +154,15 @@ export function ArtifactPicker({
                         placeholder="Search by ID or title"
                         autoFocus
                     />
+
+                    {relationshipSelectOptions.length > 0 && (
+                        <Select
+                            label="Relationship"
+                            value={selectedRelationshipType}
+                            onChange={event => setSelectedRelationshipType(event.target.value)}
+                            options={relationshipSelectOptions}
+                        />
+                    )}
 
                     <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                         <input

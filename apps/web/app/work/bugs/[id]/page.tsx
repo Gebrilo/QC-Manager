@@ -16,6 +16,7 @@ import { SyncPanel } from '@/components/shared/SyncPanel';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { bugStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { useToast } from '@/components/ui/Toast';
@@ -106,6 +107,8 @@ export default function BugDetailPage() {
             pickerTitle: 'Link tasks to this bug',
             viewPermission: 'qc.tasks.view',
             editPermission: 'qc.bugs.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugTasks,
+            relationshipDirection: 'from',
             load: async () => {
                 const response = await bugLinksApi.listTasks(id);
                 return response.data.map(row => ({
@@ -119,9 +122,9 @@ export default function BugDetailPage() {
                     relationshipType: row.relationship_type || 'blocks',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'blocks') => {
                 for (const item of items) {
-                    await bugLinksApi.addTask(id, item.id, 'blocks');
+                    await bugLinksApi.addTask(id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -135,6 +138,8 @@ export default function BugDetailPage() {
             pickerTitle: 'Link test cases to this bug',
             viewPermission: 'qc.testcases.view',
             editPermission: 'qc.bugs.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugTestCases,
+            relationshipDirection: 'from',
             load: async () => {
                 const response = await bugLinksApi.listTestCases(id);
                 return response.data.map(row => ({
@@ -148,9 +153,9 @@ export default function BugDetailPage() {
                     relationshipType: row.relationship_type || 'reveals',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'reveals') => {
                 for (const item of items) {
-                    await bugLinksApi.addTestCase(id, item.id, 'reveals');
+                    await bugLinksApi.addTestCase(id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -164,6 +169,8 @@ export default function BugDetailPage() {
             pickerTitle: 'Link user stories to this bug',
             viewPermission: 'qc.projects.view',
             editPermission: 'qc.bugs.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugUserStories,
+            relationshipDirection: 'from',
             load: async () => {
                 const response = await bugLinksApi.listUserStories(id);
                 return response.data.map(row => ({
@@ -177,9 +184,9 @@ export default function BugDetailPage() {
                     relationshipType: row.relationship_type || 'affects',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'affects') => {
                 for (const item of items) {
-                    await bugLinksApi.addUserStory(id, item.id, 'affects');
+                    await bugLinksApi.addUserStory(id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {

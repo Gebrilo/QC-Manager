@@ -3,6 +3,11 @@ const db = require('../config/db');
 const pool = db.pool;
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { auditLog } = require('../middleware/audit');
+const {
+    getAllowedRelationshipTypes,
+    getDefaultRelationshipType,
+    isAllowedRelationshipType,
+} = require('../utils/linkRelationships');
 
 const TABLES = {
     tasks: { table: 'tasks', key: 'task_id', title: 'task_name', deleted: true, view: 'qc.tasks.view', edit: 'qc.tasks.edit', notFound: 'Task not found' },
@@ -12,11 +17,11 @@ const TABLES = {
 };
 
 const pairs = [
-    { table: 'task_test_cases', fromCol: 'task_id', fromRef: 'tasks', fromLabel: 'task', toCol: 'test_case_id', toRef: 'test_case', toLabel: 'test-case', relDefault: 'covers' },
-    { table: 'bug_test_cases', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'test_case_id', toRef: 'test_case', toLabel: 'test-case', relDefault: 'reveals' },
-    { table: 'bug_tasks', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'task_id', toRef: 'tasks', toLabel: 'task', relDefault: 'blocks' },
-    { table: 'bug_user_stories', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: 'affects' },
-    { table: 'test_case_user_stories', fromCol: 'test_case_id', fromRef: 'test_case', fromLabel: 'test-case', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: 'verifies' },
+    { table: 'task_test_cases', fromCol: 'task_id', fromRef: 'tasks', fromLabel: 'task', toCol: 'test_case_id', toRef: 'test_case', toLabel: 'test-case', relDefault: getDefaultRelationshipType('task_test_cases') },
+    { table: 'bug_test_cases', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'test_case_id', toRef: 'test_case', toLabel: 'test-case', relDefault: getDefaultRelationshipType('bug_test_cases') },
+    { table: 'bug_tasks', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'task_id', toRef: 'tasks', toLabel: 'task', relDefault: getDefaultRelationshipType('bug_tasks') },
+    { table: 'bug_user_stories', fromCol: 'bug_id', fromRef: 'bugs', fromLabel: 'bug', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: getDefaultRelationshipType('bug_user_stories') },
+    { table: 'test_case_user_stories', fromCol: 'test_case_id', fromRef: 'test_case', fromLabel: 'test-case', toCol: 'user_story_id', toRef: 'user_stories', toLabel: 'user-story', relDefault: getDefaultRelationshipType('test_case_user_stories') },
 ];
 
 function displayExpr(alias, ref) {
@@ -93,8 +98,14 @@ function addRoutes(router, pair, side) {
         try {
             const ownId = req.params[ownParam];
             const otherId = req.body[otherCol];
-            const relationshipType = req.body.relationship_type || pair.relDefault;
+            const relationshipType = req.body.relationship_type ?? pair.relDefault;
             if (!otherId) return res.status(400).json({ error: `${otherCol} is required` });
+            if (!isAllowedRelationshipType(pair.table, relationshipType)) {
+                return res.status(422).json({
+                    error: 'Invalid relationship_type',
+                    allowed: getAllowedRelationshipTypes(pair.table),
+                });
+            }
 
             const own = await getArtifact(ownRef, ownId);
             if (!own) return res.status(404).json({ error: ownMeta.notFound });
@@ -109,11 +120,11 @@ function addRoutes(router, pair, side) {
             const result = await pool.query(
                 `INSERT INTO ${pair.table} (${pair.fromCol}, ${pair.toCol}, relationship_type, source, created_by)
                  VALUES ($1, $2, $3, 'qc', $4)
-                 ON CONFLICT (${pair.fromCol}, ${pair.toCol}) DO NOTHING
+                 ON CONFLICT (${pair.fromCol}, ${pair.toCol}) DO UPDATE
+                 SET relationship_type = EXCLUDED.relationship_type
                  RETURNING *`,
                 [fromId, toId, relationshipType, req.user?.id || null]
             );
-            if (result.rows.length === 0) return res.status(409).json({ error: 'Link already exists' });
 
             if (pair.fromRef === 'bugs' || pair.toRef === 'bugs') {
                 const bugId = pair.fromRef === 'bugs' ? fromId : toId;

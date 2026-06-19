@@ -64,13 +64,16 @@ test('bug detail renders provenance and all linked artifact panels', async ({ pa
 
     await page.goto(`/work/bugs/${bugId}`);
 
-    await expect(page.getByRole('heading', { name: 'Checkout fails' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Checkout fails' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('heading', { name: 'Linked Tasks' })).toBeVisible();
     await expect(page.getByText('TSK-001 - Fix checkout')).toBeVisible();
+    await expect(page.getByText('blocks')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Linked Test Cases' })).toBeVisible();
     await expect(page.getByText('TC-001 - Checkout regression')).toBeVisible();
+    await expect(page.getByText('reveals')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Linked User Stories' })).toBeVisible();
     await expect(page.getByText('US-77 - Buyer checks out')).toBeVisible();
+    await expect(page.getByText('affects')).toBeVisible();
 });
 
 test('task detail renders linked test cases and bugs', async ({ page }) => {
@@ -97,8 +100,17 @@ test('task detail renders linked test cases and bugs', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Fix checkout' })).toBeVisible();
     await expect(page.getByText('Parent user story')).toBeVisible();
     await expect(page.getByText('TC-001 - Checkout regression')).toBeVisible();
+    await expect(page.getByText('covers')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Linked Bugs' })).toBeVisible();
     await expect(page.getByText('BUG-001 - Checkout fails')).toBeVisible();
+    await expect(page.getByText('is blocked by')).toBeVisible();
+
+    await page
+        .getByRole('heading', { name: 'Linked Test Cases' })
+        .locator('xpath=ancestor::section')
+        .getByRole('button', { name: 'Add' })
+        .click();
+    await expect(page.getByLabel('Relationship')).toHaveValue('covers');
 });
 
 test('test case detail renders upstream and downstream artifact panels', async ({ page }) => {
@@ -130,8 +142,11 @@ test('test case detail renders upstream and downstream artifact panels', async (
 
     await expect(page.getByRole('heading', { name: 'Linked User Stories' })).toBeVisible();
     await expect(page.getByText('US-77 - Buyer checks out')).toBeVisible();
+    await expect(page.getByText('verifies')).toBeVisible();
     await expect(page.getByText('TSK-001 - Fix checkout')).toBeVisible();
+    await expect(page.getByText('covered by')).toBeVisible();
     await expect(page.getByText('BUG-001 - Checkout fails')).toBeVisible();
+    await expect(page.getByText('revealed by')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Containing Test Suites' })).toBeVisible();
     await expect(page.getByText('TS-001 - Release smoke')).toBeVisible();
 });
@@ -168,5 +183,7 @@ test('user story detail renders child tasks, test cases, and bugs', async ({ pag
     await expect(page.getByRole('heading', { name: 'Child Tasks' })).toBeVisible();
     await expect(page.getByText('TSK-001 - Fix checkout')).toBeVisible();
     await expect(page.getByText('TC-001 - Checkout regression')).toBeVisible();
+    await expect(page.getByText('verified by')).toBeVisible();
     await expect(page.getByText('BUG-001 - Checkout fails')).toBeVisible();
+    await expect(page.getByText('affected by')).toBeVisible();
 });

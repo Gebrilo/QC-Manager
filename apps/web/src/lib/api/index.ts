@@ -2192,7 +2192,7 @@ export const bugLinksApi = {
     listTasks: (bugId: string) =>
         fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
 
-    addTask: (bugId: string, taskId: string, relationshipType = 'reported_against') =>
+    addTask: (bugId: string, taskId: string, relationshipType = 'blocks') =>
         fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/bugs/${bugId}/tasks`, {
             method: 'POST',
             body: JSON.stringify({ task_id: taskId, relationship_type: relationshipType }),

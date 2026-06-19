@@ -2057,13 +2057,14 @@ const runMigrations = async () => {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 bug_id UUID NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
                 task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                relationship_type VARCHAR(50) NOT NULL DEFAULT 'reported_against',
+                relationship_type VARCHAR(50) NOT NULL DEFAULT 'blocks',
                 source VARCHAR(20) NOT NULL DEFAULT 'qc',
                 created_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(bug_id, task_id)
             )
         `);
+        await client.query(`ALTER TABLE bug_tasks ALTER COLUMN relationship_type SET DEFAULT 'blocks'`);
         await client.query(`ALTER TABLE bug_tasks ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'qc'`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_bug_id ON bug_tasks(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_task_id ON bug_tasks(task_id)`);

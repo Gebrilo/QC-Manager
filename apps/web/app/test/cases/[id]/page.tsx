@@ -19,6 +19,7 @@ import type { ArtifactPickerItem } from '@/components/shared/ArtifactPicker';
 import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testCaseStatusRegistry } from '@/lib/statusRegistry';
+import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -313,6 +314,8 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
             pickerTitle: 'Link user stories to this test case',
             viewPermission: 'qc.projects.view',
             editPermission: 'qc.testcases.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.testCaseUserStories,
+            relationshipDirection: 'from',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listUserStoriesForTestCase(testCase.id);
                 return response.data.map(row => ({
@@ -326,9 +329,9 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     relationshipType: row.relationship_type || 'verifies',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'verifies') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addUserStoryToTestCase(testCase.id, item.id, 'verifies');
+                    await taskTestCaseLinksApi.addUserStoryToTestCase(testCase.id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -342,6 +345,8 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
             pickerTitle: 'Link tasks to this test case',
             viewPermission: 'qc.tasks.view',
             editPermission: 'qc.testcases.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.taskTestCases,
+            relationshipDirection: 'to',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listTasks(testCase.id);
                 return response.data.map(row => ({
@@ -355,9 +360,9 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     relationshipType: row.relationship_type || 'covers',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'covers') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addTask(testCase.id, item.id, 'covers');
+                    await taskTestCaseLinksApi.addTask(testCase.id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {
@@ -371,6 +376,8 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
             pickerTitle: 'Link bugs to this test case',
             viewPermission: 'qc.bugs.view',
             editPermission: 'qc.testcases.edit',
+            relationshipOptions: LINK_RELATIONSHIP_OPTIONS_BY_PAIR.bugTestCases,
+            relationshipDirection: 'to',
             load: async () => {
                 const response = await taskTestCaseLinksApi.listBugsForTestCase(testCase.id);
                 return response.data.map(row => ({
@@ -384,9 +391,9 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     relationshipType: row.relationship_type || 'reveals',
                 }));
             },
-            add: async (items: ArtifactPickerItem[]) => {
+            add: async (items: ArtifactPickerItem[], relationshipType = 'reveals') => {
                 for (const item of items) {
-                    await taskTestCaseLinksApi.addBugToTestCase(testCase.id, item.id, 'reveals');
+                    await taskTestCaseLinksApi.addBugToTestCase(testCase.id, item.id, relationshipType);
                 }
             },
             remove: async (row) => {

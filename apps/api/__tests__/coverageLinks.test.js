@@ -93,6 +93,42 @@ describe('Coverage link router', () => {
         expect(mockQuery.mock.calls[3][0]).toContain("triage_status = 'triaged'");
     });
 
+    test('rejects relationship types outside the pair allowed set', async () => {
+        const res = await request(app)
+            .post(`/bugs/${bugId}/tasks`)
+            .send({ task_id: taskId, relationship_type: 'found in' });
+
+        expect(res.status).toBe(422);
+        expect(res.body.error).toBe('Invalid relationship_type');
+        expect(res.body.allowed).toEqual(['blocks', 'is blocked by', 'relates to']);
+        expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test('updates the relationship type when the directed link already exists', async () => {
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: bugId, project_id: projectId }] })
+            .mockResolvedValueOnce({ rows: [{ id: taskId, project_id: projectId }] })
+            .mockResolvedValueOnce({
+                rows: [{
+                    id: linkId,
+                    bug_id: bugId,
+                    task_id: taskId,
+                    relationship_type: 'relates to',
+                    source: 'qc',
+                }],
+            })
+            .mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(app)
+            .post(`/bugs/${bugId}/tasks`)
+            .send({ task_id: taskId, relationship_type: 'relates to' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.relationship_type).toBe('relates to');
+        expect(mockQuery.mock.calls[2][0]).toContain('ON CONFLICT (bug_id, task_id) DO UPDATE');
+        expect(mockQuery.mock.calls[2][0]).toContain('relationship_type = EXCLUDED.relationship_type');
+    });
+
     test('rejects cross-project links', async () => {
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: bugId, project_id: projectId }] })

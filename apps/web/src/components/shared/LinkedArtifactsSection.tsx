@@ -7,6 +7,11 @@ import { ArtifactPicker, ArtifactPickerItem } from './ArtifactPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/components/providers/AuthProvider';
+import {
+    getDirectionalRelationshipLabel,
+    type LinkRelationshipDirection,
+    type LinkRelationshipOption,
+} from '@/lib/linkRelationships';
 
 export interface LinkedArtifactRow {
     id: string;
@@ -29,9 +34,11 @@ export interface LinkedArtifactsSectionConfig {
     readOnly?: boolean;
     viewPermission?: string;
     editPermission?: string;
+    relationshipOptions?: readonly LinkRelationshipOption[];
+    relationshipDirection?: LinkRelationshipDirection;
     addLabel?: string;
     load: () => Promise<LinkedArtifactRow[]>;
-    add?: (items: ArtifactPickerItem[]) => Promise<void>;
+    add?: (items: ArtifactPickerItem[], relationshipType?: string) => Promise<void>;
     remove?: (row: LinkedArtifactRow) => Promise<void>;
 }
 
@@ -62,9 +69,9 @@ export function LinkedArtifactsSection({ config, projectId }: LinkedArtifactsSec
 
     useEffect(() => { load(); }, [load]);
 
-    const addItems = async (items: ArtifactPickerItem[]) => {
+    const addItems = async (items: ArtifactPickerItem[], relationshipType?: string) => {
         if (!config.add) return;
-        await config.add(items);
+        await config.add(items, relationshipType);
         await load();
     };
 
@@ -144,7 +151,9 @@ export function LinkedArtifactsSection({ config, projectId }: LinkedArtifactsSec
                                     )}
                                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                         {row.status && <span>{row.status}</span>}
-                                        {row.relationshipType && <span>{row.relationshipType}</span>}
+                                        {row.relationshipType && (
+                                            <span>{getDirectionalRelationshipLabel(row.relationshipType, config.relationshipDirection || 'from')}</span>
+                                        )}
                                         {row.meta && <span>{row.meta}</span>}
                                     </div>
                                 </div>
@@ -180,6 +189,8 @@ export function LinkedArtifactsSection({ config, projectId }: LinkedArtifactsSec
                     title={config.pickerTitle || `Add ${config.title}`}
                     projectId={projectId}
                     excludeIds={rows.map(row => row.artifactId)}
+                    relationshipOptions={config.relationshipOptions}
+                    relationshipDirection={config.relationshipDirection}
                     onClose={() => setPickerOpen(false)}
                     onConfirm={addItems}
                 />
