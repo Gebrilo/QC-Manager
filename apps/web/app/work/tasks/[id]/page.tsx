@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchApi, taskTestCaseLinksApi } from '@/lib/api';
+import { fetchApi, taskTestCaseLinksApi, userStoriesApi } from '@/lib/api';
 import { Task } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -375,7 +375,7 @@ export default function TaskDetailPage() {
             </div>
 
             {/* ── Linked Artifacts ────────────────────────────────────── */}
-            <TaskLinkedArtifactsSections taskId={task.id} projectId={task.project_id || null} />
+            <TaskLinkedArtifactsSections task={task} />
 
             <AttachmentSection
                 artifactType="task"
@@ -388,8 +388,32 @@ export default function TaskDetailPage() {
 
 // ── Linked artifacts ─────────────────────────────────────────────────────────
 
-function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; projectId: string | null }) {
+function TaskLinkedArtifactsSections({ task }: { task: Task }) {
+    const taskId = task.id;
+    const projectId = task.project_id || null;
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Parent User Story',
+            emptyLabel: 'No parent user story.',
+            readOnly: true,
+            viewPermission: 'qc.projects.view',
+            load: async () => {
+                if (!task.parent_user_story_id) return [];
+                const story = await userStoriesApi.get(task.parent_user_story_id);
+                const displayId = story.tuleap_artifact_id ? `US-${story.tuleap_artifact_id}` : story.id.slice(0, 8);
+                return [{
+                    id: `parent-story-${story.id}`,
+                    artifactId: story.id,
+                    displayId,
+                    title: story.title || '(no title)',
+                    status: story.status,
+                    href: `/work/stories/${story.id}`,
+                    source: 'qc' as const,
+                    relationshipType: 'child of',
+                    derived: true,
+                }];
+            },
+        },
         {
             title: 'Linked Test Cases',
             emptyLabel: 'No linked test cases yet.',
@@ -483,7 +507,7 @@ function TaskLinkedArtifactsSections({ taskId, projectId }: { taskId: string; pr
                 await taskTestCaseLinksApi.removeRunFromTask(taskId, row.artifactId);
             },
         },
-    ], [taskId]);
+    ], [taskId, task.parent_user_story_id]);
 
     return (
         <div className="space-y-4">

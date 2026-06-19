@@ -7,6 +7,7 @@ const taskId = '11111111-1111-1111-1111-111111111111';
 const testCaseId = '33333333-3333-3333-3333-333333333333';
 const testSuiteId = '22222222-2222-2222-2222-222222222222';
 const testRunId = '44444444-4444-4444-4444-444444444444';
+const foundBugId = '66666666-6666-6666-6666-666666666666';
 const userStoryId = '77777777-7777-7777-7777-777777777777';
 
 async function mockAuth(page: any) {
@@ -89,6 +90,14 @@ test('task detail renders linked test cases and bugs', async ({ page }) => {
         project_name: 'Gerbil',
         parent_user_story_id: userStoryId,
     }));
+    await page.route(`http://localhost:3001/user-stories/${userStoryId}`, route => json(route, {
+        id: userStoryId,
+        tuleap_artifact_id: 77,
+        title: 'Buyer checks out',
+        status: 'Review',
+        project_id: projectId,
+        project_name: 'Gerbil',
+    }));
     await page.route(`http://localhost:3001/tasks/${taskId}/comments`, route => json(route, []));
     await page.route(`http://localhost:3001/tasks/${taskId}/test-cases`, route => json(route, {
         data: [{ id: 'ttc-1', task_id: taskId, test_case_id: testCaseId, relationship_type: 'covers', source: 'qc', test_case_display_id: 'TC-001', test_case_title: 'Checkout regression', test_case_status: 'active', test_case_priority: 'high' }],
@@ -100,7 +109,7 @@ test('task detail renders linked test cases and bugs', async ({ page }) => {
     await page.goto(`/work/tasks/${taskId}`);
 
     await expect(page.getByRole('heading', { name: 'Fix checkout' })).toBeVisible();
-    await expect(page.getByText('Parent user story')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Parent User Story' })).toBeVisible();
     await expect(page.getByText('TC-001 - Checkout regression')).toBeVisible();
     await expect(page.getByText('covers')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Linked Bugs' })).toBeVisible();
@@ -165,7 +174,7 @@ test('test suite detail renders linked user stories', async ({ page }) => {
         project_name: 'Gerbil',
         created_at: '2026-06-19T00:00:00.000Z',
         updated_at: '2026-06-19T00:00:00.000Z',
-        test_cases: [],
+        test_cases: [{ id: testCaseId, junction_id: 'suite-case-1', test_case_id: 'TC-001', title: 'Checkout regression', status: 'active', priority: 'high', sort_order: 1 }],
     }));
     await page.route(`http://localhost:3001/test-suites/${testSuiteId}/user-stories`, route => json(route, {
         data: [{ id: 'ss-1', user_story_id: userStoryId, test_suite_id: testSuiteId, relationship_type: 'validated by', source: 'qc', user_story_display_id: 'US-77', user_story_title: 'Buyer checks out', user_story_status: 'Review' }],
@@ -174,6 +183,10 @@ test('test suite detail renders linked user stories', async ({ page }) => {
     await page.goto(`/test/suites/${testSuiteId}`);
 
     await expect(page.getByRole('heading', { name: 'Release smoke' })).toBeVisible();
+    const containedCases = page.getByRole('heading', { name: 'Contained Test Cases' }).locator('xpath=ancestor::section');
+    await expect(containedCases.getByText('TC-001 - Checkout regression')).toBeVisible();
+    await expect(containedCases.getByText('Derived')).toBeVisible();
+    await expect(containedCases.getByRole('button', { name: 'Add' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Linked User Stories' })).toBeVisible();
     await expect(page.getByText('US-77 - Buyer checks out')).toBeVisible();
     await expect(page.getByText('validates')).toBeVisible();
@@ -212,7 +225,25 @@ test('test run detail renders linked user stories, tasks, and bugs', async ({ pa
             pass_rate_pct: 0,
             not_run_pct: 0,
         },
-        executions: [],
+        executions: [{
+            id: 'exec-1',
+            test_case_uuid: testCaseId,
+            test_case_id: 'TC-001',
+            test_case_title: 'Checkout regression',
+            status: 'fail',
+            sort_order: 1,
+        }],
+    }));
+    await page.route(`http://localhost:3001/test-suites/${testSuiteId}`, route => json(route, {
+        id: testSuiteId,
+        suite_id: 'TS-001',
+        name: 'Release smoke',
+        status: 'active',
+        project_id: projectId,
+        project_name: 'Gerbil',
+        created_at: '2026-06-19T00:00:00.000Z',
+        updated_at: '2026-06-19T00:00:00.000Z',
+        test_cases: [],
     }));
     await page.route(`http://localhost:3001/test-executions/test-runs/${testRunId}/user-stories`, route => json(route, {
         data: [{ id: 'sr-1', user_story_id: userStoryId, test_run_id: testRunId, relationship_type: 'validated by', source: 'qc', user_story_display_id: 'US-77', user_story_title: 'Buyer checks out', user_story_status: 'Review' }],
@@ -223,16 +254,25 @@ test('test run detail renders linked user stories, tasks, and bugs', async ({ pa
     await page.route(`http://localhost:3001/test-executions/test-runs/${testRunId}/bugs`, route => json(route, {
         data: [{ id: 'br-1', bug_id: bugId, test_run_id: testRunId, relationship_type: 'found in', source: 'qc', bug_display_id: 'BUG-001', bug_title: 'Checkout fails', bug_status: 'Open' }],
     }));
+    await page.route(`http://localhost:3001/test-executions/test-runs/${testRunId}/bugs-found`, route => json(route, {
+        data: [{ id: 'bte-1', bug_id: foundBugId, bug_display_id: 'BUG-FOUND', bug_title: 'Payment rejected', bug_status: 'Open', bug_project_id: projectId, execution_count: 1, created_at: '2026-06-19T00:00:00.000Z' }],
+    }));
 
     await page.goto(`/test/runs/${testRunId}`);
 
     await expect(page.getByRole('heading', { name: 'RUN-001: Checkout regression run' })).toBeVisible();
+    const bugsFound = page.getByRole('heading', { name: 'Bugs Found In This Run' }).locator('xpath=ancestor::section');
+    await expect(bugsFound.getByText('BUG-FOUND - Payment rejected')).toBeVisible();
+    await expect(bugsFound.getByText('finds')).toBeVisible();
+    await expect(bugsFound.getByText('Derived')).toBeVisible();
+    await expect(bugsFound.getByRole('button', { name: 'Add' })).toHaveCount(0);
     await expect(page.getByText('US-77 - Buyer checks out')).toBeVisible();
     await expect(page.getByText('validates')).toBeVisible();
     await expect(page.getByText('TSK-001 - Fix checkout')).toBeVisible();
     await expect(page.getByText('exercises')).toBeVisible();
-    await expect(page.getByText('BUG-001 - Checkout fails')).toBeVisible();
-    await expect(page.getByText('finds')).toBeVisible();
+    const linkedBugs = page.getByRole('heading', { name: 'Linked Bugs' }).locator('xpath=ancestor::section');
+    await expect(linkedBugs.getByText('BUG-001 - Checkout fails')).toBeVisible();
+    await expect(linkedBugs.getByText('finds')).toBeVisible();
 
     await page
         .getByRole('heading', { name: 'Linked Tasks' })

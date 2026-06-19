@@ -311,6 +311,46 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
   }
 });
 
+// GET /test-runs/:id/bugs-found - Derived bugs discovered by executions in this run
+router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const runResult = await pool.query(
+      `SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+    if (runResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Test run not found' });
+    }
+    const access = await enforceArtifact(req, res, 'test_execution', runResult.rows[0], 'view', { route: 'GET /test-executions/test-runs/:id/bugs-found' });
+    if (!access.allowed) return;
+
+    const result = await pool.query(
+      `SELECT
+          MIN(bte.id::text) AS id,
+          b.id AS bug_id,
+          b.bug_id AS bug_display_id,
+          b.title AS bug_title,
+          b.status AS bug_status,
+          b.project_id AS bug_project_id,
+          MIN(bte.created_at) AS created_at,
+          COUNT(DISTINCT bte.test_execution_id)::INTEGER AS execution_count
+       FROM bug_test_executions bte
+       JOIN test_execution te ON te.id = bte.test_execution_id
+       JOIN bugs b ON b.id = bte.bug_id
+       WHERE te.test_run_id = $1
+         AND b.deleted_at IS NULL
+       GROUP BY b.id, b.bug_id, b.title, b.status, b.project_id
+       ORDER BY MIN(bte.created_at) DESC`,
+      [id]
+    );
+
+    res.json({ data: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /test-runs - Create new test run
 router.post('/test-runs', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
   const client = await pool.connect();

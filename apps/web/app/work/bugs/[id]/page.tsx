@@ -93,9 +93,10 @@ export default function BugDetailPage() {
                     displayId: row.test_run_name || `EX-${row.test_execution_id.slice(0, 8)}`,
                     title: row.execution_notes || row.execution_status || 'Test execution',
                     status: row.execution_status,
-                    href: row.test_run_id ? `/test-runs/${row.test_run_id}` : undefined,
+                    href: row.test_run_uuid ? `/test/runs/${row.test_run_uuid}` : undefined,
                     source: 'qc',
                     relationshipType: 'discovered via',
+                    derived: true,
                     meta: row.executed_at ? new Date(row.executed_at).toLocaleString() : undefined,
                 }));
             },

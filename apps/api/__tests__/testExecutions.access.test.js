@@ -252,3 +252,39 @@ describe('GET /test-executions/test-runs/:id — enforced denial', () => {
         expect(res.body.reason).toBeDefined();
     });
 });
+
+describe('GET /test-executions/test-runs/:id/bugs-found — derived bugs', () => {
+    test('admin: returns bugs discovered through executions without writing link rows', async () => {
+        setRole('admin');
+        queryHandler = async (sql) => {
+            if (/SELECT \* FROM test_run WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
+                return { rows: [{
+                    id: 'run-1',
+                    run_id: 'RUN-1',
+                    project_id: 'proj-1',
+                    created_by: 'u-admin',
+                    status: 'in_progress',
+                }] };
+            }
+            if (/FROM bug_test_executions bte/i.test(sql) && /te\.test_run_id = \$1/i.test(sql)) {
+                return { rows: [{
+                    id: 'link-1',
+                    bug_id: 'bug-1',
+                    bug_display_id: 'BUG-1',
+                    bug_title: 'Checkout fails',
+                    bug_status: 'Open',
+                    bug_project_id: 'proj-1',
+                    execution_count: 1,
+                }] };
+            }
+            return { rows: [] };
+        };
+
+        const res = await request(makeApp()).get('/test-executions/test-runs/run-1/bugs-found');
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toHaveLength(1);
+        expect(res.body.data[0]).toMatchObject({ bug_id: 'bug-1', bug_display_id: 'BUG-1' });
+        expect(queries.some(q => /^\s*(INSERT|UPDATE|DELETE)\b/i.test(q.sql))).toBe(false);
+    });
+});

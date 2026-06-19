@@ -1192,6 +1192,9 @@ export const testRunsApi = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+
+    listBugsFound: (id: string) =>
+        fetchApi<{ data: Array<{ id: string; bug_id: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string; created_at: string; execution_count: number }> }>(`/test-executions/test-runs/${id}/bugs-found`),
 };
 
 // ============================================================================
@@ -2250,7 +2253,7 @@ export const taskTestCaseLinksApi = {
 
 export const bugLinksApi = {
     listTestExecutions: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; test_execution_id: string; created_at: string; execution_status: string; execution_notes: string; executed_at: string; test_run_id: string; test_run_name: string }> }>(`/bugs/${bugId}/test-executions`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_execution_id: string; created_at: string; execution_status: string; execution_notes: string; executed_at: string; test_run_uuid?: string; test_run_id: string; test_run_name: string }> }>(`/bugs/${bugId}/test-executions`),
 
     addTestExecution: (bugId: string, testExecutionId: string) =>
         fetchApi<{ data: { id: string; bug_id: string; test_execution_id: string } }>(`/bugs/${bugId}/test-executions`, {

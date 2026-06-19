@@ -455,8 +455,27 @@ export default function TestSuiteDetailPage() {
     );
 }
 
-function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite }) {
+function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite & { test_cases?: SuiteTestCase[] } }) {
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
+        {
+            title: 'Contained Test Cases',
+            emptyLabel: 'No contained test cases yet.',
+            readOnly: true,
+            viewPermission: 'qc.testcases.view',
+            load: async () => {
+                return (suite.test_cases || []).map(testCase => ({
+                    id: testCase.junction_id || testCase.id,
+                    artifactId: testCase.id,
+                    displayId: testCase.test_case_id_display || testCase.test_case_id || testCase.id.slice(0, 8),
+                    title: testCase.title || '(no title)',
+                    status: testCase.status,
+                    href: `/test/cases/${testCase.id}`,
+                    source: 'qc' as const,
+                    relationshipType: 'contains',
+                    derived: true,
+                }));
+            },
+        },
         {
             title: 'Linked User Stories',
             emptyLabel: 'No linked user stories yet.',
@@ -488,7 +507,7 @@ function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite }) {
                 await taskTestCaseLinksApi.removeUserStoryFromSuite(suite.id, row.artifactId);
             },
         },
-    ], [suite.id]);
+    ], [suite.id, suite.test_cases]);
 
     return (
         <div className="space-y-5">

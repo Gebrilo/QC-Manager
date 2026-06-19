@@ -254,6 +254,8 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     status: task.status,
                     href: `/work/tasks/${task.id}`,
                     source: 'qc' as const,
+                    relationshipType: 'parent of',
+                    derived: true,
                 }));
             },
         },

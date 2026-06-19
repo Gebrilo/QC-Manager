@@ -732,7 +732,7 @@ router.get('/:id/test-executions', requireAuth, blockContributors, requirePermis
         const result = await pool.query(
             `SELECT bte.id, bte.bug_id, bte.test_execution_id, bte.created_at,
                     te.status AS execution_status, te.notes AS execution_notes,
-                    te.executed_at, tr.run_id AS test_run_id, tr.name AS test_run_name
+                    te.executed_at, tr.id AS test_run_uuid, tr.run_id AS test_run_id, tr.name AS test_run_name
              FROM bug_test_executions bte
              JOIN test_execution te ON te.id = bte.test_execution_id
              LEFT JOIN test_run tr ON tr.id = te.test_run_id

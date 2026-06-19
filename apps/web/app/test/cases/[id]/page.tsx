@@ -415,6 +415,8 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     status: suite.status,
                     href: `/test/suites/${suite.id}`,
                     source: 'qc',
+                    relationshipType: 'contained in',
+                    derived: true,
                     meta: suite.test_case_count ? `${suite.test_case_count} cases` : undefined,
                 }));
             },

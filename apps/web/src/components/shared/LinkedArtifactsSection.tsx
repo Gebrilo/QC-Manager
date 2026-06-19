@@ -22,6 +22,7 @@ export interface LinkedArtifactRow {
     href?: string;
     source?: 'qc' | 'tuleap';
     relationshipType?: string;
+    derived?: boolean;
     deleted?: boolean;
     meta?: string;
 }
@@ -162,6 +163,9 @@ export function LinkedArtifactsSection({ config, projectId }: LinkedArtifactsSec
                                         <Badge variant={row.source === 'tuleap' ? 'secondary' : 'info'}>
                                             {row.source === 'tuleap' ? 'Tuleap' : 'QC'}
                                         </Badge>
+                                    )}
+                                    {row.derived && (
+                                        <Badge variant="secondary">Derived</Badge>
                                     )}
                                     {canRemove && (
                                         <Button

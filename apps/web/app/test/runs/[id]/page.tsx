@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { bugLinksApi, fetchApi, taskTestCaseLinksApi, testRunsApi } from '@/lib/api';
+import { bugLinksApi, fetchApi, taskTestCaseLinksApi, testRunsApi, testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -57,6 +57,7 @@ interface TestRunDetail extends Record<string, unknown> {
 
 interface TestRunExecutionItem {
     id: string;
+    test_case_uuid?: string;
     test_case_id: string;
     test_case_title?: string;
     test_case_id_display?: string;
@@ -408,6 +409,76 @@ export default function TestRunDetailPage() {
 function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
         {
+            title: 'Source Test Suite',
+            emptyLabel: 'This run was not created from a suite.',
+            readOnly: true,
+            viewPermission: 'qc.testsuites.view',
+            load: async () => {
+                if (!run.suite_id) return [];
+                const suite = await testSuitesApi.get(run.suite_id);
+                return [{
+                    id: `run-suite-${suite.id}`,
+                    artifactId: suite.id,
+                    displayId: suite.suite_id || suite.id.slice(0, 8),
+                    title: suite.name || '(no title)',
+                    status: suite.status,
+                    href: `/test/suites/${suite.id}`,
+                    source: 'qc' as const,
+                    relationshipType: 'executes',
+                    derived: true,
+                }];
+            },
+        },
+        {
+            title: 'Executed Test Cases',
+            emptyLabel: 'No executed test cases in this run.',
+            readOnly: true,
+            viewPermission: 'qc.testcases.view',
+            load: async () => {
+                const byCaseId = new Map<string, TestRunExecutionItem>();
+                for (const execution of run.executions) {
+                    const artifactId = execution.test_case_uuid || execution.test_case_id;
+                    if (!byCaseId.has(artifactId)) byCaseId.set(artifactId, execution);
+                }
+                return Array.from(byCaseId.values()).map(execution => {
+                    const artifactId = execution.test_case_uuid || execution.test_case_id;
+                    return {
+                        id: `run-case-${execution.id}`,
+                        artifactId,
+                        displayId: execution.test_case_id_display || execution.test_case_id || artifactId.slice(0, 8),
+                        title: execution.test_case_title || '(no title)',
+                        status: execution.status,
+                        href: execution.test_case_uuid ? `/test/cases/${execution.test_case_uuid}` : undefined,
+                        source: 'qc' as const,
+                        relationshipType: 'executes',
+                        derived: true,
+                    };
+                });
+            },
+        },
+        {
+            title: 'Bugs Found In This Run',
+            emptyLabel: 'No bugs found from this run.',
+            readOnly: true,
+            viewPermission: 'qc.bugs.view',
+            relationshipDirection: 'to',
+            load: async () => {
+                const response = await testRunsApi.listBugsFound(run.id);
+                return response.data.map(row => ({
+                    id: row.id,
+                    artifactId: row.bug_id,
+                    displayId: row.bug_display_id || row.bug_id.slice(0, 8),
+                    title: row.bug_title || '(no title)',
+                    status: row.bug_status,
+                    href: `/work/bugs/${row.bug_id}`,
+                    source: 'qc' as const,
+                    relationshipType: 'found in',
+                    derived: true,
+                    meta: row.execution_count === 1 ? '1 execution' : `${row.execution_count} executions`,
+                }));
+            },
+        },
+        {
             title: 'Linked User Stories',
             emptyLabel: 'No linked user stories yet.',
             artifactType: 'user_story',
@@ -500,7 +571,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                 await bugLinksApi.removeBugFromRun(run.id, row.artifactId);
             },
         },
-    ], [run.id]);
+    ], [run.id, run.suite_id, run.executions]);
 
     return (
         <div className="mb-6 space-y-4">
