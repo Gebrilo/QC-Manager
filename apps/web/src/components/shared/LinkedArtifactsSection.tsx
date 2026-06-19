@@ -25,6 +25,17 @@ export interface LinkedArtifactRow {
     derived?: boolean;
     deleted?: boolean;
     meta?: string;
+    /** Artifact type — task/bug/test_case/user_story/test_suite/test_run.
+     *  Surfaced by the API on every linked row; used for Restricted tombstones. */
+    artifactType?: string;
+    /** Instance-level access status from the API. Drives tombstone rendering. */
+    accessStatus?: 'ok' | 'forbidden' | 'gone' | 'info';
+    /** Per-type priority (task.priority, bugs.severity, test_case.priority, story.priority). */
+    priority?: string | null;
+    /** Resolved assignee display name per type (null for stories/suites/runs). */
+    assigneeName?: string | null;
+    /** Project display name (joined via projects table). */
+    projectName?: string | null;
 }
 
 export interface LinkedArtifactsSectionConfig {
@@ -135,53 +146,80 @@ export function LinkedArtifactsSection({ config, projectId }: LinkedArtifactsSec
                     <p className="text-sm text-slate-500">{config.emptyLabel}</p>
                 ) : (
                     <ul className="space-y-2">
-                        {rows.map(row => (
-                            <li
-                                key={row.id}
-                                className={`flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3 dark:border-slate-800 ${row.deleted ? 'opacity-60' : ''}`}
-                            >
-                                <div className="min-w-0 flex-1">
-                                    {row.href && !row.deleted ? (
-                                        <Link href={row.href} className="block truncate text-sm font-medium text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
-                                            {row.displayId} - {row.title}
-                                        </Link>
-                                    ) : (
-                                        <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            {row.displayId}{row.deleted ? ' (deleted)' : ''} - {row.title}
-                                        </p>
-                                    )}
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                        {row.status && <span>{row.status}</span>}
-                                        {row.relationshipType && (
-                                            <span>{getDirectionalRelationshipLabel(row.relationshipType, config.relationshipDirection || 'from')}</span>
+                        {rows.map(row => {
+                            // Tombstones: render non-clickable stubs for deleted/gone
+                            // and restricted/forbidden targets. The API still returns
+                            // the link metadata, but we redact content client-side to
+                            // honour the spec ("Deleted" → display-ID only;
+                            // "Restricted item" → type only, no title/details).
+                            const isGone = row.accessStatus === 'gone' || row.deleted;
+                            const isRestricted = row.accessStatus === 'forbidden';
+                            const typeLabel = (row.artifactType || config.artifactType || 'artifact')
+                                .replace(/_/g, ' ');
+                            const showTombstone = isGone || isRestricted;
+                            return (
+                                <li
+                                    key={row.id}
+                                    className={`flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3 dark:border-slate-800 ${showTombstone ? 'opacity-70' : ''}`}
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        {showTombstone ? (
+                                            <p className="truncate text-sm font-medium text-slate-500 dark:text-slate-400">
+                                                {isGone
+                                                    ? `${row.displayId} (deleted)`
+                                                    : `Restricted ${typeLabel}`}
+                                            </p>
+                                        ) : row.href ? (
+                                            <Link href={row.href} className="block truncate text-sm font-medium text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
+                                                {row.displayId} - {row.title}
+                                            </Link>
+                                        ) : (
+                                            <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                {row.displayId} - {row.title}
+                                            </p>
                                         )}
-                                        {row.meta && <span>{row.meta}</span>}
+                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                            {!showTombstone && row.status && <span>{row.status}</span>}
+                                            {!showTombstone && row.priority && <span>· {row.priority}</span>}
+                                            {!showTombstone && row.assigneeName && <span>· @{row.assigneeName}</span>}
+                                            {!showTombstone && row.projectName && <span>· {row.projectName}</span>}
+                                            {row.relationshipType && (
+                                                <span>{showTombstone ? '· ' : '· '}{getDirectionalRelationshipLabel(row.relationshipType, config.relationshipDirection || 'from')}</span>
+                                            )}
+                                            {row.meta && <span>· {row.meta}</span>}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                    {row.source && (
-                                        <Badge variant={row.source === 'tuleap' ? 'secondary' : 'info'}>
-                                            {row.source === 'tuleap' ? 'Tuleap' : 'QC'}
-                                        </Badge>
-                                    )}
-                                    {row.derived && (
-                                        <Badge variant="secondary">Derived</Badge>
-                                    )}
-                                    {canRemove && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            disabled={row.source === 'tuleap' || removingId === row.id}
-                                            onClick={() => removeRow(row)}
-                                            title={row.source === 'tuleap' ? 'Tuleap-sourced links cannot be removed here' : row.deleted ? 'Unlink to clean up' : 'Unlink'}
-                                        >
-                                            <Trash2 className="h-4 w-4 text-rose-500" />
-                                        </Button>
-                                    )}
-                                </div>
-                            </li>
-                        ))}
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {isGone && (
+                                            <Badge variant="secondary">Deleted</Badge>
+                                        )}
+                                        {isRestricted && (
+                                            <Badge variant="secondary">Restricted</Badge>
+                                        )}
+                                        {!showTombstone && row.source && (
+                                            <Badge variant={row.source === 'tuleap' ? 'secondary' : 'info'}>
+                                                {row.source === 'tuleap' ? 'Tuleap' : 'QC'}
+                                            </Badge>
+                                        )}
+                                        {!showTombstone && row.derived && (
+                                            <Badge variant="secondary">Derived</Badge>
+                                        )}
+                                        {canRemove && !showTombstone && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled={row.source === 'tuleap' || removingId === row.id}
+                                                onClick={() => removeRow(row)}
+                                                title={row.source === 'tuleap' ? 'Tuleap-sourced links cannot be removed here' : 'Unlink'}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-rose-500" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>

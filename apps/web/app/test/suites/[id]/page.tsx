@@ -496,6 +496,11 @@ function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite & { test
                     href: `/work/stories/${row.user_story_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {

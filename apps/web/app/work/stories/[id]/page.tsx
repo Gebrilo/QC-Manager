@@ -279,6 +279,11 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     href: `/test/cases/${row.test_case_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'verifies',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'verifies') => {
@@ -310,6 +315,11 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     href: `/test/suites/${row.test_suite_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
@@ -341,6 +351,11 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     href: `/test/runs/${row.test_run_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
@@ -372,6 +387,11 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     href: `/work/bugs/${row.bug_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'affects',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'affects') => {

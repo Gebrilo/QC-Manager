@@ -121,6 +121,11 @@ export default function BugDetailPage() {
                     href: `/test/runs/${row.test_run_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'found in',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'found in') => {
@@ -152,6 +157,11 @@ export default function BugDetailPage() {
                     href: `/work/tasks/${row.task_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'blocks',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'blocks') => {
@@ -183,6 +193,11 @@ export default function BugDetailPage() {
                     href: `/test/cases/${row.test_case_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'reveals',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'reveals') => {
@@ -214,6 +229,11 @@ export default function BugDetailPage() {
                     href: `/work/stories/${row.user_story_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'affects',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'affects') => {

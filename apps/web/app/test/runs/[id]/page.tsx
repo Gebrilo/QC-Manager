@@ -498,6 +498,11 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     href: `/work/stories/${row.user_story_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'validated by') => {
@@ -529,6 +534,11 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     href: `/work/tasks/${row.task_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'exercised by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'exercised by') => {
@@ -560,6 +570,11 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     href: `/work/bugs/${row.bug_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'found in',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'found in') => {

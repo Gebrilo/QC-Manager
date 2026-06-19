@@ -911,3 +911,133 @@ describe('userLifecycle activation flow — insertNotification shape', () => {
         expect(inserts[0][1][6]).toBe('user-1');         // entity_id
     });
 });
+
+describe('dispatchLinkNotification — link create/remove (#246)', () => {
+    const { dispatchLinkNotification } = require('../src/services/notifications/dispatcher');
+
+    // Both endpoints: creator + assignee per side. Actor is one of them.
+    const sourceArtifact = {
+        type: 'task', id: 'task-1', display_id: 'TASK-001', title: 'Fix login',
+        owner_user_id: 'creator-A', assignee_user_id: null, assignee_resource_id: 'res-1',
+    };
+    const targetArtifact = {
+        type: 'bug', id: 'bug-1', display_id: 'BUG-001', title: 'Login bug',
+        owner_user_id: 'creator-B', assignee_user_id: null, assignee_resource_id: 'res-2',
+    };
+
+    test('CREATE: notifies creator + assignee of both endpoints, deduped, minus the actor', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'assignee-A' }] }) // source's resource lookup (res-1)
+            .mockResolvedValueOnce({ rows: [{ user_id: 'assignee-B' }] }) // target's resource lookup (res-2)
+            .mockResolvedValueOnce({ rows: [{ id: 'creator-A' }] });      // resolveActorId (actor IS the source creator)
+
+        await dispatchLinkNotification({
+            action: 'CREATE',
+            relationshipType: 'blocks',
+            source: sourceArtifact,
+            target: targetArtifact,
+            // The actor is creator-A — they should NOT receive their own action.
+            actorEmail: 'creator-A@example.com',
+        });
+
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        // Expected recipients: creator-B, assignee-A, assignee-B (creator-A is the actor → excluded).
+        const recipientIds = inserts.map(c => c[1][0]).sort();
+        expect(recipientIds).toEqual(['assignee-A', 'assignee-B', 'creator-B'].sort());
+
+        // Notification shape checks
+        const first = inserts[0][1];
+        expect(first[1]).toBe('artifact_linked');                       // type
+        expect(first[2]).toBe('New artifact link');                     // title
+        expect(first[3]).toContain('linked to');                        // message
+        expect(first[3]).toContain('blocks');                           // relationship in copy
+        expect(first[5]).toBe('task');                                  // entity_type = source's type
+        expect(first[6]).toBe('task-1');                                // entity_id = source's id
+        expect(first[7]).toBe('CREATE');                                // action
+    });
+
+    test('DELETE: sends artifact_unlinked with the same recipient resolution', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        // No actor lookup needed (system → resolveActorId returns null without a query).
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ user_id: 'assignee-A' }] })
+            .mockResolvedValueOnce({ rows: [{ user_id: 'assignee-B' }] });
+
+        await dispatchLinkNotification({
+            action: 'DELETE',
+            relationshipType: 'blocks',
+            source: sourceArtifact,
+            target: targetArtifact,
+            actorEmail: 'system',
+        });
+
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        // All 4 distinct recipients (no actor exclusion when actor is 'system').
+        const recipientIds = inserts.map(c => c[1][0]).sort();
+        expect(recipientIds).toEqual(['assignee-A', 'assignee-B', 'creator-A', 'creator-B'].sort());
+
+        const first = inserts[0][1];
+        expect(first[1]).toBe('artifact_unlinked');
+        expect(first[2]).toBe('Artifact link removed');
+        expect(first[3]).toContain('unlinked from');
+        expect(first[7]).toBe('DELETE');
+    });
+
+    test('assignee_user_id path: test_case.assigned_to (UUID app_user.id) is resolved directly without a resources lookup', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        // No resource lookups should fire — assignee_user_id is on the artifact.
+        const source = { type: 'test_case', id: 'tc-1', display_id: 'TC-1', title: 'T',
+            owner_user_id: 'tc-creator', assignee_user_id: 'tc-assignee', assignee_resource_id: null };
+        const target = { type: 'bug', id: 'bug-1', display_id: 'BUG-1', title: 'B',
+            owner_user_id: 'bug-creator', assignee_user_id: null, assignee_resource_id: null };
+
+        await dispatchLinkNotification({
+            action: 'CREATE', relationshipType: 'reveals',
+            source, target, actorEmail: 'system',
+        });
+
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        const recipientIds = inserts.map(c => c[1][0]).sort();
+        expect(recipientIds).toEqual(['bug-creator', 'tc-assignee', 'tc-creator'].sort());
+    });
+
+    test('artifacts with neither creator nor assignee produce no notifications', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchLinkNotification({
+            action: 'CREATE', relationshipType: 'relates to',
+            source: { type: 'test_suite', id: 's-1', display_id: 'S', title: 'Suite',
+                owner_user_id: null, assignee_user_id: null, assignee_resource_id: null },
+            target: { type: 'test_run', id: 'r-1', display_id: 'R', title: 'Run',
+                owner_user_id: null, assignee_user_id: null, assignee_resource_id: null },
+            actorEmail: 'system',
+        });
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        expect(inserts).toHaveLength(0);
+    });
+
+    test('a recipient who is BOTH the source creator and target creator only gets one notification (dedup)', async () => {
+        mockQuery.mockResolvedValue({ rows: [] });
+        await dispatchLinkNotification({
+            action: 'CREATE', relationshipType: 'relates to',
+            source: { type: 'task', id: 't-1', display_id: 'T1', title: 'One',
+                owner_user_id: 'same-user', assignee_user_id: null, assignee_resource_id: null },
+            target: { type: 'task', id: 't-2', display_id: 'T2', title: 'Two',
+                owner_user_id: 'same-user', assignee_user_id: null, assignee_resource_id: null },
+            actorEmail: 'system',
+        });
+        const inserts = mockQuery.mock.calls.filter(c => /INSERT INTO notification/i.test(c[0]));
+        expect(inserts).toHaveLength(1);
+        expect(inserts[0][1][0]).toBe('same-user');
+    });
+
+    test('errors during recipient resolution are swallowed (fire-and-forget)', async () => {
+        mockQuery.mockReset();
+        mockQuery.mockRejectedValueOnce(new Error('db down'));
+        // Subsequent calls should still not throw out of dispatchLinkNotification.
+        await expect(dispatchLinkNotification({
+            action: 'CREATE', relationshipType: 'blocks',
+            source: sourceArtifact, target: targetArtifact, actorEmail: 'system',
+        })).resolves.toBeUndefined();
+    });
+});

@@ -102,9 +102,85 @@ async function dispatchTaskAssignment(taskId, actorEmail, addedResourceIds = [])
     }
 }
 
+// Build a human-readable label for a link endpoint artifact, e.g.
+// "Task TASK-001 (Fix login)" — used in the notification copy.
+function artifactLabel(artifact) {
+    if (!artifact) return 'an artifact';
+    const typeLabel = (artifact.type || 'artifact').replace(/_/g, ' ');
+    const idPart = artifact.display_id || artifact.id || '';
+    const titlePart = artifact.title ? ` (${artifact.title})` : '';
+    if (!idPart && !titlePart) return `a ${typeLabel}`;
+    return `${typeLabel.charAt(0).toUpperCase()}${typeLabel.slice(1)} ${idPart}${titlePart}`;
+}
+
+// Resolve the set of recipients for a single link endpoint artifact:
+// the creator (owner_user_id) and the current assignee. Per type:
+//   - task:    owner_user_id (creator) + assignee via task_resource_assignment
+//   - bug:     owner_user_id (reporter) + assignee via resources.resource_name
+//   - test_case: owner_user_id (creator) + assigned_to (UUID app_user.id)
+//   - story/suite/run: owner_user_id only (no assignee column)
+// Returns an array of app_user ids (caller dedupes + excludes the actor).
+async function resolveLinkEndpointRecipients(artifact) {
+    if (!artifact) return [];
+    const out = [];
+    if (artifact.owner_user_id) out.push(artifact.owner_user_id);
+    if (artifact.assignee_user_id) {
+        out.push(artifact.assignee_user_id);
+    } else if (artifact.assignee_resource_id) {
+        const r = await db.query(
+            'SELECT user_id FROM resources WHERE id = $1 AND user_id IS NOT NULL AND deleted_at IS NULL',
+            [artifact.assignee_resource_id]
+        );
+        if (r.rows[0] && r.rows[0].user_id) out.push(r.rows[0].user_id);
+    }
+    return out;
+}
+
+// Explicit (non-CRUD-shaped) event: a coverage link was created or removed.
+// The per-artifact audit pipeline (#240) writes rich link payloads but the
+// policy table is keyed by table name (tasks/bugs/...) and link audits use
+// singular artifact types ('task', 'bug', ...) → dispatchFromAudit is a
+// silent no-op for link events. This dedicated dispatcher closes that gap.
+//
+// Recipients: assignee + creator of BOTH endpoints, deduped, minus the actor.
+// Deep-link: the notification.entity_id is set to the source artifact so the
+// recipient lands on a page where the link is visible.
+async function dispatchLinkNotification({ action, relationshipType, source, target, actorEmail }) {
+    try {
+        const rawRecipients = [
+            ...(await resolveLinkEndpointRecipients(source)),
+            ...(await resolveLinkEndpointRecipients(target)),
+        ];
+        const actorId = await resolveActorId(actorEmail);
+        const recipients = [...new Set(rawRecipients.filter(Boolean))]
+            .filter(id => id !== actorId);
+        if (recipients.length === 0) return;
+
+        const sourceLabel = artifactLabel(source);
+        const targetLabel = artifactLabel(target);
+        const rel = relationshipType || 'relates to';
+
+        const isCreate = action === 'CREATE';
+        await insertMany(recipients, {
+            type: isCreate ? 'artifact_linked' : 'artifact_unlinked',
+            title: isCreate ? 'New artifact link' : 'Artifact link removed',
+            message: isCreate
+                ? `${sourceLabel} was linked to ${targetLabel} (${rel}).`
+                : `${sourceLabel} was unlinked from ${targetLabel} (${rel}).`,
+            entity_type: (source && source.type) || null,
+            entity_id: (source && source.id) || null,
+            action,
+            actor_id: actorId,
+        });
+    } catch (err) {
+        console.error('dispatchLinkNotification error:', err.message);
+    }
+}
+
 module.exports = {
     insertNotification,
     resolveActorId,
     dispatchFromAudit,
     dispatchTaskAssignment,
+    dispatchLinkNotification,
 };

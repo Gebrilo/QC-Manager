@@ -20,8 +20,20 @@ export interface ArtifactPickerItem {
     project_id: string;
     project_name: string;
     status: string;
+    priority?: string | null;
+    assignee_name?: string | null;
     url: string;
 }
+
+// All types the search API can return. Used to populate the type dropdown.
+const SEARCHABLE_TYPE_OPTIONS = [
+    { value: 'task', label: 'Task' },
+    { value: 'bug', label: 'Bug' },
+    { value: 'test_case', label: 'Test Case' },
+    { value: 'user_story', label: 'User Story' },
+    { value: 'test_suite', label: 'Test Suite' },
+    { value: 'test_run', label: 'Test Run' },
+];
 
 interface ArtifactPickerProps {
     open: boolean;
@@ -47,6 +59,10 @@ export function ArtifactPicker({
     onConfirm,
 }: ArtifactPickerProps) {
     const [query, setQuery] = useState('');
+    const [selectedType, setSelectedType] = useState<string>(artifactType);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('');
+    const [assigneeFilter, setAssigneeFilter] = useState('');
     const [items, setItems] = useState<ArtifactPickerItem[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [hideLinked, setHideLinked] = useState(true);
@@ -60,9 +76,18 @@ export function ArtifactPicker({
             setQuery('');
             setItems([]);
             setSelectedIds([]);
+            setStatusFilter('');
+            setPriorityFilter('');
+            setAssigneeFilter('');
             setError(null);
         }
     }, [open]);
+
+    // Reset type filter when the section's expected type changes (different
+    // section opens the picker) — the dropdown defaults to the section's type.
+    useEffect(() => {
+        if (open) setSelectedType(artifactType);
+    }, [open, artifactType]);
 
     useEffect(() => {
         if (!open) return;
@@ -82,8 +107,11 @@ export function ArtifactPicker({
             try {
                 const response = await searchApi.search({
                     q: query.trim(),
-                    type: artifactType,
+                    type: selectedType,
                     project_id: projectId || undefined,
+                    status: statusFilter.trim() || undefined,
+                    priority: priorityFilter.trim() || undefined,
+                    assignee: assigneeFilter.trim() || undefined,
                     limit: 25,
                 });
                 if (!cancelled) setItems(response.data as ArtifactPickerItem[]);
@@ -98,7 +126,7 @@ export function ArtifactPicker({
             cancelled = true;
             window.clearTimeout(timeout);
         };
-    }, [artifactType, open, projectId, query]);
+    }, [selectedType, projectId, statusFilter, priorityFilter, assigneeFilter, open, query]);
 
     const visibleItems = useMemo(() => {
         if (!hideLinked) return items;
@@ -155,6 +183,33 @@ export function ArtifactPicker({
                         autoFocus
                     />
 
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <Select
+                            label="Type"
+                            value={selectedType}
+                            onChange={event => setSelectedType(event.target.value)}
+                            options={SEARCHABLE_TYPE_OPTIONS}
+                        />
+                        <Input
+                            label="Status"
+                            value={statusFilter}
+                            onChange={event => setStatusFilter(event.target.value)}
+                            placeholder="e.g. In Progress"
+                        />
+                        <Input
+                            label="Priority"
+                            value={priorityFilter}
+                            onChange={event => setPriorityFilter(event.target.value)}
+                            placeholder="e.g. High"
+                        />
+                        <Input
+                            label="Assignee ID"
+                            value={assigneeFilter}
+                            onChange={event => setAssigneeFilter(event.target.value)}
+                            placeholder="user UUID"
+                        />
+                    </div>
+
                     {relationshipSelectOptions.length > 0 && (
                         <Select
                             label="Relationship"
@@ -202,6 +257,8 @@ export function ArtifactPicker({
                                                 </span>
                                                 <span className="block truncate text-xs text-slate-500">
                                                     {item.project_name || 'No project'} · {item.status}
+                                                    {item.priority ? ` · ${item.priority}` : ''}
+                                                    {item.assignee_name ? ` · @${item.assignee_name}` : ''}
                                                 </span>
                                             </span>
                                         </label>

@@ -2091,7 +2091,7 @@ export interface TuleapSyncHistoryItem {
 
 export const taskTestCaseLinksApi = {
     listTestCases: (taskId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_priority: string; test_case_project_id: string }> }>(`/tasks/${taskId}/test-cases`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_priority: string; test_case_project_id: string }> }>(`/tasks/${taskId}/test-cases`),
 
     addTestCase: (taskId: string, testCaseId: string, relationshipType = 'covers') =>
         fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/tasks/${taskId}/test-cases`, {
@@ -2103,7 +2103,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
 
     listTasks: (testCaseId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-cases/${testCaseId}/tasks`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-cases/${testCaseId}/tasks`),
 
     addTask: (testCaseId: string, taskId: string, relationshipType = 'covers') =>
         fetchApi<{ data: { id: string; task_id: string; test_case_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/tasks`, {
@@ -2115,7 +2115,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/tasks/${taskId}`, { method: 'DELETE' }),
 
     listBugsForTask: (taskId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/tasks/${taskId}/bugs`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/tasks/${taskId}/bugs`),
 
     addBugToTask: (taskId: string, bugId: string, relationshipType = 'blocks') =>
         fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/tasks/${taskId}/bugs`, {
@@ -2127,7 +2127,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/bugs/${bugId}`, { method: 'DELETE' }),
 
     listBugsForTestCase: (testCaseId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-cases/${testCaseId}/bugs`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-cases/${testCaseId}/bugs`),
 
     addBugToTestCase: (testCaseId: string, bugId: string, relationshipType = 'reveals') =>
         fetchApi<{ data: { id: string; bug_id: string; test_case_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/bugs`, {
@@ -2139,7 +2139,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/bugs/${bugId}`, { method: 'DELETE' }),
 
     listUserStoriesForTestCase: (testCaseId: string) =>
-        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-cases/${testCaseId}/user-stories`),
+        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-cases/${testCaseId}/user-stories`),
 
     addUserStoryToTestCase: (testCaseId: string, userStoryId: string, relationshipType = 'verifies') =>
         fetchApi<{ data: { id: string; test_case_id: string; user_story_id: string; relationship_type: string } }>(`/test-cases/${testCaseId}/user-stories`, {
@@ -2151,7 +2151,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/test-cases/${testCaseId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
 
     listTestCasesForUserStory: (userStoryId: string) =>
-        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/user-stories/${userStoryId}/test-cases`),
+        fetchApi<{ data: Array<{ id: string; test_case_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/user-stories/${userStoryId}/test-cases`),
 
     addTestCaseToUserStory: (userStoryId: string, testCaseId: string, relationshipType = 'verifies') =>
         fetchApi<{ data: { id: string; test_case_id: string; user_story_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/test-cases`, {
@@ -2163,7 +2163,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
 
     listBugsForUserStory: (userStoryId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/user-stories/${userStoryId}/bugs`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/user-stories/${userStoryId}/bugs`),
 
     addBugToUserStory: (userStoryId: string, bugId: string, relationshipType = 'affects') =>
         fetchApi<{ data: { id: string; bug_id: string; user_story_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/bugs`, {
@@ -2175,7 +2175,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/bugs/${bugId}`, { method: 'DELETE' }),
 
     listSuitesForUserStory: (userStoryId: string) =>
-        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_suite_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_suite_display_id: string; test_suite_title: string; test_suite_status: string; test_suite_project_id: string }> }>(`/user-stories/${userStoryId}/test-suites`),
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_suite_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_suite_display_id: string; test_suite_title: string; test_suite_status: string; test_suite_project_id: string }> }>(`/user-stories/${userStoryId}/test-suites`),
 
     addSuiteToUserStory: (userStoryId: string, testSuiteId: string, relationshipType = 'validated by') =>
         fetchApi<{ data: { id: string; user_story_id: string; test_suite_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/test-suites`, {
@@ -2187,7 +2187,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-suites/${testSuiteId}`, { method: 'DELETE' }),
 
     listUserStoriesForSuite: (testSuiteId: string) =>
-        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_suite_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-suites/${testSuiteId}/user-stories`),
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_suite_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-suites/${testSuiteId}/user-stories`),
 
     addUserStoryToSuite: (testSuiteId: string, userStoryId: string, relationshipType = 'validated by') =>
         fetchApi<{ data: { id: string; user_story_id: string; test_suite_id: string; relationship_type: string } }>(`/test-suites/${testSuiteId}/user-stories`, {
@@ -2199,7 +2199,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/test-suites/${testSuiteId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
 
     listRunsForUserStory: (userStoryId: string) =>
-        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/user-stories/${userStoryId}/test-runs`),
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/user-stories/${userStoryId}/test-runs`),
 
     addRunToUserStory: (userStoryId: string, testRunId: string, relationshipType = 'validated by') =>
         fetchApi<{ data: { id: string; user_story_id: string; test_run_id: string; relationship_type: string } }>(`/user-stories/${userStoryId}/test-runs`, {
@@ -2211,7 +2211,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/user-stories/${userStoryId}/test-runs/${testRunId}`, { method: 'DELETE' }),
 
     listUserStoriesForRun: (testRunId: string) =>
-        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/user-stories`),
+        fetchApi<{ data: Array<{ id: string; user_story_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/user-stories`),
 
     addUserStoryToRun: (testRunId: string, userStoryId: string, relationshipType = 'validated by') =>
         fetchApi<{ data: { id: string; user_story_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/user-stories`, {
@@ -2223,7 +2223,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/test-executions/test-runs/${testRunId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
 
     listRunsForTask: (taskId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/tasks/${taskId}/test-runs`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/tasks/${taskId}/test-runs`),
 
     addRunToTask: (taskId: string, testRunId: string, relationshipType = 'exercised by') =>
         fetchApi<{ data: { id: string; task_id: string; test_run_id: string; relationship_type: string } }>(`/tasks/${taskId}/test-runs`, {
@@ -2235,7 +2235,7 @@ export const taskTestCaseLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/tasks/${taskId}/test-runs/${testRunId}`, { method: 'DELETE' }),
 
     listTasksForRun: (testRunId: string) =>
-        fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-executions/test-runs/${testRunId}/tasks`),
+        fetchApi<{ data: Array<{ id: string; task_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/test-executions/test-runs/${testRunId}/tasks`),
 
     addTaskToRun: (testRunId: string, taskId: string, relationshipType = 'exercised by') =>
         fetchApi<{ data: { id: string; task_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/tasks`, {
@@ -2265,7 +2265,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-executions/${testExecutionId}`, { method: 'DELETE' }),
 
     listTasks: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; task_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; task_display_id: string; task_title: string; task_name: string; task_status: string; task_project_id: string; project_id: string }> }>(`/bugs/${bugId}/tasks`),
 
     addTask: (bugId: string, taskId: string, relationshipType = 'blocks') =>
         fetchApi<{ data: { id: string; bug_id: string; task_id: string; relationship_type: string } }>(`/bugs/${bugId}/tasks`, {
@@ -2277,7 +2277,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/tasks/${taskId}`, { method: 'DELETE' }),
 
     listTestCases: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/bugs/${bugId}/test-cases`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_case_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_case_display_id: string; test_case_title: string; test_case_status: string; test_case_project_id: string }> }>(`/bugs/${bugId}/test-cases`),
 
     addTestCase: (bugId: string, testCaseId: string, relationshipType = 'reveals') =>
         fetchApi<{ data: { id: string; bug_id: string; test_case_id: string; relationship_type: string } }>(`/bugs/${bugId}/test-cases`, {
@@ -2289,7 +2289,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-cases/${testCaseId}`, { method: 'DELETE' }),
 
     listUserStories: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/bugs/${bugId}/user-stories`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; user_story_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; user_story_display_id: string; user_story_title: string; user_story_status: string; user_story_project_id: string }> }>(`/bugs/${bugId}/user-stories`),
 
     addUserStory: (bugId: string, userStoryId: string, relationshipType = 'affects') =>
         fetchApi<{ data: { id: string; bug_id: string; user_story_id: string; relationship_type: string } }>(`/bugs/${bugId}/user-stories`, {
@@ -2301,7 +2301,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/user-stories/${userStoryId}`, { method: 'DELETE' }),
 
     listRuns: (bugId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/bugs/${bugId}/test-runs`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; test_run_display_id: string; test_run_title: string; test_run_status: string; test_run_project_id: string }> }>(`/bugs/${bugId}/test-runs`),
 
     addRun: (bugId: string, testRunId: string, relationshipType = 'found in') =>
         fetchApi<{ data: { id: string; bug_id: string; test_run_id: string; relationship_type: string } }>(`/bugs/${bugId}/test-runs`, {
@@ -2313,7 +2313,7 @@ export const bugLinksApi = {
         fetchApi<{ success: boolean; message: string }>(`/bugs/${bugId}/test-runs/${testRunId}`, { method: 'DELETE' }),
 
     listBugsForRun: (testRunId: string) =>
-        fetchApi<{ data: Array<{ id: string; bug_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/bugs`),
+        fetchApi<{ data: Array<{ id: string; bug_id: string; test_run_id: string; relationship_type: string; source?: 'qc' | 'tuleap'; created_at: string; artifact_type: string; access_status: 'ok' | 'forbidden' | 'gone' | 'info'; priority: string | null; assignee_name: string | null; project_name: string | null; bug_display_id: string; bug_title: string; bug_status: string; bug_project_id: string }> }>(`/test-executions/test-runs/${testRunId}/bugs`),
 
     addBugToRun: (testRunId: string, bugId: string, relationshipType = 'found in') =>
         fetchApi<{ data: { id: string; bug_id: string; test_run_id: string; relationship_type: string } }>(`/test-executions/test-runs/${testRunId}/bugs`, {
@@ -2404,12 +2404,12 @@ export const landingPageApi = {
 // ============================================================================
 
 export const searchApi = {
-    search: (params: { q: string; type?: string; project_id?: string; limit?: number; include_archived?: boolean }) => {
+    search: (params: { q: string; type?: string; project_id?: string; limit?: number; include_archived?: boolean; status?: string; priority?: string; assignee?: string }) => {
         const clean: Record<string, string> = {};
         for (const [k, v] of Object.entries(params)) {
             if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
         }
-        return fetchApi<{ data: Array<{ type: string; id: string; display_id: string; title: string; project_id: string; project_name: string; status: string; url: string }>; meta: { q: string; limit: number; types: string[] } }>(`/search?${new URLSearchParams(clean).toString()}`);
+        return fetchApi<{ data: Array<{ type: string; id: string; display_id: string; title: string; project_id: string; project_name: string; status: string; priority?: string | null; assignee_name?: string | null; url: string }>; meta: { q: string; limit: number; types: string[]; filters?: { status?: string | null; priority?: string | null; assignee?: string | null } } }>(`/search?${new URLSearchParams(clean).toString()}`);
     },
 };
 

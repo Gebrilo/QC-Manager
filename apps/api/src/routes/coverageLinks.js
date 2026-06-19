@@ -10,6 +10,7 @@ const {
 } = require('../utils/linkRelationships');
 const { canPerform } = require('../access/AccessEngine');
 const { ARTIFACT_GATES } = require('../access/artifactLoaders');
+const { dispatchLinkNotification } = require('../services/notifications/dispatcher');
 
 const TABLES = {
     tasks: { table: 'tasks', key: 'task_id', title: 'task_name', deleted: true, artifactType: 'task', notFound: 'Task not found' },
@@ -42,15 +43,52 @@ function fields(alias, ref, label) {
     const fieldPrefix = label.replace(/-/g, '_');
     const extras = [];
     if (ref === 'tasks') {
+        // Legacy unprefixed columns kept for backward compat with older callers.
         extras.push(`${alias}.task_name AS task_name`, `${alias}.project_id AS project_id`);
+        extras.push(`${alias}.priority AS ${fieldPrefix}_priority`);
+        // task assignee: PRIMARY (or first) row in task_resource_assignment → resources.user_id → app_user.name
+        extras.push(`(
+            SELECT u.name
+              FROM task_resource_assignment tra
+              JOIN resources r ON r.id = tra.resource_id
+              LEFT JOIN app_user u ON u.id = r.user_id
+             WHERE tra.task_id = ${alias}.id
+               AND r.user_id IS NOT NULL
+               AND r.deleted_at IS NULL
+             ORDER BY (tra.assignment_type = 'PRIMARY') DESC, tra.created_at, tra.id
+             LIMIT 1
+        ) AS ${fieldPrefix}_assignee_name`);
     }
     if (ref === 'test_case') {
-        extras.push(`${alias}.priority AS test_case_priority`);
+        extras.push(`${alias}.priority AS ${fieldPrefix}_priority`);
+        // test_case.assigned_to is a UUID app_user.id directly (not a resource).
+        extras.push(`(SELECT u.name FROM app_user u WHERE u.id = ${alias}.assigned_to) AS ${fieldPrefix}_assignee_name`);
     }
+    if (ref === 'bugs') {
+        // Surface severity as the bug's "priority" — it's the field the dispatcher
+        // treats as significant and the field users filter on.
+        extras.push(`${alias}.severity AS ${fieldPrefix}_priority`);
+        // bugs.assigned_to is a Tuleap username (TEXT); match resources.resource_name → user_id.
+        extras.push(`(
+            SELECT u.name
+              FROM resources r
+              LEFT JOIN app_user u ON u.id = r.user_id
+             WHERE r.resource_name = ${alias}.assigned_to
+               AND r.user_id IS NOT NULL
+               AND r.deleted_at IS NULL
+             LIMIT 1
+        ) AS ${fieldPrefix}_assignee_name`);
+    }
+    if (ref === 'user_stories') {
+        extras.push(`${alias}.priority AS ${fieldPrefix}_priority`);
+        // Stories have no assignee column.
+    }
+    // test_suites and test_run: no priority/assignee surfaces — only status/project.
     return `${displayExpr(alias, ref)} AS "${fieldPrefix}_display_id",
             ${alias}.${meta.title} AS "${fieldPrefix}_title",
             ${alias}.status AS "${fieldPrefix}_status",
-            ${alias}.project_id AS "${fieldPrefix}_project_id"
+            ${alias}.project_id AS "${fieldPrefix}_project_id",
+            p.project_name AS "${fieldPrefix}_project_name"
             ${extras.length ? `, ${extras.join(', ')}` : ''}`;
 }
 
@@ -77,6 +115,19 @@ async function authorizeArtifact(req, res, artifact, verb) {
 
 function isCrossProject(own, other) {
     return (own.project_id || null) !== (other.project_id || null);
+}
+
+// Per-row instance-level access classification for linked targets.
+// Mirrors gateEntity() but inlines the load + canPerform so the route can
+// reuse the already-mocked deps in tests (ARTIFACT_GATES[...].load + canPerform).
+// Returns 'ok' | 'forbidden' | 'gone' | 'info'.
+async function classifyLinkAccess(otherType, otherId, user, req) {
+    const gate = ARTIFACT_GATES[otherType];
+    if (!gate) return 'info';
+    const artifact = await gate.load(otherId, user, req);
+    if (!artifact) return 'gone';
+    const result = await canPerform(user, artifact, 'view', req);
+    return result.allowed ? 'ok' : 'forbidden';
 }
 
 function artifactIdentity(ref, artifact, id) {
@@ -174,15 +225,45 @@ function addRoutes(router, pair, side) {
 
             const result = await pool.query(
                 `SELECT lk.id, lk.${pair.fromCol}, lk.${pair.toCol}, lk.relationship_type, lk.source, lk.created_at,
+                        other.deleted_at AS ${otherLabel.replace(/-/g, '_')}_deleted_at,
                         ${otherFields}
                  FROM ${pair.table} lk
                  JOIN ${otherMeta.table} other ON other.id = lk.${otherCol}
+                 LEFT JOIN projects p ON p.id = other.project_id
                  WHERE lk.${ownCol} = $1
-                   ${otherMeta.deleted ? 'AND other.deleted_at IS NULL' : ''}
                  ORDER BY lk.created_at DESC`,
                 [ownId]
             );
-            res.json({ data: result.rows });
+
+            // Per-row instance-level access check so callers can render
+            // redacted tombstones for deleted (gone) / inaccessible (forbidden)
+            // targets without leaking content across teams.
+            const otherType = otherMeta.artifactType;
+            const prefix = otherLabel.replace(/-/g, '_');
+            const data = [];
+            for (const row of result.rows) {
+                const otherId = row[otherCol];
+                let accessStatus = 'info';
+                try {
+                    accessStatus = await classifyLinkAccess(otherType, otherId, req.user, req);
+                    if (accessStatus === 'info') accessStatus = 'ok';
+                } catch (err) {
+                    // Defensive: never let a per-row access check blow up the list.
+                    accessStatus = 'ok';
+                }
+                data.push({
+                    ...row,
+                    artifact_type: otherType,
+                    access_status: accessStatus,
+                    // Normalized (prefix-free) fields so the frontend doesn't
+                    // need to know each pair's column prefix.
+                    priority: row[`${prefix}_priority`] ?? null,
+                    assignee_name: row[`${prefix}_assignee_name`] ?? null,
+                    project_name: row[`${prefix}_project_name`] ?? null,
+                });
+            }
+
+            res.json({ data });
         } catch (err) {
             next(err);
         }
@@ -236,6 +317,16 @@ function addRoutes(router, pair, side) {
                 isFrom ? other : own,
                 req
             );
+            // Fire-and-forget notification: assignee + creator of both sides,
+            // deduped, minus the actor. The source/target artifacts are already
+            // loaded with the fields resolveLinkEndpointRecipients needs.
+            dispatchLinkNotification({
+                action: 'CREATE',
+                relationshipType: result.rows[0].relationship_type,
+                source: isFrom ? own : other,
+                target: isFrom ? other : own,
+                actorEmail: req.user?.email || 'system',
+            }).catch(err => console.error('Link notification dispatch error:', err.message));
             res.status(201).json({ data: result.rows[0] });
         } catch (err) {
             next(err);
@@ -277,6 +368,14 @@ function addRoutes(router, pair, side) {
                 isFrom ? other : own,
                 req
             );
+            // Fire-and-forget notification: same recipient rule as CREATE.
+            dispatchLinkNotification({
+                action: 'DELETE',
+                relationshipType: result.rows[0].relationship_type,
+                source: isFrom ? own : other,
+                target: isFrom ? other : own,
+                actorEmail: req.user?.email || 'system',
+            }).catch(err => console.error('Link notification dispatch error:', err.message));
             res.json({ success: true, message: 'Link removed' });
         } catch (err) {
             next(err);

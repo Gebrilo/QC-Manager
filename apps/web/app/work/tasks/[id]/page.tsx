@@ -434,6 +434,11 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     href: `/test/cases/${row.test_case_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'covers',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'covers') => {
@@ -465,6 +470,11 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     href: `/work/bugs/${row.bug_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'blocks',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'blocks') => {
@@ -496,6 +506,11 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     href: `/test/runs/${row.test_run_id}`,
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'exercised by',
+                    artifactType: row.artifact_type,
+                    accessStatus: row.access_status,
+                    priority: row.priority,
+                    assigneeName: row.assignee_name,
+                    projectName: row.project_name,
                 }));
             },
             add: async (items: ArtifactPickerItem[], relationshipType = 'exercised by') => {

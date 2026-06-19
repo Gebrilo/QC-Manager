@@ -2,6 +2,7 @@ const mockQuery = jest.fn();
 const mockCanPerform = jest.fn();
 const mockLoadArtifact = jest.fn();
 const mockAuditLog = jest.fn();
+const mockDispatchLink = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery },
@@ -35,6 +36,10 @@ jest.mock('../src/access/artifactLoaders', () => ({
         test_suite: { load: (...args) => mockLoadArtifact('test_suite', ...args) },
         test_run: { load: (...args) => mockLoadArtifact('test_run', ...args) },
     },
+}));
+
+jest.mock('../src/services/notifications/dispatcher', () => ({
+    dispatchLinkNotification: (...args) => mockDispatchLink(...args),
 }));
 
 const express = require('express');
@@ -76,6 +81,7 @@ describe('Coverage link router', () => {
         mockCanPerform.mockResolvedValue({ allowed: true, branch: 'test' });
         mockLoadArtifact.mockImplementation((_type, id) => artifactById()[id] || null);
         mockAuditLog.mockResolvedValue(undefined);
+        mockDispatchLink.mockResolvedValue(undefined);
     });
 
     test('lists bug test cases from the generic link table', async () => {
@@ -164,6 +170,13 @@ describe('Coverage link router', () => {
             null,
             'system'
         );
+        // #246: link notification dispatcher is invoked with both endpoints.
+        expect(mockDispatchLink).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'CREATE',
+            relationshipType: 'reveals',
+            source: expect.objectContaining({ type: 'bug', id: bugId }),
+            target: expect.objectContaining({ type: 'test_case', id: testCaseId }),
+        }));
     });
 
     test('denies create when source instance edit access is missing', async () => {
@@ -322,6 +335,11 @@ describe('Coverage link router', () => {
             }),
             'system'
         );
+        // #246: link notification dispatcher fires on DELETE too.
+        expect(mockDispatchLink).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'DELETE',
+            relationshipType: 'blocks',
+        }));
     });
 
     test('supports task to test run links through the generic router', async () => {
@@ -433,5 +451,150 @@ describe('Coverage link router', () => {
         expect(res.status).toBe(200);
         expect(res.body.data[0].test_case_id).toBe(testCaseId);
         expect(mockQuery.mock.calls[0][0]).toContain('FROM test_case_user_stories');
+    });
+
+    describe('GET linked rows — enrichment + tombstones (#241)', () => {
+        test('enriches each row with type, project_name, priority, assignee_name, and access_status=ok', async () => {
+            mockQuery.mockResolvedValueOnce({
+                rows: [{
+                    id: linkId,
+                    bug_id: bugId,
+                    task_id: taskId,
+                    relationship_type: 'blocks',
+                    source: 'qc',
+                    task_deleted_at: null,
+                    task_display_id: 'TASK-001',
+                    task_title: 'Fix login',
+                    task_status: 'In Progress',
+                    task_project_id: projectId,
+                    task_project_name: 'CST',
+                    task_priority: 'High',
+                    task_assignee_name: 'Alice',
+                }],
+            });
+
+            const res = await request(app).get(`/bugs/${bugId}/tasks`);
+
+            expect(res.status).toBe(200);
+            const row = res.body.data[0];
+            expect(row.artifact_type).toBe('task');
+            expect(row.access_status).toBe('ok');
+            expect(row.task_project_name).toBe('CST');
+            expect(row.task_priority).toBe('High');
+            expect(row.task_assignee_name).toBe('Alice');
+            expect(row.task_deleted_at).toBeNull();
+
+            const sql = mockQuery.mock.calls[0][0];
+            expect(sql).toContain('LEFT JOIN projects p ON p.id = other.project_id');
+            expect(sql).toContain('task_priority');
+            expect(sql).toContain('task_assignee_name');
+            expect(sql).toContain('task_project_name');
+            expect(sql).not.toContain('AND other.deleted_at IS NULL');
+        });
+
+        test('classifies a deleted target as access_status=gone (Deleted tombstone)', async () => {
+            // Load the task → returns null (simulates soft-deleted row).
+            mockLoadArtifact.mockImplementation((_type, id) => {
+                if (id === taskId) return null;
+                return artifactById()[id] || null;
+            });
+            mockQuery.mockResolvedValueOnce({
+                rows: [{
+                    id: linkId,
+                    bug_id: bugId,
+                    task_id: taskId,
+                    relationship_type: 'blocks',
+                    source: 'qc',
+                    task_deleted_at: '2026-06-01T00:00:00.000Z',
+                    task_display_id: 'TASK-001',
+                    task_title: 'Fix login',
+                    task_status: 'In Progress',
+                    task_project_id: projectId,
+                    task_project_name: 'CST',
+                    task_priority: 'High',
+                    task_assignee_name: 'Alice',
+                }],
+            });
+
+            const res = await request(app).get(`/bugs/${bugId}/tasks`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data[0].access_status).toBe('gone');
+            expect(res.body.data[0].artifact_type).toBe('task');
+            // Even for gone rows, the SQL data is preserved — the frontend
+            // decides what to redact based on access_status.
+            expect(res.body.data[0].task_deleted_at).not.toBeNull();
+        });
+
+        test('classifies an inaccessible target as access_status=forbidden (Restricted tombstone)', async () => {
+            // Bug is viewable (own), but the linked task is not.
+            mockCanPerform.mockImplementation((_user, artifact, verb) => {
+                if (artifact && artifact.id === taskId && verb === 'view') {
+                    return Promise.resolve({ allowed: false, reason: 'team_mismatch' });
+                }
+                return Promise.resolve({ allowed: true, branch: 'test' });
+            });
+            mockQuery.mockResolvedValueOnce({
+                rows: [{
+                    id: linkId,
+                    bug_id: bugId,
+                    task_id: taskId,
+                    relationship_type: 'blocks',
+                    source: 'qc',
+                    task_deleted_at: null,
+                    task_display_id: 'TASK-001',
+                    task_title: 'Fix login',
+                    task_status: 'In Progress',
+                    task_project_id: projectId,
+                    task_project_name: 'CST',
+                    task_priority: 'High',
+                    task_assignee_name: 'Alice',
+                }],
+            });
+
+            const res = await request(app).get(`/bugs/${bugId}/tasks`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data[0].access_status).toBe('forbidden');
+            expect(res.body.data[0].artifact_type).toBe('task');
+        });
+
+        test('never lets a per-row access error break the whole list (defensive fallback)', async () => {
+            mockCanPerform.mockImplementation((_user, _artifact, _verb) => {
+                return Promise.reject(new Error('boom'));
+            });
+            // The own-side view check also throws → request fails before the loop,
+            // so use a fresh app setup that lets the own-side succeed.
+            mockCanPerform.mockReset();
+            mockCanPerform.mockImplementation((_user, artifact, verb) => {
+                if (artifact && artifact.id === taskId && verb === 'view') {
+                    return Promise.reject(new Error('per-row boom'));
+                }
+                return Promise.resolve({ allowed: true, branch: 'test' });
+            });
+            mockQuery.mockResolvedValueOnce({
+                rows: [{
+                    id: linkId,
+                    bug_id: bugId,
+                    task_id: taskId,
+                    relationship_type: 'blocks',
+                    source: 'qc',
+                    task_deleted_at: null,
+                    task_display_id: 'TASK-001',
+                    task_title: 'Fix login',
+                    task_status: 'In Progress',
+                    task_project_id: projectId,
+                    task_project_name: 'CST',
+                    task_priority: 'High',
+                    task_assignee_name: 'Alice',
+                }],
+            });
+
+            const res = await request(app).get(`/bugs/${bugId}/tasks`);
+
+            expect(res.status).toBe(200);
+            // The error was swallowed — fallback to 'ok' so the row still renders.
+            expect(res.body.data[0].access_status).toBe('ok');
+        });
     });
 });
