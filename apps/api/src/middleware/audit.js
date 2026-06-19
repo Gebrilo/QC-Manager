@@ -33,18 +33,20 @@ const auditLog = async (entityType, entityId, action, afterState = null, beforeS
 
         await db.query(
             `INSERT INTO audit_log (
-                entity_type, entity_uuid, entity_key, action,
+                entity_type, entity_uuid, entity_id, entity_key, action,
                 before_state, after_state, changed_fields,
-                change_summary, user_email
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                details, change_summary, user_email
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
                 entityType,
+                isUuid ? entityId : null,
                 isUuid ? entityId : null,
                 isUuid ? null : String(entityId),
                 action,
                 beforeState ? JSON.stringify(beforeState) : null,
                 afterState ? JSON.stringify(afterState) : null,
                 changedFields,
+                afterState || beforeState ? JSON.stringify(afterState || beforeState) : null,
                 summary,
                 userEmail
             ]

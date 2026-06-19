@@ -1,6 +1,7 @@
 const mockQuery = jest.fn();
 const mockCanPerform = jest.fn();
 const mockLoadArtifact = jest.fn();
+const mockAuditLog = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery },
@@ -18,7 +19,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
 }));
 
 jest.mock('../src/middleware/audit', () => ({
-    auditLog: jest.fn().mockResolvedValue(undefined),
+    auditLog: (...args) => mockAuditLog(...args),
 }));
 
 jest.mock('../src/access/AccessEngine', () => ({
@@ -50,10 +51,10 @@ describe('Coverage link router', () => {
     const linkId = '44444444-4444-4444-4444-444444444444';
 
     const artifactById = () => ({
-        [bugId]: { type: 'bug', id: bugId, project_id: projectId },
-        [taskId]: { type: 'task', id: taskId, project_id: projectId },
-        [testCaseId]: { type: 'test_case', id: testCaseId, project_id: projectId },
-        [userStoryId]: { type: 'user_story', id: userStoryId, project_id: projectId },
+        [bugId]: { type: 'bug', id: bugId, display_id: 'BUG-001', title: 'Login bug', project_id: projectId },
+        [taskId]: { type: 'task', id: taskId, display_id: 'TASK-001', title: 'Fix login', project_id: projectId },
+        [testCaseId]: { type: 'test_case', id: testCaseId, display_id: 'TC-001', title: 'Login failure', project_id: projectId },
+        [userStoryId]: { type: 'user_story', id: userStoryId, display_id: 'US-001', title: 'Login flow', project_id: projectId },
     });
 
     beforeEach(() => {
@@ -66,6 +67,7 @@ describe('Coverage link router', () => {
         jest.clearAllMocks();
         mockCanPerform.mockResolvedValue({ allowed: true, branch: 'test' });
         mockLoadArtifact.mockImplementation((_type, id) => artifactById()[id] || null);
+        mockAuditLog.mockResolvedValue(undefined);
     });
 
     test('lists bug test cases from the generic link table', async () => {
@@ -119,6 +121,41 @@ describe('Coverage link router', () => {
         expect(mockCanPerform).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ type: 'test_case', id: testCaseId }), 'view', expect.anything());
         expect(mockQuery.mock.calls[0][0]).toContain('source');
         expect(mockQuery.mock.calls[1][0]).toContain("triage_status = 'triaged'");
+        expect(mockAuditLog).toHaveBeenCalledWith('bug_test_cases', linkId, 'CREATE', expect.objectContaining({ id: linkId }), null, 'system');
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'bug',
+            bugId,
+            'CREATE',
+            expect.objectContaining({
+                event_type: 'artifact_link',
+                action: 'CREATE',
+                link_table: 'bug_test_cases',
+                link_id: linkId,
+                relationship_type: 'reveals',
+                actor_id: '22222222-2222-2222-2222-222222222222',
+                artifact: expect.objectContaining({ type: 'bug', id: bugId, display_id: 'BUG-001' }),
+                counterpart: expect.objectContaining({ type: 'test_case', id: testCaseId, display_id: 'TC-001' }),
+                direction: 'from',
+            }),
+            null,
+            'system'
+        );
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'test_case',
+            testCaseId,
+            'CREATE',
+            expect.objectContaining({
+                event_type: 'artifact_link',
+                action: 'CREATE',
+                link_table: 'bug_test_cases',
+                relationship_type: 'reveals',
+                artifact: expect.objectContaining({ type: 'test_case', id: testCaseId, display_id: 'TC-001' }),
+                counterpart: expect.objectContaining({ type: 'bug', id: bugId, display_id: 'BUG-001' }),
+                direction: 'to',
+            }),
+            null,
+            'system'
+        );
     });
 
     test('denies create when source instance edit access is missing', async () => {
@@ -227,6 +264,56 @@ describe('Coverage link router', () => {
         expect(res.status).toBe(403);
         expect(res.body.error).toContain('Tuleap-sourced');
         expect(mockCanPerform).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ id: bugId }), 'edit', expect.anything());
+    });
+
+    test('deleting a link writes audit entries keyed to both artifacts', async () => {
+        mockQuery.mockResolvedValueOnce({
+            rows: [{
+                id: linkId,
+                bug_id: bugId,
+                task_id: taskId,
+                relationship_type: 'blocks',
+                source: 'qc',
+            }],
+        });
+
+        const res = await request(app).delete(`/bugs/${bugId}/tasks/${taskId}`);
+
+        expect(res.status).toBe(200);
+        expect(mockAuditLog).toHaveBeenCalledWith('bug_tasks', linkId, 'DELETE', null, expect.objectContaining({ id: linkId }), 'system');
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'bug',
+            bugId,
+            'DELETE',
+            null,
+            expect.objectContaining({
+                event_type: 'artifact_link',
+                action: 'DELETE',
+                link_table: 'bug_tasks',
+                link_id: linkId,
+                relationship_type: 'blocks',
+                artifact: expect.objectContaining({ type: 'bug', id: bugId, display_id: 'BUG-001' }),
+                counterpart: expect.objectContaining({ type: 'task', id: taskId, display_id: 'TASK-001' }),
+                direction: 'from',
+            }),
+            'system'
+        );
+        expect(mockAuditLog).toHaveBeenCalledWith(
+            'task',
+            taskId,
+            'DELETE',
+            null,
+            expect.objectContaining({
+                event_type: 'artifact_link',
+                action: 'DELETE',
+                link_table: 'bug_tasks',
+                relationship_type: 'blocks',
+                artifact: expect.objectContaining({ type: 'task', id: taskId, display_id: 'TASK-001' }),
+                counterpart: expect.objectContaining({ type: 'bug', id: bugId, display_id: 'BUG-001' }),
+                direction: 'to',
+            }),
+            'system'
+        );
     });
 
     test('denies deletion when source instance edit access is missing', async () => {

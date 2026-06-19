@@ -71,6 +71,78 @@ function isCrossProject(own, other) {
     return (own.project_id || null) !== (other.project_id || null);
 }
 
+function artifactIdentity(ref, artifact, id) {
+    return {
+        type: artifact?.type || TABLES[ref].artifactType,
+        id: artifact?.id || id,
+        display_id: artifact?.display_id || artifact?.id || id,
+        title: artifact?.title || null,
+    };
+}
+
+function linkAuditPayload({ pair, link, action, artifact, counterpart, direction, req, occurredAt }) {
+    return {
+        event_type: 'artifact_link',
+        action,
+        link_table: pair.table,
+        link_id: link.id,
+        relationship_type: link.relationship_type || pair.relDefault,
+        source: link.source || 'qc',
+        actor_id: req.user?.id || null,
+        actor_email: req.user?.email || null,
+        occurred_at: occurredAt,
+        artifact,
+        counterpart,
+        direction,
+    };
+}
+
+async function auditLinkForArtifacts(pair, link, action, fromArtifact, toArtifact, req) {
+    const occurredAt = new Date().toISOString();
+    const actorEmail = req.user?.email || 'system';
+    const fromIdentity = artifactIdentity(pair.fromRef, fromArtifact, link[pair.fromCol]);
+    const toIdentity = artifactIdentity(pair.toRef, toArtifact, link[pair.toCol]);
+    const afterForCreate = action === 'CREATE';
+
+    const fromPayload = linkAuditPayload({
+        pair,
+        link,
+        action,
+        artifact: fromIdentity,
+        counterpart: toIdentity,
+        direction: 'from',
+        req,
+        occurredAt,
+    });
+    await auditLog(
+        fromIdentity.type,
+        fromIdentity.id,
+        action,
+        afterForCreate ? fromPayload : null,
+        afterForCreate ? null : fromPayload,
+        actorEmail
+    );
+
+    const toPayload = linkAuditPayload({
+        pair,
+        link,
+        action,
+        artifact: toIdentity,
+        counterpart: fromIdentity,
+        direction: 'to',
+        req,
+        occurredAt,
+    });
+    await auditLog(
+        toIdentity.type,
+        toIdentity.id,
+        action,
+        afterForCreate ? toPayload : null,
+        afterForCreate ? null : toPayload,
+        actorEmail
+    );
+}
+
 function addRoutes(router, pair, side) {
     const isFrom = side === 'from';
     const ownRef = isFrom ? pair.fromRef : pair.toRef;
@@ -147,7 +219,15 @@ function addRoutes(router, pair, side) {
                 await pool.query(`UPDATE bugs SET triage_status = 'triaged', updated_at = NOW() WHERE id = $1 AND triage_status = 'untriaged'`, [bugId]);
             }
 
-            await auditLog(pair.table, result.rows[0].id, 'CREATE', result.rows[0], null);
+            await auditLog(pair.table, result.rows[0].id, 'CREATE', result.rows[0], null, req.user?.email || 'system');
+            await auditLinkForArtifacts(
+                pair,
+                result.rows[0],
+                'CREATE',
+                isFrom ? own : other,
+                isFrom ? other : own,
+                req
+            );
             res.status(201).json({ data: result.rows[0] });
         } catch (err) {
             next(err);
@@ -179,7 +259,16 @@ function addRoutes(router, pair, side) {
                 return res.status(404).json({ error: 'Link not found' });
             }
 
-            await auditLog(pair.table, result.rows[0].id, 'DELETE', null, result.rows[0]);
+            const other = await getArtifact(otherRef, otherId, req.user, req);
+            await auditLog(pair.table, result.rows[0].id, 'DELETE', null, result.rows[0], req.user?.email || 'system');
+            await auditLinkForArtifacts(
+                pair,
+                result.rows[0],
+                'DELETE',
+                isFrom ? own : other,
+                isFrom ? other : own,
+                req
+            );
             res.json({ success: true, message: 'Link removed' });
         } catch (err) {
             next(err);

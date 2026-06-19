@@ -8,7 +8,7 @@ const { canPerform } = require('./AccessEngine');
 // matches the isAssignee branch (mirrors resolveTaskAccessAssigneeResourceId).
 async function loadTaskArtifact(taskId, user, req) {
     const t = await db.query(
-        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope
+        `SELECT id, task_id, task_name, project_id, owner_team_id, created_by_user_id, visibility_scope
            FROM tasks WHERE id = $1 AND deleted_at IS NULL`,
         [taskId]
     );
@@ -32,6 +32,8 @@ async function loadTaskArtifact(taskId, user, req) {
     return {
         type: 'task',
         id: row.id,
+        display_id: row.task_id || row.id,
+        title: row.task_name || null,
         project_id: row.project_id,
         owner_team_id: row.owner_team_id,
         owner_user_id: row.created_by_user_id,
@@ -48,7 +50,7 @@ async function loadTaskArtifact(taskId, user, req) {
 // owner_resource_id (immutable) so it acts as a secondary assignee match.
 async function loadBugArtifact(bugId, user, req) {
     const b = await db.query(
-        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope,
+        `SELECT id, bug_id, title, project_id, owner_team_id, created_by_user_id, visibility_scope,
                 assigned_to, owner_resource_id
            FROM bugs WHERE id = $1 AND deleted_at IS NULL`,
         [bugId]
@@ -73,6 +75,8 @@ async function loadBugArtifact(bugId, user, req) {
     return {
         type: 'bug',
         id: row.id,
+        display_id: row.bug_id || row.id,
+        title: row.title || null,
         project_id: row.project_id,
         owner_team_id: row.owner_team_id,
         owner_user_id: row.created_by_user_id,
@@ -87,7 +91,7 @@ async function loadBugArtifact(bugId, user, req) {
 // created_by_user_id (the story creator) — no assignee_resource_id is set.
 async function loadUserStoryArtifact(storyId, user, req) {
     const s = await db.query(
-        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope
+        `SELECT id, title, tuleap_artifact_id, project_id, owner_team_id, created_by_user_id, visibility_scope
            FROM user_stories WHERE id = $1 AND deleted_at IS NULL`,
         [storyId]
     );
@@ -97,6 +101,8 @@ async function loadUserStoryArtifact(storyId, user, req) {
     return {
         type: 'user_story',
         id: row.id,
+        display_id: row.tuleap_artifact_id ? `US-${row.tuleap_artifact_id}` : row.id,
+        title: row.title || null,
         project_id: row.project_id,
         owner_team_id: row.owner_team_id,
         owner_user_id: row.created_by_user_id,
@@ -114,7 +120,7 @@ async function loadUserStoryArtifact(storyId, user, req) {
 // the creator).
 async function loadTestCaseArtifact(testCaseId, user, req) {
     const t = await db.query(
-        `SELECT id, project_id, owner_team_id, created_by_user_id, visibility_scope,
+        `SELECT id, test_case_id, title, project_id, owner_team_id, created_by_user_id, visibility_scope,
                 assigned_to
            FROM test_case WHERE id = $1 AND deleted_at IS NULL`,
         [testCaseId]
@@ -125,6 +131,8 @@ async function loadTestCaseArtifact(testCaseId, user, req) {
     return {
         type: 'test_case',
         id: row.id,
+        display_id: row.test_case_id || row.id,
+        title: row.title || null,
         project_id: row.project_id,
         owner_team_id: row.owner_team_id,
         owner_user_id: row.created_by_user_id,
