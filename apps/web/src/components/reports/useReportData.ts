@@ -175,14 +175,14 @@ async function fetchCoverage({ projectId }: FetcherParams): Promise<ReportOverri
 
 // ─── Project Status ───────────────────────────────────────────────────────────
 
-async function fetchProjectStatus({ projectId }: FetcherParams): Promise<ReportOverride> {
+export async function fetchProjectStatus({ projectId }: FetcherParams): Promise<ReportOverride> {
     const all = await getProjectHealth();
     const data = projectId ? all.filter(d => d.project_id === projectId) : all;
     if (!data.length) throw new Error('no data');
 
     const atRisk = data.filter(d => d.overall_health_status === 'RED').length;
     const avgPass = Math.round(data.reduce((s, d) => s + p(d.latest_pass_rate_pct), 0) / data.length);
-    const totalTasks = data.reduce((s, d) => s + d.total_tasks, 0);
+    const totalTasks = data.reduce((s, d) => s + p(d.total_tasks), 0);
 
     function healthToStatus(s: string): ReportStatus {
         if (s === 'GREEN') return 'complete';
