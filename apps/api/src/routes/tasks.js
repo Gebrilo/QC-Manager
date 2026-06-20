@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
+router.param('id', resolveArtifactParam('task'));
 const db = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');

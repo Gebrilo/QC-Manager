@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
+router.param('id', resolveArtifactParam('user_story'));
 const { pool } = require('../config/db');
 const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { auditLog } = require('../middleware/audit');
@@ -135,9 +137,8 @@ router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, 
 router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
-        const isTuleapId = /^\d+$/.test(id);
-        const whereClause = isTuleapId ? 'us.tuleap_artifact_id = $1' : 'us.id = $1';
-        const paramValue = isTuleapId ? parseInt(id, 10) : id;
+        const whereClause = 'us.id = $1';
+        const paramValue = id;
         const result = await pool.query(
             `SELECT us.*, p.project_name
              FROM user_stories us
