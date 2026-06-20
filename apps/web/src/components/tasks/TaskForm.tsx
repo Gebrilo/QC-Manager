@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
+import { UserStoryPicker } from '@/components/shared/UserStoryPicker';
 import { Project, Resource, Task } from '@/types';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
@@ -105,7 +106,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const { register, handleSubmit, formState: { errors }, watch } = useForm<FormData>({
+    const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<FormData>({
         resolver: zodResolver(taskSchema) as any,
         mode: 'onChange',
         defaultValues: {
@@ -181,7 +182,7 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
                 actual_start_date: data.actual_start_date || undefined,
                 deadline: data.deadline || undefined,
                 completed_date: data.completed_date || undefined,
-                parent_user_story_id: data.parent_user_story_id || undefined,
+                parent_user_story_id: isEdit ? (data.parent_user_story_id || null) : (data.parent_user_story_id || undefined),
             };
 
             if (isEdit && initialData) {
@@ -428,11 +429,12 @@ export function TaskForm({ initialData, projects, resources, isEdit }: TaskFormP
             </FormSection>
 
             <FormSection title="Links">
-                <Input
+                <UserStoryPicker
                     label="Parent User Story"
-                    {...register('parent_user_story_id')}
-                    placeholder="User story UUID (or use search)"
-                    className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    projectId={projectIdValue}
+                    value={watch('parent_user_story_id')}
+                    initialValueId={(initialData as any)?.parent_user_story_id}
+                    onChange={(id) => setValue('parent_user_story_id', id ?? '', { shouldValidate: true })}
                 />
             </FormSection>
 

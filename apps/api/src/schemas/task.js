@@ -37,7 +37,8 @@ const baseTaskSchema = z.object({
 
     tags: z.array(z.string()).optional(),
     notes: z.string().optional(),
-    completed_date: z.string().date().optional()
+    completed_date: z.string().date().optional(),
+    parent_user_story_id: z.string().uuid().optional()
 });
 
 const createTaskSchema = baseTaskSchema.refine(data => {
@@ -46,7 +47,7 @@ const createTaskSchema = baseTaskSchema.refine(data => {
 }, { message: "completed_date is required when status is Done", path: ["completed_date"] });
 
 const updateTaskSchema = baseTaskSchema.partial().omit({ task_id: true }).extend({
-    parent_user_story_id: z.string().uuid().optional(),
+    parent_user_story_id: z.string().uuid().nullable().optional(),
 });
 
 module.exports = {

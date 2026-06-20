@@ -9,6 +9,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import { Project, Resource } from '@/types';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { UserStoryPicker } from '@/components/shared/UserStoryPicker';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
@@ -387,7 +388,7 @@ function CreateForm({
     const [activeSection, setActiveSection] = useState('task-general');
     const [tempId] = useState(() => (typeof crypto !== 'undefined' ? crypto.randomUUID() : `tmp-${Date.now()}`));
 
-    const { register, handleSubmit, watch, control, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, control, setValue, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         mode: 'onChange',
         defaultValues: {
@@ -885,11 +886,11 @@ function CreateForm({
                         columns={1}
                     >
                         <div>
-                            <FieldLabel>Parent User Story</FieldLabel>
-                            <input
-                                {...register('parent_user_story_id')}
-                                placeholder="User story UUID"
-                                className={fieldCls}
+                            <UserStoryPicker
+                                label="Parent User Story"
+                                projectId={projectIdValue}
+                                value={watch('parent_user_story_id')}
+                                onChange={(id) => setValue('parent_user_story_id', id ?? '', { shouldValidate: true, shouldDirty: true })}
                             />
                             <FieldError message={errors.parent_user_story_id?.message} />
                         </div>

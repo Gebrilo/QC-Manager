@@ -9,6 +9,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import { Task, Project, Resource } from '@/types';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { UserStoryPicker } from '@/components/shared/UserStoryPicker';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import {
@@ -394,7 +395,7 @@ function EditForm({
     const [activeSection, setActiveSection] = useState('task-general');
     const assignmentDefaults = getTaskAssignmentDefaults(task);
 
-    const { register, handleSubmit, watch, control, formState: { errors, isDirty } } = useForm<FormData>({
+    const { register, handleSubmit, watch, control, setValue, formState: { errors, isDirty } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
             task_id: task.task_id || '',
@@ -470,7 +471,7 @@ function EditForm({
                 completed_date: data.completed_date || undefined,
                 estimate_days,
                 assignments,
-                parent_user_story_id: data.parent_user_story_id || undefined,
+                parent_user_story_id: data.parent_user_story_id || null,
             };
             await fetchApi(`/tasks/${task.id}`, {
                 method: 'PATCH',
@@ -883,11 +884,12 @@ function EditForm({
                         columns={1}
                     >
                         <div>
-                            <FieldLabel>Parent User Story</FieldLabel>
-                            <input
-                                {...register('parent_user_story_id')}
-                                placeholder="User story UUID"
-                                className={fieldCls}
+                            <UserStoryPicker
+                                label="Parent User Story"
+                                projectId={watch('project_id')}
+                                value={watch('parent_user_story_id')}
+                                initialValueId={task.parent_user_story_id}
+                                onChange={(id) => setValue('parent_user_story_id', id ?? '', { shouldValidate: true, shouldDirty: true })}
                             />
                             <FieldError message={errors.parent_user_story_id?.message} />
                         </div>

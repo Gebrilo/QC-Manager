@@ -181,6 +181,32 @@ describe('POST/PATCH /tasks — description column mapping', () => {
         expect(insert.params[9]).toBeNull();
     });
 
+    test('create persists parent_user_story_id when provided', async () => {
+        const parentUserStoryId = '22222222-2222-4222-8222-222222222222';
+        setRole('admin');
+        wireTaskWriteQueries({
+            id: 'task-created',
+            project_id: PROJECT_ID,
+            task_name: 'Mapped task',
+            parent_user_story_id: parentUserStoryId,
+        });
+
+        const res = await request(makeApp())
+            .post('/tasks')
+            .send({
+                task_id: 'TSK-PARENT-1',
+                project_id: PROJECT_ID,
+                task_name: 'Mapped task',
+                parent_user_story_id: parentUserStoryId,
+            });
+
+        expect(res.status).toBe(201);
+        const insert = queries.find(q => /INSERT INTO tasks/i.test(q.sql));
+        expect(insert).toBeDefined();
+        expect(insert.sql).toMatch(/parent_user_story_id/);
+        expect(insert.params).toContain(parentUserStoryId);
+    });
+
     test('update maps description patches to tasks.description, not notes', async () => {
         setRole('admin');
         wireTaskWriteQueries({
@@ -204,6 +230,59 @@ describe('POST/PATCH /tasks — description column mapping', () => {
         expect(update).toBeDefined();
         expect(update.sql).not.toMatch(/notes =/);
         expect(update.params).toEqual(['Updated task details', 'task-1']);
+    });
+
+    test('update accepts parent_user_story_id null and writes it for audit-backed clearing', async () => {
+        const parentUserStoryId = '22222222-2222-4222-8222-222222222222';
+        setRole('admin');
+        wireTaskWriteQueries({
+            id: 'task-1',
+            project_id: PROJECT_ID,
+            task_name: 'Mapped task',
+            status: 'Todo',
+            owner_team_id: 'team-x',
+            visibility_scope: 'team',
+            created_by_user_id: 'u-admin',
+            parent_user_story_id: parentUserStoryId,
+        });
+        queryHandler = async (sql) => {
+            if (/SELECT \* FROM tasks WHERE id = \$1/.test(sql)) {
+                return { rows: [{
+                    id: 'task-1',
+                    project_id: PROJECT_ID,
+                    task_name: 'Mapped task',
+                    status: 'Todo',
+                    owner_team_id: 'team-x',
+                    visibility_scope: 'team',
+                    created_by_user_id: 'u-admin',
+                    parent_user_story_id: parentUserStoryId,
+                }] };
+            }
+            if (/UPDATE tasks SET parent_user_story_id = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(sql)) {
+                return { rows: [{
+                    id: 'task-1',
+                    project_id: PROJECT_ID,
+                    task_name: 'Mapped task',
+                    status: 'Todo',
+                    parent_user_story_id: null,
+                }] };
+            }
+            if (/FROM tuleap_sync_config/.test(sql)) return { rows: [] };
+            if (/UPDATE tasks SET sync_status = 'standalone'/.test(sql)) return { rows: [] };
+            if (/SELECT \* FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) {
+                return { rows: [{ id: 'task-1', parent_user_story_id: null }] };
+            }
+            return { rows: [] };
+        };
+
+        const res = await request(makeApp())
+            .patch('/tasks/task-1')
+            .send({ parent_user_story_id: null });
+
+        expect(res.status).toBe(200);
+        const update = queries.find(q => /UPDATE tasks SET parent_user_story_id = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(q.sql));
+        expect(update).toBeDefined();
+        expect(update.params).toEqual([null, 'task-1']);
     });
 });
 

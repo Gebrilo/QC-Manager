@@ -324,10 +324,11 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
                 estimate_days,
                 deadline, tags, notes, completed_date,
                 expected_start_date, actual_start_date,
+                parent_user_story_id,
                 owner_team_id, visibility_scope, created_by_user_id
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, $16
+                $12, $13, $14, $15, $16, $17
             ) RETURNING *
         `;
 
@@ -337,6 +338,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
             data.estimate_days,
             data.deadline, data.tags, data.notes || null, data.completed_date,
             data.expected_start_date || null, data.actual_start_date || null,
+            data.parent_user_story_id || null,
             accessDefaults.owner_team_id, accessDefaults.visibility_scope, req.user?.id || null,
         ];
 
