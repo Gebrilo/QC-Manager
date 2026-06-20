@@ -199,7 +199,7 @@ function WorkloadCard({ members }: { members: Member[] }) {
     }, [members]);
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="glass-card overflow-hidden rounded-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-slate-400" />
@@ -404,7 +404,7 @@ function TeamTasksCard({
     }, [tasks, filter, query]);
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="glass-card overflow-hidden rounded-2xl">
             <div className="border-b border-slate-100 px-5 pb-3.5 pt-4 dark:border-slate-800">
                 <div className="mb-3.5 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -486,17 +486,38 @@ export default function TeamManagerDashboardClient() {
         return { tasks, done, active, overCap, overSub };
     }, [data]);
 
-    if (error) return <div className="p-6 text-rose-600">{error}</div>;
-    if (!data || !derived) return <div className="p-6 text-slate-600 dark:text-slate-300">Loading…</div>;
+    if (error) {
+        return (
+            <div className="glass-card rounded-2xl p-8 text-center">
+                <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-rose-500" />
+                <p className="text-base font-semibold text-rose-700 dark:text-rose-300">Failed to load team dashboard</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error}</p>
+                <button onClick={load} className="mt-3 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">Try again</button>
+            </div>
+        );
+    }
+    if (!data || !derived) {
+        return (
+            <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="glass-card h-24 animate-pulse rounded-xl" />
+                    ))}
+                </div>
+                <div className="glass-card h-64 animate-pulse rounded-2xl" />
+                <div className="glass-card h-80 animate-pulse rounded-2xl" />
+            </div>
+        );
+    }
 
     const { tasks, done, active, overCap, overSub } = derived;
     const blocked = data.blocked_items.length;
     const overdue = data.overdue_items.length;
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-6 animate-in fade-in duration-700">
             {/* Header */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="glass-card flex items-start justify-between gap-4 rounded-2xl p-5">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Team Manager Dashboard</h1>
                     <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">

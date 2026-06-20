@@ -13,14 +13,14 @@ const SEVERITY_COLORS: Record<string, string> = {
 export default function BugSeverityChart({ data }: { data: Record<string, number> }) {
     const rows = Object.entries(data).map(([k, v]) => ({ name: k, value: v }));
     return (
-        <div>
-            <div className="mb-2 text-sm font-medium">Bugs by severity</div>
+        <div className="rounded-2xl border border-slate-200/60 p-4 dark:border-slate-700/50">
+            <div className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Bugs by severity</div>
             <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rows}>
                     <XAxis dataKey="name" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="value">
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                         {rows.map(r => <Cell key={r.name} fill={SEVERITY_COLORS[r.name] || '#6b7280'} />)}
                     </Bar>
                 </BarChart>
