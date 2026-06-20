@@ -24,6 +24,7 @@ import { taskStatusRegistry } from '@/lib/statusRegistry';
 import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
 import { QCCard, SectionLabel } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
+import { getTaskTimeRemainingState } from '@/lib/taskTimeRemaining';
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -73,10 +74,8 @@ export default function TaskDetailPage() {
     if (!task) return <div className="p-10 text-center text-slate-500">Task not found</div>;
 
     const status = task.status || '';
-    const progress = Number(task.overall_completion_pct || 0);
-    const statusOption = taskStatusRegistry.getOption(status);
-    const progressGradient = statusOption.progressGradient || 'from-slate-400 to-slate-300';
-    const progressTextColor = statusOption.progressTextClass || 'text-slate-500';
+    const timeRemaining = getTaskTimeRemainingState(task);
+    const timeRemainingWidth = timeRemaining.percentage ?? 0;
 
     const patchTask = (patch: Partial<Task>) => {
         setTask(prev => prev ? { ...prev, ...patch } : prev);
@@ -213,15 +212,22 @@ export default function TaskDetailPage() {
                             </div>
                         </div>
                         <div className="flex items-baseline justify-between mb-2">
-                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Progress</div>
-                            <div className={`text-sm font-bold tabular-nums ${progressTextColor}`}>
-                                {progress.toFixed(2)}%
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Time Remaining</div>
+                            <div className="text-right">
+                                <div className={`text-sm font-bold tabular-nums ${timeRemaining.textClassName}`}>
+                                    {timeRemaining.label}
+                                </div>
+                                {timeRemaining.note && (
+                                    <div className="mt-0.5 text-xs font-medium text-slate-400">
+                                        {timeRemaining.note}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div
-                                className={`h-full bg-gradient-to-r ${progressGradient} transition-all duration-700`}
-                                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                                className={`h-full ${timeRemaining.barClassName} transition-all duration-700`}
+                                style={{ width: `${timeRemainingWidth}%` }}
                             />
                         </div>
                     </QCCard>
