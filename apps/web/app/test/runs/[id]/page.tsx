@@ -17,6 +17,7 @@ import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { testRunStatusRegistry } from '@/lib/statusRegistry';
 import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
+import { buildExecutedTestCaseRows } from '@/lib/testRunExecutedCases';
 import { formatDistanceToNow, format } from 'date-fns';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
@@ -434,27 +435,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
             emptyLabel: 'No executed test cases in this run.',
             readOnly: true,
             viewPermission: 'qc.testcases.view',
-            load: async () => {
-                const byCaseId = new Map<string, TestRunExecutionItem>();
-                for (const execution of run.executions) {
-                    const artifactId = execution.test_case_uuid || execution.test_case_id;
-                    if (!byCaseId.has(artifactId)) byCaseId.set(artifactId, execution);
-                }
-                return Array.from(byCaseId.values()).map(execution => {
-                    const artifactId = execution.test_case_uuid || execution.test_case_id;
-                    return {
-                        id: `run-case-${execution.id}`,
-                        artifactId,
-                        displayId: execution.test_case_id_display || execution.test_case_id || artifactId.slice(0, 8),
-                        title: execution.test_case_title || '(no title)',
-                        status: execution.status,
-                        href: execution.test_case_uuid ? `/test/cases/${execution.test_case_uuid}` : undefined,
-                        source: 'qc' as const,
-                        relationshipType: 'executes',
-                        derived: true,
-                    };
-                });
-            },
+            load: async () => buildExecutedTestCaseRows(run.executions),
         },
         {
             title: 'Bugs Found In This Run',
