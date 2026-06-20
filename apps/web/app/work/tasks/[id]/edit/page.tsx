@@ -146,7 +146,7 @@ const ACCENT_MAP: Record<string, string> = {
 };
 
 function SectionCard({
-    id, icon, accent, title, description, columns = 2, children,
+    id, icon, accent, title, description, columns = 2, overflowVisible = false, children,
 }: {
     id: string;
     icon: React.ReactNode;
@@ -154,11 +154,14 @@ function SectionCard({
     title: string;
     description?: string;
     columns?: 1 | 2;
+    // Allow popovers (e.g. the user-story picker dropdown) to escape the card
+    // instead of being clipped by the rounded-corner overflow-hidden.
+    overflowVisible?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <section id={id} className="scroll-mt-24">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+            <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}>
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-lg flex-shrink-0 ${ACCENT_MAP[accent] || ACCENT_MAP.violet}`}>
                         <span className="text-white">{icon}</span>
@@ -882,6 +885,7 @@ function EditForm({
                         title="Links"
                         description="Parent user story relationship."
                         columns={1}
+                        overflowVisible
                     >
                         <div>
                             <UserStoryPicker
