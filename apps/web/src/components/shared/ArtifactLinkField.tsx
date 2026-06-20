@@ -152,6 +152,7 @@ export function ArtifactLinkField({
                         excludeIds={excludeIds}
                         onAdd={addItem}
                         searchPlaceholder={placeholder}
+                        minChars={0}
                     />
                 </div>
             )}
