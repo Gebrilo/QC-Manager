@@ -78,6 +78,21 @@
     @apply bg-indigo-600/80 hover:bg-indigo-600/95 dark:bg-indigo-500/80 dark:hover:bg-indigo-500/95 backdrop-blur-md text-white transition-all duration-200 border border-white/20 dark:border-white/10 shadow-sm hover:shadow active:scale-95;
   }
 
+  /* Tabular figures — keeps numeric columns from jittering as values change */
+  .tabnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Native select with a custom chevron (used by the My Dashboard date filter) */
+  .sel-arrow {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+    padding-right: 22px;
+  }
+
   .glass-button-secondary {
     @apply bg-white/50 hover:bg-white/70 dark:bg-slate-800/50 dark:hover:bg-slate-700/70 backdrop-blur-md text-slate-800 dark:text-slate-100 transition-all duration-200 border border-slate-200/40 dark:border-slate-600/40 shadow-sm hover:shadow active:scale-95;
   }
