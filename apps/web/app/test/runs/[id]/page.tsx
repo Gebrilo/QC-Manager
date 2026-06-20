@@ -311,8 +311,6 @@ export default function TestRunDetailPage() {
                 />
             </div>
 
-            <TestRunLinkedArtifactsSections run={run} />
-
             {selectedIds.size > 0 && (
                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-900/50 rounded-xl p-4 mb-4 flex items-center gap-4">
                     <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{selectedIds.size} selected</span>
@@ -402,6 +400,8 @@ export default function TestRunDetailPage() {
                     </div>
                 )}
             </div>
+
+            <TestRunLinkedArtifactsSections run={run} />
         </div>
     );
 }
