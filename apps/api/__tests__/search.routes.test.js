@@ -33,6 +33,27 @@ describe('GET /search', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  test('browse mode: empty query WITH a type returns a suggested list (matches all)', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        type: 'test_case',
+        id: 'tc-1',
+        display_id: 'TC-1',
+        title: 'Valid login',
+        url: '/test/cases/tc-1',
+      }],
+    });
+
+    const res = await request(app).get('/search?q=&type=test_case&limit=50');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    // The DB is hit and the query pattern is the match-all wildcard.
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery.mock.calls[0][0]).toContain('FROM test_case tc');
+    expect(mockQuery.mock.calls[0][1]).toEqual(['%%', 50]);
+  });
+
   test('admin can scope search to one requested type', async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{

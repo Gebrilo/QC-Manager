@@ -302,7 +302,13 @@ router.get('/', requireAuth, async (req, res, next) => {
         const assignee = req.query.assignee ? String(req.query.assignee) : null;
         const requestedTypes = parseTypes(req.query.type);
 
-        if (q.length < 2) {
+        // Below 2 chars we normally return nothing. But when a specific type is
+        // requested (a scoped picker, not the global search bar) we allow an
+        // empty/short query to "browse" — returning a suggested list so the user
+        // can see the relevant artifacts before typing. `%%` matches all rows,
+        // ordered by title.
+        const isBrowse = requestedTypes.length > 0;
+        if (q.length < 2 && !isBrowse) {
             return res.json({ data: [], meta: { q, limit, types: [] } });
         }
 
