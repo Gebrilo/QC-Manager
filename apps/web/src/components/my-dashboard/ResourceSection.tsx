@@ -12,7 +12,7 @@
  * existing "over budget = actual > estimate" semantics.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Task } from '@/types';
 
 /* ─────────────────────── TYPES ─────────────────────── */
@@ -98,6 +98,54 @@ function matchesPeriod(d: Date | null, f: DateFilterState): boolean {
     if (d.getMonth() + 1 !== f.month) return false;
     if (f.granularity === 'month') return true;
     return d.getDate() === f.day;
+}
+
+/**
+ * Period analytics, optionally scoped to a single resource. When `resource` is
+ * null the figures aggregate every assignee in the period; otherwise only that
+ * resource's contribution counts (R1 and/or R2 share of each task they're on).
+ */
+function computeAnalytics(tasks: Task[], resource: string | null): PeriodAnalytics {
+    let est = 0;
+    let actual = 0;
+    let done = 0;
+    let total = 0;
+
+    if (!resource) {
+        tasks.forEach(t => {
+            est += Number(t.r1_estimate_hrs || 0) + Number(t.r2_estimate_hrs || 0);
+            actual += Number(t.r1_actual_hrs || 0) + Number(t.r2_actual_hrs || 0);
+            if (t.status === 'Done') done += 1;
+        });
+        total = tasks.length;
+    } else {
+        tasks.forEach(t => {
+            const isR1 = t.resource1_name === resource;
+            const isR2 = t.resource2_name === resource;
+            if (!isR1 && !isR2) return;
+            if (isR1) {
+                est += Number(t.r1_estimate_hrs || 0);
+                actual += Number(t.r1_actual_hrs || 0);
+            }
+            if (isR2) {
+                est += Number(t.r2_estimate_hrs || 0);
+                actual += Number(t.r2_actual_hrs || 0);
+            }
+            total += 1;
+            if (t.status === 'Done') done += 1;
+        });
+    }
+
+    return {
+        finished: done,
+        efficiency: actual > 0 ? est / actual : 0,
+        est,
+        actual,
+        variance: actual - est,
+        completionPct: total > 0 ? (done / total) * 100 : 0,
+        done,
+        total,
+    };
 }
 
 /* ─────────────────────── SMALL UI HELPERS ─────────────────────── */
@@ -230,7 +278,7 @@ function DateFilter({
 
 /* ─────────────────────── UTILIZATION ROW ─────────────────────── */
 
-function UtilRow({ m, scale }: { m: MemberStat; scale: number }) {
+function UtilRow({ m, scale, selected, onSelect }: { m: MemberStat; scale: number; selected: boolean; onSelect: () => void }) {
     const within = Math.min(m.logged, m.planned);
     const over = Math.max(m.logged - m.planned, 0);
     const ratio = m.logged / Math.max(m.planned, 1);
@@ -249,7 +297,18 @@ function UtilRow({ m, scale }: { m: MemberStat; scale: number }) {
     const clampedPlannedPct = Math.min(plannedPct, 95);
 
     return (
-        <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/40 dark:hover:bg-slate-800/25 transition-colors">
+        <button
+            type="button"
+            onClick={onSelect}
+            aria-pressed={selected}
+            title={selected ? `Showing ${m.name} — click to clear` : `Show ${m.name}'s analytics`}
+            className={
+                'w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/40 ' +
+                (selected
+                    ? 'bg-indigo-50/70 dark:bg-indigo-900/20 ring-1 ring-inset ring-indigo-300/60 dark:ring-indigo-700/50'
+                    : 'hover:bg-slate-50/40 dark:hover:bg-slate-800/25')
+            }
+        >
             {/* avatar + name */}
             <div className="flex items-center gap-2 flex-shrink-0" style={{ width: 172 }}>
                 <MdAvatar initials={m.initials} tone={m.tone} size={28} />
@@ -294,7 +353,7 @@ function UtilRow({ m, scale }: { m: MemberStat; scale: number }) {
                     {pct}%
                 </div>
             </div>
-        </div>
+        </button>
     );
 }
 
@@ -303,9 +362,13 @@ function UtilRow({ m, scale }: { m: MemberStat; scale: number }) {
 function ResourceUtilizationPanel({
     members,
     filterControl,
+    selectedResource,
+    onSelect,
 }: {
     members: MemberStat[];
     filterControl: React.ReactNode;
+    selectedResource: string | null;
+    onSelect: (name: string) => void;
 }) {
     const scale = Math.max(...members.map(m => Math.max(m.planned, m.logged)), 1);
 
@@ -335,7 +398,7 @@ function ResourceUtilizationPanel({
             ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {members.map(m => (
-                        <UtilRow key={m.key} m={m} scale={scale} />
+                        <UtilRow key={m.key} m={m} scale={scale} selected={m.name === selectedResource} onSelect={() => onSelect(m.name)} />
                     ))}
                 </div>
             )}
@@ -361,7 +424,17 @@ function ResourceUtilizationPanel({
 
 /* ─────────────────────── ANALYTICS PANEL ─────────────────────── */
 
-function ResourceAnalyticsPanel({ analytics, filter }: { analytics: PeriodAnalytics; filter: DateFilterState }) {
+function ResourceAnalyticsPanel({
+    analytics,
+    filter,
+    selectedMember,
+    onClear,
+}: {
+    analytics: PeriodAnalytics;
+    filter: DateFilterState;
+    selectedMember: MemberStat | null;
+    onClear: () => void;
+}) {
     const { est, actual, variance, finished, efficiency, completionPct, done, total } = analytics;
     // Consistent with the existing Resource Analytics widget: est/actual >= 1 is good.
     const effOk = efficiency >= 1.0;
@@ -388,6 +461,30 @@ function ResourceAnalyticsPanel({ analytics, filter }: { analytics: PeriodAnalyt
                         {periodLabel}
                     </span>
                 </div>
+
+                {/* Scope: all resources, or a single drilled-in member */}
+                {selectedMember ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-inset ring-indigo-200/70 dark:ring-indigo-800/50 px-2 py-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <MdAvatar initials={selectedMember.initials} tone={selectedMember.tone} size={20} />
+                            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate" title={selectedMember.name}>
+                                {selectedMember.name}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClear}
+                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-indigo-100 flex-shrink-0"
+                        >
+                            <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                            Reset
+                        </button>
+                    </div>
+                ) : (
+                    <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">All resources · tap a member to drill in</p>
+                )}
             </div>
 
             <div className="flex-1 flex flex-col gap-0 divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -460,6 +557,8 @@ export function ResourceSection({ tasks }: { tasks: Task[] }) {
         day: null,
     }));
 
+    const [selectedResource, setSelectedResource] = useState<string | null>(null);
+
     const filteredTasks = useMemo(() => tasks.filter(t => matchesPeriod(representativeDate(t), filter)), [tasks, filter]);
 
     const members = useMemo<MemberStat[]>(() => {
@@ -480,32 +579,31 @@ export function ResourceSection({ tasks }: { tasks: Task[] }) {
             .sort((a, b) => b.planned - a.planned);
     }, [filteredTasks]);
 
-    const analytics = useMemo<PeriodAnalytics>(() => {
-        let est = 0;
-        let actual = 0;
-        let done = 0;
-        filteredTasks.forEach(t => {
-            est += Number(t.r1_estimate_hrs || 0) + Number(t.r2_estimate_hrs || 0);
-            actual += Number(t.r1_actual_hrs || 0) + Number(t.r2_actual_hrs || 0);
-            if (t.status === 'Done') done += 1;
-        });
-        const total = filteredTasks.length;
-        return {
-            finished: done,
-            efficiency: actual > 0 ? est / actual : 0,
-            est,
-            actual,
-            variance: actual - est,
-            completionPct: total > 0 ? (done / total) * 100 : 0,
-            done,
-            total,
-        };
-    }, [filteredTasks]);
+    // Drop the drill-in if the selected resource has no activity in the new period.
+    useEffect(() => {
+        if (selectedResource && !members.some(m => m.name === selectedResource)) {
+            setSelectedResource(null);
+        }
+    }, [members, selectedResource]);
+
+    const analytics = useMemo<PeriodAnalytics>(() => computeAnalytics(filteredTasks, selectedResource), [filteredTasks, selectedResource]);
+
+    const selectedMember = useMemo(
+        () => (selectedResource ? members.find(m => m.name === selectedResource) ?? null : null),
+        [members, selectedResource]
+    );
+
+    const toggleResource = (name: string) => setSelectedResource(prev => (prev === name ? null : name));
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3">
-            <ResourceUtilizationPanel members={members} filterControl={<DateFilter filter={filter} setFilter={setFilter} years={years} />} />
-            <ResourceAnalyticsPanel analytics={analytics} filter={filter} />
+            <ResourceUtilizationPanel
+                members={members}
+                filterControl={<DateFilter filter={filter} setFilter={setFilter} years={years} />}
+                selectedResource={selectedResource}
+                onSelect={toggleResource}
+            />
+            <ResourceAnalyticsPanel analytics={analytics} filter={filter} selectedMember={selectedMember} onClear={() => setSelectedResource(null)} />
         </div>
     );
 }
