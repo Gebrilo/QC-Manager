@@ -37,7 +37,7 @@ const VALUE_PROPS: Array<{ label: string; Icon: typeof BarChart3 }> = [
     { label: 'Better defect control', Icon: ShieldCheck },
     { label: 'Smarter resource tracking', Icon: Users2 },
     { label: 'Integrated delivery workflow', Icon: Workflow },
-    { label: 'AI-ready roadmap & changelog', Icon: Sparkles },
+    { label: 'AI-powered quality insights', Icon: Sparkles },
     { label: 'Full story-to-bug traceability', Icon: GitBranch },
 ];
 
@@ -58,10 +58,10 @@ const WORKFLOW_TRIO = [
 ];
 
 const AI_POINTS = [
-    { title: 'Generate release notes', body: 'Draft clear, structured changelog entries from merged tasks and resolved bugs.' },
-    { title: 'Summarize completed work', body: 'Roll up what shipped this cycle into a stakeholder-ready narrative.' },
-    { title: 'Support roadmap updates', body: 'Suggest and reprioritize roadmap items from real activity patterns.' },
-    { title: 'Activity → changelog content', body: 'Turn test runs, defects and merges into readable, publishable updates.' },
+    { title: 'Spot quality risks early', body: 'AI flags failing test patterns, bug clusters, and coverage gaps before they reach release day.' },
+    { title: 'Understand your trends', body: 'See how pass rates, defect density, and velocity evolve across sprints without manual reporting.' },
+    { title: 'See what needs attention', body: 'The assistant connects dots across test runs, bugs, and activity to suggest your next focus area.' },
+    { title: 'Trace every insight to data', body: 'Every recommendation is backed by the actual test run, bug, or trend that produced it.' },
 ];
 
 const roadmapLabels: Record<RoadmapStatus, string> = {
@@ -239,6 +239,8 @@ function RoadmapColumn({ status, items }: { status: RoadmapStatus; items: Roadma
 function RoadmapShowcase({ groups }: { groups: Record<RoadmapStatus, RoadmapItem[]> }) {
     const [tab, setTab] = useState<RoadmapStatus>('planned');
     const tabs: RoadmapStatus[] = ['planned', 'in_progress', 'completed'];
+    const filteredGroups = { planned: [] as RoadmapItem[], in_progress: [] as RoadmapItem[], completed: [] as RoadmapItem[] };
+    filteredGroups[tab] = groups[tab];
     return (
         <>
             <div className="lp-reveal flex shrink-0 items-center gap-1 self-start rounded-xl border border-slate-200 bg-slate-100 p-1 md:self-auto">
@@ -250,12 +252,13 @@ function RoadmapShowcase({ groups }: { groups: Record<RoadmapStatus, RoadmapItem
                         className={`rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         {roadmapLabels[key]}
+                        <span className="ml-1.5 text-[11px] text-slate-400">({groups[key].length})</span>
                     </button>
                 ))}
             </div>
             <div className="mt-8 grid gap-5 lg:grid-cols-3">
                 {tabs.map(key => (
-                    <div key={key} className={`${tab === key ? 'block' : 'hidden'} lg:block`}>
+                    <div key={key} className={tab === key ? 'block' : 'hidden'}>
                         <RoadmapColumn status={key} items={groups[key]} />
                     </div>
                 ))}
@@ -472,8 +475,8 @@ export function PublicLandingPage() {
                         {/* copy */}
                         <div>
                             <div className="lp-reveal mb-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm">
-                                <span className={`${PILL} bg-indigo-100 text-indigo-700`}>AI-Ready</span>
-                                <span className="text-[13px] font-medium text-slate-600">Roadmap &amp; changelog, generated from real activity</span>
+                                <span className={`${PILL} bg-indigo-100 text-indigo-700`}>AI-Powered</span>
+                                <span className="text-[13px] font-medium text-slate-600">Quality insights surfaced from your own data</span>
                             </div>
                             <h1 className="lp-reveal text-[44px] font-extrabold leading-[1.04] tracking-[-0.025em] text-slate-900 sm:text-[56px]">
                                 {config.hero_title}
@@ -622,11 +625,11 @@ export function PublicLandingPage() {
                                 <span className="text-[13px] font-medium text-slate-300">A premium capability, not a gimmick</span>
                             </div>
                             <h2 className="lp-reveal text-[36px] font-extrabold leading-[1.08] tracking-[-0.025em] text-white sm:text-[44px]">
-                                Turn raw activity into{' '}
-                                <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">clear quality updates</span>
+                                Your quality data,{' '}
+                                <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">made intelligent</span>
                             </h2>
                             <p className="lp-reveal mt-5 max-w-xl text-[17px] leading-relaxed text-slate-300">
-                                QC-Manager reads what actually happened across your test runs, bugs and merged tasks — then drafts the narrative your stakeholders need. You stay in control: review, edit, publish.
+                                The AI assistant analyzes your test runs, bug patterns, coverage trends, and team activity — then surfaces insights that help you spot risks, prioritize work, and make better quality decisions. Every recommendation links back to real data.
                             </p>
                             <div className="mt-8 space-y-3.5">
                                 {AI_POINTS.map(point => (
@@ -640,36 +643,36 @@ export function PublicLandingPage() {
                                 ))}
                             </div>
                             <a href={config.show_changelog ? '#changelog' : primaryCtaUrl} className="lp-reveal mt-9 inline-flex h-12 items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-6 text-[15px] font-semibold text-white shadow-[0_10px_15px_-3px_rgba(99,102,241,0.30)] transition-all hover:-translate-y-px hover:from-indigo-700 hover:to-violet-700 hover:shadow-[0_10px_25px_-5px_rgba(99,102,241,0.40)]">
-                                Explore AI updates
+                                Explore AI insights
                                 <ArrowRight className="h-4 w-4" />
                             </a>
                         </div>
 
-                        {/* AI drafting card */}
+                        {/* AI insights card */}
                         <div className="lp-reveal">
                             <div className="rounded-2xl border border-white/[0.12] bg-white/[0.04] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl">
                                 <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
                                     <div className="flex items-center gap-2.5">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white"><Sparkles className="h-4 w-4" /></span>
                                         <div>
-                                            <div className="text-[13px] font-bold leading-tight text-white">Changelog assistant</div>
-                                            <div className="font-mono text-[11px] text-slate-400">drafting v2.4.0</div>
+                                            <div className="text-[13px] font-bold leading-tight text-white">Quality Insights</div>
+                                            <div className="font-mono text-[11px] text-slate-400">analyzing Payments API</div>
                                         </div>
                                     </div>
-                                    <span className={`${PILL} bg-violet-500/20 text-violet-300`}>Generating</span>
+                                    <span className={`${PILL} bg-violet-500/20 text-violet-300`}>Analyzing</span>
                                 </div>
                                 <div className="space-y-3 font-mono text-[12px]">
-                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-emerald-400">+</span><span>Summarized <b className="text-white">18 merged tasks</b> across Payments API</span></div>
-                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-emerald-400">+</span><span>Grouped <b className="text-white">9 resolved bugs</b> by severity</span></div>
-                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-emerald-400">+</span><span>Linked <b className="text-white">test run #482</b> — 96% pass rate</span></div>
+                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-rose-400">!</span><span>Fail rate dropping: <b className="text-white">78% → 64%</b> in last 3 runs</span></div>
+                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-amber-400">!</span><span><b className="text-white">3 bugs</b> clustered in auth module — possible regression</span></div>
+                                    <div className="flex items-start gap-2 text-slate-300"><span className="shrink-0 text-rose-400">!</span><span>Coverage gap: <b className="text-white">checkout flow</b> has 0 test cases</span></div>
                                 </div>
                                 <div className="mt-4 rounded-xl border border-white/[0.08] bg-slate-900/60 p-4">
-                                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Draft preview</div>
-                                    <p className="text-[13px] leading-relaxed text-slate-200"><b className="text-white">Payments API hardening.</b> This release closes 9 defects raised during regression and lifts test coverage to 96%. Resource utilization stabilized after rebalancing the QA pod.<span className="ml-0.5 inline-block h-[14px] w-[2px] animate-pulse bg-indigo-400 align-middle" /></p>
+                                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Recommendation</div>
+                                    <p className="text-[13px] leading-relaxed text-slate-200"><b className="text-white">Prioritize auth &amp; checkout.</b> Auth module shows a regression pattern across 3 bugs. Add test coverage for checkout before the next release cycle.<span className="ml-0.5 inline-block h-[14px] w-[2px] animate-pulse bg-indigo-400 align-middle" /></p>
                                 </div>
                                 <div className="mt-4 flex items-center gap-2">
-                                    <span className="flex h-10 flex-1 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-[14px] font-semibold text-white">Publish</span>
-                                    <span className="flex h-10 flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/[0.08] text-[14px] font-semibold text-slate-200">Edit draft</span>
+                                    <span className="flex h-10 flex-1 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-[14px] font-semibold text-white">View details</span>
+                                    <span className="flex h-10 flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/[0.08] text-[14px] font-semibold text-slate-200">Dismiss</span>
                                 </div>
                             </div>
                         </div>
@@ -710,7 +713,7 @@ export function PublicLandingPage() {
                                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-[13px] font-extrabold text-white">QC</span>
                                 <span className="text-[15px] font-bold text-white">QC-Manager</span>
                             </div>
-                            <p className="max-w-xs text-[14px] leading-relaxed text-slate-400">One structured workspace for quality control — tasks, bugs, test cases, resources, reports and governance, with AI-assisted roadmap and changelog updates.</p>
+                            <p className="max-w-xs text-[14px] leading-relaxed text-slate-400">One structured workspace for quality control — tasks, bugs, test cases, resources, reports and governance, with AI-powered quality insights.</p>
                         </div>
                         <div>
                             <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Product</div>
