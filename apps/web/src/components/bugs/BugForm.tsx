@@ -7,10 +7,11 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { bugsApi, projectsApi, type Project } from '@/lib/api';
+import { bugsApi, projectsApi, testCasesApi, type Project } from '@/lib/api';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
+import { ArtifactLinkField } from '@/components/shared/ArtifactLinkField';
 import { shouldRestoreAsyncSelectValue } from '@/lib/forms/asyncSelect';
 import type { Bug } from '@/lib/api';
 
@@ -29,7 +30,7 @@ const bugSchema = z.object({
     qc_verification_notes: z.string().optional().default(''),
     initial_effort: z.coerce.number().nullable().optional(),
     remaining_effort: z.coerce.number().nullable().optional(),
-    linked_test_case_ids: z.string().optional().default(''),
+    linked_test_case_ids: z.array(z.string()).optional().default([]),
 });
 
 type FormData = z.infer<typeof bugSchema>;
@@ -399,8 +400,8 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
             initial_effort: initialData?.initial_effort != null ? Number(initialData.initial_effort) : null,
             remaining_effort: initialData?.remaining_effort != null ? Number(initialData.remaining_effort) : null,
             linked_test_case_ids: Array.isArray(initialData?.linked_test_case_ids)
-                ? (initialData.linked_test_case_ids as string[]).join(', ')
-                : ((initialData?.linked_test_case_ids as string) || ''),
+                ? (initialData.linked_test_case_ids as string[])
+                : [],
         },
     });
 
@@ -446,9 +447,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                 qc_verification_notes: data.qc_verification_notes || undefined,
                 close_date: data.close_date || null,
                 cc: data.cc ? data.cc.split(',').map(s => s.trim()).filter(Boolean) : undefined,
-                linked_test_case_ids: data.linked_test_case_ids
-                    ? data.linked_test_case_ids.split(',').map(s => s.trim()).filter(Boolean)
-                    : [],
+                linked_test_case_ids: data.linked_test_case_ids || [],
                 initial_effort: data.initial_effort ?? null,
                 remaining_effort: data.remaining_effort ?? null,
                 temp_id: tempId,
@@ -736,10 +735,23 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
                         columns={1}
                     >
                         <Field
-                            label="Linked test case IDs"
-                            hint="Comma-separated test case IDs"
+                            label="Linked test cases"
+                            hint="Search and select the test cases this bug surfaced from"
                         >
-                            <EFInput {...register('linked_test_case_ids')} placeholder="T-123, T-456" />
+                            <ArtifactLinkField
+                                multiple
+                                types={[{ value: 'test_case', label: 'Test Case' }]}
+                                valueKey="id"
+                                projectId={selectedProjectId || undefined}
+                                placeholder="Search test cases by ID or title…"
+                                value={watch('linked_test_case_ids') || []}
+                                onChange={value => setValue('linked_test_case_ids', value as string[], { shouldDirty: true })}
+                                resolveValue={id =>
+                                    testCasesApi.get(id)
+                                        .then(tc => ({ display_id: tc.test_case_id, title: tc.title }))
+                                        .catch(() => null)
+                                }
+                            />
                         </Field>
                     </SectionCard>
 

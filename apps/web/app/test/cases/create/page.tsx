@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { testCasesApi, fetchApi } from '@/lib/api';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { Spinner } from '@/components/ui/Spinner';
+import { ArtifactLinkField } from '@/components/shared/ArtifactLinkField';
 
 // ── Schema ───────────────────────────────────────────────────────────────────
 
@@ -235,7 +236,7 @@ export default function CreateTestCasePage() {
         return () => window.removeEventListener('scroll', handler);
     }, []);
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+    const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
             project_id: '',
@@ -507,8 +508,15 @@ export default function CreateTestCasePage() {
 
                         <div>
                             <FLabel>Suite Title</FLabel>
-                            <input {...register('suite_title')} placeholder="e.g. Authentication / Login" className={inputCls} maxLength={255} />
-                            <FHint>Grouping label used to match against test suites (normalized: lower, trimmed, internal whitespace collapsed).</FHint>
+                            <ArtifactLinkField
+                                types={[{ value: 'test_suite', label: 'Test Suite' }]}
+                                valueKey="title"
+                                projectId={watch('project_id') || undefined}
+                                placeholder="Search test suites…"
+                                value={watch('suite_title') || ''}
+                                onChange={value => setValue('suite_title', value as string, { shouldDirty: true })}
+                            />
+                            <FHint>Select a test suite to group this case under (matched by normalized title).</FHint>
                             <FError message={errors.suite_title?.message} />
                         </div>
 
@@ -602,7 +610,18 @@ export default function CreateTestCasePage() {
                     >
                         <div>
                             <FLabel>Linked Requirement</FLabel>
-                            <input {...register('linked_requirement_id')} placeholder="REQ-001" className={inputCls} />
+                            <ArtifactLinkField
+                                types={[
+                                    { value: 'task', label: 'Task' },
+                                    { value: 'user_story', label: 'User Story' },
+                                ]}
+                                valueKey="display_id"
+                                projectId={watch('project_id') || undefined}
+                                placeholder="Search tasks or user stories…"
+                                value={watch('linked_requirement_id') || ''}
+                                onChange={value => setValue('linked_requirement_id', value as string, { shouldDirty: true })}
+                            />
+                            <FHint>The task or user story this test case verifies.</FHint>
                         </div>
                     </SectionCard>
 

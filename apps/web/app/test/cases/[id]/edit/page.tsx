@@ -12,6 +12,7 @@ import { TestCase } from '@/types';
 import { stripHtml } from '@/lib/stripHtml';
 import { shouldRestoreAsyncSelectValue } from '@/lib/forms/asyncSelect';
 import { Spinner } from '@/components/ui/Spinner';
+import { ArtifactLinkField } from '@/components/shared/ArtifactLinkField';
 import { format } from 'date-fns';
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -626,13 +627,15 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
 
                         <div>
                             <FLabel>Suite Title</FLabel>
-                            <input
-                                {...register('suite_title')}
-                                placeholder="e.g. Authentication / Login"
-                                className={inputCls}
-                                maxLength={255}
+                            <ArtifactLinkField
+                                types={[{ value: 'test_suite', label: 'Test Suite' }]}
+                                valueKey="title"
+                                projectId={watch('project_id') || undefined}
+                                placeholder="Search test suites…"
+                                value={watch('suite_title') || ''}
+                                onChange={value => setValue('suite_title', value as string, { shouldDirty: true })}
                             />
-                            <FHint>Grouping label used to match against test suites (normalized: lower, trimmed, internal whitespace collapsed).</FHint>
+                            <FHint>Select a test suite to group this case under (matched by normalized title).</FHint>
                             <FError message={errors.suite_title?.message} />
                         </div>
 
@@ -750,11 +753,18 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
                     >
                         <div>
                             <FLabel>Linked Requirement</FLabel>
-                            <input
-                                {...register('linked_requirement_id')}
-                                placeholder="REQ-001"
-                                className={inputCls}
+                            <ArtifactLinkField
+                                types={[
+                                    { value: 'task', label: 'Task' },
+                                    { value: 'user_story', label: 'User Story' },
+                                ]}
+                                valueKey="display_id"
+                                projectId={watch('project_id') || undefined}
+                                placeholder="Search tasks or user stories…"
+                                value={watch('linked_requirement_id') || ''}
+                                onChange={value => setValue('linked_requirement_id', value as string, { shouldDirty: true })}
                             />
+                            <FHint>The task or user story this test case verifies.</FHint>
                         </div>
                     </SectionCard>
 
