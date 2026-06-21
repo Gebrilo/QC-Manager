@@ -1,4 +1,5 @@
 import type { LinkedArtifactRow } from '@/components/shared/LinkedArtifactsSection';
+import { artifactPath } from '@/lib/artifactPath';
 
 /** Minimal structural shape of a test-run execution needed to derive the
  *  "Executed Test Cases" linked-artifact rows. Mirrors the relevant fields of
@@ -36,7 +37,7 @@ export function buildExecutedTestCaseRows(executions: ExecutedCaseExecution[]): 
         displayId: execution.test_case_id_display || execution.test_case_id || artifactId.slice(0, 8),
         title: execution.test_case_title || '(no title)',
         status: execution.status,
-        href: execution.test_case_uuid ? `/test/cases/${execution.test_case_uuid}` : undefined,
+        href: execution.test_case_uuid ? artifactPath('test_case', { id: execution.test_case_uuid, test_case_id: execution.test_case_id_display || execution.test_case_id }) : undefined,
         source: 'qc' as const,
         relationshipType: 'executes',
         derived: true,

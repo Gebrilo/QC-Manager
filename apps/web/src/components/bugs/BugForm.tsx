@@ -480,7 +480,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
 
     const handleCancel = () => {
         if (isEdit && bugUUID) {
-            router.push(`/work/bugs/${bugUUID}`);
+            router.push(artifactPath('bug', { id: bugUUID, bug_id: bug?.bug_id }));
         } else {
             router.push('/work/bugs');
         }
