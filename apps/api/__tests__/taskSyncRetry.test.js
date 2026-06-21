@@ -50,7 +50,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
 
   it('returns 404 if task not found', async () => {
     db.query.mockResolvedValueOnce({ rows: [] });
-    const res = await request(app).post('/tasks/nonexistent/sync');
+    const res = await request(app).post('/tasks/00000000-0000-0000-0000-000000000000/sync');
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Task not found');
   });
@@ -61,7 +61,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', sync_status: 'standalone' }] });
 
-    const res = await request(app).post('/tasks/t1/sync');
+    const res = await request(app).post('/tasks/bbbbbbbb-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('standalone');
   });
@@ -76,7 +76,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
 
     emitTask.mockResolvedValueOnce({ tuleap_artifact_id: 88888, tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=88888' });
 
-    const res = await request(app).post('/tasks/t1/sync');
+    const res = await request(app).post('/tasks/bbbbbbbb-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('synced');
     expect(emitTask).toHaveBeenCalledTimes(1);
@@ -92,7 +92,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
 
     emitTask.mockRejectedValueOnce(new Error('Connection refused'));
 
-    const res = await request(app).post('/tasks/t1/sync');
+    const res = await request(app).post('/tasks/bbbbbbbb-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('failed');
   });
@@ -107,7 +107,7 @@ describe('POST /tasks/:id/sync — retry endpoint', () => {
 
     emitTask.mockResolvedValueOnce({ tuleap_artifact_id: 12345 });
 
-    await request(app).post('/tasks/t1/sync');
+    await request(app).post('/tasks/bbbbbbbb-0000-0000-0000-000000000002/sync');
     const callArgs = emitTask.mock.calls[0];
     expect(callArgs[2]).toBe('update');
   });

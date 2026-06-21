@@ -98,13 +98,13 @@ function setExistingSuiteTitle(value) {
         }
         if (/v_test_case_summary/i.test(sql) && /WHERE id = \$1/i.test(sql)) {
             return { rows: [{
-                id: 'tc-1', test_case_id: 'TC-00001', title: 'Sample',
+                id: 'ffffffff-0000-0000-0000-000000000001', test_case_id: 'TC-00001', title: 'Sample',
                 suite_title: value,
             }] };
         }
         if (/SELECT \* FROM test_case WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
             return { rows: [{
-                id: 'tc-1', test_case_id: 'TC-00001', title: 'Sample',
+                id: 'ffffffff-0000-0000-0000-000000000001', test_case_id: 'TC-00001', title: 'Sample',
                 category: 'other', suite_title: value, project_id: 'p-1',
             }] };
         }
@@ -142,19 +142,19 @@ beforeEach(() => {
         }
         if (/UPDATE test_case SET/i.test(sql) && /RETURNING \*$/i.test(sql)) {
             return { rows: [{
-                id: 'tc-1', test_case_id: 'TC-00001', title: 'Sample',
+                id: 'ffffffff-0000-0000-0000-000000000001', test_case_id: 'TC-00001', title: 'Sample',
                 suite_title: null, project_id: 'p-1',
             }] };
         }
         if (/v_test_case_summary/i.test(sql) && /WHERE id = \$1/i.test(sql)) {
             return { rows: [{
-                id: 'tc-1', test_case_id: 'TC-00001', title: 'Sample',
+                id: 'ffffffff-0000-0000-0000-000000000001', test_case_id: 'TC-00001', title: 'Sample',
                 suite_title: 'Auth / Login',
             }] };
         }
         if (/SELECT \* FROM test_case WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
             return { rows: [{
-                id: 'tc-1', test_case_id: 'TC-00001', title: 'Sample',
+                id: 'ffffffff-0000-0000-0000-000000000001', test_case_id: 'TC-00001', title: 'Sample',
                 category: 'other', suite_title: null, project_id: 'p-1',
             }] };
         }
@@ -298,7 +298,7 @@ describe('POST /test-cases — suite_title persistence and normalisation', () =>
 describe('PATCH /test-cases/:id — suite_title persistence and normalisation', () => {
     test('suite_title is in the updatable fields list and persists a new value', async () => {
         const res = await request(makeApp())
-            .patch('/test-cases/tc-1')
+            .patch('/test-cases/ffffffff-0000-0000-0000-000000000001')
             .send({ suite_title: 'Payments / Checkout' });
         expect(res.status).toBe(200);
         const upd = findUpdateTestCase();
@@ -309,7 +309,7 @@ describe('PATCH /test-cases/:id — suite_title persistence and normalisation', 
 
     test('trims surrounding whitespace on update', async () => {
         const res = await request(makeApp())
-            .patch('/test-cases/tc-1')
+            .patch('/test-cases/ffffffff-0000-0000-0000-000000000001')
             .send({ suite_title: '   Spaced   ' });
         expect(res.status).toBe(200);
         const upd = findUpdateTestCase();
@@ -319,7 +319,7 @@ describe('PATCH /test-cases/:id — suite_title persistence and normalisation', 
     test('blank suite_title on update stores NULL (clear existing value)', async () => {
         setExistingSuiteTitle('Old Suite');
         const res = await request(makeApp())
-            .patch('/test-cases/tc-1')
+            .patch('/test-cases/ffffffff-0000-0000-0000-000000000001')
             .send({ suite_title: '   ' });
         expect(res.status).toBe(200);
         const upd = findUpdateTestCase();

@@ -163,7 +163,7 @@ describe('GET /test-suites/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM test_suites ts\s+LEFT JOIN projects/i.test(sql) && /WHERE ts\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'suite-1', suite_id: 'TS-1', deleted_at: null,
+                    id: 'eeeeeeee-0000-0000-0000-000000000001', suite_id: 'TS-1', deleted_at: null,
                     project_id: 'p-other', owner_team_id: 'team-other',
                     created_by: 'u-other', created_by_user_id: 'u-other',
                     visibility_scope: 'team', name: 'Foreign',
@@ -171,7 +171,7 @@ describe('GET /test-suites/:id — detail enforcement', () => {
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-suites/suite-1');
+        const res = await request(makeApp()).get('/test-suites/eeeeeeee-0000-0000-0000-000000000001');
         expect(res.status).toBe(200);
         expect(res.body._can).toBeDefined();
     });
@@ -181,7 +181,7 @@ describe('GET /test-suites/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM test_suites ts\s+LEFT JOIN projects/i.test(sql) && /WHERE ts\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'suite-1', suite_id: 'TS-1', deleted_at: null,
+                    id: 'eeeeeeee-0000-0000-0000-000000000001', suite_id: 'TS-1', deleted_at: null,
                     project_id: 'p-other', owner_team_id: 'team-other',
                     created_by: 'u-other', created_by_user_id: 'u-other',
                     visibility_scope: 'team', name: 'Foreign',
@@ -189,7 +189,7 @@ describe('GET /test-suites/:id — detail enforcement', () => {
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-suites/suite-1');
+        const res = await request(makeApp()).get('/test-suites/eeeeeeee-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });
@@ -201,7 +201,7 @@ describe('DELETE /test-suites/:id — manipulation guard', () => {
         queryHandler = async (sql) => {
             if (/SELECT \* FROM test_suites WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
                 return { rows: [{
-                    id: 'suite-1', suite_id: 'TS-1', deleted_at: null,
+                    id: 'eeeeeeee-0000-0000-0000-000000000001', suite_id: 'TS-1', deleted_at: null,
                     project_id: 'p-other', owner_team_id: 'team-other',
                     created_by: 'u-other', created_by_user_id: 'u-other',
                     visibility_scope: 'team',
@@ -209,7 +209,7 @@ describe('DELETE /test-suites/:id — manipulation guard', () => {
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).delete('/test-suites/suite-1');
+        const res = await request(makeApp()).delete('/test-suites/eeeeeeee-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         const rollback = queries.find(q => /ROLLBACK/i.test(q.sql));
         expect(rollback).toBeDefined();
@@ -222,7 +222,7 @@ describe('GET /test-suites/:id — enforced denial', () => {
         queryHandler = async (sql) => {
             if (/FROM test_suites ts\s+LEFT JOIN projects/i.test(sql) && /WHERE ts\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'suite-1', suite_id: 'TS-1', deleted_at: null,
+                    id: 'eeeeeeee-0000-0000-0000-000000000001', suite_id: 'TS-1', deleted_at: null,
                     project_id: 'p-other', owner_team_id: 'team-other',
                     created_by: 'u-other', created_by_user_id: 'u-other',
                     visibility_scope: 'team', name: 'Foreign',
@@ -230,7 +230,7 @@ describe('GET /test-suites/:id — enforced denial', () => {
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-suites/suite-1');
+        const res = await request(makeApp()).get('/test-suites/eeeeeeee-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });

@@ -210,7 +210,7 @@ describe('POST/PATCH /tasks — description column mapping', () => {
     test('update maps description patches to tasks.description, not notes', async () => {
         setRole('admin');
         wireTaskWriteQueries({
-            id: 'task-1',
+            id: 'bbbbbbbb-0000-0000-0000-000000000001',
             project_id: PROJECT_ID,
             task_name: 'Mapped task',
             status: 'Todo',
@@ -222,21 +222,21 @@ describe('POST/PATCH /tasks — description column mapping', () => {
         });
 
         const res = await request(makeApp())
-            .patch('/tasks/task-1')
+            .patch('/tasks/bbbbbbbb-0000-0000-0000-000000000001')
             .send({ description: 'Updated task details' });
 
         expect(res.status).toBe(200);
         const update = queries.find(q => /UPDATE tasks SET description = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(q.sql));
         expect(update).toBeDefined();
         expect(update.sql).not.toMatch(/notes =/);
-        expect(update.params).toEqual(['Updated task details', 'task-1']);
+        expect(update.params).toEqual(['Updated task details', 'bbbbbbbb-0000-0000-0000-000000000001']);
     });
 
     test('update accepts parent_user_story_id null and writes it for audit-backed clearing', async () => {
         const parentUserStoryId = '22222222-2222-4222-8222-222222222222';
         setRole('admin');
         wireTaskWriteQueries({
-            id: 'task-1',
+            id: 'bbbbbbbb-0000-0000-0000-000000000001',
             project_id: PROJECT_ID,
             task_name: 'Mapped task',
             status: 'Todo',
@@ -248,7 +248,7 @@ describe('POST/PATCH /tasks — description column mapping', () => {
         queryHandler = async (sql) => {
             if (/SELECT \* FROM tasks WHERE id = \$1/.test(sql)) {
                 return { rows: [{
-                    id: 'task-1',
+                    id: 'bbbbbbbb-0000-0000-0000-000000000001',
                     project_id: PROJECT_ID,
                     task_name: 'Mapped task',
                     status: 'Todo',
@@ -260,7 +260,7 @@ describe('POST/PATCH /tasks — description column mapping', () => {
             }
             if (/UPDATE tasks SET parent_user_story_id = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(sql)) {
                 return { rows: [{
-                    id: 'task-1',
+                    id: 'bbbbbbbb-0000-0000-0000-000000000001',
                     project_id: PROJECT_ID,
                     task_name: 'Mapped task',
                     status: 'Todo',
@@ -270,19 +270,19 @@ describe('POST/PATCH /tasks — description column mapping', () => {
             if (/FROM tuleap_sync_config/.test(sql)) return { rows: [] };
             if (/UPDATE tasks SET sync_status = 'standalone'/.test(sql)) return { rows: [] };
             if (/SELECT \* FROM v_tasks_with_metrics WHERE id = \$1/.test(sql)) {
-                return { rows: [{ id: 'task-1', parent_user_story_id: null }] };
+                return { rows: [{ id: 'bbbbbbbb-0000-0000-0000-000000000001', parent_user_story_id: null }] };
             }
             return { rows: [] };
         };
 
         const res = await request(makeApp())
-            .patch('/tasks/task-1')
+            .patch('/tasks/bbbbbbbb-0000-0000-0000-000000000001')
             .send({ parent_user_story_id: null });
 
         expect(res.status).toBe(200);
         const update = queries.find(q => /UPDATE tasks SET parent_user_story_id = \$1, updated_at = NOW\(\) WHERE id = \$2 RETURNING \*/.test(q.sql));
         expect(update).toBeDefined();
-        expect(update.params).toEqual([null, 'task-1']);
+        expect(update.params).toEqual([null, 'bbbbbbbb-0000-0000-0000-000000000001']);
     });
 });
 
@@ -337,7 +337,7 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
     // task owned by a different team, created by someone else, private — so the
     // ONLY branch that can grant is the resource assignee branch.
     const TASK = Object.freeze({
-        id: 'task-1',
+        id: 'bbbbbbbb-0000-0000-0000-000000000001',
         project_id: 'p-1',
         resource1_id: 'res-primary',
         resource2_id: 'res-sec1',
@@ -378,15 +378,15 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
     test('a 3rd+ secondary (absent from both cached slots) resolves view → 200', async () => {
         setRole('tester_own_only');
         wireQueries({ callerResourceId: 'res-third', ownedResources: ['res-third'] });
-        const res = await request(makeApp()).get('/tasks/task-1');
+        const res = await request(makeApp()).get('/tasks/bbbbbbbb-0000-0000-0000-000000000001');
         expect(res.status).toBe(200);
-        expect(res.body.id).toBe('task-1');
+        expect(res.body.id).toBe('bbbbbbbb-0000-0000-0000-000000000001');
     });
 
     test('the primary still resolves view → 200', async () => {
         setRole('tester_own_only');
         wireQueries({ callerResourceId: 'res-primary', ownedResources: ['res-primary'] });
-        const res = await request(makeApp()).get('/tasks/task-1');
+        const res = await request(makeApp()).get('/tasks/bbbbbbbb-0000-0000-0000-000000000001');
         expect(res.status).toBe(200);
     });
 
@@ -399,7 +399,7 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
         setRole('tester_own_only');
         wireQueries({ callerResourceId: 'res-third', ownedResources: ['res-third'], assignmentRows });
 
-        const res = await request(makeApp()).get('/tasks/task-1');
+        const res = await request(makeApp()).get('/tasks/bbbbbbbb-0000-0000-0000-000000000001');
 
         expect(res.status).toBe(200);
         expect(res.body.assignments).toEqual(assignmentRows);
@@ -409,13 +409,13 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
     test('a non-assignee without team/role scope is denied → 403', async () => {
         setRole('tester_own_only');
         wireQueries({ callerResourceId: null, ownedResources: [] });
-        const res = await request(makeApp()).get('/tasks/task-1');
+        const res = await request(makeApp()).get('/tasks/bbbbbbbb-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
     });
 
     test('team editor gets _can.edit=true while team viewer gets _can.edit=false', async () => {
         const teamTask = {
-            id: 'task-team',
+            id: 'cccccccc-0000-0000-0000-000000000001',
             project_id: 'p-1',
             resource1_id: null,
             resource2_id: null,
@@ -434,13 +434,13 @@ describe('GET /tasks/:id — single-item enforcement via junction', () => {
         };
 
         setRole('team_editor');
-        const editorRes = await request(makeApp()).get('/tasks/task-team');
+        const editorRes = await request(makeApp()).get('/tasks/cccccccc-0000-0000-0000-000000000001');
         expect(editorRes.status).toBe(200);
         expect(editorRes.body._can.edit).toBe(true);
 
         queries.length = 0;
         setRole('team_viewer');
-        const viewerRes = await request(makeApp()).get('/tasks/task-team');
+        const viewerRes = await request(makeApp()).get('/tasks/cccccccc-0000-0000-0000-000000000001');
         expect(viewerRes.status).toBe(200);
         expect(viewerRes.body._can.edit).toBe(false);
     });

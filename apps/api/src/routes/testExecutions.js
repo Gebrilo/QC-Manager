@@ -246,7 +246,10 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
   try {
     const { id } = req.params;
     let runUuid = id;
-    if (!UUID_LOOSE_RE.test(id) && RUN_HUMAN_ID_RE.test(id)) {
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
       try {
         runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
       } catch (err) {
@@ -332,7 +335,10 @@ router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requireP
   try {
     const { id } = req.params;
     let runUuid = id;
-    if (!UUID_LOOSE_RE.test(id) && RUN_HUMAN_ID_RE.test(id)) {
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
       try {
         runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
       } catch (err) {
@@ -1391,7 +1397,10 @@ router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePer
   try {
     const { id } = req.params;
     let runUuid = id;
-    if (!UUID_LOOSE_RE.test(id) && RUN_HUMAN_ID_RE.test(id)) {
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
       try {
         runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
       } catch (err) {

@@ -38,4 +38,26 @@ describe('resolveArtifactParam', () => {
     expect(res.statusCode).toBe(404);
     expect(next).not.toHaveBeenCalled();
   });
+
+  test('fast-path 1: loose UUID passes through unchanged without a DB query', async () => {
+    const UUID = 'aaaaaaaa-0000-0000-0000-000000000001';
+    const req = { params: { id: UUID } };
+    const res = mockRes();
+    const next = jest.fn();
+    await resolveArtifactParam('task')(req, res, next, UUID);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.params.id).toBe(UUID);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('fast-path 2: unrecognized value responds 404 and does not call next', async () => {
+    const req = { params: { id: 'garbage' } };
+    const res = mockRes();
+    const next = jest.fn();
+    await resolveArtifactParam('task')(req, res, next, 'garbage');
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toMatchObject({ success: false });
+    expect(next).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
+  });
 });

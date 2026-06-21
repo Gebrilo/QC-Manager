@@ -164,14 +164,14 @@ describe('GET /user-stories/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM user_stories us\s+LEFT JOIN projects/i.test(sql)) {
                 return { rows: [{
-                    id: 'story-1', project_id: 'p1', deleted_at: null,
+                    id: 'dddddddd-0000-0000-0000-000000000001', project_id: 'p1', deleted_at: null,
                     owner_team_id: 'team-other', created_by_user_id: 'u-other',
                     visibility_scope: 'team', title: 'X',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/user-stories/story-1');
+        const res = await request(makeApp()).get('/user-stories/dddddddd-0000-0000-0000-000000000001');
         expect(res.status).toBe(200);
         expect(res.body._can).toBeDefined();
     });
@@ -181,14 +181,14 @@ describe('GET /user-stories/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM user_stories us\s+LEFT JOIN projects/i.test(sql)) {
                 return { rows: [{
-                    id: 'story-1', project_id: 'proj-other', deleted_at: null,
+                    id: 'dddddddd-0000-0000-0000-000000000001', project_id: 'proj-other', deleted_at: null,
                     owner_team_id: 'team-other', created_by_user_id: 'someone-else',
                     visibility_scope: 'team', title: 'Foreign',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/user-stories/story-1');
+        const res = await request(makeApp()).get('/user-stories/dddddddd-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });
@@ -200,14 +200,14 @@ describe('DELETE /user-stories/:id — manipulation guard', () => {
         queryHandler = async (sql) => {
             if (/SELECT \* FROM user_stories WHERE id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'story-1', deleted_at: null, project_id: 'proj-other',
+                    id: 'dddddddd-0000-0000-0000-000000000001', deleted_at: null, project_id: 'proj-other',
                     owner_team_id: 'team-other', created_by_user_id: 'someone-else',
                     visibility_scope: 'team', tuleap_artifact_id: null,
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).delete('/user-stories/story-1');
+        const res = await request(makeApp()).delete('/user-stories/dddddddd-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });
@@ -219,14 +219,14 @@ describe('GET /user-stories/:id — enforced denial', () => {
         queryHandler = async (sql) => {
             if (/FROM user_stories us\s+LEFT JOIN projects/i.test(sql)) {
                 return { rows: [{
-                    id: 'story-1', project_id: 'p-other', deleted_at: null,
+                    id: 'dddddddd-0000-0000-0000-000000000001', project_id: 'p-other', deleted_at: null,
                     owner_team_id: 'team-other', created_by_user_id: 'someone-else',
                     visibility_scope: 'team', title: 'Foreign',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/user-stories/story-1');
+        const res = await request(makeApp()).get('/user-stories/dddddddd-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });

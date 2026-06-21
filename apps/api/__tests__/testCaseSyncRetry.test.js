@@ -38,32 +38,32 @@ describe('POST /test-cases/:id/sync — retry endpoint', () => {
 
   it('returns 404 if test case not found', async () => {
     db.pool.query.mockResolvedValueOnce({ rows: [] });
-    const res = await request(app).post('/test-cases/nonexistent/sync');
+    const res = await request(app).post('/test-cases/00000000-0000-0000-0000-000000000000/sync');
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Test case not found');
   });
 
   it('returns standalone when no sync config exists', async () => {
     db.pool.query
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'standalone' }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'standalone' }] });
 
-    const res = await request(app).post('/test-cases/tc1/sync');
+    const res = await request(app).post('/test-cases/ffffffff-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('standalone');
   });
 
   it('writes synced on successful emit (create mode)', async () => {
     db.pool.query
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 7, tuleap_base_url: 'https://tuleap.example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'pending' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'synced', tuleap_artifact_id: 6001 }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'synced', tuleap_artifact_id: 6001 }] });
 
     emitTestCase.mockResolvedValueOnce({ tuleap_artifact_id: 6001, tuleap_url: 'https://tuleap.example.com/plugins/tracker/?aid=6001' });
 
-    const res = await request(app).post('/test-cases/tc1/sync');
+    const res = await request(app).post('/test-cases/ffffffff-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('synced');
     expect(emitTestCase).toHaveBeenCalledTimes(1);
@@ -71,28 +71,28 @@ describe('POST /test-cases/:id/sync — retry endpoint', () => {
 
   it('writes failed when emit throws', async () => {
     db.pool.query
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', project_id: 'p1', title: 'TC', status: 'Not Run', deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 7, tuleap_base_url: 'https://tuleap.example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'pending' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'failed', last_sync_error: 'Connection refused' }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'failed', last_sync_error: 'Connection refused' }] });
 
     emitTestCase.mockRejectedValueOnce(new Error('Connection refused'));
 
-    const res = await request(app).post('/test-cases/tc1/sync');
+    const res = await request(app).post('/test-cases/ffffffff-0000-0000-0000-000000000002/sync');
     expect(res.status).toBe(200);
     expect(res.body.data.sync_status).toBe('failed');
   });
 
   it('uses update mode when tuleap_artifact_id exists', async () => {
     db.pool.query
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', project_id: 'p1', title: 'TC', status: 'Not Run', tuleap_artifact_id: 6001, deleted_at: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', project_id: 'p1', title: 'TC', status: 'Not Run', tuleap_artifact_id: 6001, deleted_at: null }] })
       .mockResolvedValueOnce({ rows: [{ id: 'cfg1', tuleap_tracker_id: 7, tuleap_base_url: 'https://tuleap.example.com' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'pending' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'tc1', sync_status: 'synced', tuleap_artifact_id: 6001 }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ffffffff-0000-0000-0000-000000000002', sync_status: 'synced', tuleap_artifact_id: 6001 }] });
 
     emitTestCase.mockResolvedValueOnce({ tuleap_artifact_id: 6001 });
 
-    await request(app).post('/test-cases/tc1/sync');
+    await request(app).post('/test-cases/ffffffff-0000-0000-0000-000000000002/sync');
     const callArgs = emitTestCase.mock.calls[0];
     expect(callArgs[2]).toBe('update');
   });

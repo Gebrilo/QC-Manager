@@ -19,9 +19,9 @@ function dbQuery(...args) {
 // Resolution only happens when the value looks like a human-readable id:
 //   - For most types: matches PREFIX followed by digits only (e.g. TSK-001, RUN-0004).
 //   - For user_story: bare numeric or starts with "US-" + digits (tuleap_artifact_id).
-//   - Anything else (UUID or unknown format) is passed through unchanged so downstream
-//     handlers can return their own 404 — this preserves compatibility with tests that
-//     use arbitrary fake IDs like 'task-1', 'run-1', 'tc-1'.
+//   - A loose UUID passes through unchanged (fast-path 1).
+//   - Anything else returns 404 immediately to avoid PostgreSQL "invalid input
+//     syntax for type uuid" errors when a non-UUID value reaches a uuid-typed column.
 function resolveArtifactParam(type) {
   const config = ARTIFACT_ID_CONFIG[type];
 
@@ -44,9 +44,10 @@ function resolveArtifactParam(type) {
       return;
     }
     // Fast-path 2: value does not look like a human-readable id for this type.
-    // Pass it through so downstream handlers can return their own 404.
+    // Return 404 immediately — passing a non-UUID string to a uuid-typed column
+    // would cause PostgreSQL to throw "invalid input syntax for type uuid" (500).
     if (!looksLikeHumanId(value)) {
-      next();
+      res.status(404).json({ success: false, error: 'Not found' });
       return;
     }
     try {
