@@ -21,8 +21,9 @@ function mockTaskFound() {
 test('ok + href when the user may view the task', async () => {
     mockTaskFound();
     mockCanPerform.mockResolvedValue({ allowed: true });
+    mockQuery.mockResolvedValueOnce({ rows: [{ task_id: 'TSK-1' }] }); // buildLink human-id lookup
     const out = await resolveNotificationTarget(user, { entity_type: 'task', entity_id: 'task-1' }, {});
-    expect(out).toEqual({ status: 'ok', href: '/work/tasks/task-1' });
+    expect(out).toEqual({ status: 'ok', href: '/work/tasks/TSK-1' });
 });
 
 test('forbidden + null href when the user may not view it', async () => {
@@ -66,15 +67,17 @@ describe('resolveNotificationTarget — bugs', () => {
     test('ok + href when the user may view the bug', async () => {
         mockBugFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ bug_id: 'TLP-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'bug', entity_id: 'bug-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/work/bugs/bug-1' });
+        expect(out).toEqual({ status: 'ok', href: '/work/bugs/TLP-1' });
     });
 
     test('ok when the bug has an assigned_to that resolves to a resource', async () => {
         mockBugFound({ withAssignee: true });
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ bug_id: 'TLP-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'bug', entity_id: 'bug-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/work/bugs/bug-1' });
+        expect(out).toEqual({ status: 'ok', href: '/work/bugs/TLP-1' });
         // The artifact handed to canPerform should expose the resolved resource
         // id so the assignee branch can fire.
         const call = mockCanPerform.mock.calls[0];
@@ -112,8 +115,9 @@ describe('resolveNotificationTarget — user_stories', () => {
     test('ok + href when the user may view the story', async () => {
         mockStoryFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ display_id: 'US-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'user_story', entity_id: 'story-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/work/stories/story-1' });
+        expect(out).toEqual({ status: 'ok', href: '/work/stories/US-1' });
     });
 
     test('forbidden + null href when the user may not view the story', async () => {
@@ -148,8 +152,9 @@ describe('resolveNotificationTarget — test_case', () => {
     test('ok + href when the user may view the test case', async () => {
         mockTestCaseFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ test_case_id: 'TC-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'test_case', entity_id: 'tc-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/test/cases/tc-1' });
+        expect(out).toEqual({ status: 'ok', href: '/test/cases/TC-1' });
     });
 
     test('forbidden + null href when the user may not view the test case', async () => {
@@ -183,8 +188,9 @@ describe('resolveNotificationTarget — test_suite', () => {
     test('ok + href when the user may view the test suite', async () => {
         mockTestSuiteFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ suite_id: 'TS-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'test_suite', entity_id: 'ts-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/test/suites/ts-1' });
+        expect(out).toEqual({ status: 'ok', href: '/test/suites/TS-1' });
     });
 
     test('forbidden + null href when the user may not view the test suite', async () => {
@@ -219,8 +225,9 @@ describe('resolveNotificationTarget — test_run', () => {
     test('ok + href when the user may view the test run', async () => {
         mockTestRunFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
+        mockQuery.mockResolvedValueOnce({ rows: [{ run_id: 'RUN-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'test_run', entity_id: 'run-1' }, {});
-        expect(out).toEqual({ status: 'ok', href: '/test/runs/run-1' });
+        expect(out).toEqual({ status: 'ok', href: '/test/runs/RUN-1' });
     });
 
     test('forbidden + null href when the user may not view the test run', async () => {
@@ -253,8 +260,8 @@ describe('resolveNotificationTarget — test_execution', () => {
                 visibility_scope: 'team',
             }],
         });
-        // The async buildLink does a second query to resolve test_run_id.
-        mockQuery.mockResolvedValueOnce({ rows: [{ test_run_id: 'run-1' }] });
+        // The async buildLink does a second query to resolve the run's human id (run_id).
+        mockQuery.mockResolvedValueOnce({ rows: [{ run_id: 'run-1' }] });
     }
 
     test('ok + href resolves to the parent test run page', async () => {
