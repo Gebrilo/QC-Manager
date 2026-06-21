@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { TestCase, TestCaseListResponse } from '@/types';
 import { testCasesApi, projectsApi, type Project } from '@/lib/api';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
@@ -404,7 +405,7 @@ export default function TestCasesPage() {
             enableHiding: false,
             cell: (info) => (
                 <Link
-                    href={`/test/cases/${info.row.original.id}`}
+                    href={artifactPath('test_case', info.row.original)}
                     className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
                 >
                     {info.getValue()}
@@ -419,7 +420,7 @@ export default function TestCasesPage() {
                 <SimpleTooltip content={buildTestCaseTooltip(info.row.original)} position="top">
                     <div style={{ minWidth: 280, maxWidth: 360 }}>
                         <Link
-                            href={`/test/cases/${info.row.original.id}`}
+                            href={artifactPath('test_case', info.row.original)}
                             className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
                         >
                             {info.getValue()}
@@ -514,8 +515,8 @@ export default function TestCasesPage() {
             enableHiding: false,
             cell: (info) => (
                 <div className="flex justify-end gap-3 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Link href={`/test/cases/${info.row.original.id}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
-                    <Link href={`/test/cases/${info.row.original.id}`} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
+                    <Link href={`${artifactPath('test_case', info.row.original)}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
+                    <Link href={artifactPath('test_case', info.row.original)} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
                 </div>
             ),
         }),

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchApi, tuleapApi, type TuleapArtifact } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { PermissionGate } from '@/components/auth/PermissionGate';
@@ -272,7 +273,7 @@ export default function ProjectDetailPage() {
                             {userStories.map(story => (
                                 <tr key={story.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                     <td className="py-2 px-3">
-                                        <Link href={`/work/stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
+                                        <Link href={artifactPath('user_story', { id: String(story.id), tuleap_artifact_id: story.id })} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
                                             {story.xref || story.id}
                                         </Link>
                                     </td>
@@ -283,8 +284,8 @@ export default function ProjectDetailPage() {
                                         </span>
                                     </td>
                                     <td className="py-2 px-3 text-right">
-                                        <Link href={`/work/stories/${story.id}`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs mr-3">View</Link>
-                                        <Link href={`/work/stories/${story.id}/edit`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">Edit</Link>
+                                        <Link href={artifactPath('user_story', { id: String(story.id), tuleap_artifact_id: story.id })} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs mr-3">View</Link>
+                                        <Link href={`${artifactPath('user_story', { id: String(story.id), tuleap_artifact_id: story.id })}/edit`} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">Edit</Link>
                                     </td>
                                 </tr>
                             ))}

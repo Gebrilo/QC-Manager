@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { SuiteStatus, TestSuite, TestSuiteListResponse } from '@/types';
 import { testSuitesApi, projectsApi, type Project } from '@/lib/api';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
@@ -392,7 +393,7 @@ export default function TestSuitesPage() {
             enableHiding: false,
             cell: (info) => (
                 <Link
-                    href={`/test/suites/${info.row.original.id}`}
+                    href={artifactPath('test_suite', info.row.original)}
                     className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
                 >
                     {info.getValue()}
@@ -406,7 +407,7 @@ export default function TestSuitesPage() {
             cell: (info) => (
                 <div style={{ minWidth: 240, maxWidth: 360 }}>
                     <Link
-                        href={`/test/suites/${info.row.original.id}`}
+                        href={artifactPath('test_suite', info.row.original)}
                         className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
                     >
                         {info.getValue()}
@@ -481,11 +482,11 @@ export default function TestSuitesPage() {
                 return (
                 <div className="flex justify-end gap-3 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                     {canEdit ? (
-                        <Link href={`/test/suites/${suite.id}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
+                        <Link href={`${artifactPath('test_suite', suite)}/edit`} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">Edit</Link>
                     ) : (
                         <span className="text-slate-300 dark:text-slate-600 font-medium cursor-not-allowed" title="You do not have permission to edit this suite">Edit</span>
                     )}
-                    <Link href={`/test/suites/${suite.id}`} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
+                    <Link href={artifactPath('test_suite', suite)} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">View</Link>
                     <button
                         type="button"
                         onClick={() => handleDeleteSuite(suite)}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { artifactPath } from '@/lib/artifactPath';
 import { testSuitesApi, testRunsApi } from '@/lib/api';
 import { fetchApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -86,7 +87,7 @@ export default function CreateTestRunPage() {
                 environment: environment.trim() || undefined,
                 version_tag: versionTag.trim() || undefined,
             });
-            router.push(`/test/runs/${(result as any).id}`);
+            router.push(artifactPath('test_run', (result as any)));
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to create test run');

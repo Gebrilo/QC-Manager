@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { projectsApi } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -1163,7 +1164,7 @@ export default function TestExecutionsPage() {
                                             </td>
                                             <td className="px-4 py-4 text-sm font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{run.run_id}</td>
                                             <td className="px-4 py-4 text-sm font-medium max-w-xs truncate">
-                                                <Link href={`/test/runs/${run.id}`} className="text-slate-900 dark:text-white hover:text-violet-700 dark:hover:text-violet-300 transition-colors">
+                                                <Link href={artifactPath('test_run', run)} className="text-slate-900 dark:text-white hover:text-violet-700 dark:hover:text-violet-300 transition-colors">
                                                     {run.name}
                                                 </Link>
                                             </td>

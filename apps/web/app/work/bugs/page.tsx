@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugsApi, type Bug } from '@/lib/api';
 import { projectsApi, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
@@ -485,7 +486,7 @@ function BugsContent() {
             enableHiding: false,
             cell: (info) => (
                 <Link
-                    href={`/work/bugs/${info.row.original.id}`}
+                    href={artifactPath('bug', info.row.original)}
                     className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
                 >
                     {info.row.original.tuleap_artifact_id
@@ -507,7 +508,7 @@ function BugsContent() {
                 <SimpleTooltip content={`${info.getValue()}${info.row.original.component ? ` · ${info.row.original.component}` : ''}`} position="top">
                     <div style={{ minWidth: 280, maxWidth: 360 }}>
                         <Link
-                            href={`/work/bugs/${info.row.original.id}`}
+                            href={artifactPath('bug', info.row.original)}
                             className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
                         >
                             {info.getValue()}

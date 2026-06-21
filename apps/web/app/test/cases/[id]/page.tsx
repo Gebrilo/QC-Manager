@@ -164,7 +164,7 @@ export default function TestCaseDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href={`/test/cases/${id}/edit`}>
+                    <Link href={`${artifactPath('test_case', { id })}/edit`}>
                         <Button variant="outline" size="sm" className="gap-1.5">
                             <EditIcon />
                             Edit Case
@@ -333,7 +333,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
                     title: row.user_story_title || '(no title)',
                     status: row.user_story_status,
-                    href: `/work/stories/${row.user_story_id}`,
+                    href: artifactPath('user_story', { id: row.user_story_id, display_id: row.user_story_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'verifies',
                     artifactType: row.artifact_type,
@@ -369,7 +369,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     displayId: row.task_display_id || row.task_id.slice(0, 8),
                     title: row.task_title || '(no title)',
                     status: row.task_status,
-                    href: `/work/tasks/${row.task_id}`,
+                    href: artifactPath('task', { id: row.task_id, task_id: row.task_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'covers',
                     artifactType: row.artifact_type,
@@ -405,7 +405,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     displayId: row.bug_display_id || row.bug_id.slice(0, 8),
                     title: row.bug_title || '(no title)',
                     status: row.bug_status,
-                    href: `/work/bugs/${row.bug_id}`,
+                    href: artifactPath('bug', { id: row.bug_id, bug_id: row.bug_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'reveals',
                     artifactType: row.artifact_type,
@@ -437,7 +437,7 @@ function TestCaseLinkedArtifactsSections({ testCase }: { testCase: TestCase }) {
                     displayId: suite.suite_id || suite.id.slice(0, 8),
                     title: suite.name || '(no title)',
                     status: suite.status,
-                    href: `/test/suites/${suite.id}`,
+                    href: artifactPath('test_suite', suite),
                     source: 'qc',
                     relationshipType: 'contained in',
                     derived: true,

@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { tuleapApi, projectsApi, userStoriesApi, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
 import Link from 'next/link';
@@ -273,7 +274,7 @@ function CreateUserStoryContent() {
                 setSyncWarning(result.data.last_sync_error || 'Sync to Tuleap failed. Your story was saved locally.');
             }
 
-            router.push(`/work/stories/${result.data.id}`);
+            router.push(artifactPath('user_story', result.data));
             router.refresh();
         } catch (err: any) {
             setSubmitError(err.message || 'Failed to create user story');

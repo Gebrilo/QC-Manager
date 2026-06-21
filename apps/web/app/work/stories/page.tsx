@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { projectsApi, userStoriesApi, type Project, type UserStory } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ViewToggle } from '@/components/tasks/ViewToggle';
@@ -445,7 +446,7 @@ export default function UserStoriesPage() {
                 <StoriesBoardView
                     stories={filtered}
                     isLoading={isLoading}
-                    onStoryClick={(id) => router.push(`/work/stories/${id}`)}
+                    onStoryClick={(id) => router.push(artifactPath('user_story', { id }))}
                 />
             ) : (
                 <>
@@ -634,7 +635,7 @@ function StoriesTableView({
                                     </td>
                                     <td className="px-3 py-3.5" style={{ minWidth: 280, maxWidth: 360 }}>
                                         <Link
-                                            href={`/work/stories/${story.id}`}
+                                            href={artifactPath('user_story', story)}
                                             className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
                                         >
                                             {story.title || <span className="text-slate-400 italic">Untitled</span>}
@@ -672,7 +673,7 @@ function StoriesTableView({
                                         <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                             {canEdit ? (
                                                 <Link
-                                                    href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}
+                                                    href={`${artifactPath('user_story', story)}/edit`}
                                                     className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
                                                 >
                                                     Edit
@@ -799,7 +800,7 @@ function StoriesBoardView({ stories, isLoading, onStoryClick }: { stories: UserS
                             ) : colStories.map(story => (
                                 <div
                                     key={story.id}
-                                    onClick={() => onStoryClick(story.id)}
+                                    onClick={() => onStoryClick(story.display_id || story.id)}
                                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all"
                                 >
                                     <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2 leading-snug mb-2">

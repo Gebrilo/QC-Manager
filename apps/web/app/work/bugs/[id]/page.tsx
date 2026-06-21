@@ -102,7 +102,7 @@ export default function BugDetailPage() {
                     displayId: row.test_run_name || `EX-${row.test_execution_id.slice(0, 8)}`,
                     title: row.execution_notes || row.execution_status || 'Test execution',
                     status: row.execution_status,
-                    href: row.test_run_uuid ? `/test/runs/${row.test_run_uuid}` : undefined,
+                    href: row.test_run_uuid ? artifactPath('test_run', { id: row.test_run_uuid, run_id: row.test_run_id }) : undefined,
                     source: 'qc',
                     relationshipType: 'discovered via',
                     derived: true,
@@ -127,7 +127,7 @@ export default function BugDetailPage() {
                     displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
                     title: row.test_run_title || '(no title)',
                     status: row.test_run_status,
-                    href: `/test/runs/${row.test_run_id}`,
+                    href: artifactPath('test_run', { id: row.test_run_id, run_id: row.test_run_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'found in',
                     artifactType: row.artifact_type,
@@ -163,7 +163,7 @@ export default function BugDetailPage() {
                     displayId: row.task_display_id || row.task_id.slice(0, 8),
                     title: row.task_title || '(no title)',
                     status: row.task_status,
-                    href: `/work/tasks/${row.task_id}`,
+                    href: artifactPath('task', { id: row.task_id, task_id: row.task_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'blocks',
                     artifactType: row.artifact_type,
@@ -199,7 +199,7 @@ export default function BugDetailPage() {
                     displayId: row.test_case_display_id || row.test_case_id.slice(0, 8),
                     title: row.test_case_title || '(no title)',
                     status: row.test_case_status,
-                    href: `/test/cases/${row.test_case_id}`,
+                    href: artifactPath('test_case', { id: row.test_case_id, test_case_id: row.test_case_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'reveals',
                     artifactType: row.artifact_type,
@@ -235,7 +235,7 @@ export default function BugDetailPage() {
                     displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
                     title: row.user_story_title || '(no title)',
                     status: row.user_story_status,
-                    href: `/work/stories/${row.user_story_id}`,
+                    href: artifactPath('user_story', { id: row.user_story_id, display_id: row.user_story_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'affects',
                     artifactType: row.artifact_type,
@@ -380,7 +380,7 @@ export default function BugDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href={`/work/bugs/${bug.id}/edit`}>
+                    <Link href={`${artifactPath('bug', bug)}/edit`}>
                         <Button variant="outline" size="sm" className="gap-1.5">
                             <EditIcon />
                             Edit Bug

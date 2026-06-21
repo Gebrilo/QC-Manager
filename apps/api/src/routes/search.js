@@ -217,7 +217,7 @@ function buildTypeFragment(typeName, ctx) {
             ${meta.alias}.status,
             ${prioritySelect},
             ${assigneeSelect},
-            ('${meta.urlPrefix}' || ${meta.idExpr}) AS url,
+            ('${meta.urlPrefix}' || ${meta.displayIdExpr}) AS url,
             CASE
                 WHEN ${meta.idRankExpr} ILIKE $1 THEN 10
                 WHEN ${meta.titleRankExpr} ILIKE $1 THEN 7

@@ -149,7 +149,7 @@ export default function TaskDetailPage() {
                         </div>
                         {task.parent_user_story_id && (
                             <Link
-                                href={`/work/stories/${task.parent_user_story_id}`}
+                                href={artifactPath('user_story', { id: task.parent_user_story_id })}
                                 className="mt-1 inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
                             >
                                 ↗ Parent user story
@@ -159,7 +159,7 @@ export default function TaskDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href={`/work/tasks/${task.id}/edit`}>
+                    <Link href={`${artifactPath('task', task)}/edit`}>
                         <Button variant="outline" size="sm" className="gap-1.5">
                             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                 <path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -335,7 +335,7 @@ export default function TaskDetailPage() {
                         <SectionLabel>Quick Actions</SectionLabel>
                         <div className="space-y-1">
                             <Link
-                                href={`/work/tasks/${task.id}/edit`}
+                                href={`${artifactPath('task', task)}/edit`}
                                 className="w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center gap-2"
                             >
                                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -344,7 +344,7 @@ export default function TaskDetailPage() {
                                 Reassign resource
                             </Link>
                             <Link
-                                href={`/work/tasks/${task.id}/edit`}
+                                href={`${artifactPath('task', task)}/edit`}
                                 className="w-full px-3 py-2 rounded-lg text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center gap-2"
                             >
                                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -422,7 +422,7 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     displayId,
                     title: story.title || '(no title)',
                     status: story.status,
-                    href: `/work/stories/${story.id}`,
+                    href: artifactPath('user_story', story),
                     source: 'qc' as const,
                     relationshipType: 'child of',
                     derived: true,
@@ -446,7 +446,7 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     displayId: row.test_case_display_id || row.test_case_id.slice(0, 8),
                     title: row.test_case_title || '(no title)',
                     status: row.test_case_status,
-                    href: `/test/cases/${row.test_case_id}`,
+                    href: artifactPath('test_case', { id: row.test_case_id, test_case_id: row.test_case_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'covers',
                     artifactType: row.artifact_type,
@@ -482,7 +482,7 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     displayId: row.bug_display_id || row.bug_id.slice(0, 8),
                     title: row.bug_title || '(no title)',
                     status: row.bug_status,
-                    href: `/work/bugs/${row.bug_id}`,
+                    href: artifactPath('bug', { id: row.bug_id, bug_id: row.bug_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'blocks',
                     artifactType: row.artifact_type,
@@ -518,7 +518,7 @@ function TaskLinkedArtifactsSections({ task }: { task: Task }) {
                     displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
                     title: row.test_run_title || '(no title)',
                     status: row.test_run_status,
-                    href: `/test/runs/${row.test_run_id}`,
+                    href: artifactPath('test_run', { id: row.test_run_id, run_id: row.test_run_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'exercised by',
                     artifactType: row.artifact_type,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchApi, projectsApi, resourcesApi } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { Task } from '@/types';
 import { TaskTable, HIDEABLE_TASK_COLUMNS } from '@/components/tasks/TaskTable';
 import type { VisibilityState } from '@tanstack/react-table';
@@ -441,7 +442,7 @@ export default function TasksPage() {
                     tasks={filteredTasks}
                     filteredTasks={filteredTasks}
                     isLoading={isLoading}
-                    onTaskClick={(id) => router.push(`/work/tasks/${id}`)}
+                    onTaskClick={(id) => router.push(artifactPath('task', { id }))}
                 />
             ) : (
                 <>
@@ -518,7 +519,7 @@ function TaskBoardView({ tasks, filteredTasks, isLoading, onTaskClick }: { tasks
                              ) : colTasks.map(task => (
                                 <div
                                     key={task.id}
-                                    onClick={() => onTaskClick(task.id)}
+                                    onClick={() => onTaskClick(task.task_id || task.id)}
                                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all"
                                 >
                                     <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2 leading-snug mb-2">{task.task_name}</p>

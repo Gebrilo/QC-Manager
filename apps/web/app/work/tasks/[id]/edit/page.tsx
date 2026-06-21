@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFieldArray, useForm } from 'react-hook-form';
+import { artifactPath } from '@/lib/artifactPath';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
@@ -328,7 +329,7 @@ export default function EditTaskPage() {
 
     useEffect(() => {
         if (!authLoading && !hasPermission('qc.tasks.edit')) {
-            router.replace(`/work/tasks/${id}`);
+            router.replace(artifactPath('task', { id }));
         }
     }, [authLoading, hasPermission, router, id]);
 
@@ -480,7 +481,7 @@ function EditForm({
                 method: 'PATCH',
                 body: JSON.stringify(payload),
             });
-            router.push(`/work/tasks/${task.id}`);
+            router.push(artifactPath('task', task));
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to save task');
@@ -577,7 +578,7 @@ function EditForm({
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
-                        href={`/work/tasks/${taskId}`}
+                        href={artifactPath('task', { id: taskId })}
                         className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center"
                     >
                         Cancel
@@ -935,7 +936,7 @@ function EditForm({
                     </div>
                     <div className="flex items-center gap-2">
                         <Link
-                            href={`/work/tasks/${taskId}`}
+                            href={artifactPath('task', { id: taskId })}
                             className="h-9 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center"
                         >
                             Cancel

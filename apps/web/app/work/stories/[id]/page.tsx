@@ -168,7 +168,7 @@ export default function UserStoryDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href={`/work/stories/${story.tuleap_artifact_id || story.id}/edit`}>
+                    <Link href={`${artifactPath('user_story', story)}/edit`}>
                         <Button variant="outline" size="sm" className="gap-1.5">
                             <EditIcon />
                             Edit Story
@@ -261,7 +261,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     displayId: task.task_id || task.id.slice(0, 8),
                     title: task.task_name || '(no title)',
                     status: task.status,
-                    href: `/work/tasks/${task.id}`,
+                    href: artifactPath('task', task),
                     source: 'qc' as const,
                     relationshipType: 'parent of',
                     derived: true,
@@ -285,7 +285,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     displayId: row.test_case_display_id || row.test_case_id.slice(0, 8),
                     title: row.test_case_title || '(no title)',
                     status: row.test_case_status,
-                    href: `/test/cases/${row.test_case_id}`,
+                    href: artifactPath('test_case', { id: row.test_case_id, test_case_id: row.test_case_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'verifies',
                     artifactType: row.artifact_type,
@@ -321,7 +321,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     displayId: row.test_suite_display_id || row.test_suite_id.slice(0, 8),
                     title: row.test_suite_title || '(no title)',
                     status: row.test_suite_status,
-                    href: `/test/suites/${row.test_suite_id}`,
+                    href: artifactPath('test_suite', { id: row.test_suite_id, suite_id: row.test_suite_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
                     artifactType: row.artifact_type,
@@ -357,7 +357,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     displayId: row.test_run_display_id || row.test_run_id.slice(0, 8),
                     title: row.test_run_title || '(no title)',
                     status: row.test_run_status,
-                    href: `/test/runs/${row.test_run_id}`,
+                    href: artifactPath('test_run', { id: row.test_run_id, run_id: row.test_run_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
                     artifactType: row.artifact_type,
@@ -393,7 +393,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                     displayId: row.bug_display_id || row.bug_id.slice(0, 8),
                     title: row.bug_title || '(no title)',
                     status: row.bug_status,
-                    href: `/work/bugs/${row.bug_id}`,
+                    href: artifactPath('bug', { id: row.bug_id, bug_id: row.bug_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'affects',
                     artifactType: row.artifact_type,
