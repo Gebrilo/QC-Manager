@@ -448,7 +448,18 @@ router.patch('/test-runs/:id', requireAuth, blockContributors, requirePermission
   const client = await pool.connect();
 
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    let id = rawId;
+    if (!UUID_LOOSE_RE.test(rawId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        id = await resolveArtifactUuid('test_run', rawId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
     const validatedData = testRunUpdateSchema.parse(req.body);
 
     await client.query('BEGIN');
@@ -542,7 +553,18 @@ router.delete('/test-runs/:id', requireAuth, blockContributors, requirePermissio
   const client = await pool.connect();
 
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    let id = rawId;
+    if (!UUID_LOOSE_RE.test(rawId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        id = await resolveArtifactUuid('test_run', rawId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
 
     await client.query('BEGIN');
 
@@ -1449,6 +1471,18 @@ router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePer
 router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
   const client = await pool.connect();
   try {
+    const rawRunId = req.params.id;
+    let resolvedRunId = rawRunId;
+    if (!UUID_LOOSE_RE.test(rawRunId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawRunId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        resolvedRunId = await resolveArtifactUuid('test_run', rawRunId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
     const { execution_ids, status, assigned_to } = req.body;
 
     if (!Array.isArray(execution_ids) || execution_ids.length === 0) {
@@ -1493,7 +1527,7 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, re
     }
 
     // Verify run exists
-    const runResult = await client.query('SELECT id FROM test_run WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
+    const runResult = await client.query('SELECT id FROM test_run WHERE id = $1 AND deleted_at IS NULL', [resolvedRunId]);
     if (runResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Test run not found' });
@@ -1504,7 +1538,7 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, re
     params.push(...execution_ids);
 
     const query = `UPDATE test_execution SET ${updates.join(', ')} WHERE test_run_id = $${pn} AND id IN (${idPlaceholders}) RETURNING id, status, assigned_to, executed_by, executed_at`;
-    params.push(req.params.id);
+    params.push(resolvedRunId);
 
     const result = await client.query(query, params);
 

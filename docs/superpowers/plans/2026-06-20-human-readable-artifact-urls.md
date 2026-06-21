@@ -25,7 +25,7 @@
 | `user_story` | *(none)* | `US-12345` | `/work/stories/` | `apps/api/src/routes/userStories.js` | `tuleap_artifact_id` (strip `US-`) |
 | `task` | `tasks.task_id` | `TSK-001` | `/work/tasks/` | `apps/api/src/routes/tasks.js` | `task_id` column |
 | `test_case` | `test_case.test_case_id` | `TC-00001` | `/test/cases/` | `apps/api/src/routes/testCases.js` | `test_case_id` column |
-| `test_run` | `test_runs.run_id` | `RUN-1` | `/test/runs/` | `apps/api/src/routes/testExecutions.js` (`/test-runs/:id`) | `run_id` column |
+| `test_run` | `test_run.run_id` | `RUN-1` | `/test/runs/` | `apps/api/src/routes/testExecutions.js` (`/test-runs/:id`) | `run_id` column |
 | `test_suite` | `test_suites.suite_id` | `TS-1` | `/test/suites/` | `apps/api/src/routes/testSuites.js` | `suite_id` column |
 
 > Note: link tables (`bug_tasks`, `task_test_cases`, etc.) reuse the column names `bug_id`/`task_id`/`test_case_id` for **UUID foreign keys** — those are unrelated to the human-id columns above and must NOT be touched.
@@ -120,7 +120,7 @@ const ARTIFACT_ID_CONFIG = {
   user_story: { table: 'user_stories', humanColumn: null,           prefix: 'US-'  },
   task:       { table: 'tasks',        humanColumn: 'task_id',      prefix: 'TSK-' },
   test_case:  { table: 'test_case',    humanColumn: 'test_case_id', prefix: 'TC-'  },
-  test_run:   { table: 'test_runs',    humanColumn: 'run_id',       prefix: 'RUN-' },
+  test_run:   { table: 'test_run',     humanColumn: 'run_id',       prefix: 'RUN-' },
   test_suite: { table: 'test_suites',  humanColumn: 'suite_id',     prefix: 'TS-'  },
 };
 

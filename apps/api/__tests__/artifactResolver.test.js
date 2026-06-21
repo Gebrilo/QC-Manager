@@ -23,6 +23,30 @@ describe('resolveArtifactUuid', () => {
     expect(params).toEqual(['TSK-001']);
   });
 
+  test('resolves a test_run against the singular test_run table', async () => {
+    const query = jest.fn(fakeQuery([{ id: UUID }]));
+    await expect(resolveArtifactUuid('test_run', 'RUN-1', query)).resolves.toBe(UUID);
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toMatch(/FROM test_run\b/);
+    expect(sql).not.toMatch(/FROM test_runs\b/);
+    expect(sql).toMatch(/run_id = \$1/);
+    expect(params).toEqual(['RUN-1']);
+  });
+
+  test('resolves a test_case, test_suite, and bug against their tables', async () => {
+    for (const [type, value, table, col] of [
+      ['test_case', 'TC-1', 'test_case', 'test_case_id'],
+      ['test_suite', 'TS-1', 'test_suites', 'suite_id'],
+      ['bug', 'TLP-1', 'bugs', 'bug_id'],
+    ]) {
+      const query = jest.fn(fakeQuery([{ id: UUID }]));
+      await expect(resolveArtifactUuid(type, value, query)).resolves.toBe(UUID);
+      const [sql] = query.mock.calls[0];
+      expect(sql).toMatch(new RegExp(`FROM ${table}\\b`));
+      expect(sql).toMatch(new RegExp(`${col} = \\$1`));
+    }
+  });
+
   test('resolves a user_story by stripping US- to the tuleap id', async () => {
     const query = jest.fn(fakeQuery([{ id: UUID }]));
     await expect(resolveArtifactUuid('user_story', 'US-12345', query)).resolves.toBe(UUID);

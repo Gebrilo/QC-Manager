@@ -9,7 +9,7 @@ const ARTIFACT_ID_CONFIG = {
   user_story: { table: 'user_stories', humanColumn: null,           prefix: 'US-'  },
   task:       { table: 'tasks',        humanColumn: 'task_id',      prefix: 'TSK-' },
   test_case:  { table: 'test_case',    humanColumn: 'test_case_id', prefix: 'TC-'  },
-  test_run:   { table: 'test_runs',    humanColumn: 'run_id',       prefix: 'RUN-' },
+  test_run:   { table: 'test_run',     humanColumn: 'run_id',       prefix: 'RUN-' },
   test_suite: { table: 'test_suites',  humanColumn: 'suite_id',     prefix: 'TS-'  },
 };
 
