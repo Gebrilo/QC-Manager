@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TestCase, TestCaseExecution, TestCaseActivityEntry } from '@/types';
 import { taskTestCaseLinksApi, testCasesApi, testSuitesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -41,6 +42,14 @@ export default function TestCaseDetailPage() {
             .catch((err) => setError(err.message))
             .finally(() => setLoading(false));
     }, [id]);
+
+    useEffect(() => {
+        if (!testCase) return;
+        const canonical = artifactPublicId('test_case', testCase);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('test_case', testCase));
+        }
+    }, [testCase, id, router]);
 
     const handleDelete = async () => {
         const confirmed = await confirmAction({

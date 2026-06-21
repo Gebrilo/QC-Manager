@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TestSuite, SuiteTestCase } from '@/types';
 import { taskTestCaseLinksApi, testSuitesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -71,6 +72,14 @@ export default function TestSuiteDetailPage() {
     useEffect(() => {
         loadSuite();
     }, [loadSuite]);
+
+    useEffect(() => {
+        if (!suite) return;
+        const canonical = artifactPublicId('test_suite', suite);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('test_suite', suite));
+        }
+    }, [suite, id, router]);
 
     const handleDelete = async () => {
         const confirmed = await confirmAction({

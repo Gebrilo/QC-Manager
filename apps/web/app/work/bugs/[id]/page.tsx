@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugsApi, type Bug, bugLinksApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import {
     LinkedArtifactsSection,
     type LinkedArtifactsSectionConfig,
@@ -76,6 +77,14 @@ export default function BugDetailPage() {
         }
         if (id) load();
     }, [id]);
+
+    useEffect(() => {
+        if (!bug) return;
+        const canonical = artifactPublicId('bug', bug);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('bug', bug));
+        }
+    }, [bug, id, router]);
 
     const projectId = bug?.project_id;
 

@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { taskTestCaseLinksApi, tasksApi, tuleapApi, userStoriesApi, type UserStory } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { SyncPanel } from '@/components/shared/SyncPanel';
@@ -46,6 +47,14 @@ export default function UserStoryDetailPage() {
         }
         if (id) load();
     }, [id]);
+
+    useEffect(() => {
+        if (!story) return;
+        const canonical = artifactPublicId('user_story', story);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('user_story', story));
+        }
+    }, [story, id, router]);
 
     const handleDelete = async () => {
         if (!story) return;

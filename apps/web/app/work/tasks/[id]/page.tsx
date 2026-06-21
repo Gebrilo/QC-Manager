@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchApi, taskTestCaseLinksApi, userStoriesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Task } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -51,6 +52,14 @@ export default function TaskDetailPage() {
         }
         if (id) load();
     }, [id]);
+
+    useEffect(() => {
+        if (!task) return;
+        const canonical = artifactPublicId('task', task);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('task', task));
+        }
+    }, [task, id, router]);
 
     const handleDelete = async () => {
         if (!task) return;

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugLinksApi, fetchApi, taskTestCaseLinksApi, testRunsApi, testSuitesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -122,6 +123,14 @@ export default function TestRunDetailPage() {
     useEffect(() => {
         loadRun();
     }, [loadRun]);
+
+    useEffect(() => {
+        if (!run) return;
+        const canonical = artifactPublicId('test_run', run);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('test_run', run));
+        }
+    }, [run, id, router]);
 
     const handleStatusUpdate = async (executionId: string, newStatus: string) => {
         setUpdatingId(executionId);
