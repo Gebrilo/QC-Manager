@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
+router.param('id', resolveArtifactParam('test_case'));
 const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');

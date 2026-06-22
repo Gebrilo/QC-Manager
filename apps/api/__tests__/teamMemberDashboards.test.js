@@ -115,7 +115,7 @@ describe('GET /api/dashboards/team-manager', () => {
             { match: /weekly_capacity_hrs/, rows: [{ user_id: 'u-dev', resource_id: 'r-dev', name: 'Dev Member', workload_hrs: '6', capacity_hrs: '40', logged_hrs: '1' }] },
             { match: /AND t\.status = 'Blocked'/, rows: [] },
             { match: /deadline IS NOT NULL/, rows: [] },
-            { match: /SELECT t\.id, t\.task_id/, rows: [{ id: 'task-dev', task_id: 'TSK-DEV', task_name: 'Dev Task', status: 'Backlog', project_id: 'p-dev', owner_team_id: 'team-dev', resource1_id: 'r-dev', total_est_hrs: '6', total_actual_hrs: '1' }] },
+            { match: /SELECT t\.id, t\.task_id/, rows: [{ id: 'dddddddd-0000-0000-0000-000000000002', task_id: 'TSK-DEV', task_name: 'Dev Task', status: 'Backlog', project_id: 'p-dev', owner_team_id: 'team-dev', resource1_id: 'r-dev', total_est_hrs: '6', total_actual_hrs: '1' }] },
             { match: /SELECT COUNT\(\*\)::int AS c FROM bugs b/, rows: [{ c: '0' }] },
             { match: /SELECT b\.status, COUNT\(\*\)::int AS c FROM bugs b/, rows: [] },
         ]);
@@ -317,7 +317,7 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
         const app = buildTasksApp({ user: { id: 'tm-qc', role: 'team_manager' } });
         installSqlRouter([
             { match: /SELECT \* FROM tasks WHERE id = \$1/, rows: [{
-                id: 'task-dev',
+                id: 'dddddddd-0000-0000-0000-000000000002',
                 task_id: 'TSK-DEV',
                 task_name: 'Dev Task',
                 status: 'In Progress',
@@ -340,7 +340,7 @@ describe('PATCH /api/tasks/:id task take-over enforcement', () => {
         ]);
 
         const res = await request(app)
-            .patch('/api/tasks/task-dev')
+            .patch('/api/tasks/dddddddd-0000-0000-0000-000000000002')
             .send({ assignments: [
                 { resource_id: '00000000-0000-0000-0000-000000000123', assignment_type: 'PRIMARY', estimate_hrs: 0, actual_hrs: 0 },
             ] });

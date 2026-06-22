@@ -164,13 +164,13 @@ describe('GET /test-executions/test-runs/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM test_run tr\s+LEFT JOIN projects/i.test(sql) && /WHERE tr\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'run-1', run_id: 'RUN-1', deleted_at: null,
+                    id: 'aaaaaaaa-0000-0000-0000-000000000001', run_id: 'RUN-1', deleted_at: null,
                     project_id: 'p-other', created_by: 'u-other', name: 'Foreign run',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-executions/test-runs/run-1');
+        const res = await request(makeApp()).get('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001');
         expect(res.status).toBe(200);
         expect(res.body._can).toBeDefined();
     });
@@ -180,13 +180,13 @@ describe('GET /test-executions/test-runs/:id — detail enforcement', () => {
         queryHandler = async (sql) => {
             if (/FROM test_run tr\s+LEFT JOIN projects/i.test(sql) && /WHERE tr\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'run-1', run_id: 'RUN-1', deleted_at: null,
+                    id: 'aaaaaaaa-0000-0000-0000-000000000001', run_id: 'RUN-1', deleted_at: null,
                     project_id: 'p-other', created_by: 'u-other', name: 'Foreign run',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-executions/test-runs/run-1');
+        const res = await request(makeApp()).get('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });
@@ -198,14 +198,14 @@ describe('PATCH /test-executions/test-runs/:id — manipulation guard', () => {
         queryHandler = async (sql) => {
             if (/SELECT \* FROM test_run WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
                 return { rows: [{
-                    id: 'run-1', run_id: 'RUN-1', deleted_at: null,
+                    id: 'aaaaaaaa-0000-0000-0000-000000000001', run_id: 'RUN-1', deleted_at: null,
                     project_id: 'p-other', created_by: 'u-other',
                 }] };
             }
             return { rows: [] };
         };
         const res = await request(makeApp())
-            .patch('/test-executions/test-runs/run-1')
+            .patch('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001')
             .send({ name: 'hack' });
         expect(res.status).toBe(403);
         const rollback = queries.find(q => /ROLLBACK/i.test(q.sql));
@@ -241,13 +241,13 @@ describe('GET /test-executions/test-runs/:id — enforced denial', () => {
         queryHandler = async (sql) => {
             if (/FROM test_run tr\s+LEFT JOIN projects/i.test(sql) && /WHERE tr\.id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'run-1', run_id: 'RUN-1', deleted_at: null,
+                    id: 'aaaaaaaa-0000-0000-0000-000000000001', run_id: 'RUN-1', deleted_at: null,
                     project_id: 'p-other', created_by: 'u-other', name: 'Foreign run',
                 }] };
             }
             return { rows: [] };
         };
-        const res = await request(makeApp()).get('/test-executions/test-runs/run-1');
+        const res = await request(makeApp()).get('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001');
         expect(res.status).toBe(403);
         expect(res.body.reason).toBeDefined();
     });
@@ -259,7 +259,7 @@ describe('GET /test-executions/test-runs/:id/bugs-found — derived bugs', () =>
         queryHandler = async (sql) => {
             if (/SELECT \* FROM test_run WHERE id = \$1 AND deleted_at IS NULL/i.test(sql)) {
                 return { rows: [{
-                    id: 'run-1',
+                    id: 'aaaaaaaa-0000-0000-0000-000000000001',
                     run_id: 'RUN-1',
                     project_id: 'proj-1',
                     created_by: 'u-admin',
@@ -280,7 +280,7 @@ describe('GET /test-executions/test-runs/:id/bugs-found — derived bugs', () =>
             return { rows: [] };
         };
 
-        const res = await request(makeApp()).get('/test-executions/test-runs/run-1/bugs-found');
+        const res = await request(makeApp()).get('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001/bugs-found');
 
         expect(res.status).toBe(200);
         expect(res.body.data).toHaveLength(1);

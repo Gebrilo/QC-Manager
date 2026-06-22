@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 
 interface LinkedTestCase {
     id: string;
@@ -110,7 +111,7 @@ export function LinkedTestCasesPanel({ taskId }: LinkedTestCasesPanelProps) {
                             >
                                 <div className="min-w-0 flex-1">
                                     <Link
-                                        href={`/test/cases/${link.test_case_id}`}
+                                        href={artifactPath('test_case', { id: link.test_case_id, test_case_id: link.test_case_display_id })}
                                         className="text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
                                     >
                                         {link.test_case_title}

@@ -3380,6 +3380,17 @@ const runMigrations = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_ai_content_logs_type_status_created ON ai_content_generation_logs(request_type, status, created_at DESC)`);
 
+        // Human-id addressing: enforce one live row per human id so URL resolution is unambiguous.
+        // Partial (deleted_at IS NULL, col IS NOT NULL) so soft-deletes and null task_ids don't collide.
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_bugs_bug_id_live
+            ON bugs (bug_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_tasks_task_id_live
+            ON tasks (task_id) WHERE deleted_at IS NULL AND task_id IS NOT NULL`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_test_case_test_case_id_live
+            ON test_case (test_case_id) WHERE deleted_at IS NULL`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_test_suites_suite_id_live
+            ON test_suites (suite_id) WHERE deleted_at IS NULL`);
+
         await client.query(`
             INSERT INTO landing_page_config (
                 hero_title,

@@ -35,7 +35,7 @@ describe('buildExecutedTestCaseRows', () => {
                 displayId: 'TC-001',
                 title: 'Login works',
                 status: 'pass',
-                href: '/test/cases/uuid-1234abcd',
+                href: '/test/cases/TC-001',
                 source: 'qc',
                 relationshipType: 'executes',
                 derived: true,

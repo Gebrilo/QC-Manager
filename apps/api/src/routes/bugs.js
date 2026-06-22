@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
+router.param('id', resolveArtifactParam('bug'));
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
@@ -284,10 +286,6 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
 router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const { id } = req.params;
-
-        if (!UUID_RE.test(id)) {
-            return res.status(404).json({ success: false, error: 'Bug not found' });
-        }
 
         const query = `
             SELECT

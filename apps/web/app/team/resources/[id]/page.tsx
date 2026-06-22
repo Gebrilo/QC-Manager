@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { usePagination } from '@/hooks/usePagination';
 import { Pagination } from '@/components/ui/Pagination';
 import { downloadCSV, downloadXLSX, safeFilename } from '@/lib/exportUtils';
@@ -578,7 +579,7 @@ export default function ResourceDashboardPage() {
                                                     {task.task_id}
                                                 </span>
                                                 <Link
-                                                    href={`/work/tasks/${task.id}`}
+                                                    href={artifactPath('task', task)}
                                                     className="text-slate-800 dark:text-slate-100 font-medium truncate max-w-[220px] hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                                                     title={task.task_name}
                                                 >

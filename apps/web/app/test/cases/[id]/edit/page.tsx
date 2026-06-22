@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { projectsApi, testCasesApi, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { TestCase } from '@/types';
 import { stripHtml } from '@/lib/stripHtml';
@@ -413,7 +414,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
                 linked_requirement_id: data.linked_requirement_id || undefined,
             };
             await testCasesApi.update(testCaseId, payload as any);
-            router.push(`/test/cases/${testCaseId}`);
+            router.push(artifactPath('test_case', { id: testCaseId }));
             router.refresh();
         } catch (err: any) {
             setSubmitError(err.message || 'Failed to save test case');
@@ -422,7 +423,7 @@ function EditForm({ testCase, testCaseId }: { testCase: TestCase; testCaseId: st
         }
     };
 
-    const handleCancel = () => router.push(`/test/cases/${testCaseId}`);
+    const handleCancel = () => router.push(artifactPath('test_case', { id: testCaseId }));
 
     return (
         <form onSubmit={handleSubmit(onSubmit) as any} className="max-w-[1400px] mx-auto px-6 py-6">

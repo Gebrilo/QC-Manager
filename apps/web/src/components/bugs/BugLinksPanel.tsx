@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 
 interface LinkedExecution {
     id: string;
@@ -215,7 +216,7 @@ export function BugLinksPanel({ bugId, triageStatus }: BugLinksPanelProps) {
                                 >
                                     <div className="min-w-0 flex-1">
                                         <Link
-                                            href={`/work/tasks/${task.task_id}`}
+                                            href={artifactPath('task', task)}
                                             className="text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
                                         >
                                             {task.task_name}

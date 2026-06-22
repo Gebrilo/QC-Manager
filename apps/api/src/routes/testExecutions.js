@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../config/db');
+const db = require('../config/db');
+const { pool } = db;
+const { resolveArtifactUuid } = require('../services/artifactResolver');
+// Loose UUID pattern: matches 8-4-4-4-12 hex regardless of RFC 4122
+// version/variant bits so non-standard test UUIDs pass through without a DB hit.
+const UUID_LOOSE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Human run ID: RUN- (uppercase) followed by digits only (e.g. RUN-0001, RUN-042).
+// Case-sensitive so that test fixtures like 'run-1' do NOT trigger DB resolution.
+const RUN_HUMAN_ID_RE = /^RUN-\d+$/;
 const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
@@ -237,6 +245,17 @@ router.get('/test-runs', requireAuth, blockContributors, requirePermission('qc.t
 router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
+    let runUuid = id;
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
 
     // Get test run
     const runResult = await pool.query(
@@ -248,7 +267,7 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
       LEFT JOIN projects p ON tr.project_id = p.id
       LEFT JOIN app_user u ON tr.created_by = u.id
       WHERE tr.id = $1 AND tr.deleted_at IS NULL`,
-      [id]
+      [runUuid]
     );
 
     if (runResult.rows.length === 0) {
@@ -279,7 +298,7 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
         CASE WHEN COALESCE(te.sort_order, 0) > 0 THEN 0 ELSE 1 END,
         te.sort_order ASC,
         te.created_at ASC`,
-      [id]
+      [runUuid]
     );
 
     // Calculate metrics
@@ -315,9 +334,20 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
 router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
+    let runUuid = id;
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
     const runResult = await pool.query(
       `SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL`,
-      [id]
+      [runUuid]
     );
     if (runResult.rows.length === 0) {
       return res.status(404).json({ error: 'Test run not found' });
@@ -342,7 +372,7 @@ router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requireP
          AND b.deleted_at IS NULL
        GROUP BY b.id, b.bug_id, b.title, b.status, b.project_id
        ORDER BY MIN(bte.created_at) DESC`,
-      [id]
+      [runUuid]
     );
 
     res.json({ data: result.rows });
@@ -418,7 +448,18 @@ router.patch('/test-runs/:id', requireAuth, blockContributors, requirePermission
   const client = await pool.connect();
 
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    let id = rawId;
+    if (!UUID_LOOSE_RE.test(rawId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        id = await resolveArtifactUuid('test_run', rawId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
     const validatedData = testRunUpdateSchema.parse(req.body);
 
     await client.query('BEGIN');
@@ -512,7 +553,18 @@ router.delete('/test-runs/:id', requireAuth, blockContributors, requirePermissio
   const client = await pool.connect();
 
   try {
-    const { id } = req.params;
+    const rawId = req.params.id;
+    let id = rawId;
+    if (!UUID_LOOSE_RE.test(rawId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        id = await resolveArtifactUuid('test_run', rawId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
 
     await client.query('BEGIN');
 
@@ -1366,9 +1418,20 @@ router.post('/test-runs/from-suite', requireAuth, blockContributors, requirePerm
 router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
+    let runUuid = id;
+    if (!UUID_LOOSE_RE.test(id)) {
+      if (!RUN_HUMAN_ID_RE.test(id)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        runUuid = await resolveArtifactUuid('test_run', id, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
 
     const runResult = await pool.query(
-      `SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL`, [id]
+      `SELECT * FROM test_run WHERE id = $1 AND deleted_at IS NULL`, [runUuid]
     );
     if (runResult.rows.length === 0) {
       return res.status(404).json({ error: 'Test run not found' });
@@ -1390,7 +1453,7 @@ router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePer
           ELSE 0
         END as completion_rate
       FROM test_execution WHERE test_run_id = $1`,
-      [id]
+      [runUuid]
     );
 
     res.json(progressResult.rows[0]);
@@ -1408,6 +1471,18 @@ router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePer
 router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
   const client = await pool.connect();
   try {
+    const rawRunId = req.params.id;
+    let resolvedRunId = rawRunId;
+    if (!UUID_LOOSE_RE.test(rawRunId)) {
+      if (!RUN_HUMAN_ID_RE.test(rawRunId)) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+      }
+      try {
+        resolvedRunId = await resolveArtifactUuid('test_run', rawRunId, (...args) => db.query(...args));
+      } catch (err) {
+        return res.status(err.status || 500).json({ success: false, error: err.message });
+      }
+    }
     const { execution_ids, status, assigned_to } = req.body;
 
     if (!Array.isArray(execution_ids) || execution_ids.length === 0) {
@@ -1452,7 +1527,7 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, re
     }
 
     // Verify run exists
-    const runResult = await client.query('SELECT id FROM test_run WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
+    const runResult = await client.query('SELECT id FROM test_run WHERE id = $1 AND deleted_at IS NULL', [resolvedRunId]);
     if (runResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Test run not found' });
@@ -1463,7 +1538,7 @@ router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, re
     params.push(...execution_ids);
 
     const query = `UPDATE test_execution SET ${updates.join(', ')} WHERE test_run_id = $${pn} AND id IN (${idPlaceholders}) RETURNING id, status, assigned_to, executed_by, executed_at`;
-    params.push(req.params.id);
+    params.push(resolvedRunId);
 
     const result = await client.query(query, params);
 

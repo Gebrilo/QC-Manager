@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TestSuite, SuiteTestCase } from '@/types';
 import { taskTestCaseLinksApi, testSuitesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -71,6 +72,14 @@ export default function TestSuiteDetailPage() {
     useEffect(() => {
         loadSuite();
     }, [loadSuite]);
+
+    useEffect(() => {
+        if (!suite) return;
+        const canonical = artifactPublicId('test_suite', suite);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('test_suite', suite));
+        }
+    }, [suite, id, router]);
 
     const handleDelete = async () => {
         const confirmed = await confirmAction({
@@ -244,7 +253,7 @@ export default function TestSuiteDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href={`/test/suites/${id}/edit`}>
+                    <Link href={`${artifactPath('test_suite', { id })}/edit`}>
                         <Button variant="outline" size="sm" className="gap-1.5">
                             <EditIcon />
                             Edit Suite
@@ -352,12 +361,12 @@ export default function TestSuiteDetailPage() {
                                             <tr key={tc.junction_id || tc.id} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                                                 <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{tc.sort_order || idx + 1}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
-                                                    <Link href={`/test/cases/${tc.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
+                                                    <Link href={artifactPath('test_case', tc)} className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
                                                         {tc.test_case_id_display || tc.test_case_id}
                                                     </Link>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Link href={`/test/cases/${tc.id}`} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
+                                                    <Link href={artifactPath('test_case', tc)} className="text-sm font-medium text-slate-900 dark:text-white hover:underline">
                                                         {tc.title}
                                                     </Link>
                                                 </td>
@@ -469,7 +478,7 @@ function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite & { test
                     displayId: testCase.test_case_id_display || testCase.test_case_id || testCase.id.slice(0, 8),
                     title: testCase.title || '(no title)',
                     status: testCase.status,
-                    href: `/test/cases/${testCase.id}`,
+                    href: artifactPath('test_case', testCase),
                     source: 'qc' as const,
                     relationshipType: 'contains',
                     derived: true,
@@ -493,7 +502,7 @@ function TestSuiteLinkedArtifactsSections({ suite }: { suite: TestSuite & { test
                     displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
                     title: row.user_story_title || '(no title)',
                     status: row.user_story_status,
-                    href: `/work/stories/${row.user_story_id}`,
+                    href: artifactPath('user_story', { id: row.user_story_id, display_id: row.user_story_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
                     artifactType: row.artifact_type,

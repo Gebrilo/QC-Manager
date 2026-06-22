@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-table';
 import { Task } from '@/types';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { SimpleTooltip } from '@/components/ui/Tooltip';
 import { SyncBadge } from '@/components/shared/SyncBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -178,7 +179,7 @@ export function TaskTable({
             enableHiding: false,
             cell: (info) => (
                 <Link
-                    href={`/work/tasks/${info.row.original.id}`}
+                    href={artifactPath('task', info.row.original)}
                     className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 hover:text-violet-800 dark:hover:text-violet-100 transition-colors"
                 >
                     {info.getValue()}
@@ -193,7 +194,7 @@ export function TaskTable({
                 <SimpleTooltip content={buildTaskTooltip(info.row.original)} position="top">
                     <div style={{ minWidth: 280, maxWidth: 360 }}>
                         <Link
-                            href={`/work/tasks/${info.row.original.id}`}
+                            href={artifactPath('task', info.row.original)}
                             className="font-medium text-slate-800 dark:text-slate-100 hover:text-violet-700 dark:hover:text-violet-300 transition-colors truncate block"
                         >
                             {info.getValue()}
@@ -283,7 +284,7 @@ export function TaskTable({
             enableHiding: false,
             cell: (info) => (
                 <Link
-                    href={`/work/tasks/${info.row.original.id}/edit`}
+                    href={`${artifactPath('task', info.row.original)}/edit`}
                     className="p-1.5 rounded-md text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors opacity-0 group-hover:opacity-100"
                     title="Edit task"
                 >

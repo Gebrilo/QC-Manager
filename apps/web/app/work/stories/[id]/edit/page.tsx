@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { projectsApi, userStoriesApi, type UserStory, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { Spinner } from '@/components/ui/Spinner';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
@@ -395,7 +396,7 @@ function EditForm({
                 remaining_effort: data.remaining_effort ?? null,
             };
             await userStoriesApi.update(artifactId, payload);
-            router.push(`/work/stories/${artifactId}`);
+            router.push(artifactPath('user_story', { id: artifactId }));
             router.refresh();
         } catch (err: any) {
             setSubmitError(err.message || 'Failed to save user story');

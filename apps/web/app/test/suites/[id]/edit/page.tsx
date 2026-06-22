@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { artifactPath } from '@/lib/artifactPath';
 import { TestSuite, SuiteTestCase, SuiteType, ReadinessScope } from '@/types';
 import { testSuitesApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -341,7 +342,7 @@ export default function EditTestSuitePage() {
                 suite_type: suiteType,
                 readiness_scope: readinessScope,
             });
-            router.push(`/test/suites/${id}`);
+            router.push(artifactPath('test_suite', { id }));
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Failed to update test suite');
@@ -349,7 +350,7 @@ export default function EditTestSuitePage() {
         }
     };
 
-    const handleCancel = () => router.push(`/test/suites/${id}`);
+    const handleCancel = () => router.push(artifactPath('test_suite', { id }));
 
     const handleRemoveCase = async (caseId: string) => {
         setRemovingId(caseId);
@@ -791,13 +792,13 @@ export default function EditTestSuitePage() {
                                             <span className="text-slate-300 dark:text-slate-600 cursor-grab flex-shrink-0" dangerouslySetInnerHTML={{ __html: ICON_DRAG }} />
                                             <span className="text-[11px] tabular-nums text-slate-400 w-6 flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
                                             <Link
-                                                href={`/test/cases/${tc.test_case_id}`}
+                                                href={artifactPath('test_case', tc)}
                                                 className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-300 w-20 flex-shrink-0 hover:underline"
                                             >
                                                 {tc.test_case_id_display || tc.test_case_id}
                                             </Link>
                                             <Link
-                                                href={`/test/cases/${tc.test_case_id}`}
+                                                href={artifactPath('test_case', tc)}
                                                 className="text-sm text-slate-800 dark:text-slate-100 font-medium flex-1 truncate hover:underline"
                                             >
                                                 {tc.title}

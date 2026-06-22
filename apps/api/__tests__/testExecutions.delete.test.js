@@ -42,7 +42,7 @@ describe('DELETE /test-executions/test-runs/:id', () => {
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({});
 
-    const res = await request(app).delete('/test-executions/test-runs/run-uuid-1');
+    const res = await request(app).delete('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001');
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Test run deleted successfully');
@@ -61,7 +61,7 @@ describe('DELETE /test-executions/test-runs/:id', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({});
 
-    const res = await request(app).delete('/test-executions/test-runs/nonexistent');
+    const res = await request(app).delete('/test-executions/test-runs/bbbbbbbb-0000-0000-0000-000000000002');
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Test run not found');
@@ -75,7 +75,7 @@ describe('DELETE /test-executions/test-runs/:id', () => {
       })
       .mockRejectedValueOnce(new Error('DB connection lost'));
 
-    const res = await request(app).delete('/test-executions/test-runs/run-uuid-1');
+    const res = await request(app).delete('/test-executions/test-runs/aaaaaaaa-0000-0000-0000-000000000001');
 
     expect(res.status).toBe(500);
   });

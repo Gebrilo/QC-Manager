@@ -13,6 +13,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { useToast } from '@/components/ui/Toast';
 import { FormSection } from '@/components/ui/FormSection';
 import { tuleapApi, projectsApi, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 
@@ -102,11 +103,11 @@ export function UserStoryForm({ initialData, isEdit, artifactId, projectId: init
             if (isEdit && artifactId) {
                 await tuleapApi.updateUnified(artifactId, payload);
                 toast.success('Story saved');
-                router.push(`/work/stories/${artifactId}`);
+                router.push(artifactPath('user_story', { id: artifactId }));
             } else {
                 const result = await tuleapApi.createUnified(payload);
                 toast.success('Story created');
-                router.push(`/work/stories/${result.qc_id || result.tuleap_artifact_id}`);
+                router.push(artifactPath('user_story', { id: result.qc_id, tuleap_artifact_id: result.tuleap_artifact_id }));
             }
             router.refresh();
         } catch (err: any) {

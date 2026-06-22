@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskTestCaseLinksApi } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { RelationshipPicker } from '@/components/shared/RelationshipPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -112,7 +113,7 @@ export function LinkedTasksPanel({ testCaseId }: LinkedTasksPanelProps) {
                             >
                                 <div className="min-w-0 flex-1">
                                     <Link
-                                        href={`/work/tasks/${link.task_id}`}
+                                        href={artifactPath('task', { id: link.task_id, task_id: link.task_display_id })}
                                         className="text-sm font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
                                     >
                                         {link.task_name}

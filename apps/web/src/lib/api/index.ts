@@ -546,6 +546,7 @@ export type EstimateAccuracy = {
 
 export interface UserStory {
     id: string;
+    display_id?: string;
     tuleap_artifact_id?: number;
     title: string;
     description?: string;

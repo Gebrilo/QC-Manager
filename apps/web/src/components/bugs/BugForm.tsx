@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { bugsApi, projectsApi, testCasesApi, type Project } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 import { AttachmentSection } from '@/components/shared/AttachmentSection';
@@ -455,18 +456,18 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
 
             if (isEdit && bugUUID) {
                 await bugsApi.update(bugUUID, payload);
-                router.push(`/work/bugs/${bugUUID}`);
+                router.push(artifactPath('bug', { id: bugUUID }));
             } else {
                 const result = await bugsApi.create(payload);
                 const bugData = result.data;
                 if (bugData?.sync_status === 'failed') {
                     setShowSyncToast(bugData.last_sync_error || 'Tuleap sync failed. You can retry from the artifact detail page.');
                 }
-                const targetId = bugData?.id;
+                const targetPath = bugData ? artifactPath('bug', bugData) : null;
                 if (showSyncToast) {
-                    setTimeout(() => router.push(targetId ? `/work/bugs/${targetId}` : '/work/bugs'), 3000);
+                    setTimeout(() => router.push(targetPath || '/work/bugs'), 3000);
                 } else {
-                    router.push(targetId ? `/work/bugs/${targetId}` : '/work/bugs');
+                    router.push(targetPath || '/work/bugs');
                 }
             }
             router.refresh();
@@ -479,7 +480,7 @@ export function BugForm({ initialData, bug, isEdit, artifactId, bugUUID, project
 
     const handleCancel = () => {
         if (isEdit && bugUUID) {
-            router.push(`/work/bugs/${bugUUID}`);
+            router.push(artifactPath('bug', { id: bugUUID, bug_id: bug?.bug_id }));
         } else {
             router.push('/work/bugs');
         }

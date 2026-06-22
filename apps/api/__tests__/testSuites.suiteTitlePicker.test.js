@@ -68,7 +68,7 @@ function setUser() {
 function setSuite(name = 'Authentication / Login') {
     queryHandler = async (sql) => {
         if (/SELECT id, project_id, name FROM test_suites/i.test(sql)) {
-            return { rows: [{ id: 'suite-1', project_id: 'p-1', name }] };
+            return { rows: [{ id: 'eeeeeeee-0000-0000-0000-000000000001', project_id: 'p-1', name }] };
         }
         if (/^SELECT COUNT/i.test(sql)) return { rows: [{ total: '0' }] };
         return { rows: [] };
@@ -99,7 +99,7 @@ describe('GET /test-suites/:id/available-test-cases — match_suite_title', () =
     test('applies normalized-exact match against the suite name', async () => {
         setSuite('Authentication / Login');
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ match_suite_title: 'true' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -115,7 +115,7 @@ describe('GET /test-suites/:id/available-test-cases — match_suite_title', () =
     test('suite-name value comes from the suite row, not the request body', async () => {
         setSuite('Suite  Name  With  Spaces');
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ match_suite_title: 'true' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -127,7 +127,7 @@ describe('GET /test-suites/:id/available-test-cases — match_suite_title', () =
     test('no match_suite_title → no suite_title match clause is added', async () => {
         setSuite('Auth');
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ status: 'Not Run' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -141,7 +141,7 @@ describe('GET /test-suites/:id/available-test-cases — new filter params', () =
     test('suite_title adds a parameterized = clause', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ suite_title: 'Auth / Login' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -152,7 +152,7 @@ describe('GET /test-suites/:id/available-test-cases — new filter params', () =
     test('created_by adds a parameterized = clause', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ created_by: 'u-creator' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -163,7 +163,7 @@ describe('GET /test-suites/:id/available-test-cases — new filter params', () =
     test('tags (comma-separated) adds a tags && $N::text[] clause', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ tags: 'login, smoke' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -176,7 +176,7 @@ describe('GET /test-suites/:id/available-test-cases — new filter params', () =
     test('empty / missing tags adds no tag clause', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ tags: '   ' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -186,7 +186,7 @@ describe('GET /test-suites/:id/available-test-cases — new filter params', () =
     test('search filter remains backward-compatible (title/description/test_case_id)', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ search: 'login' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -201,7 +201,7 @@ describe('GET /test-suites/:id/available-test-cases — scoping & exclusion', ()
     test('project scope comes from the suite row, not the request', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ match_suite_title: 'true' });
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
@@ -213,7 +213,7 @@ describe('GET /test-suites/:id/available-test-cases — scoping & exclusion', ()
     test('linked cases (test_suite_cases) are excluded via NOT EXISTS', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases');
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases');
         expect(res.status).toBe(200);
         const q = findAvailableQuery();
         expect(q.sql).toMatch(/NOT EXISTS/i);
@@ -237,7 +237,7 @@ describe('GET /test-suites/:id/available-test-cases — scoping & exclusion', ()
     test('count query uses the same filter clauses as the data query', async () => {
         setSuite();
         const res = await request(makeApp())
-            .get('/test-suites/suite-1/available-test-cases')
+            .get('/test-suites/eeeeeeee-0000-0000-0000-000000000001/available-test-cases')
             .query({ match_suite_title: 'true', status: 'Not Run' });
         expect(res.status).toBe(200);
         const cnt = findCountQuery();
@@ -265,7 +265,7 @@ describe('POST /test-suites/:id/test-cases — duplicate prevention', () => {
         queryHandler = async (sql, params) => {
             if (/SELECT \* FROM test_suites WHERE id = \$1/i.test(sql)) {
                 return { rows: [{
-                    id: 'suite-1', suite_id: 'TS-00001', project_id: 'p-1', deleted_at: null,
+                    id: 'eeeeeeee-0000-0000-0000-000000000001', suite_id: 'TS-00001', project_id: 'p-1', deleted_at: null,
                 }] };
             }
             if (/SELECT id, project_id FROM test_case WHERE id = ANY/i.test(sql)) {
@@ -284,7 +284,7 @@ describe('POST /test-suites/:id/test-cases — duplicate prevention', () => {
             return { rows: [] };
         };
         const res = await request(makeApp())
-            .post('/test-suites/suite-1/test-cases')
+            .post('/test-suites/eeeeeeee-0000-0000-0000-000000000001/test-cases')
             .send({ test_case_ids: ['tc-a', 'tc-b'] });
         expect(res.status).toBe(200);
         expect(res.body.added).toBe(1);

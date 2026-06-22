@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FormSection } from '@/components/ui/FormSection';
 import { testCasesApi } from '@/lib/api';
+import { artifactPath } from '@/lib/artifactPath';
 import { stripHtml } from '@/lib/stripHtml';
 import { useTuleapResources } from '@/hooks/useTuleapResources';
 
@@ -103,7 +104,7 @@ export function TestCaseForm({ initialData, isEdit, testCaseId, projectId }: Tes
 
             if (isEdit && testCaseId) {
                 await testCasesApi.update(testCaseId, payload);
-                router.push(`/test/cases/${testCaseId}`);
+                router.push(artifactPath('test_case', { id: testCaseId }));
             } else {
                 await testCasesApi.create(payload as any);
                 router.push('/test/cases');

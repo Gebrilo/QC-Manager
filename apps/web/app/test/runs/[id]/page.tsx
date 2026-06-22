@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { bugLinksApi, fetchApi, taskTestCaseLinksApi, testRunsApi, testSuitesApi } from '@/lib/api';
+import { artifactPath, artifactPublicId } from '@/lib/artifactPath';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -122,6 +123,14 @@ export default function TestRunDetailPage() {
     useEffect(() => {
         loadRun();
     }, [loadRun]);
+
+    useEffect(() => {
+        if (!run) return;
+        const canonical = artifactPublicId('test_run', run);
+        if (canonical && canonical !== id) {
+            router.replace(artifactPath('test_run', run));
+        }
+    }, [run, id, router]);
 
     const handleStatusUpdate = async (executionId: string, newStatus: string) => {
         setUpdatingId(executionId);
@@ -286,7 +295,7 @@ export default function TestRunDetailPage() {
                 <span>Started: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.started_at), { addSuffix: true })}</strong></span>
                 {run.completed_at && <span>Completed: <strong className="text-slate-900 dark:text-white">{formatDistanceToNow(new Date(run.completed_at), { addSuffix: true })}</strong></span>}
                 {run.suite_id && (
-                    <span>Suite: <Link href={`/test/suites/${run.suite_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
+                    <span>Suite: <Link href={artifactPath('test_suite', { id: run.suite_id as string })} className="text-blue-600 dark:text-blue-400 hover:underline">View Suite</Link></span>
                 )}
             </div>
 
@@ -423,7 +432,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     displayId: suite.suite_id || suite.id.slice(0, 8),
                     title: suite.name || '(no title)',
                     status: suite.status,
-                    href: `/test/suites/${suite.id}`,
+                    href: artifactPath('test_suite', suite),
                     source: 'qc' as const,
                     relationshipType: 'executes',
                     derived: true,
@@ -451,7 +460,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     displayId: row.bug_display_id || row.bug_id.slice(0, 8),
                     title: row.bug_title || '(no title)',
                     status: row.bug_status,
-                    href: `/work/bugs/${row.bug_id}`,
+                    href: artifactPath('bug', { id: row.bug_id, bug_id: row.bug_display_id }),
                     source: 'qc' as const,
                     relationshipType: 'found in',
                     derived: true,
@@ -476,7 +485,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     displayId: row.user_story_display_id || row.user_story_id.slice(0, 8),
                     title: row.user_story_title || '(no title)',
                     status: row.user_story_status,
-                    href: `/work/stories/${row.user_story_id}`,
+                    href: artifactPath('user_story', { id: row.user_story_id, display_id: row.user_story_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'validated by',
                     artifactType: row.artifact_type,
@@ -512,7 +521,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     displayId: row.task_display_id || row.task_id.slice(0, 8),
                     title: row.task_title || row.task_name || '(no title)',
                     status: row.task_status,
-                    href: `/work/tasks/${row.task_id}`,
+                    href: artifactPath('task', { id: row.task_id, task_id: row.task_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'exercised by',
                     artifactType: row.artifact_type,
@@ -548,7 +557,7 @@ function TestRunLinkedArtifactsSections({ run }: { run: TestRunDetail }) {
                     displayId: row.bug_display_id || row.bug_id.slice(0, 8),
                     title: row.bug_title || '(no title)',
                     status: row.bug_status,
-                    href: `/work/bugs/${row.bug_id}`,
+                    href: artifactPath('bug', { id: row.bug_id, bug_id: row.bug_display_id }),
                     source: row.source || 'qc',
                     relationshipType: row.relationship_type || 'found in',
                     artifactType: row.artifact_type,
