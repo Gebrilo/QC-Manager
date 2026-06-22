@@ -31,11 +31,19 @@ function resolveArtifactParam(type) {
       // user_story: bare digits or US-<digits> (case-insensitive prefix)
       return /^\d+$/.test(value) || new RegExp(`^${config.prefix}\\d+$`, 'i').test(value);
     }
-    // Standard prefix + the human-id charset (e.g. TSK-001, TSK-DIAG-001, RUN-7, TC-00001).
-    // Mirrors the schema regexes (e.g. task_id = /^TSK-[A-Z0-9-]+$/) so non-numeric ids resolve
-    // instead of 404ing. Prefix match is CASE-SENSITIVE (uppercase) so lowercase test fixtures
-    // like 'tc-1'/'run-1' are not mistaken for human IDs and pass through unchanged.
-    return new RegExp(`^${config.prefix}[A-Z0-9-]+$`).test(value);
+    // Generic human-id shape: an UPPERCASE prefix segment, a dash, then the
+    // human-id charset (e.g. TLP-1, BUG-MQNNSVRS, TSK-DIAG-001, TC-00001, RUN-7).
+    //
+    // This is deliberately prefix-AGNOSTIC rather than keyed to one prefix per
+    // type, because several artifacts carry more than one live prefix family
+    // from different sources: bugs are 'TLP-' (Tuleap sync) OR 'BUG-' (QC-native
+    // creation, bugs.js); test runs are 'RUN-' (created) OR 'TR-' (Excel import).
+    // A single-prefix gate 404'd every BUG-*/TR-* artifact even though the row
+    // exists. The actual resolution still queries the TEXT humanColumn, so a
+    // wrong-shaped or wrong-prefix value simply returns 404 (never a uuid-cast
+    // 500). The gate stays CASE-SENSITIVE (uppercase start) so lowercase test
+    // fixtures like 'tc-1'/'run-1' and junk like 'garbage' 404 without a DB hit.
+    return /^[A-Z][A-Z0-9]*-[A-Z0-9-]+$/.test(value);
   }
 
   return async function (req, res, next, value) {
