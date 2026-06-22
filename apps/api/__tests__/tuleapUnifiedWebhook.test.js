@@ -126,6 +126,81 @@ describe('POST /tuleap-webhook/unified', () => {
         expect(response.tuleap_project_id).toBe(42);
     });
 
+    test('returns 400 (not an unhandled 500) when the payload has no resolvable artifact id', async () => {
+        // Regression: the unified poll intermittently posts an artifact with `values`
+        // but no `id`. tuleap_webhook_log.tuleap_artifact_id is NOT NULL, so the insert
+        // threw and surfaced as a 500. The handler must reject early with a clean 400.
+        const syncConfig = {
+            id: 'cfg-tc', tuleap_project_id: 101, tuleap_tracker_id: 9,
+            tracker_type: 'test_case', qc_project_id: 'proj-tc',
+        };
+        mockQuery.mockResolvedValueOnce({ rows: [syncConfig] }); // tracker lookup only
+
+        const mockReq = {
+            body: {
+                tracker_id: 9,
+                action: 'sync',
+                project: { id: 101 },
+                artifact: { values: [{ field_id: 1, name: 'title', value: 'TC' }] }, // no id
+            },
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn(),
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(400);
+        const response = mockRes.json.mock.calls[0][0];
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/artifact id is required/i);
+        // rejected before any webhook-log insert or persister dispatch
+        expect(mockQuery).toHaveBeenCalledTimes(1);
+        expect(mockDispatchTask).not.toHaveBeenCalled();
+    });
+
+    test('accepts a top-level tuleap_artifact_id when artifact.id is absent', async () => {
+        // Some payload variants carry the id at the top level instead of artifact.id.
+        const syncConfig = {
+            id: 'cfg-1', tuleap_project_id: 42, tuleap_tracker_id: 5,
+            tracker_type: 'bug', qc_project_id: 'proj-1',
+        };
+        mockQuery
+            .mockResolvedValueOnce({ rows: [syncConfig] }) // tracker lookup
+            .mockResolvedValueOnce({ rows: [] })            // webhook log insert
+            .mockResolvedValueOnce({ rows: [] });           // webhook log update
+        mockNormalize.mockReturnValue({ title: 'Bug' });
+        mockFromTuleap.mockReturnValue({ artifact_type: 'bug', common: { title: 'Bug' }, fields: {} });
+        mockDispatchBug.mockResolvedValueOnce({ action: 'updated', id: 'bug-uuid' });
+
+        const mockReq = {
+            body: {
+                tracker_id: 5, action: 'sync', tuleap_artifact_id: 777,
+                artifact: { values: [{ field_id: 1, name: 'title', value: 'Bug' }] },
+            },
+        };
+        const mockRes = {
+            statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json: jest.fn(),
+        };
+
+        const routeLayer = tuleapRouter.stack.find(
+            layer => layer.route && layer.route.path === '/unified' && layer.route.methods.post
+        );
+        await routeLayer.route.stack[0].handle(mockReq, mockRes, jest.fn());
+
+        expect(mockRes.statusCode).toBe(200);
+        // the resolved id flows into the webhook-log insert (2nd query, 1st param)
+        const insertCall = mockQuery.mock.calls[1];
+        expect(insertCall[1][0]).toBe(777);
+    });
+
     test('returns 201 and creates bug via dispatchAction for valid bug payload', async () => {
         const syncConfig = {
             id: 'cfg-1',
