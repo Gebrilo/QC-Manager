@@ -11,6 +11,7 @@ const {
 const { canPerform } = require('../access/AccessEngine');
 const { ARTIFACT_GATES } = require('../access/artifactLoaders');
 const { dispatchLinkNotification } = require('../services/notifications/dispatcher');
+const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
 
 const TABLES = {
     tasks: { table: 'tasks', key: 'task_id', title: 'task_name', deleted: true, artifactType: 'task', notFound: 'Task not found' },
@@ -389,6 +390,18 @@ const bugSide = express.Router();
 const userStorySide = express.Router();
 const testSuiteSide = express.Router();
 const testRunSide = express.Router();
+
+// These side-routers serve /:id/<links> where :id addresses the router's OWN
+// artifact. They are mounted at the same base paths as the main artifact routers
+// (bugs.js etc.), which resolve human ids -> UUID via router.param. These parallel
+// routers must do the same, or a human id (e.g. TLP-355) reaches a uuid-typed
+// column and Postgres throws "invalid input syntax for type uuid" (500).
+taskSide.param('id', resolveArtifactParam('task'));
+testCaseSide.param('id', resolveArtifactParam('test_case'));
+bugSide.param('id', resolveArtifactParam('bug'));
+userStorySide.param('id', resolveArtifactParam('user_story'));
+testSuiteSide.param('id', resolveArtifactParam('test_suite'));
+testRunSide.param('id', resolveArtifactParam('test_run'));
 
 for (const pair of pairs) {
     if (pair.fromRef === 'tasks') addRoutes(taskSide, pair, 'from');
