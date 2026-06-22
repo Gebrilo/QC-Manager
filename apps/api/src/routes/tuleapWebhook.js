@@ -890,6 +890,21 @@ router.post('/unified', async (req, res) => {
             });
         }
 
+        // tuleap_webhook_log.tuleap_artifact_id is NOT NULL, and nothing downstream
+        // can sync an artifact it cannot identify. Resolve the id up front (top-level
+        // artifact.id, or a tuleap_artifact_id field present on some payload variants)
+        // and reject a payload with no resolvable id with a clean 400 — otherwise the
+        // NOT-NULL insert surfaces as an unhandled 500 (seen intermittently from the
+        // unified poll emitting an artifact with values but no id).
+        const tuleapArtifactId = (artifact && artifact.id) || req.body.tuleap_artifact_id || null;
+        if (tuleapArtifactId == null) {
+            return res.status(400).json({
+                success: false,
+                error: 'artifact id is required: payload has no resolvable artifact id',
+                tracker_id,
+            });
+        }
+
         let trackerFields = null;
         try {
             const fieldsMap = await tuleapFieldRegistry._load(tracker_id);
@@ -911,9 +926,7 @@ router.post('/unified', async (req, res) => {
         if (!unified.tuleap) unified.tuleap = {};
         unified.tuleap.project_id = syncConfig.tuleap_project_id;
         unified.tuleap.tracker_id = syncConfig.tuleap_tracker_id;
-        if (artifact && artifact.id) {
-            unified.tuleap.artifact_id = artifact.id;
-        }
+        unified.tuleap.artifact_id = tuleapArtifactId;
         if (req.body.tuleap_url) {
             unified.tuleap.url = req.body.tuleap_url;
         }
@@ -921,7 +934,6 @@ router.post('/unified', async (req, res) => {
         unified.action = action;
 
         const payloadHash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
-        const tuleapArtifactId = artifact && artifact.id ? artifact.id : null;
         await pool.query(`
             INSERT INTO tuleap_webhook_log (
                 tuleap_artifact_id, tuleap_tracker_id, artifact_type, action,
