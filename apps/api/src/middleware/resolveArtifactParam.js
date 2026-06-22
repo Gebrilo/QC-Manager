@@ -17,7 +17,7 @@ function dbQuery(...args) {
 
 // Express param middleware: rewrites req.params.id (human id OR UUID) to the UUID.
 // Resolution only happens when the value looks like a human-readable id:
-//   - For most types: matches PREFIX followed by digits only (e.g. TSK-001, RUN-0004).
+//   - For most types: matches PREFIX + human-id charset [A-Z0-9-] (e.g. TSK-001, TSK-DIAG-001).
 //   - For user_story: bare numeric or starts with "US-" + digits (tuleap_artifact_id).
 //   - A loose UUID passes through unchanged (fast-path 1).
 //   - Anything else returns 404 immediately to avoid PostgreSQL "invalid input
@@ -31,10 +31,11 @@ function resolveArtifactParam(type) {
       // user_story: bare digits or US-<digits> (case-insensitive prefix)
       return /^\d+$/.test(value) || new RegExp(`^${config.prefix}\\d+$`, 'i').test(value);
     }
-    // Standard prefix + digits only (e.g. TSK-001, BUG-042, RUN-0007, TC-003, TS-001).
-    // Prefix match is CASE-SENSITIVE (uppercase) so that test fixtures like 'tc-1', 'run-1'
-    // are not mistaken for human IDs and are passed through to the handler unchanged.
-    return new RegExp(`^${config.prefix}\\d+$`).test(value);
+    // Standard prefix + the human-id charset (e.g. TSK-001, TSK-DIAG-001, RUN-7, TC-00001).
+    // Mirrors the schema regexes (e.g. task_id = /^TSK-[A-Z0-9-]+$/) so non-numeric ids resolve
+    // instead of 404ing. Prefix match is CASE-SENSITIVE (uppercase) so lowercase test fixtures
+    // like 'tc-1'/'run-1' are not mistaken for human IDs and pass through unchanged.
+    return new RegExp(`^${config.prefix}[A-Z0-9-]+$`).test(value);
   }
 
   return async function (req, res, next, value) {

@@ -50,6 +50,20 @@ describe('resolveArtifactParam', () => {
     expect(db.query).not.toHaveBeenCalled();
   });
 
+  test('resolves a non-numeric human id (e.g. TSK-DIAG-001) instead of 404ing', async () => {
+    // task_id schema is /^TSK-[A-Z0-9-]+$/, so ids like TSK-DIAG-001 and TSK-560E1333
+    // must reach the resolver, not be rejected by the format gate. Regression for #256.
+    const UUID = '22222222-2222-4222-8222-222222222222';
+    db.query.mockResolvedValue({ rows: [{ id: UUID }] });
+    const req = { params: { id: 'TSK-DIAG-001' } };
+    const res = mockRes();
+    const next = jest.fn();
+    await resolveArtifactParam('task')(req, res, next, 'TSK-DIAG-001');
+    expect(db.query).toHaveBeenCalled();
+    expect(req.params.id).toBe(UUID);
+    expect(next).toHaveBeenCalledWith();
+  });
+
   test('fast-path 2: unrecognized value responds 404 and does not call next', async () => {
     const req = { params: { id: 'garbage' } };
     const res = mockRes();

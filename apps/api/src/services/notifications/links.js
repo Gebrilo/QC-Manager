@@ -45,13 +45,14 @@ async function buildLink(entityType, entityId) {
         return `/work/tasks/${pub}`;
     }
     if (entityType === 'user_story') {
+        // user_stories has no human-id column; the public id is US-<tuleap_artifact_id>
+        // (same derivation as access/artifactLoaders.js and search.js).
         const r = await db.query(
-            `SELECT display_id, tuleap_artifact_id, id::text AS uuid
+            `SELECT tuleap_artifact_id, id::text AS uuid
              FROM user_stories WHERE id = $1 AND deleted_at IS NULL`, [entityId]);
         const row = r.rows[0];
         if (!row) return `/work/stories/${entityId}`;
-        const pub = row.display_id
-            || (row.tuleap_artifact_id ? `US-${row.tuleap_artifact_id}` : null)
+        const pub = (row.tuleap_artifact_id ? `US-${row.tuleap_artifact_id}` : null)
             || row.uuid;
         return `/work/stories/${pub}`;
     }

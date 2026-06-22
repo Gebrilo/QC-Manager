@@ -115,7 +115,8 @@ describe('resolveNotificationTarget — user_stories', () => {
     test('ok + href when the user may view the story', async () => {
         mockStoryFound();
         mockCanPerform.mockResolvedValue({ allowed: true });
-        mockQuery.mockResolvedValueOnce({ rows: [{ display_id: 'US-1' }] }); // buildLink human-id lookup
+        // user_stories has no display_id column; buildLink derives US-<tuleap_artifact_id>.
+        mockQuery.mockResolvedValueOnce({ rows: [{ tuleap_artifact_id: 1, uuid: 'story-1' }] }); // buildLink human-id lookup
         const out = await resolveNotificationTarget(user, { entity_type: 'user_story', entity_id: 'story-1' }, {});
         expect(out).toEqual({ status: 'ok', href: '/work/stories/US-1' });
     });
