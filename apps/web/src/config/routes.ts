@@ -1,6 +1,6 @@
 import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, TestTube2, Megaphone } from 'lucide-react';
 
-const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
+const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey, canonicalRole } = require('../../../shared/rbac/catalog.ts');
 
 export type UserStatus = 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 
@@ -161,7 +161,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'manage',
         label: 'Manage',
         icon: Users,
-        roles: ['team_manager', 'admin'],
+        roles: ['team_manager', 'admin', 'pm'],
         children: [
             { path: '/dashboards/team-manager', label: 'Team Dashboard', icon: LayoutGrid },
             { path: '/team/resources', label: 'Resources', icon: Users },
@@ -242,6 +242,61 @@ export function getNavbarRoutes(userOrStatus?: RouteVisibilityUser | UserStatus 
         .filter(r => r.showInNavbar)
         .filter(r => routeAllowsStatus(r, userOrStatus))
         .sort((a, b) => (a.navOrder || 99) - (b.navOrder || 99));
+}
+
+export interface NavVisibilityContext {
+    role?: string | null;
+    status?: UserStatus | null;
+    isAdmin: boolean;
+    hasPermission: (key: string) => boolean;
+}
+
+/**
+ * Whether the given navigable path is visible to the user described by `ctx`.
+ * Mirrors the gating order of RouteGuard: status scope → contributor lockout →
+ * adminOnly → permission. This is the single source of truth for sidebar link
+ * visibility so it can be unit-tested without rendering the React tree.
+ */
+export function canSeeRoutePath(path: string, ctx: NavVisibilityContext): boolean {
+    const route = getRouteConfig(path);
+    if (!route) return false;
+    if (!routeAllowsStatus(route, ctx.status ?? null)) return false;
+    if (ctx.role === 'contributor' && route.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) return false;
+    if (route.adminOnly && !ctx.isAdmin) return false;
+    if (route.permission && !ctx.hasPermission(route.permission)) return false;
+    return true;
+}
+
+function filterNavNode(node: NavigationNode, ctx: NavVisibilityContext): NavigationNode | null {
+    if (node.children?.length) {
+        const children = node.children
+            .map(child => filterNavNode(child, ctx))
+            .filter((child): child is NavigationNode => child != null);
+        return children.length > 0 ? { ...node, children } : null;
+    }
+    return node.path && canSeeRoutePath(node.path, ctx) ? node : null;
+}
+
+/**
+ * Returns the navigation sections (with their leaf links) visible to the user.
+ *
+ * A section is shown when (a) its role whitelist admits the user's role — or it
+ * has none — AND (b) at least one descendant link is permission-visible. The
+ * section role whitelist and the per-link permission check are two distinct
+ * gates: granting a permission in the admin matrix only surfaces a link if the
+ * containing section also admits the role. Keep section `roles` in sync with the
+ * permissions you expect each role to exercise.
+ */
+export function getVisibleNavSections(ctx: NavVisibilityContext): NavigationSection[] {
+    return NAVIGATION_SECTIONS
+        .filter(section => !section.roles || section.roles.includes(canonicalRole(ctx.role)))
+        .map(section => ({
+            ...section,
+            children: section.children
+                .map(child => filterNavNode(child, ctx))
+                .filter((child): child is NavigationNode => child != null),
+        }))
+        .filter(section => section.children.length > 0);
 }
 
 export function isPublicRoute(pathname: string): boolean {
