@@ -6,9 +6,11 @@ const { resolveArtifactUuid } = require('../services/artifactResolver');
 // Loose UUID pattern: matches 8-4-4-4-12 hex regardless of RFC 4122
 // version/variant bits so non-standard test UUIDs pass through without a DB hit.
 const UUID_LOOSE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Human run ID: RUN- (uppercase) followed by digits only (e.g. RUN-0001, RUN-042).
-// Case-sensitive so that test fixtures like 'run-1' do NOT trigger DB resolution.
-const RUN_HUMAN_ID_RE = /^RUN-\d+$/;
+// Human run ID: RUN- (created via POST) or TR- (Excel import) followed by digits
+// (e.g. RUN-0001, TR-00002). Test runs carry two live prefix families, so a
+// RUN-only gate 404'd every TR-* run even though the row exists. Case-sensitive
+// (uppercase) so test fixtures like 'run-1' do NOT trigger DB resolution.
+const RUN_HUMAN_ID_RE = /^(?:RUN|TR)-\d+$/;
 const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
