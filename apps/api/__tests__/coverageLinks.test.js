@@ -1,4 +1,5 @@
 const mockQuery = jest.fn();
+const mockResolveQuery = jest.fn();
 const mockCanPerform = jest.fn();
 const mockLoadArtifact = jest.fn();
 const mockAuditLog = jest.fn();
@@ -6,6 +7,8 @@ const mockDispatchLink = jest.fn();
 
 jest.mock('../src/config/db', () => ({
     pool: { query: mockQuery },
+    // resolveArtifactParam (router.param) resolves human ids via db.query, not pool.query
+    query: (...args) => mockResolveQuery(...args),
 }));
 
 jest.mock('../src/middleware/authMiddleware', () => ({
@@ -110,6 +113,21 @@ describe('Coverage link router', () => {
             'view',
             expect.anything()
         );
+    });
+
+    test('resolves a human id (TLP-355) on link sub-routes instead of 500ing on the uuid cast', async () => {
+        // Regression: the side-routers had no router.param resolver, so a bug human id
+        // from the detail-page URL (e.g. /bugs/TLP-355/test-cases) reached a uuid column
+        // -> Postgres "invalid input syntax for type uuid". The resolver must map it to the UUID.
+        mockResolveQuery.mockResolvedValue({ rows: [{ id: bugId }] }); // bug_id 'TLP-355' -> UUID
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // link list query -> no links
+
+        const res = await request(app).get(`/bugs/TLP-355/test-cases`);
+
+        expect(res.status).toBe(200);
+        expect(mockResolveQuery).toHaveBeenCalled(); // resolver ran
+        // the artifact was loaded by its resolved UUID, not the raw human id
+        expect(mockLoadArtifact).toHaveBeenCalledWith('bug', bugId, expect.anything(), expect.anything());
     });
 
     test('creates a bug test case link and auto-triages the bug', async () => {
