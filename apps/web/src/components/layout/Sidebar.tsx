@@ -7,14 +7,10 @@ import { useAuth } from '../providers/AuthProvider';
 import { useSidebar } from '../providers/SidebarProvider';
 import {
     getLandingPage,
-    getRouteConfig,
-    NAVIGATION_SECTIONS,
+    getVisibleNavSections,
     type NavigationNode,
-    routeAllowsStatus,
 } from '../../config/routes';
 import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
-
-const { canonicalRole } = require('../../../../shared/rbac/catalog.ts');
 
 export function Sidebar() {
     const { user, permissions, isAdmin, hasPermission } = useAuth();
@@ -33,42 +29,16 @@ export function Sidebar() {
         return false;
     };
 
-    const canSeePath = (path: string) => {
-        if (!user) return false;
-        const route = getRouteConfig(path);
-        if (!route) return false;
-        if (!routeAllowsStatus(route, user)) return false;
-        if (user.role === 'contributor' && route.scopes?.includes('active_only')) return false;
-        if (route.adminOnly && !isAdmin) return false;
-        if (route.permission && !hasPermission(route.permission)) return false;
-        return true;
-    };
-
-    const filterNode = (node: NavigationNode): NavigationNode | null => {
-        if (node.children?.length) {
-            const children = node.children
-                .map(child => filterNode(child))
-                .filter((child): child is NavigationNode => child != null);
-
-            return children.length > 0 ? { ...node, children } : null;
-        }
-
-        return node.path && canSeePath(node.path) ? node : null;
-    };
-
     const sections = useMemo(() => {
         if (!user) return [];
 
-        return NAVIGATION_SECTIONS
-            .filter(section => !section.roles || section.roles.includes(canonicalRole(user.role)))
-            .map(section => ({
-                ...section,
-                children: section.children
-                    .map(child => filterNode(child))
-                    .filter((child): child is NavigationNode => child != null),
-            }))
-            .filter(section => section.children.length > 0);
-    }, [user, isAdmin, hasPermission, pathname]);
+        return getVisibleNavSections({
+            role: user.role,
+            status: user.status,
+            isAdmin,
+            hasPermission,
+        });
+    }, [user, isAdmin, hasPermission]);
 
     if (!user) return null;
 
