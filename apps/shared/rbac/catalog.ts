@@ -343,6 +343,7 @@ const ROLE_DEFINITIONS = Object.freeze({
         permissions: Object.freeze([
             PERMISSIONS.TASKS_VIEW,
             PERMISSIONS.TASKS_EDIT,
+            PERMISSIONS.RESOURCES_VIEW,
             PERMISSIONS.MY_TASKS_VIEW,
             PERMISSIONS.MY_TASKS_CREATE,
             PERMISSIONS.MY_TASKS_EDIT,
@@ -455,6 +456,23 @@ function canUserPerform(user, key) {
     return rolePermissions.includes(canonicalKey);
 }
 
+/**
+ * Pure set-membership test against an actor's effective permission set.
+ *
+ * This is the unified-path resolver's membership algebra (ADR 0010): the admin
+ * `*` wildcard matches ANY key, so a freshly-minted key never 403s an admin
+ * before it is seeded. Unlike `canUserPerform`, this performs NO role-from-code
+ * resolution and NO DB access — it is a pure function of the set passed in.
+ *
+ * The server uses this on the RBAC_UNIFIED path (effective set loaded once per
+ * request via RoleResolver). The client uses it against `effective_permissions`.
+ */
+function hasPermission(effectiveSet, key) {
+    if (!effectiveSet || !key) return false;
+    if (effectiveSet.has('*')) return true;
+    return effectiveSet.has(key);
+}
+
 const BUILT_IN_ROLE_PERMISSION_DEFAULTS = Object.freeze({
     admin: Object.freeze(['*']),
     pm: Object.freeze([...new Set(collectRolePermissions('pm', new Set()))]),
@@ -478,6 +496,7 @@ module.exports = {
     collectRoleScopes,
     getScope,
     getPermissionLookupKeys,
+    hasPermission,
     isTeamManagerRole,
     isKnownPermissionKey,
     resolvePermissionKey,

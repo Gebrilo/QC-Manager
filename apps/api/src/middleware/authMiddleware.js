@@ -1,15 +1,29 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { resolve: resolveAccess } = require('../access/RoleResolver');
 const {
     canUserPerform,
     canonicalRole,
     getPermissionLookupKeys,
     getScope,
+    hasPermission,
 } = require('../../../shared/rbac/catalog.ts');
 
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 // Legacy fallback for old custom JWTs during transition
 const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
+
+/**
+ * RBAC_UNIFIED kill-switch (ADR 0010, issue #262).
+ *
+ * Read per-request from the environment so it is live-flippable (a process
+ * restart picks up the new value) and so tests can toggle it dynamically
+ * without re-requiring the module. Defaults OFF — every existing authorization
+ * decision is unchanged until the flag is turned on.
+ */
+function isRbacUnified() {
+    return String(process.env.RBAC_UNIFIED || '').toLowerCase() === 'on';
+}
 
 /**
  * Middleware: Verify Supabase JWT token, check user is active, and attach fresh user data to request.
@@ -179,7 +193,19 @@ async function loadPermissionOverrides(userId, permissionKeys) {
 }
 
 /**
- * Middleware: Check a permission through the shared RBAC catalog resolver.
+ * Middleware: Check a permission.
+ *
+ * Under RBAC_UNIFIED=on (ADR 0010, issue #262), the actor's effective permission
+ * set is resolved once per request via the Access Engine RoleResolver (DB
+ * `role_permissions` ∪ `user_permissions` deltas) and tested with the pure
+ * `hasPermission` membership helper (admin `*` wildcard matches any key). The
+ * resolved set is cached on `req._accessResolverCache` so a request never pays
+ * for resolution twice.
+ *
+ * With the flag OFF (default), the legacy catalog-based path is unchanged:
+ * per-user overrides are loaded for the requested key and `canUserPerform`
+ * resolves the role's permissions from the in-code catalog.
+ *
  * @param {string} permissionKey - Required permission key (canonical qc.* format).
  */
 function requirePermission(permissionKey) {
@@ -189,10 +215,16 @@ function requirePermission(permissionKey) {
         }
 
         try {
-            const permissionOverrides = req.user.role === 'admin'
-                ? []
-                : await loadPermissionOverrides(req.user.id, [permissionKey]);
-            const allowed = canUserPerform({ ...req.user, permissionOverrides }, permissionKey);
+            let allowed;
+            if (isRbacUnified()) {
+                const { effectivePermissions } = await resolveAccess(req.user, req);
+                allowed = hasPermission(effectivePermissions, permissionKey);
+            } else {
+                const permissionOverrides = req.user.role === 'admin'
+                    ? []
+                    : await loadPermissionOverrides(req.user.id, [permissionKey]);
+                allowed = canUserPerform({ ...req.user, permissionOverrides }, permissionKey);
+            }
             if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
             }
@@ -206,6 +238,11 @@ function requirePermission(permissionKey) {
 /**
  * Middleware: Check if user has ANY of the specified permissions.
  * Useful for endpoints accessible by multiple permission types.
+ *
+ * See `requirePermission` for the RBAC_UNIFIED semantics. On the unified path
+ * the effective set is resolved once (cached) and each candidate key is tested
+ * against it.
+ *
  * @param {string[]} permissionKeys - Array of permission keys (user needs at least one)
  */
 function requireAnyPermission(...permissionKeys) {
@@ -215,11 +252,17 @@ function requireAnyPermission(...permissionKeys) {
         }
 
         try {
-            const permissionOverrides = req.user.role === 'admin'
-                ? []
-                : await loadPermissionOverrides(req.user.id, permissionKeys);
-            const actor = { ...req.user, permissionOverrides };
-            const allowed = permissionKeys.some(permissionKey => canUserPerform(actor, permissionKey));
+            let allowed;
+            if (isRbacUnified()) {
+                const { effectivePermissions } = await resolveAccess(req.user, req);
+                allowed = permissionKeys.some(permissionKey => hasPermission(effectivePermissions, permissionKey));
+            } else {
+                const permissionOverrides = req.user.role === 'admin'
+                    ? []
+                    : await loadPermissionOverrides(req.user.id, permissionKeys);
+                const actor = { ...req.user, permissionOverrides };
+                allowed = permissionKeys.some(permissionKey => canUserPerform(actor, permissionKey));
+            }
             if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
             }
@@ -292,4 +335,5 @@ module.exports = {
     requireStatus,
     requireStatusScope,
     blockContributors,
+    isRbacUnified,
 };
