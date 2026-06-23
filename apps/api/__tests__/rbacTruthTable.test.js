@@ -134,11 +134,36 @@ describe('RBAC truth-table (issue #264)', () => {
 
     describe('role-gate registry + replacement parity', () => {
         test('every role-gate signature discovered is accounted for', () => {
-            // At baseline, no replacements are registered yet. Each signature is
-            // listed here so a NEW role gate appearing in the routes is caught.
-            const known = new Set(roleGateSignatures);
-            // The single signature in use today (journeys/devPlans/resources auto-map).
-            expect(known).toEqual(new Set(['admin|team_manager']));
+            // After the role-gate cutover (#265/#266/#267) there are NO remaining
+            // requireRole(...) calls in app code. The truth table enforces that:
+            // a NEW role gate appearing in the routes must be converted (or
+            // explicitly registered as an exception) — no regressions allowed.
+            expect(new Set(roleGateSignatures)).toEqual(new Set());
+        });
+
+        test('repo-wide sweep: no requireRole( calls remain in app code (#267)', () => {
+            // Scans every .js / .ts source under apps/api/src and apps/web/ for
+            // requireRole(. The requireRole middleware itself has been removed
+            // (authMiddleware.js), so any occurrence is a regression.
+            const roots = [
+                path.join(__dirname, '..', 'src'),
+                path.join(__dirname, '..', '..', 'web'),
+            ];
+            const hits = [];
+            function walk(dir) {
+                if (!fs.existsSync(dir)) return;
+                for (const entry of fs.readdirSync(dir)) {
+                    const full = path.join(dir, entry);
+                    const stat = fs.statSync(full);
+                    if (stat.isDirectory()) walk(full);
+                    else if (/\.(js|ts)$/.test(entry)) {
+                        const text = fs.readFileSync(full, 'utf8');
+                        if (/requireRole\(/.test(text)) hits.push(full);
+                    }
+                }
+            }
+            for (const r of roots) walk(r);
+            expect(hits).toEqual([]);
         });
 
         test('each REGISTERED role-gate replacement preserves reachability (modulo allowlist)', async () => {

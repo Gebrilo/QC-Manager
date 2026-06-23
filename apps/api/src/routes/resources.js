@@ -4,9 +4,9 @@ const db = require('../config/db');
 const { createResourceSchema, updateResourceSchema } = require('../schemas/resource');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
-const { requireAuth, requirePermission, requireRole, requireStatusScope } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireStatusScope } = require('../middleware/authMiddleware');
 const { canAccessUser, getTeamScopeFilter } = require('../middleware/teamAccess');
-const { SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
+const { PERMISSIONS, SCOPES, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
 const { computeTaskTimeline } = require('../utils/workingDays');
 const { estimateAccuracy, isClosedWorkStatus } = require('../services/metrics/estimateAccuracy');
 
@@ -224,7 +224,7 @@ router.get('/:id', requireAuth, requirePermission('qc.resources.view'), async (r
 });
 
 // POST auto-map resources to users by matching email
-router.post('/auto-map', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
+router.post('/auto-map', requireAuth, requirePermission(PERMISSIONS.RESOURCES_EDIT), async (req, res, next) => {
     try {
         // Find all unlinked resources that have an email matching an app_user
         const candidates = await db.query(`

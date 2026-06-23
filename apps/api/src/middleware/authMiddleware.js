@@ -3,7 +3,6 @@ const db = require('../config/db');
 const { resolve: resolveAccess } = require('../access/RoleResolver');
 const {
     canUserPerform,
-    canonicalRole,
     getPermissionLookupKeys,
     getScope,
     hasPermission,
@@ -98,23 +97,6 @@ async function requireAuth(req, res, next) {
         team_membership_active: user.team_membership_active,
     };
     next();
-}
-
-/**
- * Middleware: Check if user has required role (uses fresh DB role from requireAuth)
- * @param {string[]} roles - Allowed roles
- */
-function requireRole(...roles) {
-    const canonicalRoles = roles.map(role => canonicalRole(role));
-    return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-        if (!canonicalRoles.includes(canonicalRole(req.user.role))) {
-            return res.status(403).json({ error: 'Insufficient permissions' });
-        }
-        next();
-    };
 }
 
 /**
@@ -328,7 +310,6 @@ function blockContributors(req, res, next) {
 
 module.exports = {
     requireAuth,
-    requireRole,
     requirePermission,
     requireAnyPermission,
     optionalAuth,

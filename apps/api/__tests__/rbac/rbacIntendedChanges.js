@@ -40,6 +40,10 @@ const ROLE_GATE_REPLACEMENTS = Object.freeze({
         { replacementKey: 'qc.journeys.manage', rationale: 'Journeys domain gate; reachability preserved (admin via *, team_manager seeded).' },
         // #266 — Development Plans / IDP was requireRole('admin','team_manager').
         { replacementKey: 'qc.dev_plans.manage', rationale: 'Dev Plans / IDP domain gate; reachability preserved (admin via *, team_manager seeded).' },
+        // #267 — Resources /auto-map was requireRole('admin','team_manager').
+        // Reuses qc.resources.edit (team_manager already holds it; admin via *),
+        // preserving reachability without minting a duplicate vocabulary entry.
+        { replacementKey: 'qc.resources.edit', rationale: 'Resources /auto-map gate; reachability preserved (team_manager already holds qc.resources.edit, admin via *).' },
     ],
 });
 
