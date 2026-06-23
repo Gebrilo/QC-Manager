@@ -286,8 +286,9 @@ function requireStatusScope(scopeKey) {
 
         let hasScope;
         if (isRbacUnified()) {
-            const { effectiveScopes } = await resolveAccess(req.user, req);
-            hasScope = effectiveScopes.has(scopeKey);
+            const { effectivePermissions, effectiveScopes } = await resolveAccess(req.user, req);
+            // Admin * wildcard bypasses scope restrictions (parity with legacy canUserUseScope line 417)
+            hasScope = effectivePermissions.has('*') || effectiveScopes.has(scopeKey);
         } else {
             hasScope = canUserUseScope(req.user, scopeKey);
         }
