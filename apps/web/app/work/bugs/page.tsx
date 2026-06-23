@@ -32,6 +32,7 @@ const SEV_PILL: Record<string, string> = {
     'None':            'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500',
 };
 
+const SEVERITY_OPTIONS = Object.keys(SEV_PILL);
 const BULK_SELECTION_LIMIT = 50;
 const BULK_STATUS_CONCURRENCY = 5;
 
@@ -289,6 +290,21 @@ function BugsContent() {
         )));
     };
 
+    const handleSeverityChange = async (bug: Bug, nextSeverity: string) => {
+        const previousSeverity = bug.severity || 'None';
+        patchBug(bug.id, { severity: nextSeverity });
+        try {
+            const updated = await bugsApi.updateSeverity(bug.id, nextSeverity);
+            setBugs(prev => prev.map(row => (
+                row.id === bug.id ? { ...row, ...updated.data, _can: updated.data._can ?? row._can } : row
+            )));
+            bulkToast.success('Severity updated');
+        } catch (error) {
+            patchBug(bug.id, { severity: previousSeverity });
+            bulkToast.error(getBulkErrorMessage(error) || 'Failed to update severity');
+        }
+    };
+
     const bugById = useMemo(() => new Map(bugs.map(bug => [bug.id, bug])), [bugs]);
     const selectedBugs = useMemo(
         () => Array.from(selectedBugIds)
@@ -533,7 +549,23 @@ function BugsContent() {
             id: 'severity',
             header: 'Severity',
             cell: (info) => {
-                const v = info.getValue();
+                const bug = info.row.original;
+                const v = info.getValue() || 'None';
+                if (bug._can?.change_severity) {
+                    return (
+                        <select
+                            value={v}
+                            aria-label={`Severity for ${bug.bug_id}`}
+                            onClick={event => event.stopPropagation()}
+                            onChange={event => handleSeverityChange(bug, event.target.value)}
+                            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        >
+                            {SEVERITY_OPTIONS.map(option => (
+                                <option key={option} value={option}>{option}</option>
+                            ))}
+                        </select>
+                    );
+                }
                 return <Pill tone={SEV_PILL[v] || SEV_PILL['None']}>{v || 'None'}</Pill>;
             },
         }),
@@ -620,6 +652,7 @@ function BugsContent() {
         canDelete,
         cappedSelectableBugIds.length,
         handleStatusCommitted,
+        handleSeverityChange,
         handleToggleAllSelection,
         handleToggleBugSelection,
         hasBugStatusEditPermission,

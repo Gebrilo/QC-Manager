@@ -121,6 +121,16 @@ async function canPerform(user, artifact, verb, req) {
     const keyBare = `qc.${ARTIFACT_PERMISSION_NAMESPACE[artifact.type]}.${verb}`;
     const hasBareVerb = effectivePermissions.has(keyBare);
 
+    if (artifact.type === 'bug' && verb === 'change_severity') {
+        if (!effectivePermissions.has('qc.bugs.change_severity')) {
+            return { allowed: false, reason: DENIAL_REASONS.ROLE_MISSING };
+        }
+        if (artifact.owner_team_id && scope.team_id && artifact.owner_team_id === scope.team_id) {
+            return { allowed: true, branch: 'bug_severity_team' };
+        }
+        return { allowed: false, reason: DENIAL_REASONS.TEAM_MISMATCH };
+    }
+
     // Branch 1b: verb_any short-circuit
     // Holding qc.{ns}.{verb}_any means "perform {verb} on any artifact of
     // this type" — see-all/edit-all without team/ownership constraints.

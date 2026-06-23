@@ -516,6 +516,7 @@ export interface Bug {
         delete?: boolean;
         assign?: boolean;
         comment?: boolean;
+        change_severity?: boolean;
     };
 }
 
@@ -603,6 +604,12 @@ export const bugsApi = {
         fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
+        }),
+
+    updateSeverity: (id: string, severity: string) =>
+        fetchApi<{ success: boolean; data: Bug }>(`/bugs/${id}/severity`, {
+            method: 'PATCH',
+            body: JSON.stringify({ severity }),
         }),
 
     sync: (id: string) =>

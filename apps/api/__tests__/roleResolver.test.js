@@ -34,14 +34,15 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u2', role: 'tester' });
-        expect(out.effectivePermissions.has('qc.tasks.view_own')).toBe(true);
+        expect(out.effectivePermissions.has('qc.tasks.view')).toBe(true);
+        expect(out.effectivePermissions.has('qc.tasks.delete')).toBe(true);
         expect(out.effectivePermissions.has('qc.testcases.view_steps')).toBe(true);
         expect(out.scope.team_type).toBe('qc');
     });
 
     test('role_permissions table is canonical when populated', async () => {
         mockQuery
-            .mockResolvedValueOnce(rows([{ permission_key: 'qc.bugs.triage' }]))
+            .mockResolvedValueOnce(rows([{ permission_key: 'qc.bugs.edit_team' }]))
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ scope_key: 'team' }, { scope_key: 'active_only' }]))
             .mockResolvedValueOnce(rows([]))
@@ -49,16 +50,16 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u3', role: 'team_manager' });
-        expect(out.effectivePermissions.has('qc.bugs.triage')).toBe(true);
+        expect(out.effectivePermissions.has('qc.bugs.edit_team')).toBe(true);
         expect(out.effectivePermissions.has('qc.dashboard.view')).toBe(false);
     });
 
     test('user_permissions allow adds and deny strips', async () => {
         mockQuery
-            .mockResolvedValueOnce(rows([{ permission_key: 'qc.tasks.view_own' }]))
+            .mockResolvedValueOnce(rows([{ permission_key: 'qc.tasks.view' }]))
             .mockResolvedValueOnce(rows([
-                { permission_key: 'qc.bugs.triage', granted: true },
-                { permission_key: 'qc.tasks.view_own', granted: false },
+                { permission_key: 'qc.governance.manage_gates', granted: true },
+                { permission_key: 'qc.tasks.view', granted: false },
             ]))
             .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
             .mockResolvedValueOnce(rows([]))
@@ -66,8 +67,8 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u4', role: 'tester' });
-        expect(out.effectivePermissions.has('qc.bugs.triage')).toBe(true);
-        expect(out.effectivePermissions.has('qc.tasks.view_own')).toBe(false);
+        expect(out.effectivePermissions.has('qc.governance.manage_gates')).toBe(true);
+        expect(out.effectivePermissions.has('qc.tasks.view')).toBe(false);
     });
 
     test('legacy manager role canonicalizes to team_manager', async () => {
@@ -80,7 +81,7 @@ describe('RoleResolver.resolve', () => {
             .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u5', role: 'manager' });
-        expect(out.effectivePermissions.has('qc.bugs.triage')).toBe(true);
+        expect(out.effectivePermissions.has('qc.bugs.edit_team')).toBe(true);
     });
 
     test('pm_of_projects populated from project_managers join', async () => {

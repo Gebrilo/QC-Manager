@@ -203,10 +203,10 @@ describe('GET /api/dashboards/member', () => {
                 teamId: 'team-qc',
                 permissions: [
                     'qc.dashboards.member.view',
-                    'qc.tasks.view_own',
-                    'qc.tasks.edit_own',
-                    'qc.bugs.view_own',
-                    'qc.user_stories.view_own',
+                    'qc.tasks.view',
+                    'qc.tasks.edit',
+                    'qc.bugs.view',
+                    'qc.user_stories.view',
                     'qc.user_stories.view_team',
                 ],
             }),
@@ -233,7 +233,7 @@ describe('GET /api/dashboards/member', () => {
         installSqlRouter([
             ...roleRoutes({
                 teamId: 'team-qc',
-                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view', 'qc.bugs.view', 'qc.user_stories.view'],
             }),
             { match: /SELECT t\.id, t\.task_id/, rows: (sql) => { myTasksSql = sql; return [
                 { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
@@ -265,7 +265,7 @@ describe('GET /api/dashboards/member', () => {
         installSqlRouter([
             ...roleRoutes({
                 teamId: 'team-qc',
-                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view', 'qc.bugs.view', 'qc.user_stories.view'],
             }),
             { match: /SELECT t\.id, t\.task_id/, rows: [
                 { id: 'task-sup', task_id: 'TSK-SUP', task_name: 'Supporting', status: 'In Progress',
@@ -288,7 +288,7 @@ describe('GET /api/dashboards/member', () => {
         installSqlRouter([
             ...roleRoutes({
                 teamId: 'team-qc',
-                permissions: ['qc.dashboards.member.view', 'qc.tasks.view_own', 'qc.bugs.view_own', 'qc.user_stories.view_own'],
+                permissions: ['qc.dashboards.member.view', 'qc.tasks.view', 'qc.bugs.view', 'qc.user_stories.view'],
             }),
             { match: /SELECT t\.id, t\.task_id/, rows: [
                 { id: 'task-done', task_id: 'TSK-DONE', task_name: 'Completed', status: 'Done',

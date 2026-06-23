@@ -156,7 +156,7 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
     }
 });
 
-router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.user_stories.create'), async (req, res, next) => {
     try {
         const parsed = createUserStorySchema.safeParse(req.body);
         if (!parsed.success) {
@@ -249,7 +249,7 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
     }
 });
 
-router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.user_stories.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -335,7 +335,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
     }
 });
 
-router.post('/:id/sync', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.post('/:id/sync', requireAuth, requirePermission('qc.user_stories.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
 

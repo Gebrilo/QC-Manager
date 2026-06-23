@@ -3773,6 +3773,16 @@ const runMigrations = async () => {
         `);
 
         // ============================================================
+        // Migration 046: prune redundant _own and decorative RBAC keys
+        // (ADR 0011, issue #275)
+        // ============================================================
+        const { applyRbacPrunedPermissionMigration } = require('../access/rbacPrunedPermissions');
+        const prunedPermissions = await applyRbacPrunedPermissionMigration(client);
+        if (prunedPermissions.applied) {
+            console.log(`[rbac-prune] Converted ${prunedPermissions.convertedOwn} _own grants and pruned ${prunedPermissions.pruned} stale permission rows`);
+        }
+
+        // ============================================================
         // Migration 047: RBAC scopes move to DB (ADR 0010, issue #269)
         // ============================================================
         // role_scopes mirrors role_permissions: a (role, scope) pair is granted or
@@ -3827,6 +3837,90 @@ const runMigrations = async () => {
         const breakGlassResult = await runBreakGlass(client);
         if (breakGlassResult.fired) {
             console.warn('[migration-048] Break-glass recovered admin wildcard — system would have been locked out');
+        }
+
+        // ============================================================
+        // Migration 049: grant wired bug severity permission
+        // (ADR 0011, issue #278)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_bug_severity_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const bugSeveritySeed = await client.query(
+            `SELECT 1 FROM rbac_bug_severity_seed_marker
+             WHERE migration_id = 'issue-278-bug-change-severity'`
+        );
+        if (bugSeveritySeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('tester', 'qc.bugs.change_severity', 'system-seed'),
+                    ('team_manager', 'qc.bugs.change_severity', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_bug_severity_seed_marker (migration_id)
+                VALUES ('issue-278-bug-change-severity')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
+        // ============================================================
+        // Migration 050: RBAC permission grant corrections
+        // (issues #282, #283, #284, #285, #286)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_permission_grant_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const permissionGrantSeed = await client.query(
+            `SELECT 1 FROM rbac_permission_grant_seed_marker
+             WHERE migration_id = 'issues-282-286-rbac-grants'`
+        );
+        if (permissionGrantSeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO permissions (permission_key, domain)
+                VALUES
+                    ('qc.testcases.execute', 'qc.testcases'),
+                    ('qc.bugs.change_severity', 'qc.bugs'),
+                    ('qc.bugs.change_priority', 'qc.bugs'),
+                    ('qc.bugs.view_own', 'qc.bugs'),
+                    ('qc.testcases.delete_own', 'qc.testcases'),
+                    ('qc.testsuites.delete_own', 'qc.testsuites'),
+                    ('qc.testexecutions.delete_own', 'qc.testexecutions')
+                ON CONFLICT (permission_key) DO UPDATE SET domain = EXCLUDED.domain
+            `);
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('tester', 'qc.testcases.execute', 'system-seed'),
+                    ('tester', 'qc.bugs.change_severity', 'system-seed'),
+                    ('tester', 'qc.bugs.change_priority', 'system-seed'),
+                    ('pm', 'qc.bugs.create', 'system-seed'),
+                    ('pm', 'qc.bugs.edit', 'system-seed'),
+                    ('pm', 'qc.user_stories.create', 'system-seed'),
+                    ('pm', 'qc.user_stories.edit', 'system-seed'),
+                    ('viewer', 'qc.bugs.view', 'system-seed'),
+                    ('viewer', 'qc.testcases.view', 'system-seed'),
+                    ('contributor', 'qc.bugs.view_own', 'system-seed'),
+                    ('team_manager', 'qc.testcases.delete_own', 'system-seed'),
+                    ('team_manager', 'qc.testcases.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.testsuites.delete_own', 'system-seed'),
+                    ('team_manager', 'qc.testsuites.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.testexecutions.delete_own', 'system-seed'),
+                    ('team_manager', 'qc.testexecutions.delete_team', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_permission_grant_seed_marker (migration_id)
+                VALUES ('issues-282-286-rbac-grants')
+                ON CONFLICT DO NOTHING
+            `);
         }
 
         console.log('Database migrations completed successfully');

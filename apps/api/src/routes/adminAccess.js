@@ -15,52 +15,23 @@ const {
     auditRolePermissionChange,
     validateRoleName,
 } = require('../services/rolePermissions');
+const {
+    ARTIFACT_TABS,
+    SCOPE_VALUES,
+    applyScopeToSet,
+    matrixDomains,
+    permissionsForArtifact,
+    resolveScope,
+} = require('../../../shared/rbac/permissionMatrix.ts');
 
-const ARTIFACT_TABS = Object.freeze({
-    task: Object.freeze({ label: 'Tasks', domains: Object.freeze(['qc.tasks']) }),
-    bug: Object.freeze({ label: 'Bugs', domains: Object.freeze(['qc.bugs']) }),
-    test_case: Object.freeze({ label: 'Test Cases', domains: Object.freeze(['qc.testcases']) }),
-    test_suite: Object.freeze({ label: 'Test Suites', domains: Object.freeze(['qc.testsuites']) }),
-    test_execution: Object.freeze({ label: 'Test Executions', domains: Object.freeze(['qc.testexecutions', 'qc.testresults']) }),
-    user_story: Object.freeze({ label: 'User Stories', domains: Object.freeze(['qc.user_stories']) }),
-    reports: Object.freeze({ label: 'Reports', domains: Object.freeze(['qc.reports']) }),
-    admin: Object.freeze({ label: 'Admin', domains: Object.freeze(['qc.admin']) }),
-});
-
-function permissionAction(permissionKey) {
-    return permissionKey.split('.').pop();
-}
-
-function formatPermissionLabel(permissionKey) {
-    return permissionAction(permissionKey)
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase());
-}
-
-function permissionBelongsToTab(permissionKey, tab) {
-    return tab.domains.some(domain => permissionKey === domain || permissionKey.startsWith(`${domain}.`));
-}
-
-function permissionsForArtifact(artifactType) {
-    const tab = ARTIFACT_TABS[artifactType];
-    if (!tab) return null;
-    return ALL_PERMISSIONS
-        .filter(permission => permissionBelongsToTab(permission, tab))
-        .sort((a, b) => permissionAction(a).localeCompare(permissionAction(b)))
-        .map(permission => ({
-            key: permission,
-            action: permissionAction(permission),
-            label: formatPermissionLabel(permission),
-            project_scope_warning: permission.endsWith('_project')
-                ? 'Grants cross-team visibility within projects this role is project-scoped to'
-                : null,
-        }));
+function permissionsForArtifactType(artifactType) {
+    return permissionsForArtifact(ALL_PERMISSIONS, artifactType);
 }
 
 router.get('/matrix', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res, next) => {
     try {
         const artifactType = req.query.artifact_type || 'task';
-        const permissions = permissionsForArtifact(artifactType);
+        const permissions = permissionsForArtifactType(artifactType);
         const tab = ARTIFACT_TABS[artifactType];
         if (!permissions || !tab) {
             return res.status(400).json({
@@ -74,14 +45,23 @@ router.get('/matrix', requireAuth, requirePermission('qc.admin.roles.view'), asy
             const granted = new Set(role.permissions);
             return {
                 ...role,
-                permissions: Object.fromEntries(permissions.map(permission => [permission.key, granted.has(permission.key)])),
+                permissions: Object.fromEntries(
+                    permissions
+                        .filter(permission => permission.mode !== 'scope')
+                        .map(permission => [permission.key, granted.has(permission.key)])
+                ),
+                scoped_permissions: Object.fromEntries(
+                    permissions
+                        .filter(permission => permission.mode === 'scope')
+                        .map(permission => [permission.key, resolveScope(granted, permission)])
+                ),
             };
         });
 
         res.json({
             artifact_type: artifactType,
             artifact_label: tab.label,
-            artifact_types: Object.entries(ARTIFACT_TABS).map(([key, value]) => ({ key, label: value.label })),
+            artifact_types: matrixDomains(ALL_PERMISSIONS).map(domain => ({ key: domain.key, label: domain.label })),
             permission_keys: permissions,
             roles: roleRows,
         });
@@ -95,43 +75,88 @@ router.patch('/matrix', requireAuth, requirePermission('qc.admin.manage_permissi
         const roleName = normalizeRoleName(req.body.role_identifier);
         const permissionKey = req.body.permission_key;
         const granted = req.body.granted;
+        const permissionGroup = req.body.permission_group;
+        const scope = req.body.scope;
 
-        if (!roleName || typeof permissionKey !== 'string' || typeof granted !== 'boolean') {
-            return res.status(400).json({ error: 'role_identifier, permission_key, and granted are required' });
-        }
-        if (!ALL_PERMISSIONS.includes(permissionKey)) {
-            return res.status(400).json({ error: `Unknown permission_key '${permissionKey}'` });
+        if (!roleName) {
+            return res.status(400).json({ error: 'role_identifier is required' });
         }
         if (!await roleExists(db, roleName)) {
             return res.status(404).json({ error: `Role '${roleName}' not found` });
         }
-        if (roleName === 'admin' && granted === false) {
-            return res.status(403).json({ error: 'The admin role cannot have permissions revoked' });
-        }
 
         const current = await getRolePermissionSet(db, roleName);
-        const beforeGranted = roleName === 'admin' ? true : current.has(permissionKey);
-        if (granted) current.add(permissionKey);
-        else current.delete(permissionKey);
+        const next = new Set(current);
+        const audits = [];
+        let responseKey = permissionKey;
+        let responseGranted = granted;
+        let beforeGranted = false;
+
+        if (typeof permissionGroup === 'string') {
+            if (!SCOPE_VALUES.includes(scope)) {
+                return res.status(400).json({ error: 'scope must be one of none, own, team, any' });
+            }
+            const scopedPermission = Object.values(ARTIFACT_TABS)
+                .flatMap(tab => permissionsForArtifactType(tab.key) || [])
+                .find(permission => permission.mode === 'scope' && permission.key === permissionGroup);
+            if (!scopedPermission) {
+                return res.status(400).json({ error: `Unknown permission_group '${permissionGroup}'` });
+            }
+            if (roleName === 'admin' && scope === 'none') {
+                return res.status(403).json({ error: 'The admin role cannot have permissions revoked' });
+            }
+            const updated = applyScopeToSet(next, scopedPermission, scope);
+            for (const key of [scopedPermission.keys.own, scopedPermission.keys.team, scopedPermission.keys.any].filter(Boolean)) {
+                const before = roleName === 'admin' ? true : next.has(key);
+                const after = roleName === 'admin' ? true : updated.has(key);
+                if (before !== after) {
+                    audits.push({ permissionKey: key, beforeGranted: before, afterGranted: after });
+                }
+            }
+            next.clear();
+            for (const key of updated) next.add(key);
+            responseKey = permissionGroup;
+            responseGranted = scope !== 'none';
+            beforeGranted = resolveScope(current, scopedPermission) !== 'none';
+        } else {
+            if (typeof permissionKey !== 'string' || typeof granted !== 'boolean') {
+                return res.status(400).json({ error: 'permission_key and granted are required' });
+            }
+            if (!ALL_PERMISSIONS.includes(permissionKey)) {
+                return res.status(400).json({ error: `Unknown permission_key '${permissionKey}'` });
+            }
+            if (roleName === 'admin' && granted === false) {
+                return res.status(403).json({ error: 'The admin role cannot have permissions revoked' });
+            }
+            beforeGranted = roleName === 'admin' ? true : current.has(permissionKey);
+            if (granted) next.add(permissionKey);
+            else next.delete(permissionKey);
+            if (beforeGranted !== granted) {
+                audits.push({ permissionKey, beforeGranted, afterGranted: granted });
+            }
+        }
 
         let affectedRoleNames = [roleName];
         if (roleName !== 'admin') {
-            const syncResult = await syncRolePermissions(db, roleName, [...current], req.user?.email || 'system');
+            const syncResult = await syncRolePermissions(db, roleName, [...next], req.user?.email || 'system');
             affectedRoleNames = syncResult.affectedRoleNames;
         }
 
-        await auditRolePermissionChange(db, {
-            roleName,
-            permissionKey,
-            beforeGranted,
-            afterGranted: granted,
-            actorEmail: req.user?.email || 'system',
-        });
+        for (const audit of audits) {
+            await auditRolePermissionChange(db, {
+                roleName,
+                permissionKey: audit.permissionKey,
+                beforeGranted: audit.beforeGranted,
+                afterGranted: audit.afterGranted,
+                actorEmail: req.user?.email || 'system',
+            });
+        }
 
         res.json({
             role_identifier: roleName,
-            permission_key: permissionKey,
-            granted,
+            permission_key: responseKey,
+            granted: responseGranted,
+            scope: typeof permissionGroup === 'string' ? scope : undefined,
             before_granted: beforeGranted,
             affected_role_names: affectedRoleNames,
         });
@@ -261,4 +286,4 @@ router.delete('/roles/:name', requireAuth, requirePermission('qc.admin.manage_ro
 
 module.exports = router;
 module.exports.ARTIFACT_TABS = ARTIFACT_TABS;
-module.exports.permissionsForArtifact = permissionsForArtifact;
+module.exports.permissionsForArtifact = permissionsForArtifactType;

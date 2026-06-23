@@ -9,6 +9,10 @@ const {
     ROLES,
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
+const {
+    matrixDomains,
+    permissionsForArtifact,
+} = require('../../../shared/rbac/permissionMatrix.ts');
 const { syncRolePermissions } = require('../services/rolePermissions');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
@@ -87,7 +91,23 @@ router.get('/', requireAuth, requirePermission('qc.admin.roles.view'), async (re
 
 // GET all available permission keys
 router.get('/permissions', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res) => {
-    res.json(ALL_PERMISSIONS);
+    const domains = matrixDomains(ALL_PERMISSIONS).map(domain => {
+        const items = permissionsForArtifact(ALL_PERMISSIONS, domain.key) || [];
+        return {
+            key: domain.key,
+            label: domain.label,
+            permission_keys: items,
+        };
+    });
+    const matrixKeys = domains.flatMap(domain =>
+        domain.permission_keys.flatMap(item => item.mode === 'scope'
+            ? [item.keys.own, item.keys.team, item.keys.any].filter(Boolean)
+            : [item.key])
+    );
+    res.json({
+        permissions: [...new Set([...matrixKeys, ...ALL_PERMISSIONS])],
+        domains,
+    });
 });
 
 // POST create a custom role

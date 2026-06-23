@@ -5,17 +5,24 @@ router.param('id', resolveArtifactParam('bug'));
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
-const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission, blockContributors } = require('../middleware/authMiddleware');
 const { emitToTuleap: emitBug } = require('../services/emitters/bug');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createBugSchema, updateBugSchema } = require('../schemas/bug');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
-const { decorateRows } = require('../services/access/enforcement');
+const { appendListFilter, decorateRows, enforceArtifact } = require('../services/access/enforcement');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
+
+const BUG_VIEW_PERMISSIONS = Object.freeze([
+    'qc.bugs.view',
+    'qc.bugs.view_own',
+    'qc.bugs.view_team',
+    'qc.bugs.view_any',
+]);
 
 async function replaceBugLinks(bugId, { linked_test_execution_ids, linked_task_ids }) {
     if (Array.isArray(linked_test_execution_ids)) {
@@ -185,13 +192,57 @@ router.get('/summary', requireAuth, blockContributors, requirePermission('qc.bug
     }
 });
 
-router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/', requireAuth, requireAnyPermission(...BUG_VIEW_PERMISSIONS), async (req, res) => {
     try {
         const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
         const project_id = validUUID(req.query.project_id);
         const source = ['TEST_CASE', 'EXPLORATORY'].includes(req.query.source) ? req.query.source : null;
 
-        let query = `
+        const where = ['b.deleted_at IS NULL'];
+        const params = [];
+        let paramIndex = 1;
+
+        if (project_id) {
+            where.push(`b.project_id = $${paramIndex}`);
+            params.push(project_id);
+            paramIndex++;
+        }
+
+        if (status) {
+            where.push(`b.status = $${paramIndex}`);
+            params.push(status);
+            paramIndex++;
+        }
+
+        if (severity) {
+            where.push(`b.severity = $${paramIndex}`);
+            params.push(severity);
+            paramIndex++;
+        }
+
+        if (source) {
+            where.push(`b.source = $${paramIndex}`);
+            params.push(source);
+            paramIndex++;
+        }
+
+        const filter = await appendListFilter(req, 'bug', where, params, {
+            startIdx: paramIndex,
+            tableAlias: 'b',
+            ownerTeamExpr: 'b.owner_team_id',
+            visibilityExpr: 'b.visibility_scope',
+            assigneeResourceExprs: ['b.submitted_by_resource_id'],
+            userExprs: ['b.created_by_user_id'],
+        });
+        paramIndex = filter.nextIdx;
+
+        const [sortField, sortDir] = sort.split(':');
+        const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
+        const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
+        const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+        const whereSql = where.join(' AND ');
+        const query = `
             SELECT
                 b.*,
                 p.project_name,
@@ -202,70 +253,18 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             LEFT JOIN resources r ON b.submitted_by_resource_id = r.id
-            WHERE b.deleted_at IS NULL
+            WHERE ${whereSql}
+            ORDER BY b.${sortColumn} ${sortDirection} NULLS LAST
+            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
-        const params = [];
-        let paramIndex = 1;
 
-        if (project_id) {
-            query += ` AND b.project_id = $${paramIndex}`;
-            params.push(project_id);
-            paramIndex++;
-        }
+        const result = await pool.query(query, [...params, parseInt(limit), parseInt(offset)]);
 
-        if (status) {
-            query += ` AND b.status = $${paramIndex}`;
-            params.push(status);
-            paramIndex++;
-        }
-
-        if (severity) {
-            query += ` AND b.severity = $${paramIndex}`;
-            params.push(severity);
-            paramIndex++;
-        }
-
-        if (source) {
-            query += ` AND b.source = $${paramIndex}`;
-            params.push(source);
-            paramIndex++;
-        }
-
-        const [sortField, sortDir] = sort.split(':');
-        const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
-        const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
-        const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
-
-        query += ` ORDER BY b.${sortColumn} ${sortDirection} NULLS LAST`;
-        query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        params.push(parseInt(limit), parseInt(offset));
-
-        const result = await pool.query(query, params);
-
-        let countQuery = 'SELECT COUNT(*) FROM bugs WHERE deleted_at IS NULL';
-        const countParams = [];
-        let countParamIndex = 1;
-        if (project_id) {
-            countQuery += ` AND project_id = $${countParamIndex}`;
-            countParams.push(project_id);
-            countParamIndex++;
-        }
-        if (status) {
-            countQuery += ` AND status = $${countParamIndex}`;
-            countParams.push(status);
-            countParamIndex++;
-        }
-        if (severity) {
-            countQuery += ` AND severity = $${countParamIndex}`;
-            countParams.push(severity);
-            countParamIndex++;
-        }
-        if (source) {
-            countQuery += ` AND source = $${countParamIndex}`;
-            countParams.push(source);
-        }
-        const countResult = await pool.query(countQuery, countParams);
-        const data = await decorateRows(req, 'bug', result.rows);
+        const countQuery = `SELECT COUNT(*) FROM bugs b WHERE ${whereSql}`;
+        const countResult = await pool.query(countQuery, params);
+        const data = await decorateRows(req, 'bug', result.rows, {
+            actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
+        });
 
         res.json({
             success: true,
@@ -283,7 +282,7 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
     }
 });
 
-router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/:id', requireAuth, requireAnyPermission(...BUG_VIEW_PERMISSIONS), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -307,7 +306,12 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.vi
             });
         }
 
-        const [bug] = await decorateRows(req, 'bug', result.rows);
+        const access = await enforceArtifact(req, res, 'bug', result.rows[0], 'view');
+        if (!access.allowed) return;
+
+        const [bug] = await decorateRows(req, 'bug', result.rows, {
+            actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
+        });
         res.json({
             success: true,
             data: bug
@@ -578,6 +582,68 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.
             success: false,
             error: 'Failed to update bug',
             message: error.message
+        });
+    }
+});
+
+router.patch('/:id/severity', requireAuth, blockContributors, requirePermission('qc.bugs.change_severity'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const parsed = updateBugSchema.pick({ severity: true }).safeParse(req.body);
+        if (!parsed.success || parsed.data.severity === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.success ? [{ path: ['severity'], message: 'Severity is required' }] : parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+
+        const originalRes = await pool.query('SELECT * FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (originalRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Bug not found' });
+        }
+        const original = originalRes.rows[0];
+
+        const access = await enforceArtifact(req, res, 'bug', original, 'change_severity');
+        if (!access.allowed) return;
+
+        const severity = normalizeBugSeverity(parsed.data.severity);
+        const result = await pool.query(
+            `UPDATE bugs SET
+                severity = $1,
+                sync_status = 'pending',
+                last_sync_attempted_at = NULL,
+                last_sync_error = NULL,
+                updated_at = NOW()
+             WHERE id = $2
+             RETURNING *`,
+            [severity, id]
+        );
+        let updated = result.rows[0];
+
+        const config = await resolveBugSyncConfig(updated.project_id);
+        if (config) {
+            try {
+                const mode = updated.tuleap_artifact_id ? 'update' : 'create';
+                updated = await tryEmitAndWriteback(updated, { severity }, config, mode);
+            } catch (err) {
+                console.error(`[route:bugs:severity] emit_failed bug_id=${id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE bugs SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), id]
+                );
+                updated = failRes.rows[0];
+            }
+        }
+
+        await auditLog('bugs', id, 'UPDATE', updated, original);
+        res.json({ success: true, data: updated });
+    } catch (error) {
+        console.error('Error updating bug severity:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update bug severity',
+            message: error.message,
         });
     }
 });

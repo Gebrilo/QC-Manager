@@ -11,6 +11,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, res, next) => next(),
   blockContributors: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
 }));
 jest.mock('../src/services/tuleapClient', () => ({
   defaultClient: {},
