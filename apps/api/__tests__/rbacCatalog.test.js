@@ -61,11 +61,11 @@ describe('RBAC catalog resolver', () => {
 });
 
 describe('Access engine — expanded catalog (issue #80)', () => {
-    test('catalog declares scoped variants for tasks/bugs/testcases/testsuites/testexecutions/user_stories/reports', () => {
+    test('catalog declares team/any scoped variants for tasks/bugs/testcases/testsuites/testexecutions/user_stories/reports', () => {
         const scopedExpect = [];
         for (const artifact of ['tasks', 'bugs', 'testcases', 'testsuites', 'testexecutions', 'user_stories']) {
             for (const verb of ['view', 'edit', 'delete']) {
-                for (const scope of ['own', 'team', 'any']) {
+                for (const scope of ['team', 'any']) {
                     scopedExpect.push(`qc.${artifact}.${verb}_${scope}`);
                 }
             }
@@ -73,23 +73,39 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         for (const key of scopedExpect) {
             expect(ALL_PERMISSION_VALUES).toContain(key);
         }
-        for (const key of ['qc.reports.view_own', 'qc.reports.view_team', 'qc.reports.view_project', 'qc.reports.export']) {
+        for (const key of ['qc.reports.view_team', 'qc.reports.view_project', 'qc.reports.export']) {
             expect(ALL_PERMISSION_VALUES).toContain(key);
         }
     });
 
     test('artifact-specific actions are declared', () => {
         const required = [
-            'qc.tasks.log_time', 'qc.tasks.take_over', 'qc.tasks.approve_completion', 'qc.tasks.change_priority',
-            'qc.bugs.triage', 'qc.bugs.change_severity', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
-            'qc.testcases.execute', 'qc.testcases.approve', 'qc.testcases.clone',
-            'qc.testcases.import', 'qc.testcases.export', 'qc.testcases.view_steps', 'qc.testcases.edit_steps',
+            'qc.tasks.take_over', 'qc.tasks.change_priority',
+            'qc.testcases.view_steps', 'qc.testcases.edit_steps',
             'qc.admin.manage_users', 'qc.admin.manage_roles', 'qc.admin.manage_permissions',
             'qc.admin.manage_teams', 'qc.admin.manage_integrations', 'qc.admin.manage_settings',
             'qc.admin.view_audit_log',
         ];
         for (const key of required) {
             expect(ALL_PERMISSION_VALUES).toContain(key);
+        }
+    });
+
+    test('decorative and redundant _own keys are pruned from the catalog', () => {
+        const pruned = [
+            'qc.tasks.view_own', 'qc.tasks.edit_own', 'qc.tasks.delete_own',
+            'qc.bugs.view_own', 'qc.bugs.edit_own', 'qc.bugs.delete_own',
+            'qc.testcases.view_own', 'qc.testcases.edit_own', 'qc.testcases.delete_own',
+            'qc.testsuites.view_own', 'qc.testsuites.edit_own', 'qc.testsuites.delete_own',
+            'qc.testexecutions.view_own', 'qc.testexecutions.edit_own', 'qc.testexecutions.delete_own',
+            'qc.user_stories.view_own', 'qc.user_stories.edit_own', 'qc.user_stories.delete_own',
+            'qc.reports.view_own',
+            'qc.tasks.log_time', 'qc.tasks.approve_completion',
+            'qc.bugs.triage', 'qc.bugs.change_severity', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
+            'qc.testcases.execute', 'qc.testcases.approve', 'qc.testcases.clone', 'qc.testcases.import', 'qc.testcases.export',
+        ];
+        for (const key of pruned) {
+            expect(ALL_PERMISSION_VALUES).not.toContain(key);
         }
     });
 
@@ -107,9 +123,10 @@ describe('Access engine — expanded catalog (issue #80)', () => {
 
     test('tester includes former member scoped permissions', () => {
         const tester = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester;
-        expect(tester).toContain(PERMISSIONS.TASKS_VIEW_OWN);
+        expect(tester).toContain(PERMISSIONS.TASKS_VIEW);
         expect(tester).toContain(PERMISSIONS.TASKS_VIEW_TEAM);
-        expect(tester).toContain(PERMISSIONS.TASKS_LOG_TIME);
+        expect(tester).toContain(PERMISSIONS.TASKS_DELETE);
+        expect(tester).toContain(PERMISSIONS.BUGS_EDIT);
         expect(tester).toContain(PERMISSIONS.TESTCASES_VIEW_STEPS);
         expect(tester).toContain(PERMISSIONS.DASHBOARDS_MEMBER_VIEW);
         expect(tester).toContain(PERMISSIONS.REPORTS_VIEW_TEAM);
@@ -121,7 +138,7 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         }
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.admin).toEqual(['*']);
         // team_manager defaults must include the resolved permissions from its own role + inherited tester
-        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager).toContain('qc.bugs.triage');
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager).toContain('qc.bugs.edit_team');
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager).toContain('qc.testresults.upload'); // inherited from tester
         // pm gets project-scope keys; viewer does not
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.pm).toContain('qc.reports.view_project');

@@ -3773,6 +3773,16 @@ const runMigrations = async () => {
         `);
 
         // ============================================================
+        // Migration 046: prune redundant _own and decorative RBAC keys
+        // (ADR 0011, issue #275)
+        // ============================================================
+        const { applyRbacPrunedPermissionMigration } = require('../access/rbacPrunedPermissions');
+        const prunedPermissions = await applyRbacPrunedPermissionMigration(client);
+        if (prunedPermissions.applied) {
+            console.log(`[rbac-prune] Converted ${prunedPermissions.convertedOwn} _own grants and pruned ${prunedPermissions.pruned} stale permission rows`);
+        }
+
+        // ============================================================
         // Migration 047: RBAC scopes move to DB (ADR 0010, issue #269)
         // ============================================================
         // role_scopes mirrors role_permissions: a (role, scope) pair is granted or

@@ -84,7 +84,7 @@ export default function MemberDashboardClient() {
     const [data, setData] = useState<MemberDashboard | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { hasPermission } = useAuth();
-    const showBugs = hasPermission('qc.bugs.view_own');
+    const showBugs = hasPermission('qc.bugs.view');
 
     useEffect(() => {
         memberDashboardApi.get()

@@ -283,7 +283,7 @@ async function getTeamDashboard(db, user, req) {
 
     let teamBugs = null;
     const bugTypes = new Set(['qc', 'dev']);
-    if (bugTypes.has(team.team_type) && hasAnyPermission(resolved, ['qc.bugs.view_team', 'qc.bugs.view_any', 'qc.bugs.view_own'])) {
+    if (bugTypes.has(team.team_type) && hasAnyPermission(resolved, ['qc.bugs.view', 'qc.bugs.view_team', 'qc.bugs.view_any'])) {
         const bugWhere = withAccess('b.deleted_at IS NULL', bugFilter);
         const [bugTotal, bugStatus] = await Promise.all([
             db.query(`SELECT COUNT(*)::int AS c FROM bugs b WHERE ${bugWhere}`, bugFilter.params),
@@ -440,7 +440,7 @@ async function getMemberDashboard(db, user, req) {
 
     let myBugs = [];
     let bugStoryIds = [];
-    if (hasPermission(resolved, 'qc.bugs.view_own') || hasPermission(resolved, 'qc.bugs.view_team') || hasPermission(resolved, 'qc.bugs.view_any')) {
+    if (hasPermission(resolved, 'qc.bugs.view') || hasPermission(resolved, 'qc.bugs.view_team') || hasPermission(resolved, 'qc.bugs.view_any')) {
         const bugFilter = await access.buildListFilter(user, 'bug', 'view', { ...BUG_FILTER_OPTS, req, startIdx: 2 });
         const bugWhere = `
             EXISTS (
