@@ -10,7 +10,7 @@ const {
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
 const {
-    ARTIFACT_TABS,
+    matrixDomains,
     permissionsForArtifact,
 } = require('../../../shared/rbac/permissionMatrix.ts');
 const { syncRolePermissions } = require('../services/rolePermissions');
@@ -91,13 +91,23 @@ router.get('/', requireAuth, requirePermission('qc.admin.roles.view'), async (re
 
 // GET all available permission keys
 router.get('/permissions', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res) => {
-    const matrixKeys = Object.keys(ARTIFACT_TABS).flatMap(artifactType => {
-        const items = permissionsForArtifact(ALL_PERMISSIONS, artifactType) || [];
-        return items.flatMap(item => item.mode === 'scope'
-            ? [item.keys.own, item.keys.team, item.keys.any].filter(Boolean)
-            : [item.key]);
+    const domains = matrixDomains(ALL_PERMISSIONS).map(domain => {
+        const items = permissionsForArtifact(ALL_PERMISSIONS, domain.key) || [];
+        return {
+            key: domain.key,
+            label: domain.label,
+            permission_keys: items,
+        };
     });
-    res.json([...new Set([...matrixKeys, ...ALL_PERMISSIONS])]);
+    const matrixKeys = domains.flatMap(domain =>
+        domain.permission_keys.flatMap(item => item.mode === 'scope'
+            ? [item.keys.own, item.keys.team, item.keys.any].filter(Boolean)
+            : [item.key])
+    );
+    res.json({
+        permissions: [...new Set([...matrixKeys, ...ALL_PERMISSIONS])],
+        domains,
+    });
 });
 
 // POST create a custom role

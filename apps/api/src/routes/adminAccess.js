@@ -19,6 +19,7 @@ const {
     ARTIFACT_TABS,
     SCOPE_VALUES,
     applyScopeToSet,
+    matrixDomains,
     permissionsForArtifact,
     resolveScope,
 } = require('../../../shared/rbac/permissionMatrix.ts');
@@ -60,7 +61,7 @@ router.get('/matrix', requireAuth, requirePermission('qc.admin.roles.view'), asy
         res.json({
             artifact_type: artifactType,
             artifact_label: tab.label,
-            artifact_types: Object.entries(ARTIFACT_TABS).map(([key, value]) => ({ key, label: value.label })),
+            artifact_types: matrixDomains(ALL_PERMISSIONS).map(domain => ({ key: domain.key, label: domain.label })),
             permission_keys: permissions,
             roles: roleRows,
         });
@@ -96,10 +97,7 @@ router.patch('/matrix', requireAuth, requirePermission('qc.admin.manage_permissi
                 return res.status(400).json({ error: 'scope must be one of none, own, team, any' });
             }
             const scopedPermission = Object.values(ARTIFACT_TABS)
-                .flatMap((_tab, index) => {
-                    const artifactType = Object.keys(ARTIFACT_TABS)[index];
-                    return permissionsForArtifactType(artifactType) || [];
-                })
+                .flatMap(tab => permissionsForArtifactType(tab.key) || [])
                 .find(permission => permission.mode === 'scope' && permission.key === permissionGroup);
             if (!scopedPermission) {
                 return res.status(400).json({ error: `Unknown permission_group '${permissionGroup}'` });

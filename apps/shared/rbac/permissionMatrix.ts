@@ -1,15 +1,28 @@
 'use strict';
 
-const ARTIFACT_TABS = Object.freeze({
-    task: Object.freeze({ label: 'Tasks', domains: Object.freeze(['qc.tasks']), scoped: true }),
-    bug: Object.freeze({ label: 'Bugs', domains: Object.freeze(['qc.bugs']), scoped: true }),
-    test_case: Object.freeze({ label: 'Test Cases', domains: Object.freeze(['qc.testcases']), scoped: true }),
-    test_suite: Object.freeze({ label: 'Test Suites', domains: Object.freeze(['qc.testsuites']), scoped: true }),
-    test_execution: Object.freeze({ label: 'Test Executions', domains: Object.freeze(['qc.testexecutions', 'qc.testresults']), scoped: true }),
-    user_story: Object.freeze({ label: 'User Stories', domains: Object.freeze(['qc.user_stories']), scoped: true }),
-    reports: Object.freeze({ label: 'Reports', domains: Object.freeze(['qc.reports']), scoped: false }),
-    admin: Object.freeze({ label: 'Admin', domains: Object.freeze(['qc.admin']), scoped: false }),
-});
+const DOMAIN_DEFINITIONS = Object.freeze([
+    Object.freeze({ key: 'task', label: 'Tasks', domains: Object.freeze(['qc.tasks']), scoped: true }),
+    Object.freeze({ key: 'bug', label: 'Bugs', domains: Object.freeze(['qc.bugs']), scoped: true }),
+    Object.freeze({ key: 'test_case', label: 'Test Cases', domains: Object.freeze(['qc.testcases']), scoped: true }),
+    Object.freeze({ key: 'test_suite', label: 'Test Suites', domains: Object.freeze(['qc.testsuites']), scoped: true }),
+    Object.freeze({ key: 'test_execution', label: 'Test Runs / Executions', domains: Object.freeze(['qc.testexecutions', 'qc.testresults']), scoped: true }),
+    Object.freeze({ key: 'user_story', label: 'User Stories', domains: Object.freeze(['qc.user_stories']), scoped: true }),
+    Object.freeze({ key: 'projects', label: 'Projects', domains: Object.freeze(['qc.projects']), scoped: false }),
+    Object.freeze({ key: 'resources', label: 'Resources', domains: Object.freeze(['qc.resources']), scoped: false }),
+    Object.freeze({ key: 'reports', label: 'Reports', domains: Object.freeze(['qc.reports']), scoped: false }),
+    Object.freeze({ key: 'governance', label: 'Governance', domains: Object.freeze(['qc.governance']), scoped: false }),
+    Object.freeze({ key: 'journeys', label: 'Journeys', domains: Object.freeze(['qc.journeys']), scoped: false }),
+    Object.freeze({ key: 'dev_plans', label: 'Dev Plans', domains: Object.freeze(['qc.dev_plans']), scoped: false }),
+    Object.freeze({ key: 'team', label: 'Team', domains: Object.freeze(['qc.team']), scoped: false }),
+    Object.freeze({ key: 'quality', label: 'Quality', domains: Object.freeze(['qc.quality']), scoped: false }),
+    Object.freeze({ key: 'admin', label: 'Admin', domains: Object.freeze(['qc.admin']), scoped: false }),
+    Object.freeze({ key: 'dashboard', label: 'Dashboards', domains: Object.freeze(['qc.dashboard', 'qc.dashboards']), scoped: false }),
+    Object.freeze({ key: 'mywork', label: 'My Work', domains: Object.freeze(['qc.mywork']), scoped: false }),
+]);
+
+const ARTIFACT_TABS = Object.freeze(Object.fromEntries(
+    DOMAIN_DEFINITIONS.map(definition => [definition.key, definition])
+));
 
 const SCOPE_VALUES = Object.freeze(['none', 'own', 'team', 'any']);
 
@@ -25,6 +38,12 @@ function formatPermissionLabel(permissionKey) {
 
 function permissionBelongsToTab(permissionKey, tab) {
     return tab.domains.some(domain => permissionKey === domain || permissionKey.startsWith(`${domain}.`));
+}
+
+function matrixDomains(allPermissions) {
+    return DOMAIN_DEFINITIONS.filter(definition =>
+        allPermissions.some(permission => permissionBelongsToTab(permission, definition))
+    );
 }
 
 function scopedGroupFor(permissionKey, permissionSet, tab) {
@@ -115,8 +134,10 @@ function applyScopeToSet(permissionSet, item, scope) {
 
 module.exports = {
     ARTIFACT_TABS,
+    DOMAIN_DEFINITIONS,
     SCOPE_VALUES,
     applyScopeToSet,
+    matrixDomains,
     permissionsForArtifact,
     resolveScope,
 };

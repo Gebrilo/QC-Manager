@@ -16,46 +16,49 @@ interface Role {
     created_by?: string;
 }
 
+interface PermissionKeyItem {
+    key: string;
+    mode: 'toggle' | 'scope';
+    keys?: {
+        own: string;
+        team: string | null;
+        any: string | null;
+    };
+}
+
+interface PermissionDomain {
+    key: string;
+    label: string;
+    permission_keys: PermissionKeyItem[];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
-function groupPermissions(permissions: string[]) {
+function groupPermissions(permissions: string[], domains: PermissionDomain[]): Record<string, string[]> {
+    if (domains.length > 0) {
+        const permissionSet = new Set(permissions);
+        const grouped: Record<string, string[]> = {};
+        for (const domain of domains) {
+            const keys = domain.permission_keys.flatMap(item => item.mode === 'scope' && item.keys
+                ? [item.keys.own, item.keys.team, item.keys.any].filter(Boolean)
+                : [item.key]
+            ).filter((key): key is string => typeof key === 'string' && permissionSet.has(key));
+            if (keys.length > 0) grouped[domain.label] = keys;
+        }
+        return grouped;
+    }
+
     const groups: Record<string, string[]> = {};
-    const domainLabels: Record<string, string> = {
-        'qc.tasks': 'Tasks',
-        'qc.projects': 'Projects',
-        'qc.resources': 'Resources',
-        'qc.dashboard': 'Dashboard',
-        'qc.reports': 'Reports',
-        'qc.governance': 'Governance',
-        'qc.testexecutions': 'Test Executions',
-        'qc.testresults': 'Test Results',
-        'qc.testcases': 'Test Cases',
-        'qc.testsuites': 'Test Suites',
-        'qc.bugs': 'Bugs',
-        'qc.mywork': 'My Work',
-        'qc.journeys': 'Journeys',
-        'qc.team': 'Team',
-        'qc.admin': 'Admin',
-        'qc.quality': 'Quality',
-    };
     for (const perm of permissions) {
         const parts = perm.split('.');
         const domain = parts.slice(0, -1).join('.');
-        const label = domainLabels[domain] || domain;
+        const label = domain;
         if (!groups[label]) groups[label] = [];
         groups[label].push(perm);
     }
-    const ordered: Record<string, string[]> = {};
-    for (const key of Object.keys(domainLabels)) {
-        const label = domainLabels[key];
-        if (groups[label]) ordered[label] = groups[label];
-    }
-    for (const label of Object.keys(groups)) {
-        if (!ordered[label]) ordered[label] = groups[label];
-    }
-    return ordered;
+    return groups;
 }
 
 function formatPermLabel(key: string): string {
@@ -363,6 +366,7 @@ export default function RolesPage() {
     const { user, token, isAdmin } = useAuth();
     const [roles, setRoles] = useState<Role[]>([]);
     const [allPermissions, setAllPermissions] = useState<string[]>([]);
+    const [permissionDomains, setPermissionDomains] = useState<PermissionDomain[]>([]);
     const [loading, setLoading] = useState(true);
     const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -388,7 +392,8 @@ export default function RolesPage() {
             const rolesData = await rolesRes.json();
             const permsData = await permsRes.json();
             setRoles(rolesData);
-            setAllPermissions(permsData);
+            setAllPermissions(Array.isArray(permsData) ? permsData : permsData.permissions || []);
+            setPermissionDomains(Array.isArray(permsData) ? [] : permsData.domains || []);
         } catch (err: any) {
             showNotification('error', err.message);
         } finally {
@@ -433,7 +438,7 @@ export default function RolesPage() {
         }
     };
 
-    const permGroups = groupPermissions(allPermissions);
+    const permGroups = groupPermissions(allPermissions, permissionDomains);
 
     if (!isAdmin) {
         return (

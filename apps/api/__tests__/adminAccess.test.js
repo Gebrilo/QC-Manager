@@ -44,6 +44,13 @@ describe('admin access matrix routes', () => {
         expect(permissions.find(permission => permission.key === 'qc.tasks.create')).toMatchObject({ mode: 'toggle' });
     });
 
+    test('permissionsForArtifact exposes flat domains as toggle items', () => {
+        expect(permissionsForArtifact('projects').find(permission => permission.key === 'qc.projects.view'))
+            .toMatchObject({ mode: 'toggle', action: 'view' });
+        expect(permissionsForArtifact('governance').find(permission => permission.key === 'qc.governance.approve_release'))
+            .toMatchObject({ mode: 'toggle', action: 'approve_release' });
+    });
+
     test('PATCH /admin/access/matrix updates role_permissions and writes audit_log', async () => {
         mockQuery.mockResolvedValue({ rows: [] });
 
