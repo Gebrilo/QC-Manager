@@ -190,6 +190,7 @@ jobs:
               printf '%s\n' "TULEAP_BASE_URL=${TULEAP_BASE_URL}"
               printf '%s\n' "TULEAP_ACCESS_KEY=${TULEAP_ACCESS_KEY}"
               echo "NEXT_PUBLIC_API_URL=https://${API_DOMAIN}"
+              echo "RBAC_UNIFIED=on"
             } > .env
 
             echo "=== Docker login ==="
