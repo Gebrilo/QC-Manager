@@ -3732,6 +3732,29 @@ const runMigrations = async () => {
             GROUP BY p.id, p.project_name, trun.total_tests_run
         `);
 
+        // ============================================================
+        // Migration 044: RBAC seed + collapse user_permissions to a sparse delta
+        // (ADR 0010, issue #263)
+        // ============================================================
+        // Per-role seeded marker: once a role's role_permissions have been
+        // seeded from the catalog, we never re-seed — even if an admin
+        // deliberately empties the role. The marker is independent of row count.
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_seed_marker (
+                role_identifier VARCHAR(50) PRIMARY KEY,
+                seeded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const { seedRolePermissions, collapseUserPermissions } = require('../access/rbacSeed');
+        const seededRoles = await seedRolePermissions(client);
+        if (seededRoles.length > 0) {
+            console.log(`[rbac-seed] Seeded role_permissions for: ${seededRoles.join(', ')}`);
+        }
+        const collapsedCount = await collapseUserPermissions(client);
+        if (collapsedCount > 0) {
+            console.log(`[rbac-seed] Collapsed ${collapsedCount} redundant user_permissions rows into the sparse delta`);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

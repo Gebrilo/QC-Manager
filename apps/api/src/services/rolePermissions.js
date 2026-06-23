@@ -141,20 +141,12 @@ async function syncRolePermissions(client, roleName, permissions, actorEmail = '
         );
     }
 
-    await client.query(
-        `DELETE FROM user_permissions
-         WHERE user_id IN (SELECT id FROM app_user WHERE role = ANY($1::text[]))`,
-        [storageNames]
-    );
-    await client.query(
-        `INSERT INTO user_permissions (user_id, permission_key, granted)
-         SELECT u.id, p.permission_key, true
-         FROM app_user u
-         CROSS JOIN UNNEST($2::text[]) AS p(permission_key)
-         WHERE u.role = ANY($1::text[])
-         ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
-        [storageNames, normalizedPermissions]
-    );
+    // ADR 0010 (issue #263): the role-permission fan-out into per-user
+    // user_permissions rows is removed. role_permissions is the canonical role
+    // layer; the Access Engine resolver reads it directly. user_permissions is a
+    // sparse delta of genuine per-user exceptions only, so a Matrix save must
+    // not wipe or rewrite them (this also fixes the latent data-loss bug where
+    // a save deleted real per-user exceptions).
 
     return { permissions: normalizedPermissions, affectedRoleNames: storageNames };
 }

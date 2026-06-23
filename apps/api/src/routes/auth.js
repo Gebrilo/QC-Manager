@@ -3,11 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { insertNotification } = require('../services/notifications/dispatcher');
-const { canonicalRole, resolve: resolveRole } = require('../access/RoleResolver');
-const {
-    BUILT_IN_ROLE_PERMISSION_DEFAULTS,
-    collectRolePermissions,
-} = require('../../../shared/rbac/catalog.ts');
+const { resolve: resolveRole } = require('../access/RoleResolver');
 
 const DEFAULT_PERMISSIONS = {
     admin: [
@@ -72,6 +68,7 @@ const DEFAULT_PERMISSIONS = {
     ],
     contributor: [
         'qc.tasks.view', 'qc.tasks.edit',
+        'qc.resources.view',
         'qc.mywork.tasks.view', 'qc.mywork.tasks.create', 'qc.mywork.tasks.edit', 'qc.mywork.tasks.delete',
         'qc.mywork.dashboard.view',
     ],
@@ -83,49 +80,20 @@ const INACTIVE_PERMISSIONS = [
 ];
 
 async function setDefaultPermissions(userId, role) {
-    let permissions;
-
-    const roleIdentifier = canonicalRole(role);
-
-    // role_permissions is the canonical role-permission store. Catalog defaults
-    // are only a bootstrap fallback for built-ins with no persisted rows yet.
-    try {
-        const result = await db.query(
-            'SELECT permission_key FROM role_permissions WHERE role_identifier = $1 ORDER BY permission_key',
-            [roleIdentifier]
-        );
-        if (result.rows.length > 0) {
-            permissions = result.rows.map(row => row.permission_key);
-        }
-    } catch {
-        // DB error — fall through to defaults
-    }
-
-    // Fall back to hardcoded defaults if no DB override found
-    if (!permissions) {
-        permissions = BUILT_IN_ROLE_PERMISSION_DEFAULTS[roleIdentifier]
-            || collectRolePermissions(roleIdentifier, new Set())
-            || DEFAULT_PERMISSIONS[role];
-    }
-
-    // Final fallback for unknown roles with no DB entry
-    if (!permissions) {
-        permissions = DEFAULT_PERMISSIONS.viewer;
-    }
-
-    await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
-    for (const perm of permissions) {
-        await db.query(
-            `INSERT INTO user_permissions (user_id, permission_key, granted)
-             VALUES ($1, $2, true)
-             ON CONFLICT (user_id, permission_key) DO UPDATE SET granted = true`,
-            [userId, perm]
-        );
-    }
+    // ADR 0010 (issue #263): role permissions are no longer denormalized into
+    // per-user user_permissions rows. The Access Engine resolver derives a
+    // user's effective set from role_permissions (+ sparse per-user exceptions),
+    // so there is nothing to fan out on user-create, role-change, or activation.
+    // Retained as a no-op for backward compatibility with existing callers
+    // (routes/users.js, /auth/sync).
+    void userId;
+    void role;
 }
 
 async function setInactivePermissions(userId) {
-    await db.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+    // ADR 0010 (issue #263): preparation-status users get a sparse onboarding
+    // grant (mywork tasks) as a genuine per-user exception — NOT a role fan-out.
+    // Upsert WITHOUT a preceding DELETE so real per-user exceptions survive.
     for (const perm of INACTIVE_PERMISSIONS) {
         await db.query(
             `INSERT INTO user_permissions (user_id, permission_key, granted)
