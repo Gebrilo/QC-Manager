@@ -87,12 +87,15 @@ describe('RBAC_UNIFIED flag (issue #262)', () => {
     describe('flag ON — unified resolver path', () => {
         beforeEach(() => { process.env.RBAC_UNIFIED = 'on'; });
 
-        // RoleResolver.resolve issues four queries in this order:
-        //   1. role_permissions  2. user_permissions  3. team join  4. project_managers
+        // RoleResolver.resolve issues six queries in this order:
+        //   1. role_permissions  2. user_permissions  3. role_scopes  4. user_scopes
+        //   5. team join  6. project_managers
         function mockResolveSequence(rolePerms, userPerms = []) {
             mockQuery
                 .mockResolvedValueOnce(rows(rolePerms.map(permission_key => ({ permission_key }))))
                 .mockResolvedValueOnce(rows(userPerms))
+                .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+                .mockResolvedValueOnce(rows([]))
                 .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
                 .mockResolvedValueOnce(rows([]));
         }
@@ -173,7 +176,7 @@ describe('RBAC_UNIFIED flag (issue #262)', () => {
         });
 
         test('effective set is resolved once per request (cached on req)', async () => {
-            // Four queries per resolve; we only mock one resolve's worth.
+            // Six queries per resolve; we only mock one resolve's worth.
             mockResolveSequence(['qc.tasks.view']);
             const req = { user: { id: 'tester-1', role: 'tester' } };
             const res = makeRes();
@@ -182,7 +185,7 @@ describe('RBAC_UNIFIED flag (issue #262)', () => {
             // Second invocation on the SAME req must hit the cache (no extra queries).
             const res2 = makeRes();
             await mw(req, res2, jest.fn());
-            expect(mockQuery).toHaveBeenCalledTimes(4); // not 8
+            expect(mockQuery).toHaveBeenCalledTimes(6); // not 12
         });
     });
 
@@ -203,6 +206,8 @@ describe('RBAC_UNIFIED flag (issue #262)', () => {
             mockQuery.mockReset();
             mockQuery
                 .mockResolvedValueOnce(rows([{ permission_key: 'qc.tasks.view' }]))
+                .mockResolvedValueOnce(rows([]))
+                .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
                 .mockResolvedValueOnce(rows([]))
                 .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
                 .mockResolvedValueOnce(rows([]));

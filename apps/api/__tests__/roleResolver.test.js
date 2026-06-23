@@ -12,10 +12,12 @@ afterEach(() => jest.clearAllMocks());
 describe('RoleResolver.resolve', () => {
     test('admin gets wildcard set + empty scope', async () => {
         mockQuery
-            .mockResolvedValueOnce(rows([])) // role_permissions
-            .mockResolvedValueOnce(rows([])) // user_permissions
-            .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }])) // team join
-            .mockResolvedValueOnce(rows([])); // project_managers
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
+            .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u1', role: 'admin' });
         expect(out.effectivePermissions.has('*')).toBe(true);
@@ -24,8 +26,10 @@ describe('RoleResolver.resolve', () => {
 
     test('tester without role_permissions row falls back to catalog defaults', async () => {
         mockQuery
-            .mockResolvedValueOnce(rows([])) // role_permissions empty
-            .mockResolvedValueOnce(rows([])) // user_permissions empty
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
@@ -38,6 +42,8 @@ describe('RoleResolver.resolve', () => {
     test('role_permissions table is canonical when populated', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([{ permission_key: 'qc.bugs.triage' }]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'team' }, { scope_key: 'active_only' }]))
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
@@ -54,6 +60,8 @@ describe('RoleResolver.resolve', () => {
                 { permission_key: 'qc.bugs.triage', granted: true },
                 { permission_key: 'qc.tasks.view_own', granted: false },
             ]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
@@ -66,6 +74,8 @@ describe('RoleResolver.resolve', () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'team' }, { scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
@@ -77,6 +87,8 @@ describe('RoleResolver.resolve', () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'pm' }]))
             .mockResolvedValueOnce(rows([{ project_id: 'p-A' }, { project_id: 'p-B' }]));
 
@@ -87,6 +99,8 @@ describe('RoleResolver.resolve', () => {
     test('canonicalises role BEFORE the role_permissions DB lookup', async () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'team' }, { scope_key: 'active_only' }]))
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
             .mockResolvedValueOnce(rows([]));
@@ -100,11 +114,11 @@ describe('RoleResolver.resolve', () => {
     });
 
     test('contributor still resolves via catalog when role_permissions is empty', async () => {
-        // Defense against silent lockout: contributor must still get catalog
-        // permissions when a database has no normalized role_permission rows yet.
         mockQuery
-            .mockResolvedValueOnce(rows([])) // role_permissions empty
-            .mockResolvedValueOnce(rows([])) // user_permissions empty
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'preparation_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
             .mockResolvedValueOnce(rows([]));
 
@@ -118,6 +132,8 @@ describe('RoleResolver.resolve', () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
+            .mockResolvedValueOnce(rows([{ scope_key: 'active_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: 't-1', team_type: 'qc' }]))
             .mockResolvedValueOnce(rows([]));
 
@@ -125,6 +141,6 @@ describe('RoleResolver.resolve', () => {
         const first = await resolve(req.user, req);
         const second = await resolve(req.user, req);
         expect(first).toBe(second);
-        expect(mockQuery).toHaveBeenCalledTimes(4); // not 8
+        expect(mockQuery).toHaveBeenCalledTimes(6);
     });
 });

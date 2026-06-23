@@ -25,13 +25,17 @@ describe('GET /auth/me — Access Engine shape', () => {
         //  2) auth.js SELECT FROM user_permissions (legacy)
         //  3) RoleResolver: SELECT FROM role_permissions
         //  4) RoleResolver: SELECT FROM user_permissions
-        //  5) RoleResolver: SELECT FROM app_user JOIN teams JOIN team_types
-        //  6) RoleResolver: SELECT FROM project_managers
+        //  5) RoleResolver: SELECT FROM role_scopes
+        //  6) RoleResolver: SELECT FROM user_scopes
+        //  7) RoleResolver: SELECT FROM app_user JOIN teams JOIN team_types
+        //  8) RoleResolver: SELECT FROM project_managers
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'M', email: 'm@x', role: 'member', active: true, status: 'ACTIVE' }] })
             .mockResolvedValueOnce({ rows: [{ permission_key: 'qc.tasks.view_team', granted: true }] })
-            .mockResolvedValueOnce({ rows: [] }) // role_permissions empty → catalog default
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ permission_key: 'qc.tasks.view_team', granted: true }] })
+            .mockResolvedValueOnce({ rows: [{ scope_key: 'active_only' }] })
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ team_id: 't-1', team_type: 'qc' }] })
             .mockResolvedValueOnce({ rows: [{ project_id: 'p-1' }] });
 

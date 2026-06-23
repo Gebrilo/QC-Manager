@@ -95,6 +95,14 @@ function mockResolverForRole(role) {
         if (sql.includes('FROM user_permissions')) {
             return Promise.resolve({ rows: [] });
         }
+        if (sql.includes('FROM role_scopes')) {
+            const catalog = require('../../shared/rbac/catalog.ts');
+            const scopes = catalog.collectRoleScopes(canonicalRole(params[0]), new Set());
+            return Promise.resolve({ rows: scopes.map(k => ({ scope_key: k })) });
+        }
+        if (sql.includes('FROM user_scopes')) {
+            return Promise.resolve({ rows: [] });
+        }
         // scope queries (team join / project_managers)
         return Promise.resolve({ rows: [] });
     });

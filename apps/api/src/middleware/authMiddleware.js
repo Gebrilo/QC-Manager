@@ -3,6 +3,7 @@ const db = require('../config/db');
 const { resolve: resolveAccess } = require('../access/RoleResolver');
 const {
     canUserPerform,
+    canUserUseScope,
     getPermissionLookupKeys,
     getScope,
     hasPermission,
@@ -11,6 +12,12 @@ const {
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 // Legacy fallback for old custom JWTs during transition
 const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-not-for-production-use-only';
+
+const TERMINAL_STATUSES = Object.freeze(['SUSPENDED', 'ARCHIVED']);
+
+function isTerminalStatus(status) {
+    return typeof status === 'string' && TERMINAL_STATUSES.includes(status.toUpperCase());
+}
 
 /**
  * RBAC_UNIFIED kill-switch (ADR 0010, issue #262).
@@ -256,14 +263,41 @@ function requireAnyPermission(...permissionKeys) {
 }
 
 function requireStatusScope(scopeKey) {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        // Terminal-status floor (ADR 0010 §6, issue #269): SUSPENDED / ARCHIVED
+        // are never scope-exemptable, regardless of any user_scopes[granted=true]
+        // row. This is a security invariant — applies in both flag states.
+        if (isTerminalStatus(req.user.status)) {
+            return res.status(403).json({
+                error: 'Access restricted based on your account status.',
+                reason: 'terminal_status_floor',
+                current: req.user.status,
+            });
         }
 
         const scope = getScope(scopeKey);
         if (!scope || !Array.isArray(scope.statuses)) {
             return res.status(500).json({ error: `Invalid status scope: ${scopeKey}` });
+        }
+
+        let hasScope;
+        if (isRbacUnified()) {
+            const { effectiveScopes } = await resolveAccess(req.user, req);
+            hasScope = effectiveScopes.has(scopeKey);
+        } else {
+            hasScope = canUserUseScope(req.user, scopeKey);
+        }
+        if (!hasScope) {
+            return res.status(403).json({
+                error: 'Access restricted based on your account status.',
+                reason: 'scope_missing',
+                required_scope: scopeKey,
+                current: req.user.status,
+            });
         }
 
         if (!scope.statuses.includes(req.user.status)) {
@@ -317,4 +351,6 @@ module.exports = {
     requireStatusScope,
     blockContributors,
     isRbacUnified,
+    isTerminalStatus,
+    TERMINAL_STATUSES,
 };
