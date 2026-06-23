@@ -38,7 +38,7 @@ COPY apps/api/src/ ./src/
 COPY apps/shared/ /shared/
 
 # Pre-create uploads directory with correct ownership before dropping privileges
-RUN mkdir -p /app/uploads/avatars && chown -R apiuser:nodejs /app/uploads
+RUN mkdir -p /app/uploads/avatars /app/uploads/journey-tasks && chown -R apiuser:nodejs /app/uploads
 
 # Switch to non-root user
 USER apiuser

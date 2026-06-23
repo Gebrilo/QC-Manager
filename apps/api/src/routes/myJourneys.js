@@ -11,12 +11,18 @@ router.use(requireAuth);
 
 // Configure multer for journey task file uploads
 const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'journey-tasks');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+
+const ensureUploadDir = () => {
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+};
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
+    destination: (req, file, cb) => {
+        try { ensureUploadDir(); } catch (err) { return cb(err); }
+        cb(null, uploadDir);
+    },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const ext = path.extname(file.originalname);

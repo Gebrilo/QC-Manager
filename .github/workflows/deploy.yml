@@ -168,6 +168,10 @@ jobs:
             echo "=== Ensuring shared network exists ==="
             docker network create qc-shared-network 2>/dev/null || true
 
+            echo "=== Ensuring uploads directories exist with correct ownership ==="
+            mkdir -p "$DEPLOY_DIR/uploads/avatars" "$DEPLOY_DIR/uploads/journey-tasks"
+            sudo chown -R 1001:1001 "$DEPLOY_DIR/uploads"
+
             echo "=== Writing .env ==="
             {
               echo "DOCKER_HUB_USERNAME=${DOCKER_HUB_USERNAME}"
@@ -269,6 +273,10 @@ jobs:
 
             echo "=== Ensuring shared network exists ==="
             docker network create qc-shared-network 2>/dev/null || true
+
+            echo "=== Ensuring uploads directories exist with correct ownership ==="
+            mkdir -p "$DEPLOY_DIR/uploads/avatars" "$DEPLOY_DIR/uploads/journey-tasks"
+            sudo chown -R 1001:1001 "$DEPLOY_DIR/uploads"
 
             echo "=== Ensuring backup directory exists ==="
             mkdir -p "$DEPLOY_DIR/backups-staging"
