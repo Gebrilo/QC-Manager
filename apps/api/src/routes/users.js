@@ -7,6 +7,7 @@ const { DEFAULT_PERMISSIONS, setDefaultPermissions } = require('./auth');
 const { insertNotification } = require('../services/notifications/dispatcher');
 const { rollbackUser } = require('../services/userLifecycle');
 const { ROLES } = require('../../../shared/rbac/catalog.ts');
+const { assertNotLastHolder, KEYS_THAT_REQUIRE_A_HOLDER } = require('../access/lockoutGuard');
 
 const BUILT_IN_ROLES = Object.freeze(Object.keys(ROLES));
 
@@ -223,6 +224,13 @@ router.put('/:id/permissions', requirePermission('qc.admin.manage_permissions'),
 
         for (const permKey of ALL_PERMISSIONS) {
             if (permissionsToGrant.has(permKey)) {
+                // Last-keyholder invariant (ADR 0010, issue #268): the admin-domain
+                // keys must have at least one active holder after the write. The
+                // GRANT path can never drop a holder, but the assertion is kept
+                // symmetric so the invariant logic has one entry point.
+                if (KEYS_THAT_REQUIRE_A_HOLDER.includes(permKey)) {
+                    await assertNotLastHolder(db, permKey, { excludingUserId: null });
+                }
                 // Grant this permission
                 await db.query(
                     `INSERT INTO user_permissions (user_id, permission_key, granted)
@@ -231,6 +239,13 @@ router.put('/:id/permissions', requirePermission('qc.admin.manage_permissions'),
                     [id, permKey]
                 );
             } else {
+                // Last-keyholder invariant: refusing to revoke the key if this user
+                // is the last active holder. We assert BEFORE the DELETE so a thrown
+                // error leaves the row intact (and so the error reaches the caller
+                // before any state change).
+                if (KEYS_THAT_REQUIRE_A_HOLDER.includes(permKey)) {
+                    await assertNotLastHolder(db, permKey, { excludingUserId: id });
+                }
                 // Revoke this permission (delete the row)
                 await db.query(
                     `DELETE FROM user_permissions WHERE user_id = $1 AND permission_key = $2`,
@@ -246,6 +261,10 @@ router.put('/:id/permissions', requirePermission('qc.admin.manage_permissions'),
 
         res.json(result.rows);
     } catch (err) {
+        if (err.status) return res.status(err.status).json({ error: err.message });
+        if (err.message && /Refusing to drop the last active holder/.test(err.message)) {
+            return res.status(409).json({ error: err.message });
+        }
         next(err);
     }
 });

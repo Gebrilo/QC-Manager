@@ -2,14 +2,22 @@
 
 const {
     ALL_PERMISSION_VALUES,
+    PERMISSIONS,
     ROLES,
     canonicalRole,
     collectRolePermissions,
 } = require('../../../shared/rbac/catalog.ts');
+const { assertNotLastHolder } = require('../access/lockoutGuard');
 
 const ALL_PERMISSIONS = Object.freeze(ALL_PERMISSION_VALUES);
 const BUILT_IN_ROLES = Object.freeze(Object.keys(ROLES));
 const ROLE_NAME_PATTERN = /^[a-z0-9_]+$/;
+
+const KEYS_REQUIRING_A_HOLDER = Object.freeze([
+    PERMISSIONS.ADMIN_MANAGE_PERMISSIONS,
+    PERMISSIONS.ADMIN_MANAGE_ROLES,
+]);
+const ADMIN_WILDCARD = '*';
 
 function isBuiltInRole(roleName) {
     return BUILT_IN_ROLES.includes(roleName);
@@ -120,6 +128,21 @@ async function syncRolePermissions(client, roleName, permissions, actorEmail = '
     const normalizedPermissions = validatePermissionList(permissions);
     const canonical = canonicalRole(roleName);
     const storageNames = roleStorageNames(roleName);
+
+    const currentPermissions = await getRolePermissionSet(client, canonical);
+    const proposedSet = new Set(normalizedPermissions);
+
+    if (canonical === 'admin' && currentPermissions.has(ADMIN_WILDCARD) && !proposedSet.has(ADMIN_WILDCARD)) {
+        throw new Error(
+            `Refusing to remove the admin role's '${ADMIN_WILDCARD}' wildcard — it is the canonical source of every admin permission and cannot be edited via the Matrix.`
+        );
+    }
+
+    for (const key of KEYS_REQUIRING_A_HOLDER) {
+        if (currentPermissions.has(key) && !proposedSet.has(key)) {
+            await assertNotLastHolder(client, key, { excludingRoleName: canonical });
+        }
+    }
 
     await client.query('DELETE FROM role_permissions WHERE role_identifier = $1', [canonical]);
     for (const permission of normalizedPermissions) {

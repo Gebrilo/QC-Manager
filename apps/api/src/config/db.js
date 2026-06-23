@@ -3772,6 +3772,63 @@ const runMigrations = async () => {
             ON CONFLICT (role_identifier, permission_key) DO NOTHING
         `);
 
+        // ============================================================
+        // Migration 047: RBAC scopes move to DB (ADR 0010, issue #269)
+        // ============================================================
+        // role_scopes mirrors role_permissions: a (role, scope) pair is granted or
+        // absent. user_scopes mirrors user_permissions: a (user, scope) row carries
+        // a granted boolean — granted=true exempts a user from a scope restriction
+        // (broadens access), granted=false adds one (narrows it). Both tables are
+        // sparse-delta by design; user_scopes starts empty. The per-role
+        // rbac_scope_seed_marker prevents re-seeding a role an admin has emptied.
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS role_scopes (
+                role_identifier VARCHAR(50) NOT NULL,
+                scope_key VARCHAR(50) NOT NULL,
+                granted_by VARCHAR(255),
+                seeded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (role_identifier, scope_key)
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_scopes (
+                user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+                scope_key VARCHAR(50) NOT NULL,
+                granted BOOLEAN NOT NULL DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, scope_key)
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_scope_seed_marker (
+                role_identifier VARCHAR(50) PRIMARY KEY,
+                seeded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const { seedRoleScopes } = require('../access/rbacScopeSeed');
+        const seededScopeRoles = await seedRoleScopes(client);
+        if (seededScopeRoles.length > 0) {
+            console.log(`[rbac-scope-seed] Seeded role_scopes for: ${seededScopeRoles.join(', ')}`);
+        }
+
+        // ============================================================
+        // Migration 048: Break-glass for last-keyholder invariant
+        // (ADR 0010, issue #268)
+        // ============================================================
+        // If the admin '*' wildcard row has somehow been stripped AND no active
+        // user effectively holds qc.admin.manage_permissions, re-grant the
+        // wildcard. The runtime invariant (lockoutGuard.assertNotLastHolder) is
+        // the primary defense — this is a recovery net for the case where the
+        // invariant was bypassed (direct SQL edit, botched migration) and the
+        // system has already locked itself out. ON CONFLICT DO NOTHING keeps
+        // this idempotent: once the row exists, re-runs are no-ops.
+        const { runBreakGlass } = require('../access/lockoutGuard');
+        const breakGlassResult = await runBreakGlass(client);
+        if (breakGlassResult.fired) {
+            console.warn('[migration-048] Break-glass recovered admin wildcard — system would have been locked out');
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
