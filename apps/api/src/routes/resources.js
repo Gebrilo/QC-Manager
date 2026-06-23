@@ -40,7 +40,7 @@ router.get('/', requireAuth, requireStatusScope(SCOPES.ACTIVE_ONLY.key), require
 });
 
 // GET resource analytics dashboard (admin/manager only)
-router.get('/:id/analytics', requireAuth, requireRole('admin', 'team_manager'), async (req, res, next) => {
+router.get('/:id/analytics', requireAuth, requirePermission('qc.team.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
