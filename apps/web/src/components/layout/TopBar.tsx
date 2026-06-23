@@ -16,7 +16,7 @@ export function TopBar() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isThemeMounted, setIsThemeMounted] = useState(false);
     const { theme, toggleTheme } = useTheme();
-    const { user, permissions, logout } = useAuth();
+    const { user, permissions, scopes, logout } = useAuth();
     const { toggleExpanded, toggleMobile } = useSidebar();
 
     useEffect(() => {
@@ -26,7 +26,7 @@ export function TopBar() {
     if (!user) return null;
 
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const logoHref = getLandingPage(user, permissions);
+    const logoHref = getLandingPage(user, permissions, scopes);
     const displayName = user.display_name || user.name;
     const userInitial = displayName?.charAt(0).toUpperCase() || 'U';
     const rawAvatar = user.avatar_url;

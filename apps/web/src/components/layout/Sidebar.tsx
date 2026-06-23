@@ -13,7 +13,7 @@ import {
 import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 
 export function Sidebar() {
-    const { user, permissions, isAdmin, hasPermission } = useAuth();
+    const { user, permissions, scopes, isAdmin, hasPermission } = useAuth();
     const { isExpanded, isMobileOpen, toggleExpanded, closeMobile } = useSidebar();
     const pathname = usePathname();
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -34,15 +34,15 @@ export function Sidebar() {
 
         return getVisibleNavSections({
             role: user.role,
-            status: user.status,
             isAdmin,
             hasPermission,
+            effectiveScopes: scopes,
         });
-    }, [user, isAdmin, hasPermission]);
+    }, [user, isAdmin, hasPermission, scopes]);
 
     if (!user) return null;
 
-    const logoHref = getLandingPage(user, permissions);
+    const logoHref = getLandingPage(user, permissions, scopes);
 
     const nodeIsActive = (node: NavigationNode): boolean => {
         if (node.path && isActive(node.path)) return true;

@@ -164,9 +164,11 @@ router.post('/sync', async (req, res, next) => {
             const permissions = permsResult.rows.map(p => p.permission_key);
 
             let effective_permissions = permissions;
+            let effective_scopes = [];
             try {
                 const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
                 effective_permissions = Array.from(resolved.effectivePermissions);
+                effective_scopes = Array.from(resolved.effectiveScopes || []);
             } catch {}
 
             return res.json({
@@ -178,6 +180,7 @@ router.post('/sync', async (req, res, next) => {
                 },
                 permissions,
                 effective_permissions,
+                effective_scopes,
                 token: accessToken,
             });
         }
@@ -210,9 +213,11 @@ router.post('/sync', async (req, res, next) => {
                     const permissions = permsResult.rows.map(p => p.permission_key);
 
                     let effective_permissions = permissions;
+                    let effective_scopes = [];
                     try {
                         const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
                         effective_permissions = Array.from(resolved.effectivePermissions);
+                        effective_scopes = Array.from(resolved.effectiveScopes || []);
                     } catch {}
 
                     return res.json({
@@ -224,6 +229,7 @@ router.post('/sync', async (req, res, next) => {
                         },
                         permissions,
                         effective_permissions,
+                        effective_scopes,
                         token: accessToken,
                     });
                 }
@@ -269,21 +275,24 @@ router.post('/sync', async (req, res, next) => {
         );
         const permissions = permsResult.rows.map(p => p.permission_key);
 
-        let effective_permissions = permissions;
+let effective_permissions = permissions;
+        let effective_scopes = [];
         try {
             const resolved = await resolveRole({ id: user.id, role: user.role, status: user.status }, { app: { locals: {} } });
             effective_permissions = Array.from(resolved.effectivePermissions);
+            effective_scopes = Array.from(resolved.effectiveScopes || []);
         } catch {}
 
         res.status(201).json({
             user: {
-                id: user.id, name: user.name, email: user.email, phone: user.phone,
+                id: user.id, name: user.email, email: user.email, phone: user.phone,
                 role: user.role, status: user.status,
                 preferences: {},
                 avatar_url: null, avatar_type: null,
             },
             permissions,
             effective_permissions,
+            effective_scopes,
             token: accessToken,
         });
 
@@ -339,11 +348,13 @@ router.get('/me', requireAuth, async (req, res, next) => {
 
         const resolved = await resolveRole(req.user, req);
         const effective_permissions = Array.from(resolved.effectivePermissions);
+        const effective_scopes = Array.from(resolved.effectiveScopes || []);
 
         res.json({
             user,
             permissions,
             effective_permissions,
+            effective_scopes,
             scope: resolved.scope,
         });
     } catch (err) {

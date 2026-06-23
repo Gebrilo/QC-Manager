@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi, profileApi, UserPreferences } from '@/lib/api';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { getRouteConfig, routeAllowsStatus } from '@/config/routes';
+import { getRouteConfig } from '@/config/routes';
 
 interface UserProfile {
     id: string;
@@ -315,7 +315,7 @@ function DensityCard({ value, active, label, onClick, lineCount }: {
 
 export default function PreferencesPage() {
     const { setTheme } = useTheme();
-    const { user: authUser, permissions, hasPermission, isAdmin, refreshUser } = useAuth();
+    const { user: authUser, permissions, scopes, hasPermission, hasScope, refreshUser } = useAuth();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeSection, setActiveSection] = useState('profile');
@@ -325,13 +325,12 @@ export default function PreferencesPage() {
         return LANDING_PAGE_OPTIONS.filter(opt => {
             const route = getRouteConfig(opt.path);
             if (!route) return false;
-            if (isAdmin) return true;
-            if (route.adminOnly) return false;
-            if (!routeAllowsStatus(route, authUser)) return false;
+            if (authUser?.role === 'admin') return true;
+            if (route.scopes?.length && !route.scopes.every(s => hasScope(s))) return false;
             if (route.permission && !hasPermission(route.permission)) return false;
             return true;
         });
-    }, [authUser, permissions, isAdmin, hasPermission]);
+    }, [authUser, permissions, scopes, hasPermission, hasScope]);
 
     const [displayName, setDisplayName] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);

@@ -32,12 +32,14 @@ interface User {
 interface AuthContextType {
     user: User | null;
     permissions: string[];
+    scopes: string[];
     token: string | null;
     loading: boolean;
     signInWithPassword: (email: string, password: string) => Promise<void>;
     signUp: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
     hasPermission: (key: string) => boolean;
+    hasScope: (key: string) => boolean;
     isAdmin: boolean;
     isManager: boolean;
     userStatus: 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' | null;
@@ -51,6 +53,7 @@ const PUBLIC_PATHS = ['/login', '/register', '/auth/callback', '/auth/confirmed'
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [permissions, setPermissions] = useState<string[]>([]);
+    const [scopes, setScopes] = useState<string[]>([]);
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -67,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const syncWithBackend = useCallback(async (accessToken: string): Promise<{ user: User; permissions: string[] } | null> => {
+    const syncWithBackend = useCallback(async (accessToken: string): Promise<{ user: User; permissions: string[]; scopes: string[] } | null> => {
         try {
             const res = await fetch(`${API_URL}/auth/sync`, {
                 method: 'POST',
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return {
                 user: { ...data.user },
                 permissions: data.effective_permissions || data.permissions || [],
+                scopes: data.effective_scopes || [],
             };
         } catch (err) {
             console.error('[AuthProvider] Backend sync failed:', err);
@@ -101,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             applyPreferences(data.user.preferences);
             setUser({ ...data.user });
             setPermissions(data.effective_permissions || data.permissions || []);
+            setScopes(data.effective_scopes || []);
             return true;
         } catch {
             return false;
@@ -114,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!session) {
                 setUser(null);
                 setPermissions([]);
+                setScopes([]);
                 setToken(null);
                 setLoading(false);
                 return;
@@ -125,12 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 applyPreferences(syncResult.user.preferences);
                 setUser(syncResult.user);
                 setPermissions(syncResult.permissions);
+                setScopes(syncResult.scopes);
             } else {
                 const fetched = await fetchCurrentUser(accessToken);
                 if (!fetched) {
                     await supabase.auth.signOut();
                     setUser(null);
                     setPermissions([]);
+                    setScopes([]);
                     setToken(null);
                 }
             }
@@ -183,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         setUser(null);
         setPermissions([]);
+        setScopes([]);
         setToken(null);
         router.push('/login');
     }, [router]);
@@ -196,15 +205,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     }, [user, permissions]);
 
+    const hasScope = useCallback((key: string) => {
+        if (!key) return true;
+        if (user?.role === 'admin') return true;
+        return scopes.includes(key);
+    }, [user, scopes]);
+
     const isAdmin = user?.role === 'admin';
     const isManager = canonicalRole(user?.role) === 'team_manager';
     const userStatus = user?.status ?? null;
 
     return (
         <AuthContext.Provider value={{
-            user, permissions, token, loading,
+            user, permissions, scopes, token, loading,
             signInWithPassword, signUp,
-            logout, hasPermission, isAdmin, isManager, userStatus, refreshUser,
+            logout, hasPermission, hasScope, isAdmin, isManager, userStatus, refreshUser,
         }}>
             {children}
         </AuthContext.Provider>

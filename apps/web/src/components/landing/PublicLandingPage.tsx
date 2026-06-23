@@ -310,7 +310,7 @@ function ChangelogShowcase({ entries }: { entries: ChangelogEntry[] }) {
 
 export function PublicLandingPage() {
     const router = useRouter();
-    const { user, permissions, loading: authLoading } = useAuth();
+    const { user, permissions, scopes, loading: authLoading } = useAuth();
     const [data, setData] = useState<PublicLandingPageResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -320,7 +320,7 @@ export function PublicLandingPage() {
     useEffect(() => {
         if (authLoading) return;
         if (user) {
-            router.replace(getLandingPage(user, permissions));
+            router.replace(getLandingPage(user, permissions, scopes));
             return;
         }
 
@@ -335,11 +335,12 @@ export function PublicLandingPage() {
                 if (active) setError(err.message || 'Landing page is unavailable');
             })
             .finally(() => {
-                if (active) setLoading(false);
+                if (!active) return;
+                setLoading(false);
             });
 
         return () => { active = false; };
-    }, [authLoading, permissions, router, user]);
+    }, [authLoading, permissions, scopes, router, user]);
 
     // Nav background + scroll-reveal. Bound to the scroll container because the
     // document itself does not scroll (html is overflow:hidden app-wide).

@@ -1,6 +1,6 @@
 import { LucideIcon, CheckSquare, LayoutGrid, ListTodo, FolderKanban, Users, ShieldCheck, FlaskConical, BarChart3, UserCog, History, Map, Settings2, Users2, Bug, GraduationCap, Layers, ClipboardList, BookOpen, PlayCircle, TestTube2, Megaphone } from 'lucide-react';
 
-const { PERMISSIONS, SCOPES, getScope, resolvePermissionKey, canonicalRole } = require('../../../shared/rbac/catalog.ts');
+const { PERMISSIONS, SCOPES, resolvePermissionKey } = require('../../../shared/rbac/catalog.ts');
 
 export type UserStatus = 'PREPARATION' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 
@@ -9,7 +9,6 @@ export interface RouteConfig {
     label: string;
     permission?: string;
     scopes?: readonly string[];
-    adminOnly?: boolean;
     showInNavbar?: boolean;
     navOrder?: number;
     icon?: LucideIcon;
@@ -28,12 +27,7 @@ export interface NavigationSection {
     key: 'my-work' | 'quality' | 'manage' | 'admin';
     label: string;
     icon: LucideIcon;
-    roles?: readonly string[];
     children: NavigationNode[];
-}
-
-interface RouteVisibilityUser {
-    status?: UserStatus | null;
 }
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
@@ -91,15 +85,15 @@ const ROUTES: RouteConfig[] = [
     { path: '/test/results/upload', label: 'Upload Results', permission: PERMISSIONS.TESTRESULTS_UPLOAD, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/team/history', label: 'Task History', permission: PERMISSIONS.TASK_HISTORY_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: History },
     { path: '/quality/reports', label: 'Reports', permission: PERMISSIONS.REPORTS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 8, icon: BarChart3 },
-    { path: '/admin', label: 'Settings', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/admin/teams', label: 'Teams', permission: PERMISSIONS.TEAM_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.3, icon: Users2 },
-    { path: '/admin/journeys', label: 'Manage Journeys', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.5, icon: Map },
-    { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
-    { path: '/admin/permissions/matrix', label: 'Permissions Matrix', permission: PERMISSIONS.ADMIN_MANAGE_PERMISSIONS, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.2, icon: ShieldCheck },
+    { path: '/admin', label: 'Settings', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
+    { path: '/admin/teams', label: 'Teams', permission: PERMISSIONS.TEAM_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.3, icon: Users2 },
+    { path: '/admin/journeys', label: 'Manage Journeys', permission: PERMISSIONS.JOURNEYS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.5, icon: Map },
+    { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
+    { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
+    { path: '/admin/permissions/matrix', label: 'Permissions Matrix', permission: PERMISSIONS.ADMIN_MANAGE_PERMISSIONS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.2, icon: ShieldCheck },
     { path: '/admin/landing-config', label: 'Landing Page', permission: PERMISSIONS.ADMIN_LANDING_PAGE_MANAGE, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.4, icon: Megaphone },
-    { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
-    { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, adminOnly: true, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
+    { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
+    { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
     { path: '/team/journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
     { path: '/team/journeys/[userId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/team/journeys/[userId]/[journeyId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
@@ -126,7 +120,6 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'quality',
         label: 'Quality',
         icon: ShieldCheck,
-        roles: ['admin', 'team_manager', 'pm', 'tester'],
         children: [
             { path: '/work/projects', label: 'Projects', icon: FolderKanban },
             {
@@ -161,7 +154,6 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'manage',
         label: 'Manage',
         icon: Users,
-        roles: ['team_manager', 'admin', 'pm'],
         children: [
             { path: '/dashboards/team-manager', label: 'Team Dashboard', icon: LayoutGrid },
             { path: '/team/resources', label: 'Resources', icon: Users },
@@ -174,7 +166,6 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: 'admin',
         label: 'Admin',
         icon: Settings2,
-        roles: ['admin'],
         children: [
             { path: '/admin/users', label: 'Users', icon: UserCog },
             { path: '/admin/teams', label: 'Teams', icon: Users2 },
@@ -200,12 +191,6 @@ function pathToRegex(routePath: string): RegExp {
     return new RegExp(`^${escaped}$`);
 }
 
-function getStatus(userOrStatus?: RouteVisibilityUser | UserStatus | null): UserStatus | null {
-    if (!userOrStatus) return null;
-    if (typeof userOrStatus === 'string') return userOrStatus;
-    return userOrStatus.status ?? null;
-}
-
 export function hasCatalogPermission(permissions: readonly string[] | undefined, key: string): boolean {
     if (!permissions) return false;
 
@@ -216,15 +201,18 @@ export function hasCatalogPermission(permissions: readonly string[] | undefined,
     });
 }
 
-export function routeAllowsStatus(route: RouteConfig, userOrStatus?: RouteVisibilityUser | UserStatus | null): boolean {
+/**
+ * Whether the route is visible given the actor's `effective_scopes`. Scope
+ * membership is computed server-side (ADR 0010 §1) and pushed through the auth
+ * response. The client does not consult the catalog for status mappings —
+ * a route is in-scope iff every required scope is in the actor's effective
+ * set. (The catalog is the source of scope *definitions*; this is the
+ * membership test, and the only one the client should run.)
+ */
+export function routeAllowsScope(route: RouteConfig, effectiveScopes: readonly string[] | undefined): boolean {
     if (!route.scopes?.length) return true;
-
-    const status = getStatus(userOrStatus);
-    return route.scopes.every(scopeKey => {
-        const scope = getScope(scopeKey);
-        if (!scope?.statuses) return true;
-        return status ? scope.statuses.includes(status) : false;
-    });
+    if (!effectiveScopes) return false;
+    return route.scopes.every(scopeKey => effectiveScopes.includes(scopeKey));
 }
 
 export function getRouteConfig(pathname: string): RouteConfig | undefined {
@@ -237,32 +225,38 @@ export function getRouteConfig(pathname: string): RouteConfig | undefined {
     });
 }
 
-export function getNavbarRoutes(userOrStatus?: RouteVisibilityUser | UserStatus | null): RouteConfig[] {
+export function getNavbarRoutes(effectiveScopes?: readonly string[]): RouteConfig[] {
     return ROUTES
         .filter(r => r.showInNavbar)
-        .filter(r => routeAllowsStatus(r, userOrStatus))
+        .filter(r => routeAllowsScope(r, effectiveScopes))
         .sort((a, b) => (a.navOrder || 99) - (b.navOrder || 99));
 }
 
 export interface NavVisibilityContext {
     role?: string | null;
-    status?: UserStatus | null;
     isAdmin: boolean;
     hasPermission: (key: string) => boolean;
+    effectiveScopes: readonly string[];
 }
 
 /**
  * Whether the given navigable path is visible to the user described by `ctx`.
- * Mirrors the gating order of RouteGuard: status scope → contributor lockout →
- * adminOnly → permission. This is the single source of truth for sidebar link
- * visibility so it can be unit-tested without rendering the React tree.
+ * Mirrors the gating order of RouteGuard: scope → permission. There is no
+ * adminOnly or section-role gate — those were the second authorisation axis
+ * the Matrix couldn't reach. The API is the security boundary; the client
+ * gates on the unified resolver data (effective_scopes + effective_permissions).
+ *
+ * Admin is the one role the API seeds with ZERO role_scopes rows (admin is
+ * gated by the `active` flag and the `*` permission wildcard, never by a
+ * scope row). So admin's `effective_scopes` is `[]` by design, but admin
+ * must still see scope-gated routes. We short-circuit on `isAdmin` here to
+ * match the resolver's admin semantics on the client.
  */
 export function canSeeRoutePath(path: string, ctx: NavVisibilityContext): boolean {
+    if (ctx.isAdmin) return true;
     const route = getRouteConfig(path);
     if (!route) return false;
-    if (!routeAllowsStatus(route, ctx.status ?? null)) return false;
-    if (ctx.role === 'contributor' && route.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) return false;
-    if (route.adminOnly && !ctx.isAdmin) return false;
+    if (!routeAllowsScope(route, ctx.effectiveScopes)) return false;
     if (route.permission && !ctx.hasPermission(route.permission)) return false;
     return true;
 }
@@ -280,16 +274,13 @@ function filterNavNode(node: NavigationNode, ctx: NavVisibilityContext): Navigat
 /**
  * Returns the navigation sections (with their leaf links) visible to the user.
  *
- * A section is shown when (a) its role whitelist admits the user's role — or it
- * has none — AND (b) at least one descendant link is permission-visible. The
- * section role whitelist and the per-link permission check are two distinct
- * gates: granting a permission in the admin matrix only surfaces a link if the
- * containing section also admits the role. Keep section `roles` in sync with the
- * permissions you expect each role to exercise.
+ * A section is shown when at least one descendant link is scope+permission
+ * visible. There is no section-level role gate — section visibility is a pure
+ * function of the union of its child visibility. Granting a permission in the
+ * admin Matrix is enough to surface a link; revoking it is enough to hide it.
  */
 export function getVisibleNavSections(ctx: NavVisibilityContext): NavigationSection[] {
     return NAVIGATION_SECTIONS
-        .filter(section => !section.roles || section.roles.includes(canonicalRole(ctx.role)))
         .map(section => ({
             ...section,
             children: section.children
@@ -303,7 +294,7 @@ export function isPublicRoute(pathname: string): boolean {
     return PUBLIC_PATHS.includes(pathname);
 }
 
-interface UserForLanding extends RouteVisibilityUser {
+interface UserForLanding {
     status: UserStatus;
     role?: string;
     preferences?: {
@@ -315,11 +306,20 @@ interface UserForLanding extends RouteVisibilityUser {
 const DEFAULT_LANDING = '/me/tasks';
 
 /**
- * Returns the user's preferred landing page with route, status scope, and
- * permission validation. Falls back to /me/tasks because it is accessible to
- * all roles that have an authenticated session.
+ * Returns the user's preferred landing page with scope and permission
+ * validation against their `effective_scopes`/`effective_permissions`. Falls
+ * back to /me/tasks because it is accessible to all roles that have an
+ * authenticated session.
+ *
+ * Admin is short-circuited on the scope check: the resolver intentionally
+ * seeds zero role_scopes rows for admin, so admin's `effective_scopes` is `[]`
+ * by design even though admin must be able to land on any page.
  */
-export function getLandingPage(user: UserForLanding | null, permissions?: string[]): string {
+export function getLandingPage(
+    user: UserForLanding | null,
+    permissions?: string[],
+    effectiveScopes?: readonly string[]
+): string {
     if (!user) return '/login';
     if (user.status !== 'ACTIVE') return '/me/tasks';
 
@@ -328,14 +328,12 @@ export function getLandingPage(user: UserForLanding | null, permissions?: string
 
     const route = getRouteConfig(preferredPage);
     if (!route) return DEFAULT_LANDING;
-    if (!routeAllowsStatus(route, user)) return DEFAULT_LANDING;
 
-    if (route.adminOnly && user.role !== 'admin') {
-        return DEFAULT_LANDING;
-    }
+    const isAdmin = user.role === 'admin';
+    if (!isAdmin && !routeAllowsScope(route, effectiveScopes)) return DEFAULT_LANDING;
 
     if (route.permission && permissions) {
-        if (user.role === 'admin') return preferredPage;
+        if (isAdmin) return preferredPage;
         if (!hasCatalogPermission(permissions, route.permission)) return DEFAULT_LANDING;
     }
 

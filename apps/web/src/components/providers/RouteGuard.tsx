@@ -3,12 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsStatus, SCOPES } from '../../config/routes';
+import { getRouteConfig, isPublicRoute, getLandingPage } from '../../config/routes';
 import { UnauthorizedPage } from '../PermissionGuard';
 import { useToastSafe } from '../ui/Toast';
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-    const { user, permissions, loading, hasPermission, isAdmin } = useAuth();
+    const { user, permissions, scopes, loading, hasPermission, hasScope, isAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const toast = useToastSafe();
@@ -18,7 +18,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         if (loading) return;
 
         if (user && (pathname === '/login' || pathname === '/register')) {
-            router.replace(getLandingPage(user, permissions));
+            router.replace(getLandingPage(user, permissions, scopes));
             return;
         }
 
@@ -32,11 +32,16 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const route = getRouteConfig(pathname || '');
         if (!route) return;
 
-        const landing = getLandingPage(user, permissions);
+        const landing = getLandingPage(user, permissions, scopes);
 
-        // Contributors cannot access routes with active_only scope
-        // This check ensures contributors are redirected even if they have the permission
-        if (user.role === 'contributor' && route.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) {
+        // ADR 0010 / issue #270: gating is purely on the unified resolver data
+        // pushed through the auth response — `effective_scopes` for status/scope
+        // and `effective_permissions` for capability. No more adminOnly or
+        // catalog-status fallback. The API remains the security boundary.
+        // Admin is short-circuited (hasScope / isAdmin) because the resolver
+        // intentionally seeds zero role_scopes rows for admin.
+        const scopeOk = !route.scopes?.length || route.scopes.every(s => hasScope(s));
+        if (!scopeOk) {
             if (lastRedirectPath.current !== pathname) {
                 toast.warning("You don't have permission to access this page. Redirected to My Tasks.");
                 lastRedirectPath.current = pathname;
@@ -45,16 +50,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        if (!routeAllowsStatus(route, user)) {
-            if (lastRedirectPath.current !== pathname) {
-                toast.warning("You don't have permission to access this page. Redirected to My Tasks.");
-                lastRedirectPath.current = pathname;
-            }
-            router.replace('/me/tasks');
-            return;
-        }
-
-        if (route.adminOnly && !isAdmin) {
+        if (route.permission && !hasPermission(route.permission) && !isAdmin) {
             if (lastRedirectPath.current !== pathname) {
                 toast.warning("You don't have permission to access this page. Redirected to your landing page.");
                 lastRedirectPath.current = pathname;
@@ -62,16 +58,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             router.replace(landing);
             return;
         }
-
-        if (route.permission && !hasPermission(route.permission)) {
-            if (lastRedirectPath.current !== pathname) {
-                toast.warning("You don't have permission to access this page. Redirected to your landing page.");
-                lastRedirectPath.current = pathname;
-            }
-            router.replace(landing);
-            return;
-        }
-    }, [loading, user, permissions, pathname, router, hasPermission, isAdmin, toast]);
+    }, [loading, user, permissions, scopes, pathname, router, hasPermission, hasScope, isAdmin, toast]);
 
     if (loading) {
         return (
@@ -93,19 +80,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     if (!user) return null;
 
-    // Synchronous contributor guard — prevents flash of content before useEffect redirect
-    if (pathname && !isPublicRoute(pathname)) {
-        const blockedRoute = getRouteConfig(pathname);
-        if (blockedRoute && user.role === 'contributor' && blockedRoute.scopes?.includes(SCOPES.ACTIVE_ONLY.key)) {
-            return null;
-        }
-    }
-
     return <>{children}</>;
 }
 
 export function PagePermissionGuard({ children }: { children: React.ReactNode }) {
-    const { user, hasPermission, isAdmin } = useAuth();
+    const { user, scopes, hasPermission, hasScope, isAdmin } = useAuth();
     const pathname = usePathname();
 
     if (!user) return null;
@@ -113,11 +92,8 @@ export function PagePermissionGuard({ children }: { children: React.ReactNode })
     const route = getRouteConfig(pathname || '');
     if (!route) return <>{children}</>;
 
-    // Contributors cannot access routes with active_only scope
-    if (user.role === 'contributor' && route.scopes?.includes('active_only')) return <UnauthorizedPage />;
-    if (!routeAllowsStatus(route, user)) return <UnauthorizedPage />;
-    if (route.adminOnly && !isAdmin) return <UnauthorizedPage />;
-    if (route.permission && !hasPermission(route.permission)) return <UnauthorizedPage />;
+    if (route.scopes?.length && !route.scopes.every(s => hasScope(s))) return <UnauthorizedPage />;
+    if (route.permission && !hasPermission(route.permission) && !isAdmin) return <UnauthorizedPage />;
 
     return <>{children}</>;
 }
