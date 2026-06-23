@@ -211,7 +211,7 @@ function bugsToRows(bugs: ResourceAnalytics['bugs']) {
 
 export default function ResourceDashboardPage() {
     const params = useParams();
-    const { token, isAdmin, isManager } = useAuth();
+    const { token, hasPermission } = useAuth();
     const [data, setData] = useState<ResourceAnalytics | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -219,7 +219,7 @@ export default function ResourceDashboardPage() {
     const tasksPagination = usePagination(data?.tasks.length ?? 0);
     const bugsPagination = usePagination(data?.bugs.length ?? 0);
 
-    const canAccess = isAdmin || isManager;
+    const canAccess = hasPermission('qc.resources.view');
 
     useEffect(() => {
         if (!canAccess) return;

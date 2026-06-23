@@ -38,9 +38,9 @@ export function ResourceTable({
 }: ResourceTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-    const { user, isAdmin, isManager } = useAuth();
+    const { hasPermission } = useAuth();
     const { density } = useTheme();
-    const canViewDashboard = isAdmin || isManager;
+    const canViewDashboard = hasPermission('qc.resources.view');
 
     const columns = useMemo(
         () => [
