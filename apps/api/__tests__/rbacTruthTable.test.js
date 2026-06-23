@@ -148,18 +148,20 @@ describe('RBAC truth-table (issue #264)', () => {
                 effectiveByRole[role] = await newEffectiveSet(role);
             }
 
-            for (const [signature, { replacementKey }] of Object.entries(ROLE_GATE_REPLACEMENTS)) {
+            for (const [signature, replacements] of Object.entries(ROLE_GATE_REPLACEMENTS)) {
                 const roleList = signature.split('|');
-                for (const role of ALL_ROLES) {
-                    const oldDecision = oldRoleDecision(role, roleList);
-                    const eff = effectiveByRole[role];
-                    const newDecision = eff.has('*') || eff.has(replacementKey);
-                    if (oldDecision === newDecision) continue;
+                for (const { replacementKey } of replacements) {
+                    for (const role of ALL_ROLES) {
+                        const oldDecision = oldRoleDecision(role, roleList);
+                        const eff = effectiveByRole[role];
+                        const newDecision = eff.has('*') || eff.has(replacementKey);
+                        if (oldDecision === newDecision) continue;
 
-                    // Divergence allowed only if explicitly intended.
-                    const allowed = INTENDED_CHANGES[replacementKey]?.[role];
-                    expect({ signature, role, replacementKey, old: oldDecision, new: newDecision, allowed: Boolean(allowed) })
-                        .toEqual(expect.objectContaining({ allowed: true }));
+                        // Divergence allowed only if explicitly intended.
+                        const allowed = INTENDED_CHANGES[replacementKey]?.[role];
+                        expect({ signature, role, replacementKey, old: oldDecision, new: newDecision, allowed: Boolean(allowed) })
+                            .toEqual(expect.objectContaining({ allowed: true }));
+                    }
                 }
             }
         });
@@ -168,7 +170,9 @@ describe('RBAC truth-table (issue #264)', () => {
     describe('allowlist hygiene', () => {
         test('every INTENDED_CHANGES entry references a key the routes actually gate on, or a registered replacement', () => {
             const gateKeys = new Set(permissionKeys);
-            const replacementKeys = new Set(Object.values(ROLE_GATE_REPLACEMENTS).map(r => r.replacementKey));
+            const replacementKeys = new Set(
+                Object.values(ROLE_GATE_REPLACEMENTS).flatMap(list => list.map(r => r.replacementKey))
+            );
             for (const [key, roles] of Object.entries(INTENDED_CHANGES)) {
                 const known = gateKeys.has(key) || replacementKeys.has(key);
                 expect({ key, known, roles: Object.keys(roles) }).toEqual(expect.objectContaining({ known: true }));

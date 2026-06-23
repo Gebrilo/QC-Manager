@@ -26,14 +26,21 @@ const INTENDED_CHANGES = Object.freeze({
 });
 
 // `requireRole(...)` gates that have been converted to a permission gate.
-// Shape: { [roleGateSignature]: { replacementKey: <qc.* key>, rationale: <string> } }
+// Shape: { [roleGateSignature]: Array<{ replacementKey, rationale }> }
 // where `roleGateSignature` is the canonical gate key produced by the harness
 // (the LOWER-CASED, SORTED, '|'-joined role list, e.g. 'admin|team_manager').
+// A signature may map to multiple keys when the same role list governed several
+// domains that each got their own replacement key (e.g. journeys vs dev-plans).
 // Once an entry exists here, the harness asserts that for EVERY role the old
 // role-list decision equals the new replacement-key decision (parity), and any
 // intentional shift must also appear in INTENDED_CHANGES.
 const ROLE_GATE_REPLACEMENTS = Object.freeze({
-    // (no entries at baseline — populated by #265 / #266 / #267)
+    'admin|team_manager': [
+        // #265 — Journeys CRUD was requireRole('admin','team_manager').
+        { replacementKey: 'qc.journeys.manage', rationale: 'Journeys domain gate; reachability preserved (admin via *, team_manager seeded).' },
+        // #266 — Development Plans / IDP was requireRole('admin','team_manager').
+        { replacementKey: 'qc.dev_plans.manage', rationale: 'Dev Plans / IDP domain gate; reachability preserved (admin via *, team_manager seeded).' },
+    ],
 });
 
 module.exports = { INTENDED_CHANGES, ROLE_GATE_REPLACEMENTS };

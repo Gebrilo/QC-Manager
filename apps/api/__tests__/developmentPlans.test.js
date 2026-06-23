@@ -12,6 +12,7 @@ jest.mock('jsonwebtoken', () => ({
 jest.mock('../src/middleware/authMiddleware', () => ({
     requireAuth: (req, _res, next) => next(),
     requireRole: () => (req, _res, next) => next(),
+    requirePermission: () => (req, _res, next) => next(),
 }));
 
 jest.mock('../src/middleware/teamAccess', () => ({

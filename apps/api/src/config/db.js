@@ -3755,6 +3755,23 @@ const runMigrations = async () => {
             console.log(`[rbac-seed] Collapsed ${collapsedCount} redundant user_permissions rows into the sparse delta`);
         }
 
+        // ============================================================
+        // Migration 045: Seed new domain-management keys introduced by the
+        // role-gate cutover (ADR 0010, issues #265 / #266)
+        // ============================================================
+        // The bootstrap seed (#263) only seeds roles not yet marked; for databases
+        // that have already been seeded, mint the new keys onto team_manager here.
+        // admin is covered by the '*' wildcard. ON CONFLICT DO NOTHING keeps this
+        // idempotent and never overrides an admin who has since revoked the key
+        // (a re-run is a no-op once the row exists).
+        await client.query(`
+            INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+            VALUES
+                ('team_manager', 'qc.journeys.manage', 'system-seed'),
+                ('team_manager', 'qc.dev_plans.manage', 'system-seed')
+            ON CONFLICT (role_identifier, permission_key) DO NOTHING
+        `);
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

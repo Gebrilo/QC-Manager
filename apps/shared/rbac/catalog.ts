@@ -59,6 +59,11 @@ const PERMISSIONS = Object.freeze({
     JOURNEYS_ASSIGN: 'qc.journeys.assign',
     JOURNEYS_VIEW_ASSIGNED: 'qc.journeys.view_assigned',
     JOURNEYS_VIEW_TEAM_PROGRESS: 'qc.journeys.view_team_progress',
+    JOURNEYS_MANAGE: 'qc.journeys.manage',
+
+    // Development Plans / IDP management (ADR 0010, issue #266) — replaces the
+    // requireRole('admin','team_manager') gate on every dev-plans route.
+    DEV_PLANS_MANAGE: 'qc.dev_plans.manage',
 
     TEAM_VIEW: 'qc.team.view',
     TEAM_MANAGE: 'qc.team.manage',
@@ -205,6 +210,8 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TASK_HISTORY_VIEW,
             PERMISSIONS.JOURNEYS_ASSIGN,
             PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS,
+            PERMISSIONS.JOURNEYS_MANAGE,
+            PERMISSIONS.DEV_PLANS_MANAGE,
             PERMISSIONS.TEAM_VIEW,
             PERMISSIONS.GOVERNANCE_VIEW,
             PERMISSIONS.GOVERNANCE_APPROVE_RELEASE,
