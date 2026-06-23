@@ -18,15 +18,19 @@ interface ArtifactType {
 
 interface PermissionKey {
     key: string;
+    mode: 'toggle' | 'scope';
     action: string;
     label: string;
     project_scope_warning: string | null;
 }
 
+type ScopeValue = 'none' | 'own' | 'team' | 'any';
+
 interface MatrixRole {
     name: string;
     role_identifier: string;
     permissions: Record<string, boolean>;
+    scoped_permissions: Record<string, ScopeValue>;
     is_builtin: boolean;
     is_protected: boolean;
 }
@@ -58,7 +62,9 @@ function roleLabel(roleId: string) {
 
 function grantedCount(role: MatrixRole, permissions: PermissionKey[]): number {
     if (role.is_protected) return permissions.length;
-    return permissions.filter(p => !!role.permissions[p.key]).length;
+    return permissions.filter(p => p.mode === 'scope'
+        ? role.scoped_permissions?.[p.key] && role.scoped_permissions[p.key] !== 'none'
+        : !!role.permissions[p.key]).length;
 }
 
 export default function PermissionsMatrixPage() {
@@ -151,6 +157,38 @@ export default function PermissionsMatrixPage() {
         } catch (err: any) {
             setRoles(prev => prev.map(r => r.role_identifier === role.role_identifier
                 ? { ...r, permissions: { ...r.permissions, [permissionKey]: previous } }
+                : r
+            ));
+            showMessage('error', err.message);
+        } finally {
+            setSavingCells(prev => { const s = new Set(prev); s.delete(cellKey); return s; });
+        }
+    };
+
+    const saveScope = async (role: MatrixRole, permissionKey: string, scope: ScopeValue) => {
+        if (!token || role.is_protected) return;
+        const cellKey = `${role.role_identifier}:${permissionKey}`;
+        const previous = role.scoped_permissions?.[permissionKey] || 'none';
+
+        setSavingCells(prev => new Set(prev).add(cellKey));
+        setRoles(prev => prev.map(r => r.role_identifier === role.role_identifier
+            ? { ...r, scoped_permissions: { ...(r.scoped_permissions || {}), [permissionKey]: scope } }
+            : r
+        ));
+
+        try {
+            const res = await fetch(`${API_URL}/admin/access/matrix`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role_identifier: role.role_identifier, permission_group: permissionKey, scope }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to update scope');
+            }
+        } catch (err: any) {
+            setRoles(prev => prev.map(r => r.role_identifier === role.role_identifier
+                ? { ...r, scoped_permissions: { ...(r.scoped_permissions || {}), [permissionKey]: previous } }
                 : r
             ));
             showMessage('error', err.message);
@@ -430,6 +468,7 @@ export default function PermissionsMatrixPage() {
                                                     const saving   = savingCells.has(cellKey);
                                                     const checked  = isAdminRole || !!role.permissions[perm.key];
                                                     const disabled = role.is_protected || saving;
+                                                    const scopeValue = role.scoped_permissions?.[perm.key] || 'none';
 
                                                     if (isAdminRole) {
                                                         return (
@@ -442,6 +481,25 @@ export default function PermissionsMatrixPage() {
                                                                     </TooltipTrigger>
                                                                     <TooltipContent className="text-xs">Admin has all permissions</TooltipContent>
                                                                 </Tooltip>
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    if (perm.mode === 'scope') {
+                                                        return (
+                                                            <td key={perm.key} className="border-b border-r border-slate-200/60 px-3 py-2.5 text-center dark:border-slate-700/60">
+                                                                <select
+                                                                    aria-label={`${role.role_identifier} — ${perm.label} scope`}
+                                                                    value={scopeValue}
+                                                                    disabled={disabled}
+                                                                    onChange={event => saveScope(role, perm.key, event.target.value as ScopeValue)}
+                                                                    className="h-8 w-24 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none transition-colors hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:ring-indigo-950"
+                                                                >
+                                                                    <option value="none">No</option>
+                                                                    <option value="own">Own</option>
+                                                                    <option value="team">Team</option>
+                                                                    <option value="any">Any</option>
+                                                                </select>
                                                             </td>
                                                         );
                                                     }
