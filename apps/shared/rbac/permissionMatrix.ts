@@ -72,12 +72,36 @@ function scopedGroupFor(permissionKey, permissionSet, tab) {
     };
 }
 
-function toggleItem(permissionKey) {
+// The action is everything after the tab's domain prefix, so multi-segment keys
+// (e.g. `qc.tasks.history.view`) keep their full action (`history.view`) instead
+// of collapsing to the bare verb (`view`) and colliding with `qc.tasks.view`.
+function actionSuffix(permissionKey, tab) {
+    const domains = (tab && tab.domains) || [];
+    const domain = domains.find(item => permissionKey === item || permissionKey.startsWith(`${item}.`));
+    if (!domain) return permissionAction(permissionKey);
+    const base = permissionKey === domain ? permissionAction(domain) : permissionKey.slice(domain.length + 1);
+    // A tab can bundle several domains (e.g. Test Runs = testexecutions + testresults).
+    // Prefix secondary-domain actions with the domain leaf so identical verbs across
+    // domains (`testexecutions.delete` vs `testresults.delete`) don't both read "Delete".
+    if (domains.length > 1 && domain !== domains[0]) {
+        return `${domain.split('.').pop()}.${base}`;
+    }
+    return base;
+}
+
+function formatActionLabel(action) {
+    return action
+        .replace(/[._]/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function toggleItem(permissionKey, tab) {
+    const action = actionSuffix(permissionKey, tab);
     return {
         key: permissionKey,
         mode: 'toggle',
-        action: permissionAction(permissionKey),
-        label: formatPermissionLabel(permissionKey),
+        action,
+        label: formatActionLabel(action),
         project_scope_warning: permissionKey.endsWith('_project')
             ? 'Grants cross-team visibility within projects this role is project-scoped to'
             : null,
@@ -104,7 +128,7 @@ function permissionsForArtifact(allPermissions, artifactType) {
     }
 
     for (const permission of allPermissions.filter(key => permissionBelongsToTab(key, tab))) {
-        if (!groupedKeys.has(permission)) toggles.push(toggleItem(permission));
+        if (!groupedKeys.has(permission)) toggles.push(toggleItem(permission, tab));
     }
 
     return [...groups, ...toggles]

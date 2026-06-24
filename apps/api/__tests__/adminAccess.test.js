@@ -44,6 +44,21 @@ describe('admin access matrix routes', () => {
         expect(permissions.find(permission => permission.key === 'qc.tasks.create')).toMatchObject({ mode: 'toggle' });
     });
 
+    test('multi-segment action keys get a distinct label, not a duplicate "View"', () => {
+        // qc.tasks.history.view must not collide with qc.tasks.view as a second "View"
+        const history = permissionsForArtifact('task').find(permission => permission.key === 'qc.tasks.history.view');
+        expect(history).toMatchObject({ action: 'history.view', label: 'History View' });
+    });
+
+    test('no tab renders two permissions with the same display label', () => {
+        const { ARTIFACT_TABS } = require('../../shared/rbac/permissionMatrix.ts');
+        for (const artifactType of Object.keys(ARTIFACT_TABS)) {
+            const labels = (permissionsForArtifact(artifactType) || []).map(permission => permission.label);
+            const duplicates = labels.filter((label, index) => labels.indexOf(label) !== index);
+            expect({ artifactType, duplicates }).toEqual({ artifactType, duplicates: [] });
+        }
+    });
+
     test('permissionsForArtifact exposes flat domains as toggle items', () => {
         expect(permissionsForArtifact('projects').find(permission => permission.key === 'qc.projects.view'))
             .toMatchObject({ mode: 'toggle', action: 'view' });
