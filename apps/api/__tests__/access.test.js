@@ -128,6 +128,31 @@ describe('AccessEngine.canPerform — OR branches', () => {
         expect(out).toEqual({ allowed: true, branch: 'project_scope' });
     });
 
+    test('project-scope (PM of project) grants bare write verbs only inside managed projects', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.edit']),
+            scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1'] },
+        });
+        const allowed = await canPerform(
+            { id: 'u', role: 'pm' },
+            { type: 'bug', id: 'b1', owner_team_id: 't-other', assignee_resource_id: null, project_id: 'p-1' },
+            'edit'
+        );
+        expect(allowed).toEqual({ allowed: true, branch: 'project_scope' });
+
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.edit']),
+            scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1'] },
+        });
+        mockQuery.mockResolvedValue({ rows: [] });
+        const denied = await canPerform(
+            { id: 'u', role: 'pm' },
+            { type: 'bug', id: 'b2', owner_team_id: 't-other', assignee_resource_id: null, project_id: 'p-2' },
+            'edit'
+        );
+        expect(denied.allowed).toBe(false);
+    });
+
     test('visibility_scope=project + project team membership grants view', async () => {
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set(['qc.bugs.view_team']),
@@ -242,9 +267,8 @@ describe('AccessEngine.buildListFilter', () => {
         expect(f.clause).toMatch(/owner_team_id\s*=\s*\$/);
         expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM resources/);
         expect(f.clause).toMatch(/EXISTS \(SELECT 1 FROM artifact_access/);
-        expect(f.clause).toMatch(/project_id\s+IN/);
         expect(f.nextIdx).toBeGreaterThan(5);
-        expect(f.params).toEqual(expect.arrayContaining(['u', 't-1', 'p-9']));
+        expect(f.params).toEqual(expect.arrayContaining(['u', 't-1']));
     });
 
     test('view_any short-circuits to TRUE (see-all regardless of team/own/PM scope)', async () => {
@@ -257,9 +281,9 @@ describe('AccessEngine.buildListFilter', () => {
         expect(f.params).toEqual([]);
     });
 
-    test('pm with view_team + pm_of_projects gets project_id IN clause', async () => {
+    test('pm with bare view + pm_of_projects gets project_id IN clause', async () => {
         mockResolve.mockResolvedValueOnce({
-            effectivePermissions: new Set(['qc.bugs.view_team']),
+            effectivePermissions: new Set(['qc.bugs.view']),
             scope: { team_id: null, team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] },
         });
         const f = await buildListFilter({ id: 'pm', role: 'pm' }, 'bug', 'view');

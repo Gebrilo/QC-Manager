@@ -56,7 +56,7 @@ describe('AccessEngine.buildListFilter — explicit type casts (issue #120 regre
     });
 
     test('pm_of_projects branch: each placeholder gets ::uuid for IN clause', async () => {
-        resolveWith(['qc.bugs.view_team'], { team_id: null, team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] });
+        resolveWith(['qc.bugs.view'], { team_id: null, team_type: 'pm', pm_of_projects: ['p-1', 'p-2'] });
         const f = await buildListFilter({ id: 'u-5', role: 'pm' }, 'bug', 'view');
         const inCasts = f.clause.match(/\$\d+::uuid/g);
         expect(inCasts.length).toBeGreaterThanOrEqual(2);
@@ -78,7 +78,7 @@ describe('AccessEngine.buildListFilter — explicit type casts (issue #120 regre
 
     test('combined scenario: user with view_team + pm_of_projects has casts on all branches', async () => {
         resolveWith(
-            ['qc.user_stories.view_team'],
+            ['qc.user_stories.view', 'qc.user_stories.view_team'],
             { team_id: 't-combined', team_type: 'qc', pm_of_projects: ['proj-a'] }
         );
         const f = await buildListFilter(
@@ -95,7 +95,7 @@ describe('AccessEngine.buildListFilter — explicit type casts (issue #120 regre
 
     test('no untyped $N remains in generated clause (all have explicit cast)', async () => {
         resolveWith(
-            ['qc.bugs.view_own', 'qc.bugs.view_team'],
+            ['qc.bugs.view', 'qc.bugs.view_own', 'qc.bugs.view_team'],
             { team_id: 't-full', team_type: 'qc', pm_of_projects: ['proj-x'] }
         );
         const f = await buildListFilter({ id: 'u-full', role: 'member' }, 'bug', 'view');

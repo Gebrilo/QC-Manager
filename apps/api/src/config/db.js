@@ -3868,6 +3868,46 @@ const runMigrations = async () => {
             `);
         }
 
+        // ============================================================
+        // Migration 050: grant PM project-scoped work permissions
+        // (ADR 0011, issue #279)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_pm_project_scope_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const pmProjectScopeSeed = await client.query(
+            `SELECT 1 FROM rbac_pm_project_scope_seed_marker
+             WHERE migration_id = 'issue-279-pm-project-scope'`
+        );
+        if (pmProjectScopeSeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('pm', 'qc.tasks.create', 'system-seed'),
+                    ('pm', 'qc.tasks.edit', 'system-seed'),
+                    ('pm', 'qc.tasks.delete', 'system-seed'),
+                    ('pm', 'qc.bugs.create', 'system-seed'),
+                    ('pm', 'qc.bugs.edit', 'system-seed'),
+                    ('pm', 'qc.bugs.delete', 'system-seed'),
+                    ('pm', 'qc.user_stories.create', 'system-seed'),
+                    ('pm', 'qc.user_stories.edit', 'system-seed'),
+                    ('pm', 'qc.user_stories.delete', 'system-seed'),
+                    ('pm', 'qc.testcases.view', 'system-seed'),
+                    ('pm', 'qc.testsuites.view', 'system-seed'),
+                    ('pm', 'qc.testexecutions.view', 'system-seed'),
+                    ('pm', 'qc.reports.export', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_pm_project_scope_seed_marker (migration_id)
+                VALUES ('issue-279-pm-project-scope')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

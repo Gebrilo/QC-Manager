@@ -26,6 +26,18 @@ interface PermissionKey {
 
 type ScopeValue = 'none' | 'own' | 'team' | 'any';
 
+const PM_PROJECT_SCOPE_KEYS = new Set([
+    'qc.tasks.create',
+    'qc.tasks.edit',
+    'qc.tasks.delete',
+    'qc.bugs.create',
+    'qc.bugs.edit',
+    'qc.bugs.delete',
+    'qc.user_stories.create',
+    'qc.user_stories.edit',
+    'qc.user_stories.delete',
+]);
+
 interface MatrixRole {
     name: string;
     role_identifier: string;
@@ -65,6 +77,10 @@ function grantedCount(role: MatrixRole, permissions: PermissionKey[]): number {
     return permissions.filter(p => p.mode === 'scope'
         ? role.scoped_permissions?.[p.key] && role.scoped_permissions[p.key] !== 'none'
         : !!role.permissions[p.key]).length;
+}
+
+function isPmProjectScopedCell(role: MatrixRole, permission: PermissionKey) {
+    return role.role_identifier === 'pm' && PM_PROJECT_SCOPE_KEYS.has(permission.key);
 }
 
 export default function PermissionsMatrixPage() {
@@ -480,6 +496,21 @@ export default function PermissionsMatrixPage() {
                                                                         </span>
                                                                     </TooltipTrigger>
                                                                     <TooltipContent className="text-xs">Admin has all permissions</TooltipContent>
+                                                                </Tooltip>
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    if (isPmProjectScopedCell(role, perm)) {
+                                                        return (
+                                                            <td key={perm.key} className="border-b border-r border-slate-200/60 px-3 py-2.5 text-center dark:border-slate-700/60">
+                                                                <Tooltip delayDuration={100}>
+                                                                    <TooltipTrigger asChild>
+                                                                        <span className="inline-flex h-8 items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-2 text-[11px] font-semibold text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+                                                                            Project (PM)
+                                                                        </span>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent className="text-xs">Scoped to projects this PM manages</TooltipContent>
                                                                 </Tooltip>
                                                             </td>
                                                         );

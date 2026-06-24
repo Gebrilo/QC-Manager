@@ -30,6 +30,12 @@ async function resolveUserStorySyncConfig(projectId) {
     return result.rows[0] || null;
 }
 
+async function enforcePmProjectScope(req, res, verb, projectId) {
+    if (req.user?.role !== 'pm' || !projectId) return true;
+    const access = await enforceArtifact(req, res, 'user_story', { type: 'user_story', id: 'new', project_id: projectId }, verb);
+    return access.allowed;
+}
+
 async function tryEmitAndWriteback(story, config, mode) {
     const unified = {
         artifact_type: 'user_story',
@@ -156,7 +162,7 @@ router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (re
     }
 });
 
-router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.user_stories.create'), async (req, res, next) => {
     try {
         const parsed = createUserStorySchema.safeParse(req.body);
         if (!parsed.success) {
@@ -167,6 +173,7 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
             });
         }
         const data = parsed.data;
+        if (!await enforcePmProjectScope(req, res, 'create', data.project_id)) return;
 
         const accessDefaults = await buildAccessDefaults({
             creator: req.user ? { id: req.user.id } : null,
@@ -249,7 +256,7 @@ router.post('/', requireAuth, requirePermission('qc.projects.edit'), async (req,
     }
 });
 
-router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.user_stories.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -270,6 +277,9 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
             });
         }
         const data = parsed.data;
+        if (data.project_id && data.project_id !== original.project_id) {
+            if (!await enforcePmProjectScope(req, res, 'edit', data.project_id)) return;
+        }
 
         const allowedFields = [
             'title', 'description', 'status', 'acceptance_criteria',
@@ -335,7 +345,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
     }
 });
 
-router.post('/:id/sync', requireAuth, requirePermission('qc.projects.edit'), async (req, res, next) => {
+router.post('/:id/sync', requireAuth, requirePermission('qc.user_stories.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -382,7 +392,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.projects.edit'), asy
     }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.projects.edit'), async (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('qc.user_stories.delete'), async (req, res) => {
     try {
         const { id } = req.params;
         const originalRes = await pool.query('SELECT * FROM user_stories WHERE id = $1', [id]);

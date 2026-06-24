@@ -17,6 +17,12 @@ const { decorateRows, enforceArtifact } = require('../services/access/enforcemen
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
 
+async function enforcePmProjectScope(req, res, verb, projectId) {
+    if (req.user?.role !== 'pm' || !projectId) return true;
+    const access = await enforceArtifact(req, res, 'bug', { type: 'bug', id: 'new', project_id: projectId }, verb);
+    return access.allowed;
+}
+
 async function replaceBugLinks(bugId, { linked_test_execution_ids, linked_task_ids }) {
     if (Array.isArray(linked_test_execution_ids)) {
         await pool.query('DELETE FROM bug_test_executions WHERE bug_id = $1', [bugId]);
@@ -371,6 +377,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.bugs.crea
             });
         }
         const data = parsed.data;
+        if (!await enforcePmProjectScope(req, res, 'create', data.project_id)) return;
 
         const normalizedStatus = normalizeBugStatus(data.status);
         const normalizedSeverity = normalizeBugSeverity(data.severity);
@@ -506,6 +513,10 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.
             });
         }
         const data = parsed.data;
+        if (!await enforcePmProjectScope(req, res, 'edit', original.project_id)) return;
+        if (data.project_id && data.project_id !== original.project_id) {
+            if (!await enforcePmProjectScope(req, res, 'edit', data.project_id)) return;
+        }
 
         const allowedFields = [
             'title', 'description', 'status', 'severity', 'priority', 'project_id',
@@ -714,6 +725,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.bugs
                 error: 'Bug already deleted'
             });
         }
+        if (!await enforcePmProjectScope(req, res, 'delete', original.project_id)) return;
 
         if (original.tuleap_artifact_id) {
             const configResult = await pool.query(

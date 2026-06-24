@@ -141,9 +141,9 @@ async function canPerform(user, artifact, verb, req) {
     }
 
     // Branch 2: project-scope role (PM of this project).
-    // keyAny short-circuited above; here we only honor the report-scope grant.
+    // Bare artifact keys are route gates; pm_of_projects supplies the row scope.
     if (artifact.project_id && scope.pm_of_projects.includes(artifact.project_id)) {
-        if (verb === 'view' && effectivePermissions.has('qc.reports.view_project')) {
+        if (hasBareVerb || (verb === 'view' && effectivePermissions.has('qc.reports.view_project'))) {
             return { allowed: true, branch: 'project_scope' };
         }
     }
@@ -319,7 +319,7 @@ async function buildListFilter(user, artifactType, verb, opts = {}) {
     }
 
     // project_managers (PM of project)
-    if (scope.pm_of_projects.length > 0) {
+    if (scope.pm_of_projects.length > 0 && (hasBareVerb || (verb === 'view' && effectivePermissions.has('qc.reports.view_project')))) {
         const placeholders = scope.pm_of_projects.map(p => `${bind(p)}::uuid`).join(', ');
         branches.push(`${projectExpr} IN (${placeholders})`);
     }

@@ -82,6 +82,12 @@ async function resolveTaskAccessAssigneeResourceId(taskId, user, req) {
     return rows[0].resource_id;
 }
 
+async function enforcePmProjectScope(req, res, verb, projectId) {
+    if (req.user?.role !== 'pm' || !projectId) return true;
+    const access = await enforceArtifact(req, res, 'task', { type: 'task', id: 'new', project_id: projectId }, verb);
+    return access.allowed;
+}
+
 async function decorateTaskRows(req, rows) {
     if (!Array.isArray(rows) || rows.length === 0) {
         return decorateRows(req, 'task', rows || []);
@@ -273,6 +279,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.tasks.cre
     try {
         const temp_id = req.body.temp_id;
         const data = createTaskSchema.parse(req.body);
+        if (!await enforcePmProjectScope(req, res, 'create', data.project_id)) return;
 
         // ADR 0009 — resolve the desired assignment set and enforce the
         // assignment rules before any write.
@@ -461,6 +468,9 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.tasks
             if (!canEdit) {
                 return res.status(403).json({ error: 'You do not have permission to edit this task' });
             }
+        }
+        if (data.project_id && data.project_id !== original.project_id) {
+            if (!await enforcePmProjectScope(req, res, 'edit', data.project_id)) return;
         }
 
         // Enforce team scope for managers
@@ -696,6 +706,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.task
         if (original.deleted_at) {
             return res.status(400).json({ error: 'Task already deleted' });
         }
+        if (!await enforcePmProjectScope(req, res, 'delete', original.project_id)) return;
 
         if (original.tuleap_artifact_id) {
             const configResult = await db.query(
