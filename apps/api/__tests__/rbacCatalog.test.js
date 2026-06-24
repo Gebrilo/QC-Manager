@@ -29,6 +29,7 @@ describe('RBAC catalog resolver', () => {
     test('tester role can use task and test permissions without admin rights', () => {
         expect(canUserPerform({ role: 'tester' }, PERMISSIONS.TASKS_VIEW)).toBe(true);
         expect(canUserPerform({ role: 'tester' }, PERMISSIONS.TESTCASES_VIEW)).toBe(true);
+        expect(canUserPerform({ role: 'tester' }, PERMISSIONS.TESTCASES_EXECUTE)).toBe(true);
         expect(canUserPerform({ role: 'tester' }, PERMISSIONS.GOVERNANCE_MANAGE_GATES)).toBe(false);
     });
 
@@ -94,15 +95,15 @@ describe('Access engine — expanded catalog (issue #80)', () => {
     test('decorative and redundant _own keys are pruned from the catalog', () => {
         const pruned = [
             'qc.tasks.view_own', 'qc.tasks.edit_own', 'qc.tasks.delete_own',
-            'qc.bugs.view_own', 'qc.bugs.edit_own',
+            'qc.bugs.edit_own',
             'qc.testcases.view_own', 'qc.testcases.edit_own',
-            'qc.testsuites.view_own', 'qc.testsuites.edit_own', 'qc.testsuites.delete_own',
-            'qc.testexecutions.view_own', 'qc.testexecutions.edit_own', 'qc.testexecutions.delete_own',
+            'qc.testsuites.view_own', 'qc.testsuites.edit_own',
+            'qc.testexecutions.view_own', 'qc.testexecutions.edit_own',
             'qc.user_stories.view_own', 'qc.user_stories.edit_own', 'qc.user_stories.delete_own',
             'qc.reports.view_own',
             'qc.tasks.log_time', 'qc.tasks.approve_completion',
-            'qc.bugs.triage', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
-            'qc.testcases.execute', 'qc.testcases.approve', 'qc.testcases.clone', 'qc.testcases.import', 'qc.testcases.export',
+            'qc.bugs.triage', 'qc.bugs.reopen', 'qc.bugs.close',
+            'qc.testcases.approve', 'qc.testcases.clone', 'qc.testcases.import', 'qc.testcases.export',
         ];
         for (const key of pruned) {
             expect(ALL_PERMISSION_VALUES).not.toContain(key);
@@ -129,7 +130,9 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(tester).toContain(PERMISSIONS.BUGS_EDIT);
         expect(tester).toContain(PERMISSIONS.BUGS_DELETE_OWN);
         expect(tester).toContain(PERMISSIONS.BUGS_CHANGE_SEVERITY);
+        expect(tester).toContain(PERMISSIONS.BUGS_CHANGE_PRIORITY);
         expect(tester).toContain(PERMISSIONS.TESTCASES_DELETE_OWN);
+        expect(tester).toContain(PERMISSIONS.TESTCASES_EXECUTE);
         expect(tester).toContain(PERMISSIONS.TESTCASES_VIEW_STEPS);
         expect(tester).toContain(PERMISSIONS.DASHBOARDS_MEMBER_VIEW);
         expect(tester).toContain(PERMISSIONS.REPORTS_VIEW_TEAM);
@@ -196,8 +199,11 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(tester).toContain(PERMISSIONS.TESTCASES_DELETE_OWN);
         expect(grants).toContain(PERMISSIONS.TASKS_DELETE_TEAM);
         expect(grants).toContain(PERMISSIONS.BUGS_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTCASES_DELETE_OWN);
         expect(grants).toContain(PERMISSIONS.TESTCASES_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTSUITES_DELETE_OWN);
         expect(grants).toContain(PERMISSIONS.TESTSUITES_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTEXECUTIONS_DELETE_OWN);
         expect(grants).toContain(PERMISSIONS.TESTEXECUTIONS_DELETE_TEAM);
         expect(grants).toContain(PERMISSIONS.USER_STORIES_DELETE_TEAM);
     });

@@ -82,6 +82,7 @@ const PERMISSIONS = Object.freeze({
 
     BUGS_VIEW_TEAM: 'qc.bugs.view_team',
     BUGS_VIEW_ANY: 'qc.bugs.view_any',
+    BUGS_VIEW_OWN: 'qc.bugs.view_own',
     BUGS_EDIT_TEAM: 'qc.bugs.edit_team',
     BUGS_EDIT_ANY: 'qc.bugs.edit_any',
     BUGS_DELETE_OWN: 'qc.bugs.delete_own',
@@ -100,6 +101,7 @@ const PERMISSIONS = Object.freeze({
     TESTSUITES_VIEW_ANY: 'qc.testsuites.view_any',
     TESTSUITES_EDIT_TEAM: 'qc.testsuites.edit_team',
     TESTSUITES_EDIT_ANY: 'qc.testsuites.edit_any',
+    TESTSUITES_DELETE_OWN: 'qc.testsuites.delete_own',
     TESTSUITES_DELETE_TEAM: 'qc.testsuites.delete_team',
     TESTSUITES_DELETE_ANY: 'qc.testsuites.delete_any',
 
@@ -107,6 +109,7 @@ const PERMISSIONS = Object.freeze({
     TESTEXECUTIONS_VIEW_ANY: 'qc.testexecutions.view_any',
     TESTEXECUTIONS_EDIT_TEAM: 'qc.testexecutions.edit_team',
     TESTEXECUTIONS_EDIT_ANY: 'qc.testexecutions.edit_any',
+    TESTEXECUTIONS_DELETE_OWN: 'qc.testexecutions.delete_own',
     TESTEXECUTIONS_DELETE_TEAM: 'qc.testexecutions.delete_team',
     TESTEXECUTIONS_DELETE_ANY: 'qc.testexecutions.delete_any',
 
@@ -126,7 +129,9 @@ const PERMISSIONS = Object.freeze({
     TASKS_CHANGE_PRIORITY: 'qc.tasks.change_priority',
 
     BUGS_CHANGE_SEVERITY: 'qc.bugs.change_severity',
+    BUGS_CHANGE_PRIORITY: 'qc.bugs.change_priority',
 
+    TESTCASES_EXECUTE: 'qc.testcases.execute',
     TESTCASES_VIEW_STEPS: 'qc.testcases.view_steps',
     TESTCASES_EDIT_STEPS: 'qc.testcases.edit_steps',
 
@@ -199,14 +204,17 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.BUGS_CHANGE_SEVERITY,
             PERMISSIONS.TESTCASES_VIEW_TEAM,
             PERMISSIONS.TESTCASES_EDIT_TEAM,
+            PERMISSIONS.TESTCASES_DELETE_OWN,
             PERMISSIONS.TESTCASES_DELETE_TEAM,
             PERMISSIONS.TESTCASES_VIEW_STEPS,
             PERMISSIONS.TESTCASES_EDIT_STEPS,
             PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM,
             PERMISSIONS.TESTEXECUTIONS_EDIT_TEAM,
+            PERMISSIONS.TESTEXECUTIONS_DELETE_OWN,
             PERMISSIONS.TESTEXECUTIONS_DELETE_TEAM,
             PERMISSIONS.TESTSUITES_VIEW_TEAM,
             PERMISSIONS.TESTSUITES_EDIT_TEAM,
+            PERMISSIONS.TESTSUITES_DELETE_OWN,
             PERMISSIONS.TESTSUITES_DELETE_TEAM,
             PERMISSIONS.USER_STORIES_VIEW_TEAM,
             PERMISSIONS.USER_STORIES_EDIT_TEAM,
@@ -289,8 +297,10 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.BUGS_EDIT,
             PERMISSIONS.BUGS_DELETE_OWN,
             PERMISSIONS.BUGS_CHANGE_SEVERITY,
+            PERMISSIONS.BUGS_CHANGE_PRIORITY,
             PERMISSIONS.TESTCASES_VIEW_TEAM,
             PERMISSIONS.TESTCASES_DELETE_OWN,
+            PERMISSIONS.TESTCASES_EXECUTE,
             PERMISSIONS.TESTCASES_VIEW_STEPS,
             PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM,
             PERMISSIONS.TESTEXECUTIONS_EDIT,
