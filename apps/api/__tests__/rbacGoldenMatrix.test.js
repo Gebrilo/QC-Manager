@@ -54,6 +54,7 @@ describe('RBAC golden matrix', () => {
     "qc.user_stories.view_any",
   ],
   "team_manager": [
+    "qc.bugs.change_severity",
     "qc.bugs.create",
     "qc.bugs.edit",
     "qc.bugs.edit_team",
@@ -118,6 +119,7 @@ describe('RBAC golden matrix', () => {
     "qc.user_stories.view_team",
   ],
   "tester": [
+    "qc.bugs.change_severity",
     "qc.bugs.create",
     "qc.bugs.edit",
     "qc.bugs.view",

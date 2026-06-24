@@ -30,7 +30,6 @@ const DECORATIVE_PERMISSION_KEYS = Object.freeze([
     'qc.tasks.log_time',
     'qc.tasks.approve_completion',
     'qc.bugs.triage',
-    'qc.bugs.change_severity',
     'qc.bugs.change_priority',
     'qc.bugs.reopen',
     'qc.bugs.close',

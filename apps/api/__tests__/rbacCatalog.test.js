@@ -101,7 +101,7 @@ describe('Access engine — expanded catalog (issue #80)', () => {
             'qc.user_stories.view_own', 'qc.user_stories.edit_own', 'qc.user_stories.delete_own',
             'qc.reports.view_own',
             'qc.tasks.log_time', 'qc.tasks.approve_completion',
-            'qc.bugs.triage', 'qc.bugs.change_severity', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
+            'qc.bugs.triage', 'qc.bugs.change_priority', 'qc.bugs.reopen', 'qc.bugs.close',
             'qc.testcases.execute', 'qc.testcases.approve', 'qc.testcases.clone', 'qc.testcases.import', 'qc.testcases.export',
         ];
         for (const key of pruned) {
@@ -127,6 +127,7 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(tester).toContain(PERMISSIONS.TASKS_VIEW_TEAM);
         expect(tester).toContain(PERMISSIONS.TASKS_DELETE);
         expect(tester).toContain(PERMISSIONS.BUGS_EDIT);
+        expect(tester).toContain(PERMISSIONS.BUGS_CHANGE_SEVERITY);
         expect(tester).toContain(PERMISSIONS.TESTCASES_VIEW_STEPS);
         expect(tester).toContain(PERMISSIONS.DASHBOARDS_MEMBER_VIEW);
         expect(tester).toContain(PERMISSIONS.REPORTS_VIEW_TEAM);

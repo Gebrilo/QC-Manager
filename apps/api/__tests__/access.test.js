@@ -38,6 +38,30 @@ describe('AccessEngine.canPerform — OR branches', () => {
         expect(out).toEqual({ allowed: true, branch: 'owner_team' });
     });
 
+    test('bug change_severity is granted only on same-team bugs', async () => {
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.change_severity']),
+            scope: { team_id: 't-qc', team_type: 'qc', pm_of_projects: [] },
+        });
+        const allowed = await canPerform(
+            { id: 'u', role: 'tester' },
+            { type: 'bug', id: 'b1', owner_team_id: 't-qc', project_id: 'p-1' },
+            'change_severity'
+        );
+        expect(allowed).toEqual({ allowed: true, branch: 'bug_severity_team' });
+
+        mockResolve.mockResolvedValueOnce({
+            effectivePermissions: new Set(['qc.bugs.change_severity']),
+            scope: { team_id: 't-qc', team_type: 'qc', pm_of_projects: [] },
+        });
+        const denied = await canPerform(
+            { id: 'u', role: 'tester' },
+            { type: 'bug', id: 'b2', owner_team_id: 't-other', project_id: 'p-1' },
+            'change_severity'
+        );
+        expect(denied).toEqual({ allowed: false, reason: DENIAL_REASONS.TEAM_MISMATCH });
+    });
+
     test('assignee via resource bridge grants view_own', async () => {
         mockResolve.mockResolvedValueOnce({
             effectivePermissions: new Set(['qc.bugs.view_own']),

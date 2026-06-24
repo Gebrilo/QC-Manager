@@ -123,6 +123,8 @@ const PERMISSIONS = Object.freeze({
     TASKS_TAKE_OVER: 'qc.tasks.take_over',
     TASKS_CHANGE_PRIORITY: 'qc.tasks.change_priority',
 
+    BUGS_CHANGE_SEVERITY: 'qc.bugs.change_severity',
+
     TESTCASES_VIEW_STEPS: 'qc.testcases.view_steps',
     TESTCASES_EDIT_STEPS: 'qc.testcases.edit_steps',
 
@@ -191,6 +193,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TASKS_CHANGE_PRIORITY,
             PERMISSIONS.BUGS_VIEW_TEAM,
             PERMISSIONS.BUGS_EDIT_TEAM,
+            PERMISSIONS.BUGS_CHANGE_SEVERITY,
             PERMISSIONS.TESTCASES_VIEW_TEAM,
             PERMISSIONS.TESTCASES_EDIT_TEAM,
             PERMISSIONS.TESTCASES_DELETE_TEAM,
@@ -268,6 +271,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.TASKS_DELETE,
             PERMISSIONS.BUGS_VIEW_TEAM,
             PERMISSIONS.BUGS_EDIT,
+            PERMISSIONS.BUGS_CHANGE_SEVERITY,
             PERMISSIONS.TESTCASES_VIEW_TEAM,
             PERMISSIONS.TESTCASES_VIEW_STEPS,
             PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM,

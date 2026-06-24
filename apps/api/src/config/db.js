@@ -3839,6 +3839,35 @@ const runMigrations = async () => {
             console.warn('[migration-048] Break-glass recovered admin wildcard — system would have been locked out');
         }
 
+        // ============================================================
+        // Migration 049: grant wired bug severity permission
+        // (ADR 0011, issue #278)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_bug_severity_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const bugSeveritySeed = await client.query(
+            `SELECT 1 FROM rbac_bug_severity_seed_marker
+             WHERE migration_id = 'issue-278-bug-change-severity'`
+        );
+        if (bugSeveritySeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('tester', 'qc.bugs.change_severity', 'system-seed'),
+                    ('team_manager', 'qc.bugs.change_severity', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_bug_severity_seed_marker (migration_id)
+                VALUES ('issue-278-bug-change-severity')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

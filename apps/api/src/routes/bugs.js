@@ -12,7 +12,7 @@ const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createBugSchema, updateBugSchema } = require('../schemas/bug');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
-const { decorateRows } = require('../services/access/enforcement');
+const { decorateRows, enforceArtifact } = require('../services/access/enforcement');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
@@ -265,7 +265,9 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
             countParams.push(source);
         }
         const countResult = await pool.query(countQuery, countParams);
-        const data = await decorateRows(req, 'bug', result.rows);
+        const data = await decorateRows(req, 'bug', result.rows, {
+            actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
+        });
 
         res.json({
             success: true,
@@ -307,7 +309,9 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.vi
             });
         }
 
-        const [bug] = await decorateRows(req, 'bug', result.rows);
+        const [bug] = await decorateRows(req, 'bug', result.rows, {
+            actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
+        });
         res.json({
             success: true,
             data: bug
@@ -578,6 +582,68 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.
             success: false,
             error: 'Failed to update bug',
             message: error.message
+        });
+    }
+});
+
+router.patch('/:id/severity', requireAuth, blockContributors, requirePermission('qc.bugs.change_severity'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const parsed = updateBugSchema.pick({ severity: true }).safeParse(req.body);
+        if (!parsed.success || parsed.data.severity === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: parsed.success ? [{ path: ['severity'], message: 'Severity is required' }] : parsed.error.issues.map(i => ({ path: i.path, message: i.message })),
+            });
+        }
+
+        const originalRes = await pool.query('SELECT * FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (originalRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Bug not found' });
+        }
+        const original = originalRes.rows[0];
+
+        const access = await enforceArtifact(req, res, 'bug', original, 'change_severity');
+        if (!access.allowed) return;
+
+        const severity = normalizeBugSeverity(parsed.data.severity);
+        const result = await pool.query(
+            `UPDATE bugs SET
+                severity = $1,
+                sync_status = 'pending',
+                last_sync_attempted_at = NULL,
+                last_sync_error = NULL,
+                updated_at = NOW()
+             WHERE id = $2
+             RETURNING *`,
+            [severity, id]
+        );
+        let updated = result.rows[0];
+
+        const config = await resolveBugSyncConfig(updated.project_id);
+        if (config) {
+            try {
+                const mode = updated.tuleap_artifact_id ? 'update' : 'create';
+                updated = await tryEmitAndWriteback(updated, { severity }, config, mode);
+            } catch (err) {
+                console.error(`[route:bugs:severity] emit_failed bug_id=${id} err="${err.message}"`);
+                const failRes = await pool.query(
+                    `UPDATE bugs SET sync_status = 'failed', last_sync_attempted_at = NOW(), last_sync_error = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+                    [String(err.message).slice(0, 1024), id]
+                );
+                updated = failRes.rows[0];
+            }
+        }
+
+        await auditLog('bugs', id, 'UPDATE', updated, original);
+        res.json({ success: true, data: updated });
+    } catch (error) {
+        console.error('Error updating bug severity:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update bug severity',
+            message: error.message,
         });
     }
 });

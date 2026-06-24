@@ -43,6 +43,14 @@ const BUG_AUTO_DETAIL_LABELS = {
     updated_at: 'Last Updated',
 };
 
+const BUG_SEVERITY_OPTIONS = [
+    'None',
+    'Cosmetic impact',
+    'Minor Impact',
+    'Major impact',
+    'Critical Impact',
+];
+
 function formatEffortHours(value: unknown) {
     if (value === null || value === undefined || value === '') return null;
     return `${value}h`;
@@ -284,6 +292,20 @@ export default function BugDetailPage() {
         setBug(prev => prev ? { ...prev, ...next, _can: next._can ?? prev._can } : prev);
     };
 
+    const handleSeverityChange = async (nextSeverity: string) => {
+        if (!bug || nextSeverity === bug.severity) return;
+        const previousSeverity = bug.severity || 'None';
+        patchBug({ severity: nextSeverity });
+        try {
+            const response = await bugsApi.updateSeverity(bug.id, nextSeverity);
+            setBug(prev => prev ? { ...prev, ...response.data, _can: response.data._can ?? prev._can } : prev);
+            toast.success('Severity updated');
+        } catch (err: any) {
+            patchBug({ severity: previousSeverity });
+            toast.error(err.message || 'Failed to update severity');
+        }
+    };
+
     if (isLoading) return (
         <div className="max-w-[1280px] mx-auto px-6 py-6 animate-pulse space-y-6">
             <div className="flex items-center gap-4">
@@ -351,6 +373,22 @@ export default function BugDetailPage() {
                                 onChangeCommitted={handleStatusCommitted}
                                 onChangeRolledBack={(previousStatus) => patchBug({ status: previousStatus })}
                             />
+                            {bug._can?.change_severity ? (
+                                <select
+                                    value={bug.severity || 'None'}
+                                    aria-label="Bug severity"
+                                    onChange={event => handleSeverityChange(event.target.value)}
+                                    className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                >
+                                    {BUG_SEVERITY_OPTIONS.map(option => (
+                                        <option key={option} value={option}>{option}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                                    {bug.severity || 'None'}
+                                </span>
+                            )}
                         </div>
                         <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                             {bug.tuleap_url ? (
