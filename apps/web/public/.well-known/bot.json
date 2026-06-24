@@ -1,0 +1,17 @@
+{
+  "name": "QC Manager",
+  "description": "Quality Management Platform — plan, test, govern, and report quality work from one operational workspace.",
+  "url": "https://gebrils.cloud",
+  "type": "web_application",
+  "categories": ["quality-management", "testing", "devtools"],
+  "provides": {
+    "api": "https://api.gerbil.qc",
+    "documentation": "https://gebrils.cloud"
+  },
+  "agent_capabilities": {
+    "robots_txt": true,
+    "sitemap_xml": true,
+    "markdown_negotiation": true,
+    "link_headers": true
+  }
+}

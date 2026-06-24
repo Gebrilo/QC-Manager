@@ -2,6 +2,24 @@
 const nextConfig = {
     output: 'standalone',
     experimental: {},
+    // RFC 8288 Link headers for agent discovery
+    async headers() {
+        const siteUrl = process.env.PUBLIC_SITE_URL || 'https://gebrils.cloud';
+        return [
+            {
+                source: '/:path*',
+                headers: [
+                    {
+                        key: 'Link',
+                        value: [
+                            `<${siteUrl}/robots.txt>; rel="robots"`,
+                            `<${siteUrl}/sitemap.xml>; rel="sitemap"`,
+                        ].join(', '),
+                    },
+                ],
+            },
+        ];
+    },
     async rewrites() {
         const apiInternal = process.env.API_INTERNAL_URL || 'http://qc-api:3001';
         return [
