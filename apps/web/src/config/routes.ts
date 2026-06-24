@@ -8,6 +8,10 @@ export interface RouteConfig {
     path: string;
     label: string;
     permission?: string;
+    // When set, the route is visible/accessible if the actor holds ANY of these
+    // permissions (OR semantics). Use instead of `permission` for capabilities
+    // reachable via more than one grant (e.g. own-team vs all-teams views).
+    anyPermission?: readonly string[];
     scopes?: readonly string[];
     showInNavbar?: boolean;
     navOrder?: number;
@@ -32,6 +36,9 @@ export interface NavigationSection {
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/auth/callback', '/auth/reset-password', '/auth/confirmed'];
 const ACTIVE_ONLY_SCOPES = [SCOPES.ACTIVE_ONLY.key] as const;
+// The manager team-view (Team Journeys) is reachable via either the own-team
+// grant or the all-teams grant; mirrors the API gate in managerView.js.
+const TEAM_VIEW_PERMISSIONS = [PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, PERMISSIONS.JOURNEYS_VIEW_ALL_TEAMS_PROGRESS] as const;
 
 const ROUTES: RouteConfig[] = [
     { path: '/', label: 'Landing Page' },
@@ -94,9 +101,9 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/landing-config', label: 'Landing Page', permission: PERMISSIONS.ADMIN_LANDING_PAGE_MANAGE, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.4, icon: Megaphone },
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
     { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
-    { path: '/team/journeys', label: 'Team Journeys', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
-    { path: '/team/journeys/[userId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
-    { path: '/team/journeys/[userId]/[journeyId]', label: 'Team Member Journey', permission: PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS, scopes: ACTIVE_ONLY_SCOPES },
+    { path: '/team/journeys', label: 'Team Journeys', anyPermission: TEAM_VIEW_PERMISSIONS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.8, icon: Users2 },
+    { path: '/team/journeys/[userId]', label: 'Team Member Journey', anyPermission: TEAM_VIEW_PERMISSIONS, scopes: ACTIVE_ONLY_SCOPES },
+    { path: '/team/journeys/[userId]/[journeyId]', label: 'Team Member Journey', anyPermission: TEAM_VIEW_PERMISSIONS, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/team/idp', label: 'Development Plans', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.6, icon: GraduationCap },
     { path: '/team/idp/[userId]', label: 'IDP Builder', permission: PERMISSIONS.RESOURCES_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/me/preferences', label: 'Preferences' },
@@ -215,6 +222,26 @@ export function routeAllowsScope(route: RouteConfig, effectiveScopes: readonly s
     return route.scopes.every(scopeKey => effectiveScopes.includes(scopeKey));
 }
 
+/**
+ * The permission keys that gate a route, normalising the single-`permission`
+ * and `anyPermission` (OR) forms to one list. Empty means the route has no
+ * permission gate.
+ */
+export function routePermissionKeys(route: RouteConfig): readonly string[] {
+    if (route.anyPermission?.length) return route.anyPermission;
+    return route.permission ? [route.permission] : [];
+}
+
+/**
+ * Whether the actor satisfies a route's permission gate: no gate passes; an
+ * `anyPermission` gate passes if the actor holds ANY listed key; a single
+ * `permission` passes if the actor holds it.
+ */
+export function routeAllowsPermission(route: RouteConfig, hasPermission: (key: string) => boolean): boolean {
+    const keys = routePermissionKeys(route);
+    return keys.length === 0 || keys.some(key => hasPermission(key));
+}
+
 export function getRouteConfig(pathname: string): RouteConfig | undefined {
     return ROUTES.find(route => {
         if (route.path === pathname) return true;
@@ -257,7 +284,7 @@ export function canSeeRoutePath(path: string, ctx: NavVisibilityContext): boolea
     const route = getRouteConfig(path);
     if (!route) return false;
     if (!routeAllowsScope(route, ctx.effectiveScopes)) return false;
-    if (route.permission && !ctx.hasPermission(route.permission)) return false;
+    if (!routeAllowsPermission(route, ctx.hasPermission)) return false;
     return true;
 }
 
@@ -332,9 +359,10 @@ export function getLandingPage(
     const isAdmin = user.role === 'admin';
     if (!isAdmin && !routeAllowsScope(route, effectiveScopes)) return DEFAULT_LANDING;
 
-    if (route.permission && permissions) {
+    const permKeys = routePermissionKeys(route);
+    if (permKeys.length && permissions) {
         if (isAdmin) return preferredPage;
-        if (!hasCatalogPermission(permissions, route.permission)) return DEFAULT_LANDING;
+        if (!permKeys.some(key => hasCatalogPermission(permissions, key))) return DEFAULT_LANDING;
     }
 
     return preferredPage;

@@ -10,7 +10,25 @@
  */
 
 const db = require('../config/db');
-const { SCOPES, canUserUseScope, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
+const { SCOPES, PERMISSIONS, canUserUseScope, isTeamManagerRole } = require('../../../shared/rbac/catalog.ts');
+const { userHasAnyPermission } = require('./authMiddleware');
+
+// Manager team-view access is permission-driven (not tied to the teams.manager_id
+// assignment). Two grantable permissions decide reach:
+//   - ALL_TEAMS  → every team, unscoped (like admin). Default-seeded to `pm`.
+//   - OWN_TEAM   → only the actor's team (the team they manage, else the team
+//                  they belong to). Default-seeded to `team_manager`.
+const ALL_TEAMS_VIEW_PERMISSION = PERMISSIONS.JOURNEYS_VIEW_ALL_TEAMS_PROGRESS;
+const OWN_TEAM_VIEW_PERMISSION = PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS;
+
+/**
+ * The team an actor is scoped to for the own-team grant: the team they manage
+ * (teams.manager_id), falling back to the team they belong to (app_user.team_id).
+ * Returns null when the actor is associated with no team.
+ */
+async function resolveOwnTeamId(userId) {
+    return (await getManagerTeamId(userId)) || (await getUserTeamId(userId));
+}
 
 /**
  * Get the team record for the current manager (req.user).
@@ -110,27 +128,33 @@ async function requireTeamScope(req, res, next) {
         req.teamId = null;
         return next();
     }
-    if (!canUserUseScope(req.user, SCOPES.TEAM.key)) {
-        return res.status(403).json({ error: 'Manager or admin access required' });
-    }
     try {
-        const teamId = await getManagerTeamId(req.user.id);
-        if (!teamId) {
-            return res.status(403).json({
-                error: 'You are not assigned as a manager of any team',
-            });
+        // All-teams grant → unscoped, every team is visible (like admin).
+        if (await userHasAnyPermission(req.user, [ALL_TEAMS_VIEW_PERMISSION], req)) {
+            req.teamId = null;
+            return next();
         }
-        req.teamId = teamId;
-        next();
+        // Own-team grant → scope to the actor's team (manage-first, else belong).
+        if (await userHasAnyPermission(req.user, [OWN_TEAM_VIEW_PERMISSION], req)) {
+            const teamId = await resolveOwnTeamId(req.user.id);
+            if (!teamId) {
+                return res.status(403).json({ error: 'You are not assigned to a team' });
+            }
+            req.teamId = teamId;
+            return next();
+        }
+        return res.status(403).json({ error: 'Manager or admin access required' });
     } catch (err) {
         next(err);
     }
 }
 
 /**
- * Check whether requestUser can access a target user record.
- * Admin → always true. Self-access → true. Manager → checks team_id match via DB.
- * Other roles → false.
+ * Check whether requestUser can access a target user record. Mirrors the tiers
+ * in requireTeamScope so per-user endpoints and list endpoints agree:
+ *   Admin → always true. Self-access → true.
+ *   All-teams grant → any user. Own-team grant → users on the actor's team
+ *   (manage-first, else belong). Anyone else → false.
  *
  * @param {object} requestUser - req.user
  * @param {string} targetUserId - UUID of the user being accessed
@@ -139,16 +163,21 @@ async function requireTeamScope(req, res, next) {
 async function canAccessUser(requestUser, targetUserId) {
     if (requestUser.role === 'admin') return true;
     if (requestUser.id === targetUserId) return true;
-    if (!isTeamManagerRole(requestUser.role)) return false;
 
-    const teamId = await getManagerTeamId(requestUser.id);
-    if (!teamId) return false;
+    // All-teams grant can reach any user.
+    if (await userHasAnyPermission(requestUser, [ALL_TEAMS_VIEW_PERMISSION])) return true;
 
-    const result = await db.query(
-        `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
-        [targetUserId, teamId]
-    );
-    return result.rows.length > 0;
+    // Own-team grant can reach users on the actor's team only.
+    if (await userHasAnyPermission(requestUser, [OWN_TEAM_VIEW_PERMISSION])) {
+        const teamId = await resolveOwnTeamId(requestUser.id);
+        if (!teamId) return false;
+        const result = await db.query(
+            `SELECT id FROM app_user WHERE id = $1 AND team_id = $2`,
+            [targetUserId, teamId]
+        );
+        return result.rows.length > 0;
+    }
+    return false;
 }
 
 /**

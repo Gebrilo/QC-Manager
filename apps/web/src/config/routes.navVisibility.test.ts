@@ -3,6 +3,7 @@ import {
     getVisibleNavSections,
     canSeeRoutePath,
     routeAllowsScope,
+    routeAllowsPermission,
     type NavigationNode,
 } from './routes';
 
@@ -190,6 +191,48 @@ describe('routeAllowsScope — direct membership test', () => {
         const openRoute = { path: '/me/tasks', label: 'My Tasks', permission: PERMISSIONS.MY_TASKS_VIEW };
         expect(routeAllowsScope(openRoute, [])).toBe(true);
         expect(routeAllowsScope(openRoute, undefined)).toBe(true);
+    });
+});
+
+describe('anyPermission — OR-gated routes (team-view feature)', () => {
+    const OWN_TEAM = PERMISSIONS.JOURNEYS_VIEW_TEAM_PROGRESS;
+    const ALL_TEAMS = PERMISSIONS.JOURNEYS_VIEW_ALL_TEAMS_PROGRESS;
+
+    function ctxWith(keys: string[]): Ctx {
+        const set = new Set(keys);
+        return {
+            role: 'custom',
+            isAdmin: false,
+            hasPermission: (key: string) => set.has(key),
+            effectiveScopes: [ACTIVE_ONLY],
+        };
+    }
+
+    it('/team/journeys is visible to a holder of ONLY the all-teams grant', () => {
+        expect(canSeeRoutePath('/team/journeys', ctxWith([ALL_TEAMS]))).toBe(true);
+    });
+
+    it('/team/journeys is visible to a holder of ONLY the own-team grant', () => {
+        expect(canSeeRoutePath('/team/journeys', ctxWith([OWN_TEAM]))).toBe(true);
+    });
+
+    it('/team/journeys is hidden when the actor holds neither grant', () => {
+        expect(canSeeRoutePath('/team/journeys', ctxWith([]))).toBe(false);
+        expect(canSeeRoutePath('/team/journeys', ctxWith(['qc.unrelated.key']))).toBe(false);
+    });
+
+    it('routeAllowsPermission honors anyPermission (OR), single permission, and no gate', () => {
+        const anyRoute = { path: '/x', label: 'X', anyPermission: [OWN_TEAM, ALL_TEAMS] as readonly string[] };
+        expect(routeAllowsPermission(anyRoute, k => k === OWN_TEAM)).toBe(true);
+        expect(routeAllowsPermission(anyRoute, k => k === ALL_TEAMS)).toBe(true);
+        expect(routeAllowsPermission(anyRoute, () => false)).toBe(false);
+
+        const singleRoute = { path: '/y', label: 'Y', permission: OWN_TEAM };
+        expect(routeAllowsPermission(singleRoute, k => k === OWN_TEAM)).toBe(true);
+        expect(routeAllowsPermission(singleRoute, () => false)).toBe(false);
+
+        const openRoute = { path: '/z', label: 'Z' };
+        expect(routeAllowsPermission(openRoute, () => false)).toBe(true);
     });
 });
 

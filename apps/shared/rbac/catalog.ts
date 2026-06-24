@@ -59,6 +59,7 @@ const PERMISSIONS = Object.freeze({
     JOURNEYS_ASSIGN: 'qc.journeys.assign',
     JOURNEYS_VIEW_ASSIGNED: 'qc.journeys.view_assigned',
     JOURNEYS_VIEW_TEAM_PROGRESS: 'qc.journeys.view_team_progress',
+    JOURNEYS_VIEW_ALL_TEAMS_PROGRESS: 'qc.journeys.view_all_teams_progress',
     JOURNEYS_MANAGE: 'qc.journeys.manage',
 
     // Development Plans / IDP management (ADR 0010, issue #266) — replaces the
@@ -261,6 +262,7 @@ const ROLE_DEFINITIONS = Object.freeze({
             PERMISSIONS.QUALITY_TRACEABILITY_VIEW,
             PERMISSIONS.DASHBOARD_PM_VIEW,
             PERMISSIONS.TEAM_VIEW,
+            PERMISSIONS.JOURNEYS_VIEW_ALL_TEAMS_PROGRESS,
         ]),
         scopes: Object.freeze([SCOPES.ACTIVE_ONLY.key]),
     }),

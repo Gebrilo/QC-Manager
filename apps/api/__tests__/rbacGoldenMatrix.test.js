@@ -46,6 +46,7 @@ describe('RBAC golden matrix', () => {
     "qc.dashboard.pm.view",
     "qc.dashboard.view",
     "qc.governance.view",
+    "qc.journeys.view_all_teams_progress",
     "qc.mywork.dashboard.view",
     "qc.mywork.tasks.create",
     "qc.mywork.tasks.delete",

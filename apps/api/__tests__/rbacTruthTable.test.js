@@ -51,9 +51,15 @@ function discoverGates() {
             permissionKeys.add(m[1]);
         }
         for (const m of src.matchAll(/requireAnyPermission\(\s*([^)]+)\)/g)) {
-            // Split the arg list into individual keys.
+            // Split the arg list into individual keys. Spread args —
+            // requireAnyPermission(...SOME_CONSTANT) — reference a constant the
+            // static scanner cannot resolve, so skip them rather than register
+            // the literal "...SOME_CONSTANT" as a bogus permission key (which
+            // would diff against the resolver for admin's `*` wildcard).
             for (const part of m[1].split(',')) {
-                const k = part.trim().replace(/^'|'$/g, '');
+                const trimmed = part.trim();
+                if (trimmed.startsWith('...')) continue;
+                const k = trimmed.replace(/^'|'$/g, '');
                 if (k) permissionKeys.add(k);
             }
         }

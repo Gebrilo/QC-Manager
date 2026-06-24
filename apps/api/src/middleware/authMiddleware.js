@@ -182,6 +182,34 @@ async function loadPermissionOverrides(userId, permissionKeys) {
 }
 
 /**
+ * Resolve whether `user` holds ANY of `permissionKeys`, honouring the
+ * RBAC_UNIFIED flag exactly like requirePermission/requireAnyPermission. This is
+ * the boolean primitive both of those middlewares delegate to, and it is also
+ * exported so non-middleware authorisation helpers (e.g. team-scope resolution
+ * in teamAccess.js) test capability the same way the route gates do.
+ *
+ * `req` is optional and only used to reuse the per-request resolver cache
+ * (`req._accessResolverCache`); pass it when available to avoid re-resolving.
+ *
+ * @param {object} user - req.user shape ({ id, role, status, ... }).
+ * @param {string[]} permissionKeys - candidate keys; true if the user has any.
+ * @param {object} [req] - optional request, for resolver caching.
+ * @returns {Promise<boolean>}
+ */
+async function userHasAnyPermission(user, permissionKeys, req) {
+    if (!user) return false;
+    if (isRbacUnified()) {
+        const { effectivePermissions } = await resolveAccess(user, req);
+        return permissionKeys.some(permissionKey => hasPermission(effectivePermissions, permissionKey));
+    }
+    const permissionOverrides = user.role === 'admin'
+        ? []
+        : await loadPermissionOverrides(user.id, permissionKeys);
+    const actor = { ...user, permissionOverrides };
+    return permissionKeys.some(permissionKey => canUserPerform(actor, permissionKey));
+}
+
+/**
  * Middleware: Check a permission.
  *
  * Under RBAC_UNIFIED=on (ADR 0010, issue #262), the actor's effective permission
@@ -204,16 +232,7 @@ function requirePermission(permissionKey) {
         }
 
         try {
-            let allowed;
-            if (isRbacUnified()) {
-                const { effectivePermissions } = await resolveAccess(req.user, req);
-                allowed = hasPermission(effectivePermissions, permissionKey);
-            } else {
-                const permissionOverrides = req.user.role === 'admin'
-                    ? []
-                    : await loadPermissionOverrides(req.user.id, [permissionKey]);
-                allowed = canUserPerform({ ...req.user, permissionOverrides }, permissionKey);
-            }
+            const allowed = await userHasAnyPermission(req.user, [permissionKey], req);
             if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
             }
@@ -241,17 +260,7 @@ function requireAnyPermission(...permissionKeys) {
         }
 
         try {
-            let allowed;
-            if (isRbacUnified()) {
-                const { effectivePermissions } = await resolveAccess(req.user, req);
-                allowed = permissionKeys.some(permissionKey => hasPermission(effectivePermissions, permissionKey));
-            } else {
-                const permissionOverrides = req.user.role === 'admin'
-                    ? []
-                    : await loadPermissionOverrides(req.user.id, permissionKeys);
-                const actor = { ...req.user, permissionOverrides };
-                allowed = permissionKeys.some(permissionKey => canUserPerform(actor, permissionKey));
-            }
+            const allowed = await userHasAnyPermission(req.user, permissionKeys, req);
             if (!allowed) {
                 return res.status(403).json({ error: 'You do not have permission to perform this action' });
             }
@@ -332,6 +341,7 @@ module.exports = {
     requireAuth,
     requirePermission,
     requireAnyPermission,
+    userHasAnyPermission,
     optionalAuth,
     requireStatus,
     requireStatusScope,

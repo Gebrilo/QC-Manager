@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { getRouteConfig, isPublicRoute, getLandingPage } from '../../config/routes';
+import { getRouteConfig, isPublicRoute, getLandingPage, routeAllowsPermission } from '../../config/routes';
 import { UnauthorizedPage } from '../PermissionGuard';
 import { useToastSafe } from '../ui/Toast';
 
@@ -50,7 +50,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        if (route.permission && !hasPermission(route.permission) && !isAdmin) {
+        if (!routeAllowsPermission(route, hasPermission) && !isAdmin) {
             if (lastRedirectPath.current !== pathname) {
                 toast.warning("You don't have permission to access this page. Redirected to your landing page.");
                 lastRedirectPath.current = pathname;
@@ -93,7 +93,7 @@ export function PagePermissionGuard({ children }: { children: React.ReactNode })
     if (!route) return <>{children}</>;
 
     if (route.scopes?.length && !route.scopes.every(s => hasScope(s))) return <UnauthorizedPage />;
-    if (route.permission && !hasPermission(route.permission) && !isAdmin) return <UnauthorizedPage />;
+    if (!routeAllowsPermission(route, hasPermission) && !isAdmin) return <UnauthorizedPage />;
 
     return <>{children}</>;
 }
