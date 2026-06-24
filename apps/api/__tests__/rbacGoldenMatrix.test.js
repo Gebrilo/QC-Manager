@@ -18,6 +18,8 @@ describe('RBAC golden matrix', () => {
     "*",
   ],
   "contributor": [
+    "qc.bugs.view",
+    "qc.bugs.view_team",
     "qc.mywork.dashboard.view",
     "qc.mywork.tasks.create",
     "qc.mywork.tasks.delete",
@@ -26,6 +28,14 @@ describe('RBAC golden matrix', () => {
     "qc.resources.view",
     "qc.tasks.edit",
     "qc.tasks.view",
+    "qc.testcases.view",
+    "qc.testcases.view_team",
+    "qc.testexecutions.view",
+    "qc.testexecutions.view_team",
+    "qc.testsuites.view",
+    "qc.testsuites.view_team",
+    "qc.user_stories.view",
+    "qc.user_stories.view_team",
   ],
   "pm": [
     "qc.bugs.create",
@@ -169,6 +179,8 @@ describe('RBAC golden matrix', () => {
     "qc.user_stories.view_team",
   ],
   "viewer": [
+    "qc.bugs.view",
+    "qc.bugs.view_team",
     "qc.dashboard.view",
     "qc.mywork.dashboard.view",
     "qc.mywork.tasks.view",
@@ -177,8 +189,14 @@ describe('RBAC golden matrix', () => {
     "qc.resources.view",
     "qc.tasks.view",
     "qc.tasks.view_team",
+    "qc.testcases.view",
+    "qc.testcases.view_team",
     "qc.testexecutions.view",
     "qc.testexecutions.view_team",
+    "qc.testsuites.view",
+    "qc.testsuites.view_team",
+    "qc.user_stories.view",
+    "qc.user_stories.view_team",
   ],
 }
 `);

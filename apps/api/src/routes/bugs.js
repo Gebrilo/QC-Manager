@@ -5,17 +5,24 @@ router.param('id', resolveArtifactParam('bug'));
 const db = require('../config/db');
 const pool = db.pool;
 const { auditLog } = require('../middleware/audit');
-const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission } = require('../middleware/authMiddleware');
 const { emitToTuleap: emitBug } = require('../services/emitters/bug');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { createBugSchema, updateBugSchema } = require('../schemas/bug');
 const { normalizeBugStatus, normalizeBugSeverity } = require('../services/normalizers/bug');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
-const { decorateRows, enforceArtifact } = require('../services/access/enforcement');
+const { appendListFilter, decorateRows, enforceArtifact } = require('../services/access/enforcement');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validUUID(val) { return val && UUID_RE.test(val) ? val : null; }
+
+const BUG_VIEW_PERMISSIONS = Object.freeze([
+    'qc.bugs.view',
+    'qc.bugs.view_own',
+    'qc.bugs.view_team',
+    'qc.bugs.view_any',
+]);
 
 async function enforcePmProjectScope(req, res, verb, projectId) {
     if (req.user?.role !== 'pm' || !projectId) return true;
@@ -104,7 +111,7 @@ async function tryEmitAndWriteback(bug, data, config, mode) {
     return updateRes.rows[0];
 }
 
-router.get('/summary', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/summary', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const project_id = validUUID(req.query.project_id);
 
@@ -191,13 +198,57 @@ router.get('/summary', requireAuth, blockContributors, requirePermission('qc.bug
     }
 });
 
-router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/', requireAuth, requireAnyPermission(...BUG_VIEW_PERMISSIONS), async (req, res) => {
     try {
         const { status, severity, limit = 50, offset = 0, sort = 'created_at:desc' } = req.query;
         const project_id = validUUID(req.query.project_id);
         const source = ['TEST_CASE', 'EXPLORATORY'].includes(req.query.source) ? req.query.source : null;
 
-        let query = `
+        const where = ['b.deleted_at IS NULL'];
+        const params = [];
+        let paramIndex = 1;
+
+        if (project_id) {
+            where.push(`b.project_id = $${paramIndex}`);
+            params.push(project_id);
+            paramIndex++;
+        }
+
+        if (status) {
+            where.push(`b.status = $${paramIndex}`);
+            params.push(status);
+            paramIndex++;
+        }
+
+        if (severity) {
+            where.push(`b.severity = $${paramIndex}`);
+            params.push(severity);
+            paramIndex++;
+        }
+
+        if (source) {
+            where.push(`b.source = $${paramIndex}`);
+            params.push(source);
+            paramIndex++;
+        }
+
+        const filter = await appendListFilter(req, 'bug', where, params, {
+            startIdx: paramIndex,
+            tableAlias: 'b',
+            ownerTeamExpr: 'b.owner_team_id',
+            visibilityExpr: 'b.visibility_scope',
+            assigneeResourceExprs: ['b.submitted_by_resource_id'],
+            userExprs: ['b.created_by_user_id'],
+        });
+        paramIndex = filter.nextIdx;
+
+        const [sortField, sortDir] = sort.split(':');
+        const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
+        const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
+        const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+        const whereSql = where.join(' AND ');
+        const query = `
             SELECT
                 b.*,
                 p.project_name,
@@ -208,69 +259,15 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
             FROM bugs b
             LEFT JOIN projects p ON b.project_id = p.id
             LEFT JOIN resources r ON b.submitted_by_resource_id = r.id
-            WHERE b.deleted_at IS NULL
+            WHERE ${whereSql}
+            ORDER BY b.${sortColumn} ${sortDirection} NULLS LAST
+            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
-        const params = [];
-        let paramIndex = 1;
 
-        if (project_id) {
-            query += ` AND b.project_id = $${paramIndex}`;
-            params.push(project_id);
-            paramIndex++;
-        }
+        const result = await pool.query(query, [...params, parseInt(limit), parseInt(offset)]);
 
-        if (status) {
-            query += ` AND b.status = $${paramIndex}`;
-            params.push(status);
-            paramIndex++;
-        }
-
-        if (severity) {
-            query += ` AND b.severity = $${paramIndex}`;
-            params.push(severity);
-            paramIndex++;
-        }
-
-        if (source) {
-            query += ` AND b.source = $${paramIndex}`;
-            params.push(source);
-            paramIndex++;
-        }
-
-        const [sortField, sortDir] = sort.split(':');
-        const validSortFields = ['created_at', 'reported_date', 'severity', 'status', 'title'];
-        const sortColumn = validSortFields.includes(sortField) ? sortField : 'created_at';
-        const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
-
-        query += ` ORDER BY b.${sortColumn} ${sortDirection} NULLS LAST`;
-        query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        params.push(parseInt(limit), parseInt(offset));
-
-        const result = await pool.query(query, params);
-
-        let countQuery = 'SELECT COUNT(*) FROM bugs WHERE deleted_at IS NULL';
-        const countParams = [];
-        let countParamIndex = 1;
-        if (project_id) {
-            countQuery += ` AND project_id = $${countParamIndex}`;
-            countParams.push(project_id);
-            countParamIndex++;
-        }
-        if (status) {
-            countQuery += ` AND status = $${countParamIndex}`;
-            countParams.push(status);
-            countParamIndex++;
-        }
-        if (severity) {
-            countQuery += ` AND severity = $${countParamIndex}`;
-            countParams.push(severity);
-            countParamIndex++;
-        }
-        if (source) {
-            countQuery += ` AND source = $${countParamIndex}`;
-            countParams.push(source);
-        }
-        const countResult = await pool.query(countQuery, countParams);
+        const countQuery = `SELECT COUNT(*) FROM bugs b WHERE ${whereSql}`;
+        const countResult = await pool.query(countQuery, params);
         const data = await decorateRows(req, 'bug', result.rows, {
             actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
         });
@@ -291,7 +288,7 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.bugs.view'
     }
 });
 
-router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/:id', requireAuth, requireAnyPermission(...BUG_VIEW_PERMISSIONS), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -315,6 +312,9 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.vi
             });
         }
 
+        const access = await enforceArtifact(req, res, 'bug', result.rows[0], 'view');
+        if (!access.allowed) return;
+
         const [bug] = await decorateRows(req, 'bug', result.rows, {
             actions: ['edit', 'delete', 'assign', 'comment', 'change_severity'],
         });
@@ -332,7 +332,7 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.vi
     }
 });
 
-router.get('/by-project/:projectId', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res) => {
+router.get('/by-project/:projectId', requireAuth, requirePermission('qc.bugs.view'), async (req, res) => {
     try {
         const { projectId } = req.params;
 
@@ -366,7 +366,7 @@ router.get('/by-project/:projectId', requireAuth, blockContributors, requirePerm
     }
 });
 
-router.post('/', requireAuth, blockContributors, requirePermission('qc.bugs.create'), async (req, res) => {
+router.post('/', requireAuth, requirePermission('qc.bugs.create'), async (req, res) => {
     try {
         const parsed = createBugSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -491,7 +491,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.bugs.crea
     }
 });
 
-router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('qc.bugs.edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -597,7 +597,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.
     }
 });
 
-router.patch('/:id/severity', requireAuth, blockContributors, requirePermission('qc.bugs.change_severity'), async (req, res) => {
+router.patch('/:id/severity', requireAuth, requirePermission('qc.bugs.change_severity'), async (req, res) => {
     try {
         const { id } = req.params;
         const parsed = updateBugSchema.pick({ severity: true }).safeParse(req.body);
@@ -659,7 +659,7 @@ router.patch('/:id/severity', requireAuth, blockContributors, requirePermission(
     }
 });
 
-router.post('/:id/sync', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res) => {
+router.post('/:id/sync', requireAuth, requirePermission('qc.bugs.edit'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -706,7 +706,7 @@ router.post('/:id/sync', requireAuth, blockContributors, requirePermission('qc.b
     }
 });
 
-router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.bugs.delete'), async (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('qc.bugs.delete'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -797,7 +797,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.bugs
 // BUG TEST EXECUTION LINKING ENDPOINTS
 // =====================================================
 
-router.get('/:id/test-executions', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res, next) => {
+router.get('/:id/test-executions', requireAuth, requirePermission('qc.bugs.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
@@ -823,7 +823,7 @@ router.get('/:id/test-executions', requireAuth, blockContributors, requirePermis
     }
 });
 
-router.post('/:id/test-executions', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.post('/:id/test-executions', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { test_execution_id } = req.body;
@@ -866,7 +866,7 @@ router.post('/:id/test-executions', requireAuth, blockContributors, requirePermi
     }
 });
 
-router.delete('/:id/test-executions/:executionId', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.delete('/:id/test-executions/:executionId', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id, executionId } = req.params;
 
@@ -906,7 +906,7 @@ router.delete('/:id/test-executions/:executionId', requireAuth, blockContributor
 // BUG TASK LINKING ENDPOINTS
 // =====================================================
 
-router.get('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.bugs.view'), async (req, res, next) => {
+router.get('/:id/tasks', requireAuth, requirePermission('qc.bugs.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const bugCheck = await pool.query('SELECT id FROM bugs WHERE id = $1 AND deleted_at IS NULL', [id]);
@@ -930,7 +930,7 @@ router.get('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.b
     }
 });
 
-router.post('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.post('/:id/tasks', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const { task_id, relationship_type = 'reported_against' } = req.body;
@@ -973,7 +973,7 @@ router.post('/:id/tasks', requireAuth, blockContributors, requirePermission('qc.
     }
 });
 
-router.delete('/:id/tasks/:taskId', requireAuth, blockContributors, requirePermission('qc.bugs.edit'), async (req, res, next) => {
+router.delete('/:id/tasks/:taskId', requireAuth, requirePermission('qc.bugs.edit'), async (req, res, next) => {
     try {
         const { id, taskId } = req.params;
 

@@ -118,9 +118,10 @@ describe('RoleResolver.resolve', () => {
         mockQuery
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
-            .mockResolvedValueOnce(rows([{ scope_key: 'preparation_only' }]))
+            .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([]))
             .mockResolvedValueOnce(rows([{ team_id: null, team_type: null }]))
+            .mockResolvedValueOnce(rows([{ '?column?': 1 }]))
             .mockResolvedValueOnce(rows([]));
 
         const out = await resolve({ id: 'u', role: 'contributor' });

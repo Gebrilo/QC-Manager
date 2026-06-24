@@ -5,7 +5,7 @@ router.param('id', resolveArtifactParam('test_case'));
 const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');
-const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
@@ -115,7 +115,7 @@ async function logTestCaseHistory(client, { test_case_id, action, changed_fields
     );
 }
 
-router.get('/', requireAuth, blockContributors, requirePermission('qc.testcases.view'), async (req, res, next) => {
+router.get('/', requireAuth, requirePermission('qc.testcases.view'), async (req, res, next) => {
     try {
         const {
             page = 1, limit = 25, search, project_id, status, priority,
@@ -212,7 +212,7 @@ router.get('/', requireAuth, blockContributors, requirePermission('qc.testcases.
     } catch (error) { next(error); }
 });
 
-router.get('/:id', requireAuth, blockContributors, requirePermission('qc.testcases.view'), async (req, res, next) => {
+router.get('/:id', requireAuth, requirePermission('qc.testcases.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`SELECT * FROM v_test_case_summary WHERE id = $1`, [id]);
@@ -235,7 +235,7 @@ router.get('/:id', requireAuth, blockContributors, requirePermission('qc.testcas
     } catch (error) { next(error); }
 });
 
-router.post('/', requireAuth, blockContributors, requirePermission('qc.testcases.create'), async (req, res, next) => {
+router.post('/', requireAuth, requirePermission('qc.testcases.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const validatedData = testCaseCreateSchema.parse(req.body);
@@ -333,7 +333,7 @@ router.post('/', requireAuth, blockContributors, requirePermission('qc.testcases
     } finally { client.release(); }
 });
 
-router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.testcases.edit'), async (req, res, next) => {
+router.patch('/:id', requireAuth, requirePermission('qc.testcases.edit'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -421,7 +421,7 @@ router.patch('/:id', requireAuth, blockContributors, requirePermission('qc.testc
     } finally { client.release(); }
 });
 
-router.post('/:id/sync', requireAuth, blockContributors, requirePermission('qc.testcases.edit'), async (req, res, next) => {
+router.post('/:id/sync', requireAuth, requirePermission('qc.testcases.edit'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const tcRes = await pool.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
@@ -463,7 +463,7 @@ router.post('/:id/sync', requireAuth, blockContributors, requirePermission('qc.t
     }
 });
 
-router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.testcases.delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -492,7 +492,7 @@ router.delete('/:id', requireAuth, blockContributors, requirePermission('qc.test
     finally { client.release(); }
 });
 
-router.post('/bulk-import', requireAuth, blockContributors, requirePermission('qc.testcases.create'), async (req, res, next) => {
+router.post('/bulk-import', requireAuth, requirePermission('qc.testcases.create'), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { test_cases, project_id } = req.body;

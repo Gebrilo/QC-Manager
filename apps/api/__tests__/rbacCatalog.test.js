@@ -165,13 +165,26 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.pm.some(key => key.startsWith('qc.admin.'))).toBe(false);
     });
 
-    test('contributor remains preparation-only and has no active quality permissions', () => {
-        expect(canUserUseScope({ role: 'contributor' }, SCOPES.PREPARATION_ONLY.key)).toBe(true);
+    test('contributor has team read-only quality access without status scope', () => {
+        expect(canUserUseScope({ role: 'contributor' }, SCOPES.PREPARATION_ONLY.key)).toBe(false);
         expect(canUserUseScope({ role: 'contributor' }, SCOPES.ACTIVE_ONLY.key)).toBe(false);
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.MY_TASKS_VIEW);
         expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.PROJECTS_VIEW);
-        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.TESTCASES_VIEW);
-        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.BUGS_VIEW);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.BUGS_VIEW_TEAM);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.TESTCASES_VIEW_TEAM);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.TESTSUITES_VIEW_TEAM);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).toContain(PERMISSIONS.USER_STORIES_VIEW_TEAM);
+        expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS.contributor).not.toContain(PERMISSIONS.BUGS_EDIT);
+    });
+
+    test('viewer can view team quality artifacts', () => {
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.BUGS_VIEW_TEAM)).toBe(true);
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.TESTCASES_VIEW_TEAM)).toBe(true);
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.TESTSUITES_VIEW_TEAM)).toBe(true);
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM)).toBe(true);
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.USER_STORIES_VIEW_TEAM)).toBe(true);
+        expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.BUGS_EDIT)).toBe(false);
     });
 
     test('legacy role identifiers canonicalize during migration rollout', () => {

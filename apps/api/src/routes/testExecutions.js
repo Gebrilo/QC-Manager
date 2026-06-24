@@ -14,7 +14,7 @@ const RUN_HUMAN_ID_RE = /^(?:RUN|TR)-\d+$/;
 const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { requireAuth, requirePermission, blockContributors } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
 const {
   appendListFilter,
   decorateRows,
@@ -82,7 +82,7 @@ function shouldStampExecution(existingStatus, nextStatus) {
 // ============================================================================
 
 // GET /summary - Aggregate stats for dashboard
-router.get('/summary', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/summary', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { project_id } = req.query;
 
@@ -165,7 +165,7 @@ router.get('/summary', requireAuth, blockContributors, requirePermission('qc.tes
 // ============================================================================
 
 // GET /test-runs - List all test runs
-router.get('/test-runs', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/test-runs', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { project_id, status, limit = 50, offset = 0 } = req.query;
 
@@ -244,7 +244,7 @@ router.get('/test-runs', requireAuth, blockContributors, requirePermission('qc.t
 });
 
 // GET /test-runs/:id - Get single test run with executions
-router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
     let runUuid = id;
@@ -333,7 +333,7 @@ router.get('/test-runs/:id', requireAuth, blockContributors, requirePermission('
 });
 
 // GET /test-runs/:id/bugs-found - Derived bugs discovered by executions in this run
-router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/test-runs/:id/bugs-found', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
     let runUuid = id;
@@ -384,7 +384,7 @@ router.get('/test-runs/:id/bugs-found', requireAuth, blockContributors, requireP
 });
 
 // POST /test-runs - Create new test run
-router.post('/test-runs', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
+router.post('/test-runs', requireAuth, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -446,7 +446,7 @@ router.post('/test-runs', requireAuth, blockContributors, requirePermission('qc.
 });
 
 // PATCH /test-runs/:id - Update test run
-router.patch('/test-runs/:id', requireAuth, blockContributors, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
+router.patch('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -551,7 +551,7 @@ router.patch('/test-runs/:id', requireAuth, blockContributors, requirePermission
 });
 
 // DELETE /test-runs/:id - Soft delete test run
-router.delete('/test-runs/:id', requireAuth, blockContributors, requirePermission('qc.testexecutions.delete'), async (req, res, next) => {
+router.delete('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.delete'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -629,7 +629,7 @@ router.delete('/test-runs/:id', requireAuth, blockContributors, requirePermissio
 // ============================================================================
 
 // GET /executions - List executions (with filters)
-router.get('/executions', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/executions', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { test_run_id, test_case_id, status, limit = 100, offset = 0 } = req.query;
 
@@ -712,7 +712,7 @@ router.get('/executions', requireAuth, blockContributors, requirePermission('qc.
 });
 
 // POST /executions - Log single test execution
-router.post('/executions', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
+router.post('/executions', requireAuth, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -787,7 +787,7 @@ router.post('/executions', requireAuth, blockContributors, requirePermission('qc
 });
 
 // PATCH /executions/:id - Update execution
-router.patch('/executions/:id', requireAuth, blockContributors, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
+router.patch('/executions/:id', requireAuth, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -901,7 +901,7 @@ router.patch('/executions/:id', requireAuth, blockContributors, requirePermissio
 });
 
 // POST /executions/bulk-import - Bulk import execution results
-router.post('/executions/bulk-import', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
+router.post('/executions/bulk-import', requireAuth, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -1042,7 +1042,7 @@ function validateExecutionDate(value) {
 // ============================================================================
 
 // POST /upload-excel - Upload Excel file with test results
-router.post('/upload-excel', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), upload.single('file'), async (req, res, next) => {
+router.post('/upload-excel', requireAuth, requirePermission('qc.testexecutions.create'), upload.single('file'), async (req, res, next) => {
   const client = await pool.connect();
 
   try {
@@ -1234,7 +1234,7 @@ router.post('/upload-excel', requireAuth, blockContributors, requirePermission('
 });
 
 // GET /recent-uploads - Get recent test run uploads
-router.get('/recent-uploads', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/recent-uploads', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const whereClauses = ['tr.deleted_at IS NULL'];
     const params = [];
@@ -1295,7 +1295,7 @@ module.exports.validateExecutionDate = validateExecutionDate;
 // ============================================================================
 
 // POST /test-runs/from-suite — Create test run from suite
-router.post('/test-runs/from-suite', requireAuth, blockContributors, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
+router.post('/test-runs/from-suite', requireAuth, requirePermission('qc.testexecutions.create'), async (req, res, next) => {
   const client = await pool.connect();
   try {
     const suiteRunSchema = z.object({
@@ -1417,7 +1417,7 @@ router.post('/test-runs/from-suite', requireAuth, blockContributors, requirePerm
 });
 
 // GET /test-runs/:id/progress — Get run progress summary
-router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
+router.get('/test-runs/:id/progress', requireAuth, requirePermission('qc.testexecutions.view'), async (req, res, next) => {
   try {
     const { id } = req.params;
     let runUuid = id;
@@ -1470,7 +1470,7 @@ router.get('/test-runs/:id/progress', requireAuth, blockContributors, requirePer
 // We add a route for bulk update below
 
 // POST /test-runs/:id/executions/bulk — Bulk update execution statuses
-router.post('/test-runs/:id/executions/bulk', requireAuth, blockContributors, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
+router.post('/test-runs/:id/executions/bulk', requireAuth, requirePermission('qc.testexecutions.edit'), async (req, res, next) => {
   const client = await pool.connect();
   try {
     const rawRunId = req.params.id;

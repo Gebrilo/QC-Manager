@@ -156,12 +156,12 @@ describe('seedRoleScopes (issue #269)', () => {
         expect(adminScopeInserts.length).toBe(0);
     });
 
-    test('contributor role seeded with preparation_only', async () => {
+    test('contributor role is seeded without status scopes', async () => {
         const { client, queries } = makeClient();
         await seedRoleScopes(client);
         const contributorInserts = queries.filter(q =>
             q.params[0] === 'contributor' && /INSERT INTO role_scopes/.test(q.text));
-        expect(contributorInserts.map(q => q.params[1])).toEqual(['preparation_only']);
+        expect(contributorInserts).toEqual([]);
     });
 
     test('tester / pm / viewer / team_manager get active_only (and team_manager also gets team)', async () => {
@@ -222,7 +222,7 @@ describe('seedRoleScopes (issue #269)', () => {
         expect(defaultScopesForRole('admin')).toEqual([]);
         expect(defaultScopesForRole('tester')).toEqual(['active_only']);
         expect(new Set(defaultScopesForRole('team_manager'))).toEqual(new Set(['team', 'active_only']));
-        expect(defaultScopesForRole('contributor')).toEqual(['preparation_only']);
+        expect(defaultScopesForRole('contributor')).toEqual([]);
     });
 });
 
@@ -293,7 +293,7 @@ describe('requireStatusScope (issue #269)', () => {
             expect(res.status).toHaveBeenCalledWith(403);
         });
 
-        test('contributor (catalog has preparation_only only) is denied active_only even in ACTIVE', async () => {
+        test('contributor with no status scope is denied active_only even in ACTIVE', async () => {
             const { res, next } = await runMiddleware(
                 requireStatusScope('active_only'),
                 { id: 'u1', role: 'contributor', status: 'ACTIVE' }

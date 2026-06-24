@@ -3908,6 +3908,58 @@ const runMigrations = async () => {
             `);
         }
 
+        // ============================================================
+        // Migration 051: grant viewer/contributor team reads
+        // (ADR 0011, issue #280)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_viewer_contributor_reads_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const teamReadSeed = await client.query(
+            `SELECT 1 FROM rbac_viewer_contributor_reads_seed_marker
+             WHERE migration_id = 'issue-280-viewer-contributor-team-reads'`
+        );
+        if (teamReadSeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('viewer', 'qc.bugs.view', 'system-seed'),
+                    ('viewer', 'qc.bugs.view_team', 'system-seed'),
+                    ('viewer', 'qc.testcases.view', 'system-seed'),
+                    ('viewer', 'qc.testcases.view_team', 'system-seed'),
+                    ('viewer', 'qc.testsuites.view', 'system-seed'),
+                    ('viewer', 'qc.testsuites.view_team', 'system-seed'),
+                    ('viewer', 'qc.testexecutions.view', 'system-seed'),
+                    ('viewer', 'qc.testexecutions.view_team', 'system-seed'),
+                    ('viewer', 'qc.user_stories.view', 'system-seed'),
+                    ('viewer', 'qc.user_stories.view_team', 'system-seed'),
+                    ('contributor', 'qc.bugs.view', 'system-seed'),
+                    ('contributor', 'qc.bugs.view_team', 'system-seed'),
+                    ('contributor', 'qc.testcases.view', 'system-seed'),
+                    ('contributor', 'qc.testcases.view_team', 'system-seed'),
+                    ('contributor', 'qc.testsuites.view', 'system-seed'),
+                    ('contributor', 'qc.testsuites.view_team', 'system-seed'),
+                    ('contributor', 'qc.testexecutions.view', 'system-seed'),
+                    ('contributor', 'qc.testexecutions.view_team', 'system-seed'),
+                    ('contributor', 'qc.user_stories.view', 'system-seed'),
+                    ('contributor', 'qc.user_stories.view_team', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(
+                `DELETE FROM role_scopes
+                 WHERE role_identifier = 'contributor'
+                   AND scope_key = 'preparation_only'`
+            );
+            await client.query(`
+                INSERT INTO rbac_viewer_contributor_reads_seed_marker (migration_id)
+                VALUES ('issue-280-viewer-contributor-team-reads')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

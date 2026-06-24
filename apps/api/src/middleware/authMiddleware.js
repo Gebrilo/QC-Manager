@@ -328,21 +328,6 @@ function requireStatus(...statuses) {
     };
 }
 
-/**
- * Middleware: Block contributors from accessing Quality routes.
- * This is a security measure to ensure contributors cannot access
- * project data, test cases, bugs, etc., regardless of permissions.
- */
-function blockContributors(req, res, next) {
-    if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-    if (req.user.role === 'contributor') {
-        return res.status(403).json({ error: 'Contributors do not have access to Quality features.' });
-    }
-    next();
-}
-
 module.exports = {
     requireAuth,
     requirePermission,
@@ -350,7 +335,6 @@ module.exports = {
     optionalAuth,
     requireStatus,
     requireStatusScope,
-    blockContributors,
     isRbacUnified,
     isTerminalStatus,
     TERMINAL_STATUSES,
