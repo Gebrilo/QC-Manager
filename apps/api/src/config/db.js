@@ -4063,6 +4063,18 @@ const runMigrations = async () => {
             `);
         }
 
+        // ============================================================
+        // Migration 054: reconcile built-in grants to the ADR 0011 spec
+        // Revoke the over-broad tester grants (qc.bugs.view_any, qc.bugs.edit_team)
+        // and clear the stray qc.bugs.view_own residue on tester/team_manager/
+        // contributor. Idempotent, marker-guarded, each removal audited.
+        // ============================================================
+        const { applyRbacGrantReconcileMigration } = require('../access/rbacGrantReconcile');
+        const grantReconcile = await applyRbacGrantReconcileMigration(client);
+        if (grantReconcile.applied) {
+            console.log(`[rbac-reconcile] revoked ${grantReconcile.revoked} over-broad/stale grant(s)`);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);
