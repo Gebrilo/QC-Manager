@@ -14,7 +14,13 @@ const nextConfig = {
                         value: [
                             `<${siteUrl}/robots.txt>; rel="robots"`,
                             `<${siteUrl}/sitemap.xml>; rel="sitemap"`,
+                            `<${siteUrl}/.well-known/api-catalog>; rel="api-catalog"`,
+                            `<${siteUrl}/.well-known/bot.json>; rel="service-desc"`,
                         ].join(', '),
+                    },
+                    {
+                        key: 'Content-Signals',
+                        value: 'ai-training=opt-out, ai-search=allow, indexing=allow',
                     },
                 ],
             },
