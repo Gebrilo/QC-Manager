@@ -1,0 +1,195 @@
+# QC-Manager robots.txt
+# Purpose: Provide clear crawl guidance for search engines and AI agents.
+# Note: robots.txt is advisory only. It is not a security control.
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# OpenAI crawlers
+# GPTBot: OpenAI model training crawler
+User-agent: GPTBot
+Disallow: /
+
+# OAI-SearchBot: OpenAI search/discovery crawler
+User-agent: OAI-SearchBot
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# ChatGPT user-triggered browsing/fetching
+User-agent: ChatGPT-User
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# Anthropic Claude crawlers
+# ClaudeBot: model training crawler
+User-agent: ClaudeBot
+Disallow: /
+
+# Claude-SearchBot: Claude search/discovery crawler
+User-agent: Claude-SearchBot
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# Claude user-triggered browsing/fetching
+User-agent: Claude-User
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# Perplexity crawler
+User-agent: PerplexityBot
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /my-dashboard/
+Disallow: /projects/
+Disallow: /tasks/
+Disallow: /bugs/
+Disallow: /test-cases/
+Disallow: /test-suites/
+Disallow: /test-runs/
+Disallow: /user-stories/
+Disallow: /resources/
+Disallow: /teams/
+Disallow: /reports/
+Disallow: /governance/
+Disallow: /settings/
+Disallow: /notifications/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /attachments/
+Disallow: /private/
+Crawl-delay: 10
+
+# Google AI training opt-out
+User-agent: Google-Extended
+Disallow: /
+
+# Common Crawl
+User-agent: CCBot
+Disallow: /
+
+# Amazon crawler
+User-agent: Amazonbot
+Disallow: /
+
+# Sitemap reference
+Sitemap: https://gebrils.cloud/sitemap.xml
