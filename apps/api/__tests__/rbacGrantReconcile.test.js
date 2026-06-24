@@ -21,6 +21,15 @@ describe('applyRbacGrantReconcileMigration', () => {
         ]);
     });
 
+    test('never revokes a current catalog default (no seed/revoke fight)', () => {
+        const { BUILT_IN_ROLE_PERMISSION_DEFAULTS } = require('../../shared/rbac/catalog.ts');
+        // If a reconciled key were also a catalog seed default, mig 044 would seed it
+        // and mig 054 would revoke it on every fresh install — a silent loop. Guard it.
+        for (const { role, key } of RECONCILE_REVOKES) {
+            expect(BUILT_IN_ROLE_PERMISSION_DEFAULTS[role]).not.toContain(key);
+        }
+    });
+
     test('deletes each grant, audits the removal, and marks completion', async () => {
         const calls = [];
         const client = {
