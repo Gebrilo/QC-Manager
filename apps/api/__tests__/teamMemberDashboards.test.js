@@ -40,6 +40,8 @@ function buildTasksApp({ user, hasPermission = true }) {
         blockContributors: (_req, _res, next) => next(),
         requirePermission: () => (_req, res, next) =>
             hasPermission ? next() : res.status(403).json({ error: 'forbidden' }),
+        requireAnyPermission: () => (_req, res, next) =>
+            hasPermission ? next() : res.status(403).json({ error: 'forbidden' }),
         optionalAuth: (_req, _res, next) => next(),
     }));
     const app = express();

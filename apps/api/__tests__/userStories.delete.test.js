@@ -1,11 +1,11 @@
-// Regression for "Failed to delete in Tuleap" 404 propagating to the client.
-// When the Tuleap artifact is already gone (manual delete, never created, or
-// stale id), the local soft-delete must still succeed so the user is not
-// stuck with an undeletable record.
+// Non-admin deletes are local soft-deletes only. Tuleap propagation remains an
+// admin-only operation so broader delete grants cannot hard-delete upstream
+// artifacts.
 
 jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, _res, next) => { req.user = { id: 'test-user' }; next(); },
   requirePermission: () => (_req, _res, next) => next(),
+  requireAnyPermission: () => (_req, _res, next) => next(),
 }));
 
 jest.mock('../src/middleware/audit', () => ({
@@ -36,13 +36,13 @@ function buildApp() {
   return app;
 }
 
-describe('DELETE /user-stories/:id — Tuleap 404 tolerance', () => {
+describe('DELETE /user-stories/:id — non-admin local delete', () => {
   beforeEach(() => {
     mockEmit.mockReset();
     mockPoolQuery.mockReset();
   });
 
-  it('soft-deletes locally when Tuleap returns 404 (artifact already gone)', async () => {
+  it('soft-deletes locally without emitting to Tuleap', async () => {
     const storyId = 'dd314ea0-d509-4ab0-bde5-96d21eb8b54b';
 
     mockPoolQuery
@@ -54,15 +54,7 @@ describe('DELETE /user-stories/:id — Tuleap 404 tolerance', () => {
         project_id: 'proj-uuid',
         deleted_at: null,
       }] })
-      // SELECT tuleap_sync_config
-      .mockResolvedValueOnce({ rows: [{
-        qc_project_id: 'proj-uuid',
-        tracker_type: 'user_story',
-        tuleap_tracker_id: 19,
-      }] })
       // UPDATE user_stories SET deleted_at = NOW() ...
-      .mockResolvedValueOnce({ rows: [] })
-      // SELECT refreshed row
       .mockResolvedValueOnce({ rows: [{
         id: storyId,
         title: 'orphaned story',
@@ -78,13 +70,13 @@ describe('DELETE /user-stories/:id — Tuleap 404 tolerance', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.tuleap_already_gone).toBe(true);
-    // The local UPDATE ... deleted_at = NOW() must have run
+    expect(mockEmit).not.toHaveBeenCalled();
     const updateCall = mockPoolQuery.mock.calls.find(c => /UPDATE user_stories SET deleted_at/i.test(c[0]));
     expect(updateCall).toBeDefined();
+    expect(mockPoolQuery.mock.calls.some(c => /FROM tuleap_sync_config/i.test(c[0]))).toBe(false);
   });
 
-  it('still surfaces non-404 Tuleap delete errors to the client', async () => {
+  it('does not return the Tuleap failure path for non-admin deletes', async () => {
     const storyId = 'cafefeed-0000-0000-0000-000000000001';
 
     mockPoolQuery
@@ -96,9 +88,11 @@ describe('DELETE /user-stories/:id — Tuleap 404 tolerance', () => {
         deleted_at: null,
       }] })
       .mockResolvedValueOnce({ rows: [{
-        qc_project_id: 'proj-uuid',
-        tracker_type: 'user_story',
-        tuleap_tracker_id: 19,
+        id: storyId,
+        title: 'gated story',
+        tuleap_artifact_id: 999,
+        project_id: 'proj-uuid',
+        deleted_at: new Date().toISOString(),
       }] });
 
     const tuleap403 = new Error('Forbidden');
@@ -107,8 +101,8 @@ describe('DELETE /user-stories/:id — Tuleap 404 tolerance', () => {
 
     const res = await request(buildApp()).delete(`/user-stories/${storyId}`);
 
-    expect(res.status).toBe(403);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toBe('Failed to delete in Tuleap');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mockEmit).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@ const { createTaskSchema, updateTaskSchema } = require('../schemas/task');
 const { auditLog } = require('../middleware/audit');
 const { triggerWorkflow } = require('../utils/n8n');
 const { dispatchTaskAssignment } = require('../services/notifications/dispatcher');
-const { requireAuth, requirePermission, optionalAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission, optionalAuth } = require('../middleware/authMiddleware');
 const { getManagerTeamId } = require('../middleware/teamAccess');
 const { emitToTuleap: emitTask, buildTaskEmitUnified } = require('../services/emitters/task');
 const { adoptStagedAttachments } = require('./artifactAttachments');
@@ -26,6 +26,13 @@ const {
     getTaskAssignmentSummary,
     primaryOf,
 } = require('../services/assignments/taskAssignments');
+
+const TASK_DELETE_PERMISSIONS = Object.freeze([
+    'qc.tasks.delete',
+    'qc.tasks.delete_own',
+    'qc.tasks.delete_team',
+    'qc.tasks.delete_any',
+]);
 
 const TASK_FILTER_OPTS = Object.freeze({
     tableAlias: 'v',
@@ -679,7 +686,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.tasks.edit'), async 
 });
 
 // DELETE soft delete task — enforce team scope
-router.delete('/:id', requireAuth, requirePermission('qc.tasks.delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requireAnyPermission(...TASK_DELETE_PERMISSIONS), async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -706,9 +713,11 @@ router.delete('/:id', requireAuth, requirePermission('qc.tasks.delete'), async (
         if (original.deleted_at) {
             return res.status(400).json({ error: 'Task already deleted' });
         }
+        const access = await enforceArtifact(req, res, 'task', original, 'delete', { route: 'DELETE /tasks/:id' });
+        if (!access.allowed) return;
         if (!await enforcePmProjectScope(req, res, 'delete', original.project_id)) return;
 
-        if (original.tuleap_artifact_id) {
+        if (req.user?.role === 'admin' && original.tuleap_artifact_id) {
             const configResult = await db.query(
                 `SELECT * FROM tuleap_sync_config
                  WHERE qc_project_id = $1 AND tracker_type = 'task' AND is_active = true`,

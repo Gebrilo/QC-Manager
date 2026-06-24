@@ -12,6 +12,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, _res, next) => { req.user = { id: 'user-1', role: 'admin' }; next(); },
   blockContributors: (_req, _res, next) => next(),
   requirePermission: () => (_req, _res, next) => next(),
+  requireAnyPermission: () => (_req, _res, next) => next(),
   optionalAuth: (req, _res, next) => { req.user = { id: 'user-1', role: 'admin' }; next(); },
   requireRole: () => (_req, _res, next) => next(),
   requireStatusScope: () => (_req, _res, next) => next(),

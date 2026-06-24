@@ -23,6 +23,12 @@ const BUG_VIEW_PERMISSIONS = Object.freeze([
     'qc.bugs.view_team',
     'qc.bugs.view_any',
 ]);
+const BUG_DELETE_PERMISSIONS = Object.freeze([
+    'qc.bugs.delete',
+    'qc.bugs.delete_own',
+    'qc.bugs.delete_team',
+    'qc.bugs.delete_any',
+]);
 
 async function enforcePmProjectScope(req, res, verb, projectId) {
     if (req.user?.role !== 'pm' || !projectId) return true;
@@ -706,7 +712,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.bugs.edit'), async (
     }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.bugs.delete'), async (req, res) => {
+router.delete('/:id', requireAuth, requireAnyPermission(...BUG_DELETE_PERMISSIONS), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -725,9 +731,11 @@ router.delete('/:id', requireAuth, requirePermission('qc.bugs.delete'), async (r
                 error: 'Bug already deleted'
             });
         }
+        const access = await enforceArtifact(req, res, 'bug', original, 'delete', { route: 'DELETE /bugs/:id' });
+        if (!access.allowed) return;
         if (!await enforcePmProjectScope(req, res, 'delete', original.project_id)) return;
 
-        if (original.tuleap_artifact_id) {
+        if (req.user?.role === 'admin' && original.tuleap_artifact_id) {
             const configResult = await pool.query(
                 `SELECT * FROM tuleap_sync_config
                  WHERE qc_project_id = $1 AND tracker_type = 'bug' AND is_active = true`,

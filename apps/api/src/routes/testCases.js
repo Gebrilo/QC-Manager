@@ -5,13 +5,20 @@ router.param('id', resolveArtifactParam('test_case'));
 const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission } = require('../middleware/authMiddleware');
 const { defaultClient } = require('../services/tuleapClient');
 const { defaultRegistry } = require('../services/tuleapFieldRegistry');
 const { emitToTuleap: emitTestCase } = require('../services/emitters/test_case');
 const { buildAccessDefaults, materializeAclGrants } = require('../services/accessDefaults');
 const { auditLog } = require('../middleware/audit');
-const { decorateRows } = require('../services/access/enforcement');
+const { decorateRows, enforceArtifact } = require('../services/access/enforcement');
+
+const TEST_CASE_DELETE_PERMISSIONS = Object.freeze([
+    'qc.testcases.delete',
+    'qc.testcases.delete_own',
+    'qc.testcases.delete_team',
+    'qc.testcases.delete_any',
+]);
 
 const STATUS_TO_TULEAP = { 'None': 'Not Run', 'Not Run': 'Not Run', 'Review': 'Review', 'Pass': 'Pass', 'Fail': 'Fail', 'Blocked': 'Blocked' };
 
@@ -463,7 +470,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.testcases.edit'), as
     }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requireAnyPermission(...TEST_CASE_DELETE_PERMISSIONS), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -472,6 +479,8 @@ router.delete('/:id', requireAuth, requirePermission('qc.testcases.delete'), asy
         const existingResult = await client.query('SELECT * FROM test_case WHERE id = $1 AND deleted_at IS NULL', [id]);
         if (existingResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Test case not found' }); }
         const existing = existingResult.rows[0];
+        const access = await enforceArtifact(req, res, 'test_case', existing, 'delete', { route: 'DELETE /test-cases/:id' });
+        if (!access.allowed) { await client.query('ROLLBACK'); return; }
 
         const result = await client.query(
             `UPDATE test_case SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1

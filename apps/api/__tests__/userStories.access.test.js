@@ -22,6 +22,7 @@ const mockCurrentUser = { value: null };
 jest.mock('../src/middleware/authMiddleware', () => ({
     requireAuth: (req, _res, next) => { req.user = mockCurrentUser.value; next(); },
     requirePermission: () => (_req, _res, next) => next(),
+    requireAnyPermission: () => (_req, _res, next) => next(),
 }));
 
 jest.mock('../src/middleware/audit', () => ({ auditLog: jest.fn().mockResolvedValue(undefined) }));

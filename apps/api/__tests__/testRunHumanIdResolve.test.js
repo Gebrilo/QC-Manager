@@ -17,6 +17,7 @@ jest.mock('../src/middleware/authMiddleware', () => ({
   requireAuth: (req, _res, next) => { req.user = { id: 'user-1', role: 'admin' }; next(); },
   blockContributors: (_req, _res, next) => next(),
   requirePermission: () => (_req, _res, next) => next(),
+  requireAnyPermission: () => (_req, _res, next) => next(),
 }));
 
 jest.mock('../src/middleware/audit', () => ({ auditLog: jest.fn() }));

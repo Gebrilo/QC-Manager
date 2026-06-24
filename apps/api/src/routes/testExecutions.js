@@ -14,7 +14,7 @@ const RUN_HUMAN_ID_RE = /^(?:RUN|TR)-\d+$/;
 const { z } = require('zod');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission } = require('../middleware/authMiddleware');
 const {
   appendListFilter,
   decorateRows,
@@ -22,6 +22,13 @@ const {
   shadowList,
 } = require('../services/access/enforcement');
 const { auditLog } = require('../middleware/audit');
+
+const TEST_EXECUTION_DELETE_PERMISSIONS = Object.freeze([
+  'qc.testexecutions.delete',
+  'qc.testexecutions.delete_own',
+  'qc.testexecutions.delete_team',
+  'qc.testexecutions.delete_any',
+]);
 
 // Configure multer for file upload (memory storage)
 const upload = multer({
@@ -551,7 +558,7 @@ router.patch('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions
 });
 
 // DELETE /test-runs/:id - Soft delete test run
-router.delete('/test-runs/:id', requireAuth, requirePermission('qc.testexecutions.delete'), async (req, res, next) => {
+router.delete('/test-runs/:id', requireAuth, requireAnyPermission(...TEST_EXECUTION_DELETE_PERMISSIONS), async (req, res, next) => {
   const client = await pool.connect();
 
   try {

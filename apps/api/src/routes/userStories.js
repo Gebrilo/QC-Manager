@@ -3,7 +3,7 @@ const router = express.Router();
 const { resolveArtifactParam } = require('../middleware/resolveArtifactParam');
 router.param('id', resolveArtifactParam('user_story'));
 const { pool } = require('../config/db');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission } = require('../middleware/authMiddleware');
 const { auditLog } = require('../middleware/audit');
 const { emitToTuleap } = require('../services/emitters/user_story');
 const { defaultClient } = require('../services/tuleapClient');
@@ -16,6 +16,13 @@ const {
     enforceArtifact,
     shadowList,
 } = require('../services/access/enforcement');
+
+const USER_STORY_DELETE_PERMISSIONS = Object.freeze([
+    'qc.user_stories.delete',
+    'qc.user_stories.delete_own',
+    'qc.user_stories.delete_team',
+    'qc.user_stories.delete_any',
+]);
 
 function parseCsvParam(value) {
     if (!value) return [];
@@ -392,7 +399,7 @@ router.post('/:id/sync', requireAuth, requirePermission('qc.user_stories.edit'),
     }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.user_stories.delete'), async (req, res) => {
+router.delete('/:id', requireAuth, requireAnyPermission(...USER_STORY_DELETE_PERMISSIONS), async (req, res) => {
     try {
         const { id } = req.params;
         const originalRes = await pool.query('SELECT * FROM user_stories WHERE id = $1', [id]);
@@ -407,7 +414,7 @@ router.delete('/:id', requireAuth, requirePermission('qc.user_stories.delete'), 
         const access = await enforceArtifact(req, res, 'user_story', original, 'delete', { route: 'DELETE /user-stories/:id' });
         if (!access.allowed) return;
 
-        if (original.tuleap_artifact_id) {
+        if (req.user?.role === 'admin' && original.tuleap_artifact_id) {
             const configResult = await pool.query(
                 `SELECT * FROM tuleap_sync_config
                  WHERE qc_project_id = $1 AND tracker_type = 'user_story' AND is_active = true`,

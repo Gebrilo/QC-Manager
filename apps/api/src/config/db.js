@@ -3960,6 +3960,54 @@ const runMigrations = async () => {
             `);
         }
 
+        // ============================================================
+        // Migration 052: broaden row-scoped delete grants
+        // (ADR 0011, issue #281)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_delete_scope_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const deleteScopeSeed = await client.query(
+            `SELECT 1 FROM rbac_delete_scope_seed_marker
+             WHERE migration_id = 'issue-281-delete-scopes'`
+        );
+        if (deleteScopeSeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO permissions (permission_key, domain)
+                VALUES
+                    ('qc.bugs.delete_own', 'qc.bugs'),
+                    ('qc.bugs.delete_team', 'qc.bugs'),
+                    ('qc.testcases.delete_own', 'qc.testcases'),
+                    ('qc.testcases.delete_team', 'qc.testcases'),
+                    ('qc.testsuites.delete_team', 'qc.testsuites'),
+                    ('qc.testexecutions.delete_team', 'qc.testexecutions'),
+                    ('qc.tasks.delete_team', 'qc.tasks'),
+                    ('qc.user_stories.delete_team', 'qc.user_stories')
+                ON CONFLICT (permission_key) DO UPDATE SET domain = EXCLUDED.domain
+            `);
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES
+                    ('tester', 'qc.bugs.delete_own', 'system-seed'),
+                    ('tester', 'qc.testcases.delete_own', 'system-seed'),
+                    ('team_manager', 'qc.bugs.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.testcases.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.testsuites.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.testexecutions.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.tasks.delete_team', 'system-seed'),
+                    ('team_manager', 'qc.user_stories.delete_team', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_delete_scope_seed_marker (migration_id)
+                VALUES ('issue-281-delete-scopes')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

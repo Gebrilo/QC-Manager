@@ -94,8 +94,8 @@ describe('Access engine — expanded catalog (issue #80)', () => {
     test('decorative and redundant _own keys are pruned from the catalog', () => {
         const pruned = [
             'qc.tasks.view_own', 'qc.tasks.edit_own', 'qc.tasks.delete_own',
-            'qc.bugs.view_own', 'qc.bugs.edit_own', 'qc.bugs.delete_own',
-            'qc.testcases.view_own', 'qc.testcases.edit_own', 'qc.testcases.delete_own',
+            'qc.bugs.view_own', 'qc.bugs.edit_own',
+            'qc.testcases.view_own', 'qc.testcases.edit_own',
             'qc.testsuites.view_own', 'qc.testsuites.edit_own', 'qc.testsuites.delete_own',
             'qc.testexecutions.view_own', 'qc.testexecutions.edit_own', 'qc.testexecutions.delete_own',
             'qc.user_stories.view_own', 'qc.user_stories.edit_own', 'qc.user_stories.delete_own',
@@ -127,7 +127,9 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(tester).toContain(PERMISSIONS.TASKS_VIEW_TEAM);
         expect(tester).toContain(PERMISSIONS.TASKS_DELETE);
         expect(tester).toContain(PERMISSIONS.BUGS_EDIT);
+        expect(tester).toContain(PERMISSIONS.BUGS_DELETE_OWN);
         expect(tester).toContain(PERMISSIONS.BUGS_CHANGE_SEVERITY);
+        expect(tester).toContain(PERMISSIONS.TESTCASES_DELETE_OWN);
         expect(tester).toContain(PERMISSIONS.TESTCASES_VIEW_STEPS);
         expect(tester).toContain(PERMISSIONS.DASHBOARDS_MEMBER_VIEW);
         expect(tester).toContain(PERMISSIONS.REPORTS_VIEW_TEAM);
@@ -185,6 +187,19 @@ describe('Access engine — expanded catalog (issue #80)', () => {
         expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.TESTEXECUTIONS_VIEW_TEAM)).toBe(true);
         expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.USER_STORIES_VIEW_TEAM)).toBe(true);
         expect(canUserPerform({ role: 'viewer' }, PERMISSIONS.BUGS_EDIT)).toBe(false);
+    });
+
+    test('tester and team_manager delete grants stay row-scoped', () => {
+        const tester = BUILT_IN_ROLE_PERMISSION_DEFAULTS.tester;
+        const grants = BUILT_IN_ROLE_PERMISSION_DEFAULTS.team_manager;
+        expect(tester).toContain(PERMISSIONS.BUGS_DELETE_OWN);
+        expect(tester).toContain(PERMISSIONS.TESTCASES_DELETE_OWN);
+        expect(grants).toContain(PERMISSIONS.TASKS_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.BUGS_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTCASES_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTSUITES_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.TESTEXECUTIONS_DELETE_TEAM);
+        expect(grants).toContain(PERMISSIONS.USER_STORIES_DELETE_TEAM);
     });
 
     test('legacy role identifiers canonicalize during migration rollout', () => {

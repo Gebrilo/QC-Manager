@@ -5,7 +5,7 @@ router.param('id', resolveArtifactParam('test_suite'));
 const db = require('../config/db');
 const pool = db.pool;
 const { z } = require('zod');
-const { requireAuth, requirePermission } = require('../middleware/authMiddleware');
+const { requireAuth, requirePermission, requireAnyPermission } = require('../middleware/authMiddleware');
 const {
     appendListFilter,
     decorateRows,
@@ -13,6 +13,13 @@ const {
     shadowList,
 } = require('../services/access/enforcement');
 const { auditLog } = require('../middleware/audit');
+
+const TEST_SUITE_DELETE_PERMISSIONS = Object.freeze([
+    'qc.testsuites.delete',
+    'qc.testsuites.delete_own',
+    'qc.testsuites.delete_team',
+    'qc.testsuites.delete_any',
+]);
 
 const suiteCreateSchema = z.object({
     name: z.string().min(3).max(255),
@@ -326,7 +333,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.testsuites.edit'), async
     } finally { client.release(); }
 });
 
-router.delete('/:id', requireAuth, requirePermission('qc.testsuites.delete'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requireAnyPermission(...TEST_SUITE_DELETE_PERMISSIONS), async (req, res, next) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
