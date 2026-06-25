@@ -1139,6 +1139,10 @@ const runMigrations = async () => {
         await client.query(`ALTER TABLE user_journey_assignments ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journeys_next_journey ON journeys(next_journey_id)`);
 
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_journeys_slug_unique ON journeys(slug)`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_journey_chapters_journey_slug_unique ON journey_chapters(journey_id, slug)`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_journey_quests_chapter_slug_unique ON journey_quests(chapter_id, slug)`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_journey_tasks_quest_slug_unique ON journey_tasks(quest_id, slug)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_chapters_journey ON journey_chapters(journey_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_quests_chapter ON journey_quests(chapter_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_journey_tasks_quest ON journey_tasks(quest_id)`);
