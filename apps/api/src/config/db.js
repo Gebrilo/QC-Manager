@@ -990,6 +990,7 @@ const runMigrations = async () => {
             )
         `);
 
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_permissions_unique_pair ON user_permissions(user_id, permission_key)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id)`);
 
         // Custom roles table for RBAC management
@@ -2183,6 +2184,7 @@ const runMigrations = async () => {
                 UNIQUE(task_id, test_run_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_task_runs_unique_pair ON task_runs(task_id, test_run_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_runs_task_id ON task_runs(task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_runs_test_run_id ON task_runs(test_run_id)`);
 
@@ -2198,6 +2200,7 @@ const runMigrations = async () => {
                 UNIQUE(bug_id, test_run_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bug_runs_unique_pair ON bug_runs(bug_id, test_run_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_runs_bug_id ON bug_runs(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_runs_test_run_id ON bug_runs(test_run_id)`);
         await client.query(`
@@ -2642,6 +2645,7 @@ const runMigrations = async () => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_permissions_permission_key_unique ON permissions(permission_key)`);
 
         const { ALL_PERMISSION_VALUES, BUILT_IN_ROLE_PERMISSION_DEFAULTS, collectRolePermissions } = require('../../../shared/rbac/catalog.ts');
         for (const permKey of ALL_PERMISSION_VALUES) {
@@ -2920,6 +2924,7 @@ const runMigrations = async () => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_team_types_code_unique ON team_types(code)`);
         await client.query(`
             INSERT INTO team_types (code, name, description) VALUES
                 ('qc', 'QC', 'Quality Control team'),
@@ -2951,6 +2956,7 @@ const runMigrations = async () => {
                 PRIMARY KEY (project_id, team_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_teams_unique_pair ON project_teams(project_id, team_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_project_teams_team_id ON project_teams(team_id)`);
         await client.query(`
             INSERT INTO project_teams (project_id, team_id)
@@ -2967,6 +2973,7 @@ const runMigrations = async () => {
                 PRIMARY KEY (project_id, user_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_managers_unique_pair ON project_managers(project_id, user_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_project_managers_user_id ON project_managers(user_id)`);
 
         await client.query(`
@@ -3014,6 +3021,7 @@ const runMigrations = async () => {
                 UNIQUE (artifact_type, artifact_id, subject_type, subject_id, action)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_access_unique_acl ON artifact_access(artifact_type, artifact_id, subject_type, subject_id, action)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_artifact_access_artifact ON artifact_access(artifact_type, artifact_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_artifact_access_subject ON artifact_access(subject_type, subject_id)`);
 
@@ -3026,6 +3034,7 @@ const runMigrations = async () => {
                 PRIMARY KEY (role_identifier, permission_key)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_role_permissions_unique_pair ON role_permissions(role_identifier, permission_key)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_identifier)`);
         let rolesWithLegacyCustomPermissions = new Set();
         if (hasCustomRolesPermissionsColumn) {
@@ -3059,6 +3068,7 @@ const runMigrations = async () => {
                 UNIQUE (team_type_id, artifact_type)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_default_artifact_visibility_unique_pair ON default_artifact_visibility(team_type_id, artifact_type)`);
 
         await client.query(`
             INSERT INTO default_artifact_visibility (team_type_id, artifact_type, default_scope, default_acl_grants)
@@ -3781,6 +3791,7 @@ const runMigrations = async () => {
                 seeded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_seed_marker_role_unique ON rbac_seed_marker(role_identifier)`);
         const { seedRolePermissions, collapseUserPermissions } = require('../access/rbacSeed');
         const seededRoles = await seedRolePermissions(client);
         if (seededRoles.length > 0) {
@@ -3836,6 +3847,7 @@ const runMigrations = async () => {
                 PRIMARY KEY (role_identifier, scope_key)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_role_scopes_unique_pair ON role_scopes(role_identifier, scope_key)`);
         await client.query(`
             CREATE TABLE IF NOT EXISTS user_scopes (
                 user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
@@ -3846,12 +3858,14 @@ const runMigrations = async () => {
                 PRIMARY KEY (user_id, scope_key)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_scopes_unique_pair ON user_scopes(user_id, scope_key)`);
         await client.query(`
             CREATE TABLE IF NOT EXISTS rbac_scope_seed_marker (
                 role_identifier VARCHAR(50) PRIMARY KEY,
                 seeded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_scope_seed_marker_role_unique ON rbac_scope_seed_marker(role_identifier)`);
         const { seedRoleScopes } = require('../access/rbacScopeSeed');
         const seededScopeRoles = await seedRoleScopes(client);
         if (seededScopeRoles.length > 0) {
@@ -3885,6 +3899,7 @@ const runMigrations = async () => {
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_bug_severity_seed_marker_unique ON rbac_bug_severity_seed_marker(migration_id)`);
         const bugSeveritySeed = await client.query(
             `SELECT 1 FROM rbac_bug_severity_seed_marker
              WHERE migration_id = 'issue-278-bug-change-severity'`
@@ -3914,6 +3929,7 @@ const runMigrations = async () => {
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_pm_project_scope_seed_marker_unique ON rbac_pm_project_scope_seed_marker(migration_id)`);
         const pmProjectScopeSeed = await client.query(
             `SELECT 1 FROM rbac_pm_project_scope_seed_marker
              WHERE migration_id = 'issue-279-pm-project-scope'`
@@ -3954,6 +3970,7 @@ const runMigrations = async () => {
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_viewer_contributor_reads_seed_marker_unique ON rbac_viewer_contributor_reads_seed_marker(migration_id)`);
         const teamReadSeed = await client.query(
             `SELECT 1 FROM rbac_viewer_contributor_reads_seed_marker
              WHERE migration_id = 'issue-280-viewer-contributor-team-reads'`
@@ -4006,6 +4023,7 @@ const runMigrations = async () => {
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_delete_scope_seed_marker_unique ON rbac_delete_scope_seed_marker(migration_id)`);
         const deleteScopeSeed = await client.query(
             `SELECT 1 FROM rbac_delete_scope_seed_marker
              WHERE migration_id = 'issue-281-delete-scopes'`
@@ -4054,6 +4072,7 @@ const runMigrations = async () => {
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_permission_grant_seed_marker_unique ON rbac_permission_grant_seed_marker(migration_id)`);
         const permissionGrantSeed = await client.query(
             `SELECT 1 FROM rbac_permission_grant_seed_marker
              WHERE migration_id = 'issues-282-286-rbac-grants'`
