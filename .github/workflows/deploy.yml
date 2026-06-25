@@ -348,7 +348,9 @@ jobs:
               echo "Extension setup returned ${extension_setup_status}; continuing to API startup verification."
             fi
 
-            if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
+            if [ "${REFRESH_STAGING_DATA}" != "true" ]; then
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api backup
+            else
               echo "=== Refreshing staging data from production public schema ==="
               DUMP_FILE="$DEPLOY_DIR/backups-staging/prod-public-$(date +%Y%m%d%H%M%S).dump"
               docker run --rm --network qc-shared-network postgres:15-alpine pg_dump \
@@ -371,8 +373,6 @@ jobs:
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
-            else
-              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api backup
             fi
 
             echo "=== Cleanup ==="
