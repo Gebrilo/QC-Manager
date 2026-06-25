@@ -11,6 +11,11 @@ on:
         options:
           - staging
           - production
+      refresh_staging_data:
+        description: 'Refresh staging database from production'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: deploy-${{ github.event.inputs.environment }}
@@ -237,10 +242,12 @@ jobs:
           WEB_DOMAIN: ${{ secrets.STAGING_WEB_DOMAIN }}
           API_DOMAIN: ${{ secrets.STAGING_API_DOMAIN }}
           CORS_ORIGIN: ${{ secrets.STAGING_CORS_ORIGIN }}
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
+          REFRESH_STAGING_DATA: ${{ github.event.inputs.refresh_staging_data || 'false' }}
         with:
           host: ${{ secrets.VPS_HOST }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
@@ -249,7 +256,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           timeout: 60s
           command_timeout: 30m
-          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,QC_AGENT_WEBHOOK_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH
+          envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,QC_AGENT_WEBHOOK_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_DATABASE_URL,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH,REFRESH_STAGING_DATA
           script_stop: true
           script: |
             set -euo pipefail
@@ -311,6 +318,27 @@ jobs:
 
             echo "=== Deploying staging ==="
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate
+
+            if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
+              echo "=== Refreshing staging data from production public schema ==="
+              DUMP_FILE="$DEPLOY_DIR/backups-staging/prod-public-$(date +%Y%m%d%H%M%S).dump"
+              docker run --rm postgres:15-alpine pg_dump \
+                --format=custom \
+                --schema=public \
+                --no-owner \
+                --no-acl \
+                "$SUPABASE_DATABASE_URL" > "$DUMP_FILE"
+
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging stop api web backup
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
+                psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
+                -c 'DROP SCHEMA public CASCADE;' \
+                -c 'CREATE SCHEMA public;' \
+                -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
+                pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
+            fi
 
             echo "=== Cleanup ==="
             docker image prune -f
