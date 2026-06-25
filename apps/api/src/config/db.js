@@ -663,7 +663,21 @@ const runMigrations = async () => {
             LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
             LEFT JOIN task_assignment_totals tat ON tat.task_id = t.id
             WHERE p.deleted_at IS NULL
-            GROUP BY p.id
+            GROUP BY
+                p.id,
+                p.project_id,
+                p.project_name,
+                p.team_id,
+                p.owner,
+                p.total_weight,
+                p.priority,
+                p.status,
+                p.description,
+                p.start_date,
+                p.target_date,
+                p.created_at,
+                p.updated_at,
+                p.deleted_at
         `);
 
         await client.query(`
