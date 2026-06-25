@@ -319,6 +319,11 @@ jobs:
             echo "=== Deploying staging ==="
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate
 
+            echo "=== Syncing staging database password ==="
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
+              psql -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 -v app_password="$POSTGRES_PASSWORD" \
+              -c "ALTER USER qc_staging_admin WITH PASSWORD :'app_password';"
+
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
               DUMP_FILE="$DEPLOY_DIR/backups-staging/prod-public-$(date +%Y%m%d%H%M%S).dump"
@@ -339,6 +344,8 @@ jobs:
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
+            else
+              docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api backup
             fi
 
             echo "=== Cleanup ==="
