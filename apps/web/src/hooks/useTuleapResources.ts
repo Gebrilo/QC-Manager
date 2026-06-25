@@ -20,7 +20,7 @@ export function useTuleapResources(projectId?: string, trackerType?: string): Us
     const [allowedLabels, setAllowedLabels] = useState<Set<string> | null>(null);
 
     useEffect(() => {
-        resourcesApi.list()
+        resourcesApi.list({ silent: true })
             .then((all: Resource[]) => {
                 setResources(
                     all
@@ -43,7 +43,7 @@ export function useTuleapResources(projectId?: string, trackerType?: string): Us
             return;
         }
         let cancelled = false;
-        tuleapApi.getBindLabels(projectId, trackerType)
+        tuleapApi.getBindLabels(projectId, trackerType, { silent: true })
             .then(res => {
                 if (cancelled) return;
                 const labels = res.data?.fields?.assigned_to;

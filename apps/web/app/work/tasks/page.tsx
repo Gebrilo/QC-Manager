@@ -134,7 +134,7 @@ export default function TasksPage() {
                 const [tasksData, projectsData, resourcesData] = await Promise.all([
                     fetchApi<Task[]>('/tasks', { cache: 'no-store' }),
                     projectsApi.list().catch(() => []),
-                    resourcesApi.list().catch(() => [])
+                    resourcesApi.list({ silent: true }).catch(() => [])
                 ]);
                 setTasks(tasksData);
                 setProjects(Array.isArray(projectsData) ? projectsData : []);

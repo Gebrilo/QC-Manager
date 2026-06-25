@@ -16,7 +16,11 @@ function emitApiError(e: ApiErrorEvent) {
 /**
  * Generic API fetch wrapper
  */
-export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function fetchApi<T>(endpoint: string, options: RequestInit & { silent?: boolean } = {}): Promise<T> {
+    // `silent` suppresses the global ApiErrorToaster for best-effort background
+    // loads (e.g. an assignee picker fetching /resources) that the caller already
+    // handles — so a forbidden background fetch doesn't pop a red toast.
+    const { silent, ...fetchOptions } = options;
     const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
     // Get auth token from Supabase session
@@ -37,7 +41,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     }
 
     const response = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         headers,
     });
 
@@ -57,7 +61,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
         if (response.status === 403) {
             const err = new Error(errorData.error || 'You do not have permission to perform this action');
             (err as any).status = 403;
-            emitApiError({ status: 403, message: err.message, endpoint });
+            if (!silent) emitApiError({ status: 403, message: err.message, endpoint });
             throw err;
         }
 
@@ -71,7 +75,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
         const err = new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
         (err as any).status = response.status;
-        emitApiError({ status: response.status, message: err.message, endpoint });
+        if (!silent) emitApiError({ status: response.status, message: err.message, endpoint });
         throw err;
     }
 
@@ -445,7 +449,7 @@ export const taskCommentsApi = {
 // ============================================================================
 
 export const resourcesApi = {
-    list: () => fetchApi<Resource[]>('/resources'),
+    list: (opts?: { silent?: boolean }) => fetchApi<Resource[]>('/resources', opts),
 
     get: (id: string) => fetchApi<Resource>(`/resources/${id}`),
 
@@ -2044,9 +2048,10 @@ export const tuleapApi = {
         fetchApi<Array<{ id: number; username: string; display_name: string; email: string | null }>>(
             `/tuleap-webhook/users${query ? `?query=${encodeURIComponent(query)}` : ''}`
         ),
-    getBindLabels: (projectId: string, trackerType?: string) =>
+    getBindLabels: (projectId: string, trackerType?: string, opts?: { silent?: boolean }) =>
         fetchApi<{ success: boolean; data: { tracker_id: number | null; fields: Record<string, string[]> } }>(
-            `/tuleap-webhook/projects/${projectId}/bind-labels${trackerType ? `?tracker_type=${trackerType}` : ''}`
+            `/tuleap-webhook/projects/${projectId}/bind-labels${trackerType ? `?tracker_type=${trackerType}` : ''}`,
+            opts
         ),
 };
 
