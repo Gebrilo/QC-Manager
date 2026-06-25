@@ -321,9 +321,25 @@ jobs:
 
             echo "=== Syncing staging database password ==="
             escaped_postgres_password=$(printf '%s' "$POSTGRES_PASSWORD" | sed "s/'/''/g")
+            set +e
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
               psql -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 \
               -c "ALTER USER qc_staging_admin WITH PASSWORD '${escaped_postgres_password}';"
+            password_sync_status=$?
+            set -e
+            if [ "$password_sync_status" -ne 0 ]; then
+              echo "Password sync returned ${password_sync_status}; verifying current password before continuing."
+            fi
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
+              sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 -c "SELECT 1" >/dev/null'
+
+            echo "=== Ensuring staging database extensions ==="
+            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
+              psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
+              -c 'CREATE SCHEMA IF NOT EXISTS extensions;' \
+              -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;' \
+              -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;' \
+              -c 'ALTER DATABASE qc_staging_app SET search_path TO public, extensions;'
 
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
@@ -338,10 +354,12 @@ jobs:
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging stop api web backup
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
-                -c 'DROP SCHEMA public CASCADE;' \
+                -c 'DROP SCHEMA IF EXISTS public CASCADE;' \
+                -c 'DROP SCHEMA IF EXISTS extensions CASCADE;' \
                 -c 'CREATE SCHEMA extensions;' \
                 -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;' \
-                -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;'
+                -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;' \
+                -c 'ALTER DATABASE qc_staging_app SET search_path TO public, extensions;'
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
