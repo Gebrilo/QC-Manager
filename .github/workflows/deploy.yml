@@ -322,7 +322,7 @@ jobs:
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
               DUMP_FILE="$DEPLOY_DIR/backups-staging/prod-public-$(date +%Y%m%d%H%M%S).dump"
-              docker run --rm postgres:15-alpine pg_dump \
+              docker run --rm --network qc-shared-network postgres:15-alpine pg_dump \
                 --format=custom \
                 --schema=public \
                 --no-owner \
