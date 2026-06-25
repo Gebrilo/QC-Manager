@@ -2452,7 +2452,15 @@ const runMigrations = async () => {
             LEFT JOIN bug_test_executions bte ON bte.bug_id = b.id
             LEFT JOIN bug_tasks bt ON bt.bug_id = b.id
             WHERE b.deleted_at IS NULL
-            GROUP BY b.id
+            GROUP BY
+                b.id,
+                b.bug_id,
+                b.project_id,
+                b.title,
+                b.status,
+                b.source,
+                b.triage_status,
+                b.linked_test_case_ids
         `);
 
         // Add GIN index on test_case tags
