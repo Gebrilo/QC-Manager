@@ -327,10 +327,9 @@ jobs:
               -c "ALTER USER qc_staging_admin WITH PASSWORD '${escaped_postgres_password}';"
             password_sync_status=$?
             set -e
-            case "$password_sync_status" in
-              0) true ;;
-              *) echo "Password sync returned ${password_sync_status}; verifying current password before continuing." ;;
-            esac
+            if [ "$password_sync_status" -ne 0 ]; then
+              echo "Password sync returned ${password_sync_status}; verifying current password before continuing."
+            fi
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
               sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 -c "SELECT 1" >/dev/null'
 
@@ -345,16 +344,14 @@ jobs:
               -c 'ALTER ROLE qc_staging_admin IN DATABASE qc_staging_app SET search_path TO public, extensions;'
             extension_setup_status=$?
             set -e
-            case "$extension_setup_status" in
-              0) true ;;
-              *) echo "Extension setup returned ${extension_setup_status}; verifying required functions before continuing." ;;
-            esac
+            if [ "$extension_setup_status" -ne 0 ]; then
+              echo "Extension setup returned ${extension_setup_status}; verifying required functions before continuing."
+            fi
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
               psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
               -c 'SELECT extensions.uuid_generate_v4();' >/dev/null
 
-            case "${REFRESH_STAGING_DATA}" in
-            true)
+            if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
               DUMP_FILE="$DEPLOY_DIR/backups-staging/prod-public-$(date +%Y%m%d%H%M%S).dump"
               docker run --rm --network qc-shared-network postgres:15-alpine pg_dump \
@@ -376,11 +373,9 @@ jobs:
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
-              ;;
-            *)
+            else
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api backup
-              ;;
-            esac
+            fi
 
             echo "=== Cleanup ==="
             docker image prune -f
