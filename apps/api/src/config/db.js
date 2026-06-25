@@ -1789,6 +1789,7 @@ const runMigrations = async () => {
             )
         `);
 
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_case_id_unique ON test_case(id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_tuleap_artifact ON test_case(tuleap_artifact_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_project_id ON test_case(project_id) WHERE deleted_at IS NULL`);
 
