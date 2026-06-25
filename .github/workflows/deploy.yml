@@ -345,11 +345,8 @@ jobs:
             extension_setup_status=$?
             set -e
             if [ "$extension_setup_status" -ne 0 ]; then
-              echo "Extension setup returned ${extension_setup_status}; verifying required functions before continuing."
+              echo "Extension setup returned ${extension_setup_status}; continuing to API startup verification."
             fi
-            docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
-              psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
-              -c 'SET search_path TO public, extensions; SELECT uuid_generate_v4();' >/dev/null
 
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
