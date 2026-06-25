@@ -349,7 +349,7 @@ jobs:
             fi
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
               psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
-              -c 'SELECT extensions.uuid_generate_v4();' >/dev/null
+              -c 'SET search_path TO public, extensions; SELECT uuid_generate_v4();' >/dev/null
 
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
@@ -369,7 +369,8 @@ jobs:
                 -c 'CREATE SCHEMA extensions;' \
                 -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;' \
                 -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;' \
-                -c 'ALTER DATABASE qc_staging_app SET search_path TO public, extensions;'
+                -c 'ALTER DATABASE qc_staging_app SET search_path TO public, extensions;' \
+                -c 'ALTER ROLE qc_staging_admin IN DATABASE qc_staging_app SET search_path TO public, extensions;'
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
