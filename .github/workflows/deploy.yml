@@ -328,7 +328,7 @@ jobs:
             password_sync_status=$?
             set -e
             case "$password_sync_status" in
-              0) ;;
+              0) true ;;
               *) echo "Password sync returned ${password_sync_status}; verifying current password before continuing." ;;
             esac
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
@@ -346,7 +346,7 @@ jobs:
             extension_setup_status=$?
             set -e
             case "$extension_setup_status" in
-              0) ;;
+              0) true ;;
               *) echo "Extension setup returned ${extension_setup_status}; verifying required functions before continuing." ;;
             esac
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
