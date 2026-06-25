@@ -255,7 +255,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           timeout: 60s
-          command_timeout: 30m
+          command_timeout: 90m
           envs: DOCKER_HUB_USERNAME,DOCKER_HUB_TOKEN,JWT_SECRET,QC_AGENT_WEBHOOK_SECRET,POSTGRES_PASSWORD,N8N_WEBHOOK_URL,WEB_DOMAIN,API_DOMAIN,CORS_ORIGIN,SUPABASE_DATABASE_URL,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_JWT_SECRET,DEPLOY_BRANCH,REFRESH_STAGING_DATA
           script_stop: true
           script: |
