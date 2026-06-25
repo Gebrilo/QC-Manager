@@ -320,9 +320,10 @@ jobs:
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate
 
             echo "=== Syncing staging database password ==="
+            escaped_postgres_password=$(printf '%s' "$POSTGRES_PASSWORD" | sed "s/'/''/g")
             docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
-              psql -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 -v app_password="$POSTGRES_PASSWORD" \
-              -c "ALTER USER qc_staging_admin WITH PASSWORD :'app_password';"
+              psql -U qc_staging_admin -d postgres -v ON_ERROR_STOP=1 \
+              -c "ALTER USER qc_staging_admin WITH PASSWORD '${escaped_postgres_password}';"
 
             if [ "${REFRESH_STAGING_DATA}" = "true" ]; then
               echo "=== Refreshing staging data from production public schema ==="
