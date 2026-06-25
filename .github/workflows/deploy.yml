@@ -333,8 +333,9 @@ jobs:
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 psql -U qc_staging_admin -d qc_staging_app -v ON_ERROR_STOP=1 \
                 -c 'DROP SCHEMA public CASCADE;' \
-                -c 'CREATE SCHEMA public;' \
-                -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+                -c 'CREATE SCHEMA extensions;' \
+                -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;' \
+                -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;'
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging exec -T postgres \
                 pg_restore --no-owner --no-acl -U qc_staging_admin -d qc_staging_app < "$DUMP_FILE"
               docker compose -p qc-staging -f docker-compose.staging.yml --env-file .env.staging up -d --force-recreate api web backup
