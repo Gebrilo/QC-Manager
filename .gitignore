@@ -71,3 +71,6 @@ playwright-report/
 test-results/
 .worktrees/
 .claude/worktrees/
+
+# graphify rebuild cache — content-addressed, regenerable, not read by Claude
+graphify-out/cache/
