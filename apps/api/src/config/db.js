@@ -2023,6 +2023,7 @@ const runMigrations = async () => {
             )
         `);
         await client.query(`ALTER TABLE task_test_cases ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'qc'`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_task_test_cases_unique_pair ON task_test_cases(task_id, test_case_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_task_id ON task_test_cases(task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_task_test_cases_test_case_id ON task_test_cases(test_case_id)`);
         await client.query(`
@@ -2049,6 +2050,7 @@ const runMigrations = async () => {
                 UNIQUE(bug_id, test_execution_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bug_test_executions_unique_pair ON bug_test_executions(bug_id, test_execution_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_executions_bug_id ON bug_test_executions(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_executions_execution_id ON bug_test_executions(test_execution_id)`);
         await client.query(`ALTER TABLE bugs ADD COLUMN IF NOT EXISTS triage_status VARCHAR(20) NOT NULL DEFAULT 'untriaged'`);
@@ -2085,6 +2087,7 @@ const runMigrations = async () => {
         `);
         await client.query(`ALTER TABLE bug_tasks ALTER COLUMN relationship_type SET DEFAULT 'blocks'`);
         await client.query(`ALTER TABLE bug_tasks ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'qc'`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bug_tasks_unique_pair ON bug_tasks(bug_id, task_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_bug_id ON bug_tasks(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_tasks_task_id ON bug_tasks(task_id)`);
 
@@ -2100,6 +2103,7 @@ const runMigrations = async () => {
                 UNIQUE(bug_id, test_case_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bug_test_cases_unique_pair ON bug_test_cases(bug_id, test_case_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_cases_bug_id ON bug_test_cases(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_test_cases_test_case_id ON bug_test_cases(test_case_id)`);
 
@@ -2115,6 +2119,7 @@ const runMigrations = async () => {
                 UNIQUE(bug_id, user_story_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bug_user_stories_unique_pair ON bug_user_stories(bug_id, user_story_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_user_stories_bug_id ON bug_user_stories(bug_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_bug_user_stories_user_story_id ON bug_user_stories(user_story_id)`);
 
@@ -2130,6 +2135,7 @@ const runMigrations = async () => {
                 UNIQUE(test_case_id, user_story_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_case_user_stories_unique_pair ON test_case_user_stories(test_case_id, user_story_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_test_case_id ON test_case_user_stories(test_case_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_case_user_stories_user_story_id ON test_case_user_stories(user_story_id)`);
 
@@ -2145,6 +2151,7 @@ const runMigrations = async () => {
                 UNIQUE(user_story_id, test_suite_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_suites_unique_pair ON story_suites(user_story_id, test_suite_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_story_suites_user_story_id ON story_suites(user_story_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_story_suites_test_suite_id ON story_suites(test_suite_id)`);
 
@@ -2160,6 +2167,7 @@ const runMigrations = async () => {
                 UNIQUE(user_story_id, test_run_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_runs_unique_pair ON story_runs(user_story_id, test_run_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_story_runs_user_story_id ON story_runs(user_story_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_story_runs_test_run_id ON story_runs(test_run_id)`);
 
@@ -2336,6 +2344,7 @@ const runMigrations = async () => {
                 UNIQUE(test_run_id, test_case_id)
             )
         `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_run_suite_cases_unique_pair ON test_run_suite_cases(test_run_id, test_case_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_run_id ON test_run_suite_cases(test_run_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_suite_id ON test_run_suite_cases(original_suite_id)`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_test_run_suite_cases_test_case_id ON test_run_suite_cases(test_case_id)`);
