@@ -38,6 +38,21 @@ const ARTIFACT_TABLES = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TULEAP_ID_RE = /^\d+$/;
 
+// Supabase Storage rejects non-ASCII object keys ("Invalid key"), which broke every
+// Arabic-named upload. base64url-encode the original filename into the key so the key
+// is always ASCII-safe and key-legal, while staying reversible for staged-adopt. The
+// human-readable name is also kept verbatim in artifact_attachments.original_name.
+function encodeStorageName(originalName) {
+    return `${uuidv4()}_${Buffer.from(originalName, 'utf8').toString('base64url')}`;
+}
+
+function decodeStorageName(storageName) {
+    const encoded = storageName.replace(/^[0-9a-f-]{36}_/i, '');
+    const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+    // Legacy files embedded the raw name (not base64); detect via round-trip mismatch.
+    return Buffer.from(decoded, 'utf8').toString('base64url') === encoded ? decoded : encoded;
+}
+
 function httpError(status, message) {
     const err = new Error(message);
     err.status = status;
@@ -74,7 +89,7 @@ router.post('/staged', requireAuth, upload.single('file'), async (req, res, next
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
         await storage.ensureArtifactBucketExists();
-        const uniqueName = `${uuidv4()}_${req.file.originalname}`;
+        const uniqueName = encodeStorageName(req.file.originalname);
         const storagePath = `tmp/${temp_id}/${uniqueName}`;
         await storage.uploadArtifactFile(storagePath, req.file.buffer, req.file.mimetype);
 
@@ -161,7 +176,7 @@ router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), as
         const resolvedArtifactId = await resolveArtifactId(artifactType, artifactId);
 
         await storage.ensureArtifactBucketExists();
-        const uniqueName = `${uuidv4()}_${req.file.originalname}`;
+        const uniqueName = encodeStorageName(req.file.originalname);
         const storagePath = `${artifactType}/${resolvedArtifactId}/${uniqueName}`;
         await storage.uploadArtifactFile(storagePath, req.file.buffer, req.file.mimetype);
 
@@ -197,7 +212,7 @@ async function adoptStagedAttachments(artifactType, artifactId, tempId, uploaded
         const sizeBytes = file.metadata?.size || buffer.length;
         await storage.uploadArtifactFile(newPath, buffer, mimeType);
         await storage.deleteArtifactFile(oldPath);
-        const originalName = file.name.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/, '');
+        const originalName = decodeStorageName(file.name);
         await db.pool.query(
             `INSERT INTO artifact_attachments
                (artifact_type, artifact_id, original_name, filename, mime_type, size_bytes, storage_path, uploaded_by)
@@ -209,3 +224,5 @@ async function adoptStagedAttachments(artifactType, artifactId, tempId, uploaded
 
 module.exports = router;
 module.exports.adoptStagedAttachments = adoptStagedAttachments;
+module.exports.encodeStorageName = encodeStorageName;
+module.exports.decodeStorageName = decodeStorageName;

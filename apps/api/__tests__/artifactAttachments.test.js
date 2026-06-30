@@ -211,6 +211,27 @@ describe('DELETE /attachments/file/:id', () => {
     });
 });
 
+// ── ASCII-safe storage keys (Arabic filenames) ────────────────────────────────
+
+describe('storage key encoding', () => {
+    const { encodeStorageName, decodeStorageName } = require('../src/routes/artifactAttachments');
+    const arabic = 'مذكرة متطلبات على V1.0.docx';
+
+    test('encoded key is ASCII-only so Supabase Storage accepts it', () => {
+        const key = encodeStorageName(arabic);
+        // eslint-disable-next-line no-control-regex
+        expect(key).toMatch(/^[\x00-\x7F]+$/);
+    });
+
+    test('round-trips a non-ASCII filename losslessly', () => {
+        expect(decodeStorageName(encodeStorageName(arabic))).toBe(arabic);
+    });
+
+    test('decodes legacy raw-name files unchanged', () => {
+        expect(decodeStorageName('abc12345-0000-4000-8000-000000000000_photo.jpg')).toBe('photo.jpg');
+    });
+});
+
 // ── adoptStagedAttachments ────────────────────────────────────────────────────
 
 describe('adoptStagedAttachments', () => {
@@ -232,6 +253,21 @@ describe('adoptStagedAttachments', () => {
             expect.stringContaining('INSERT INTO artifact_attachments'),
             expect.arrayContaining(['bug', 'bug-uuid'])
         );
+    });
+
+    test('recovers the Arabic display name from the base64url key on adopt', async () => {
+        const { encodeStorageName } = require('../src/routes/artifactAttachments');
+        const arabic = 'مذكرة متطلبات.docx';
+        storage.listArtifactFiles.mockResolvedValueOnce([
+            { name: encodeStorageName(arabic), metadata: { mimetype: 'application/pdf', size: 99 } },
+        ]);
+        storage.downloadArtifactFile.mockResolvedValueOnce(new Blob(['x']));
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+
+        const { adoptStagedAttachments } = require('../src/routes/artifactAttachments');
+        await adoptStagedAttachments('user_story', 'us-uuid', 'temp-id', 'user-1');
+
+        expect(mockQuery.mock.calls[0][1]).toEqual(expect.arrayContaining([arabic]));
     });
 
     test('does nothing when temp_id is null', async () => {
