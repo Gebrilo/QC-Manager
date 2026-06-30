@@ -46,6 +46,13 @@ function encodeStorageName(originalName) {
     return `${uuidv4()}_${Buffer.from(originalName, 'utf8').toString('base64url')}`;
 }
 
+// multer/busboy decodes the multipart filename header as latin1, so non-ASCII
+// (Arabic) filenames arrive as mojibake (e.g. "ÙØ«ÙÙØ©"). Reinterpret the bytes as
+// utf8 to recover the real name. No-op for ASCII names.
+function decodeMultipartFilename(name) {
+    return Buffer.from(name, 'latin1').toString('utf8');
+}
+
 function decodeStorageName(storageName) {
     const encoded = storageName.replace(/^[0-9a-f-]{36}_/i, '');
     const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
@@ -89,13 +96,14 @@ router.post('/staged', requireAuth, upload.single('file'), async (req, res, next
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
         await storage.ensureArtifactBucketExists();
-        const uniqueName = encodeStorageName(req.file.originalname);
+        const originalName = decodeMultipartFilename(req.file.originalname);
+        const uniqueName = encodeStorageName(originalName);
         const storagePath = `tmp/${temp_id}/${uniqueName}`;
         await storage.uploadArtifactFile(storagePath, req.file.buffer, req.file.mimetype);
 
         res.status(201).json({
             storagePath,
-            originalName: req.file.originalname,
+            originalName,
             mimeType: req.file.mimetype,
             sizeBytes: req.file.size,
         });
@@ -176,7 +184,8 @@ router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), as
         const resolvedArtifactId = await resolveArtifactId(artifactType, artifactId);
 
         await storage.ensureArtifactBucketExists();
-        const uniqueName = encodeStorageName(req.file.originalname);
+        const originalName = decodeMultipartFilename(req.file.originalname);
+        const uniqueName = encodeStorageName(originalName);
         const storagePath = `${artifactType}/${resolvedArtifactId}/${uniqueName}`;
         await storage.uploadArtifactFile(storagePath, req.file.buffer, req.file.mimetype);
 
@@ -185,7 +194,7 @@ router.post('/:artifactType/:artifactId', requireAuth, upload.single('file'), as
                (artifact_type, artifact_id, original_name, filename, mime_type, size_bytes, storage_path, uploaded_by)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id, original_name, mime_type, size_bytes, created_at`,
-            [artifactType, resolvedArtifactId, req.file.originalname, uniqueName, req.file.mimetype, req.file.size, storagePath, req.user.id]
+            [artifactType, resolvedArtifactId, originalName, uniqueName, req.file.mimetype, req.file.size, storagePath, req.user.id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -226,3 +235,4 @@ module.exports = router;
 module.exports.adoptStagedAttachments = adoptStagedAttachments;
 module.exports.encodeStorageName = encodeStorageName;
 module.exports.decodeStorageName = decodeStorageName;
+module.exports.decodeMultipartFilename = decodeMultipartFilename;

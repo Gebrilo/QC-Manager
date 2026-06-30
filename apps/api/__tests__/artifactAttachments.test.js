@@ -230,6 +230,18 @@ describe('storage key encoding', () => {
     test('decodes legacy raw-name files unchanged', () => {
         expect(decodeStorageName('abc12345-0000-4000-8000-000000000000_photo.jpg')).toBe('photo.jpg');
     });
+
+    test('recovers Arabic names mangled by busboy latin1 decoding', () => {
+        const { decodeMultipartFilename } = require('../src/routes/artifactAttachments');
+        // busboy hands the utf8 filename bytes back decoded as latin1 (mojibake)
+        const mojibake = Buffer.from(arabic, 'utf8').toString('latin1');
+        expect(decodeMultipartFilename(mojibake)).toBe(arabic);
+    });
+
+    test('leaves ASCII filenames untouched', () => {
+        const { decodeMultipartFilename } = require('../src/routes/artifactAttachments');
+        expect(decodeMultipartFilename('report.docx')).toBe('report.docx');
+    });
 });
 
 // ── adoptStagedAttachments ────────────────────────────────────────────────────
