@@ -281,6 +281,10 @@ export interface NavVisibilityContext {
  */
 export function canSeeRoutePath(path: string, ctx: NavVisibilityContext): boolean {
     if (ctx.isAdmin) return true;
+    // Admin console (/admin/*) is admin-only — never surface its links to
+    // non-admin roles, even if a per-user permission override (e.g. qc.team.view)
+    // would otherwise admit a single page. See issues #292 / #297.
+    if (path.startsWith('/admin/')) return false;
     const route = getRouteConfig(path);
     if (!route) return false;
     if (!routeAllowsScope(route, ctx.effectiveScopes)) return false;

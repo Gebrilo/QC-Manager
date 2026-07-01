@@ -101,14 +101,15 @@ describe('per-role sidebar smoke test (ADR 0010 / issue #270 cutover)', () => {
         expect(sections).toContain('manage');
         expect(sections).toContain('quality');
         expect(sections).toContain('my-work');
-        // team_manager holds qc.team.view, which gates /admin/teams in the
-        // route config, so the admin section is admitted.
-        expect(sections).toContain('admin');
+        // /admin/* is admin-only (issues #292/#297): team_manager no longer
+        // sees the admin section even though it holds qc.team.view.
+        expect(sections).not.toContain('admin');
 
         const paths = visiblePathsFor('team_manager');
         expect(paths).toContain('/team/resources');
         expect(paths).toContain('/dashboards/team-manager');
         expect(paths).toContain('/team/journeys');
+        expect(paths).not.toContain('/admin/teams');
         // /admin/permissions/matrix requires qc.admin.manage_permissions, which
         // team_manager does not hold — no link, no section-child visibility.
         expect(paths).not.toContain('/admin/permissions/matrix');
