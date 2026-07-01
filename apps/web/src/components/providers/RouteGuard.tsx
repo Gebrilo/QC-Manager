@@ -29,6 +29,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        // Admin console (/admin/*) is admin-only and enforced by
+        // app/admin/layout.tsx, which renders a stable 403 page. Skip the
+        // scope/permission redirect here so unauthorized users see the 403
+        // page instead of being silently bounced to My Tasks (#289/#290/#295).
+        if (pathname?.startsWith('/admin/') && !isAdmin) return;
+
         const route = getRouteConfig(pathname || '');
         if (!route) return;
 
