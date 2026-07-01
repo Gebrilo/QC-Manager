@@ -26,6 +26,13 @@ export default function ProjectDetailPage() {
     const [userStories, setUserStories] = useState<TuleapArtifact[]>([]);
     const [storiesLoading, setStoriesLoading] = useState(false);
 
+    // ponytail: guard the dynamic segment before it ever reaches the API.
+    // '/work/projects/new' (and any non-UUID) used to fall through to
+    // GET /projects/new → Postgres 500 'invalid input syntax for type uuid'
+    // (issue #291). 'new' routes to the create page; other non-UUIDs render
+    // the not-found state without a network call.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     const loadUserStories = async () => {
         setStoriesLoading(true);
         try {
@@ -39,6 +46,9 @@ export default function ProjectDetailPage() {
     };
 
     useEffect(() => {
+        if (!id) return;
+        if (id === 'new') { router.replace('/work/projects/create'); return; }
+        if (!UUID_RE.test(id)) { setIsLoading(false); return; }
         async function load() {
             try {
                 const data = await fetchApi<Project>(`/projects/${id}`);
@@ -49,7 +59,7 @@ export default function ProjectDetailPage() {
                 setIsLoading(false);
             }
         }
-        if (id) load();
+        load();
     }, [id]);
 
     const getLogo = (projectId: string) => {
