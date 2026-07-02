@@ -31,7 +31,8 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
         priority: initialData?.priority || 'Medium',
         start_date: initialData?.start_date?.split('T')[0] || '',
         target_date: initialData?.target_date?.split('T')[0] || '',
-        description: initialData?.description || ''
+        description: initialData?.description || '',
+        ai_intake_enabled: initialData?.ai_intake_enabled || false,
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -62,14 +63,6 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
             let projectId = initialData?.id;
 
             if (isEdit && projectId) {
-                // Assuming PATCH /projects/:id exists or using PUT. 
-                // The backend implementation I checked earlier (routes/projects.js) only had GET and POST.
-                // I might need to ADD PATCH to the backend if it doesn't exist.
-                // Or I can assume full replacement if PUT. 
-                // For now, I'll attempt PATCH. If it fails, I'll fix the backend.
-                // Actually, I should probably check backend routes again? 
-                // Context says `projects.js` has GETs and POST. No update. 
-                // I will need to ADD `router.patch('/:id')` to `apps/api/src/routes/projects.js`.
                 await fetchApi(`/projects/${projectId}`, {
                     method: 'PATCH',
                     body: JSON.stringify(payload),
@@ -189,6 +182,25 @@ export default function ProjectForm({ initialData, onSuccess, isEdit = false }: 
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 hover:border-slate-300 dark:hover:border-slate-700 transition-all outline-none"
                     />
                 </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 px-4 py-3">
+                <input
+                    id="ai_intake_enabled"
+                    type="checkbox"
+                    checked={formData.ai_intake_enabled}
+                    onChange={(event) => setFormData(prev => ({
+                        ...prev,
+                        ai_intake_enabled: event.target.checked,
+                    }))}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <label htmlFor="ai_intake_enabled" className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-900 dark:text-white">Enable AI story intake</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Allows the AI intake route to create review-ready user stories for this project.
+                    </span>
+                </label>
             </div>
 
             <div>

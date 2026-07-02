@@ -164,6 +164,8 @@ export interface Project {
     id: string;
     project_id: string;
     project_name: string;
+    team_id?: string;
+    ai_intake_enabled?: boolean;
     priority?: 'High' | 'Medium' | 'Low';
     total_weight?: number;
     start_date?: string;
@@ -214,6 +216,14 @@ export interface Task {
     tags?: string[];
     notes?: string;
     sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    generated_by_ai?: boolean;
+    source?: string;
+    source_content_hash?: string | null;
+    ai_content_hash?: string | null;
+    ai_skill_name?: string | null;
+    ai_source_agent?: string | null;
+    ai_source_conversation_id?: string | null;
+    ai_raw_markdown?: string | null;
     last_sync_attempted_at?: string | null;
     last_sync_error?: string | null;
     created_at?: string;
@@ -565,6 +575,14 @@ export interface UserStory {
     created_at?: string;
     updated_at?: string;
     sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    generated_by_ai?: boolean;
+    source?: string;
+    source_content_hash?: string | null;
+    ai_content_hash?: string | null;
+    ai_skill_name?: string | null;
+    ai_source_agent?: string | null;
+    ai_source_conversation_id?: string | null;
+    ai_raw_markdown?: string | null;
     last_sync_attempted_at?: string | null;
     last_sync_error?: string | null;
     _can?: {
@@ -655,6 +673,77 @@ export const userStoriesApi = {
 
     delete: (id: string) =>
         fetchApi<{ success: boolean; message: string; data: UserStory }>(`/user-stories/${id}`, { method: 'DELETE' }),
+};
+
+export interface AiIntakeTaskInput {
+    task_name?: string;
+    title?: string;
+    description?: string;
+    notes?: string;
+    type?: string;
+    priority?: 'High' | 'Medium' | 'Low';
+    definition_of_done?: string[];
+    estimate_days?: number | null;
+    deadline?: string | null;
+    expected_start_date?: string | null;
+    actual_start_date?: string | null;
+    tags?: string[];
+}
+
+export interface AiIntakeTaskGenerationSummary {
+    status?: 'received' | 'pending' | 'processed' | 'failed' | 'rejected';
+    job_id?: string;
+    max_tasks?: number;
+    created_task_count?: number;
+    skipped_titles?: string[];
+    regenerated?: boolean;
+}
+
+export interface AiIntakeStoryResponse {
+    success: boolean;
+    story: UserStory;
+    tasks?: Task[];
+    task_generation?: AiIntakeTaskGenerationSummary;
+}
+
+export interface AiIntakeGeneratedTasksResponse {
+    success: boolean;
+    story: UserStory;
+    tasks: Task[];
+    job?: Record<string, unknown> | null;
+    max_tasks: number;
+}
+
+export const aiIntakeApi = {
+    createStory: (data: {
+        project_id: string;
+        content_markdown?: string;
+        markdown?: string;
+        tasks?: AiIntakeTaskInput[];
+        force_import?: boolean;
+        create_tasks?: boolean;
+        generate_tasks?: boolean;
+        skill_name?: string;
+        source_agent?: string;
+        source_conversation_id?: string;
+    }) =>
+        fetchApi<AiIntakeStoryResponse>('/ai-intake/user-story', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    getGeneratedTasks: (id: string) =>
+        fetchApi<AiIntakeGeneratedTasksResponse>(`/user-stories/${id}/generated-tasks`),
+
+    generateTasks: (id: string) =>
+        fetchApi<AiIntakeStoryResponse>(`/user-stories/${id}/generate-tasks`, {
+            method: 'POST',
+        }),
+
+    regenerateTasks: (id: string) =>
+        fetchApi<AiIntakeStoryResponse>(`/user-stories/${id}/regenerate-tasks`, {
+            method: 'POST',
+        }),
 };
 
 // ============================================================================

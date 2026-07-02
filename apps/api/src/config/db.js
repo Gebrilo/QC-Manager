@@ -47,6 +47,7 @@ const runMigrations = async () => {
                 created_by VARCHAR(255),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_by VARCHAR(255),
+                ai_intake_enabled BOOLEAN NOT NULL DEFAULT FALSE,
                 deleted_at TIMESTAMP WITH TIME ZONE,
                 deleted_by VARCHAR(255)
             )
@@ -89,6 +90,8 @@ const runMigrations = async () => {
                 project_id UUID,
                 task_name VARCHAR(255) NOT NULL,
                 description TEXT,
+                generated_by_ai BOOLEAN NOT NULL DEFAULT FALSE,
+                source VARCHAR(30) NOT NULL DEFAULT 'manual',
                 status VARCHAR(50) NOT NULL DEFAULT 'Todo',
                 assignee VARCHAR(255),
                 priority VARCHAR(20) DEFAULT 'medium',
@@ -429,12 +432,14 @@ const runMigrations = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS user_stories (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                tuleap_artifact_id INTEGER NOT NULL UNIQUE,
+                tuleap_artifact_id INTEGER UNIQUE,
                 tuleap_tracker_id  INTEGER,
                 tuleap_url         TEXT,
                 title              VARCHAR(500) NOT NULL,
                 description        TEXT,
                 acceptance_criteria TEXT,
+                generated_by_ai    BOOLEAN NOT NULL DEFAULT FALSE,
+                source            VARCHAR(30) NOT NULL DEFAULT 'manual',
                 status             VARCHAR(50) NOT NULL DEFAULT 'Draft',
                 requirement_version VARCHAR(50),
                 priority           VARCHAR(50),
@@ -627,6 +632,7 @@ const runMigrations = async () => {
                 p.priority,
                 p.status AS project_status_field,
                 p.description,
+                p.ai_intake_enabled,
                 p.start_date,
                 p.target_date,
                 CASE WHEN p.target_date IS NOT NULL THEN p.target_date - CURRENT_DATE ELSE NULL END AS days_until_target,
@@ -673,6 +679,7 @@ const runMigrations = async () => {
                 p.priority,
                 p.status,
                 p.description,
+                p.ai_intake_enabled,
                 p.start_date,
                 p.target_date,
                 p.created_at,
@@ -943,6 +950,9 @@ const runMigrations = async () => {
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='team_id') THEN
                     ALTER TABLE projects ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='ai_intake_enabled') THEN
+                    ALTER TABLE projects ADD COLUMN ai_intake_enabled BOOLEAN NOT NULL DEFAULT FALSE;
                 END IF;
             END $$;
         `);
@@ -2258,6 +2268,8 @@ const runMigrations = async () => {
                 t.priority,
                 t.tags,
                 t.notes,
+                t.generated_by_ai,
+                t.source,
                 pri.resource_id AS resource1_id,
                 sec.resource_id AS resource2_id,
                 pri.resource_id AS resource1_uuid,
@@ -3009,6 +3021,21 @@ const runMigrations = async () => {
         `);
 
         await client.query(`
+            DO $$
+            BEGIN
+                IF to_regclass('public.tasks') IS NOT NULL THEN
+                    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN NOT NULL DEFAULT FALSE;
+                    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source VARCHAR(30) NOT NULL DEFAULT 'manual';
+                END IF;
+                IF to_regclass('public.user_stories') IS NOT NULL THEN
+                    ALTER TABLE user_stories ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN NOT NULL DEFAULT FALSE;
+                    ALTER TABLE user_stories ADD COLUMN IF NOT EXISTS source VARCHAR(30) NOT NULL DEFAULT 'manual';
+                    ALTER TABLE user_stories ALTER COLUMN tuleap_artifact_id DROP NOT NULL;
+                END IF;
+            END $$;
+        `);
+
+        await client.query(`
             CREATE TABLE IF NOT EXISTS artifact_access (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 artifact_type VARCHAR(40) NOT NULL,
@@ -3413,18 +3440,63 @@ const runMigrations = async () => {
             CREATE TABLE IF NOT EXISTS ai_content_generation_logs (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 request_type VARCHAR(30) NOT NULL,
+                project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+                user_story_id UUID REFERENCES user_stories(id) ON DELETE SET NULL,
+                content_hash VARCHAR(64),
+                source_content_hash VARCHAR(64),
                 raw_payload JSONB,
                 generated_content JSONB,
                 status VARCHAR(30) NOT NULL DEFAULT 'received',
                 error_message TEXT,
+                force_import BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 processed_at TIMESTAMP WITH TIME ZONE,
                 source VARCHAR(80),
-                CONSTRAINT ai_content_generation_logs_request_type_check CHECK (request_type IN ('changelog', 'roadmap', 'landing_copy')),
-                CONSTRAINT ai_content_generation_logs_status_check CHECK (status IN ('received', 'processed', 'rejected', 'failed'))
+                CONSTRAINT ai_content_generation_logs_request_type_check CHECK (request_type IN ('changelog', 'roadmap', 'landing_copy', 'ai_intake_user_story', 'ai_intake_task_generation')),
+                CONSTRAINT ai_content_generation_logs_status_check CHECK (status IN ('received', 'pending', 'processed', 'rejected', 'failed'))
             )
         `);
+        await client.query(`
+            DO $$
+            BEGIN
+                IF to_regclass('public.ai_content_generation_logs') IS NOT NULL THEN
+                    ALTER TABLE ai_content_generation_logs ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+                    ALTER TABLE ai_content_generation_logs ADD COLUMN IF NOT EXISTS user_story_id UUID REFERENCES user_stories(id) ON DELETE SET NULL;
+                    ALTER TABLE ai_content_generation_logs ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64);
+                    ALTER TABLE ai_content_generation_logs ADD COLUMN IF NOT EXISTS source_content_hash VARCHAR(64);
+                    ALTER TABLE ai_content_generation_logs ADD COLUMN IF NOT EXISTS force_import BOOLEAN NOT NULL DEFAULT FALSE;
+                    UPDATE ai_content_generation_logs
+                       SET source_content_hash = content_hash
+                     WHERE source_content_hash IS NULL
+                       AND content_hash IS NOT NULL;
+
+                    IF EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'ai_content_generation_logs_request_type_check'
+                        AND pg_get_constraintdef(oid) NOT LIKE '%ai_intake_user_story%'
+                    ) THEN
+                        ALTER TABLE ai_content_generation_logs DROP CONSTRAINT ai_content_generation_logs_request_type_check;
+                        ALTER TABLE ai_content_generation_logs ADD CONSTRAINT ai_content_generation_logs_request_type_check
+                            CHECK (request_type IN ('changelog', 'roadmap', 'landing_copy', 'ai_intake_user_story', 'ai_intake_task_generation'));
+                    END IF;
+
+                    IF EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'ai_content_generation_logs_status_check'
+                        AND pg_get_constraintdef(oid) NOT LIKE '%pending%'
+                    ) THEN
+                        ALTER TABLE ai_content_generation_logs DROP CONSTRAINT ai_content_generation_logs_status_check;
+                        ALTER TABLE ai_content_generation_logs ADD CONSTRAINT ai_content_generation_logs_status_check
+                            CHECK (status IN ('received', 'pending', 'processed', 'rejected', 'failed'));
+                    END IF;
+                END IF;
+            END $$;
+        `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_ai_content_logs_type_status_created ON ai_content_generation_logs(request_type, status, created_at DESC)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_ai_content_logs_story_hash_created ON ai_content_generation_logs(project_id, request_type, content_hash, created_at DESC)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_ai_content_logs_story_source_hash_created ON ai_content_generation_logs(project_id, request_type, source_content_hash, created_at DESC)`);
+        await client.query(`DROP INDEX IF EXISTS uq_ai_content_logs_story_hash`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_content_logs_story_hash ON ai_content_generation_logs(project_id, request_type, source_content_hash) WHERE request_type = 'ai_intake_user_story' AND force_import = FALSE AND source_content_hash IS NOT NULL AND status <> 'failed'`);
 
         // Human-id addressing: enforce one live row per human id so URL resolution is unambiguous.
         // Partial (deleted_at IS NULL, col IS NOT NULL) so soft-deletes and null task_ids don't collide.

@@ -349,15 +349,26 @@ export default function UserStoriesPage() {
                 <div className="flex items-center gap-3">
                     <ViewToggle view={viewMode} onChange={handleViewChange} />
                     <PermissionGate permission="qc.user_stories.create" fallbackTooltip="Requires editor access to create stories">
-                        <Link
-                            href="/work/stories/create"
-                            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
-                        >
-                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
-                            New Story
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href="/work/stories/ai-intake"
+                                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 bg-white/70 dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-md hover:border-violet-400/70 hover:text-violet-700 dark:hover:text-violet-300 transition-all"
+                            >
+                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M12 3v4M8 5h8M7 9h10M9 13h6M10 17h4" />
+                                </svg>
+                                AI Intake
+                            </Link>
+                            <Link
+                                href="/work/stories/create"
+                                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
+                            >
+                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                                New Story
+                            </Link>
+                        </div>
                     </PermissionGate>
                 </div>
             </div>

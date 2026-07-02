@@ -60,6 +60,7 @@ export interface Project {
     target_date?: string;
     status: 'active' | 'archived' | 'deleted';
     team_id?: string; // Team this project belongs to
+    ai_intake_enabled?: boolean;
     // Aggregated fields from View
     tasks_total_count?: number;
     tasks_done_count?: number;
@@ -124,6 +125,8 @@ export interface Task {
     notes?: string;
     tuleap_url?: string;
     sync_status?: 'synced' | 'pending' | 'failed' | 'standalone';
+    generated_by_ai?: boolean;
+    source?: string;
     last_sync_attempted_at?: string | null;
     last_sync_error?: string | null;
 

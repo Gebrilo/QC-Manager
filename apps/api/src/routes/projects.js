@@ -87,8 +87,8 @@ router.post('/', requireAuth, requirePermission('qc.projects.create'), async (re
         const result = await db.query(
             `INSERT INTO projects (
                 project_id, project_name, description, total_weight, priority,
-                start_date, target_date, team_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+                start_date, target_date, team_id, ai_intake_enabled
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [
                 data.project_id,
                 data.name,
@@ -98,6 +98,7 @@ router.post('/', requireAuth, requirePermission('qc.projects.create'), async (re
                 data.start_date,
                 data.target_date,
                 teamId,
+                data.ai_intake_enabled ?? false,
             ]
         );
 
@@ -141,6 +142,7 @@ router.patch('/:id', requireAuth, requirePermission('qc.projects.edit'), async (
         if (validatedData.priority) dbFields.priority = validatedData.priority;
         if (validatedData.start_date) dbFields.start_date = validatedData.start_date;
         if (validatedData.target_date) dbFields.target_date = validatedData.target_date;
+        if (validatedData.ai_intake_enabled !== undefined) dbFields.ai_intake_enabled = validatedData.ai_intake_enabled;
         // Admins may reassign team; managers cannot change team
         if (validatedData.team_id !== undefined && req.user.role === 'admin') {
             dbFields.team_id = validatedData.team_id;

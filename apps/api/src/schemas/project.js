@@ -7,7 +7,8 @@ const createProjectSchema = z.object({
     total_weight: z.number().int().min(1).max(5).optional(),
     priority: z.enum(['High', 'Medium', 'Low']).optional(),
     start_date: z.string().date().optional(), // ISO Date string YYYY-MM-DD
-    target_date: z.string().date().optional()
+    target_date: z.string().date().optional(),
+    ai_intake_enabled: z.boolean().optional().default(false)
 });
 
 const updateProjectSchema = createProjectSchema.partial(); // project_id updatable for auto-provisioned projects

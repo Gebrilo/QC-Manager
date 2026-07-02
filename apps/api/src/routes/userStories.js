@@ -16,6 +16,12 @@ const {
     enforceArtifact,
     shadowList,
 } = require('../services/access/enforcement');
+const {
+    handleGetGeneratedTasks,
+    handleGenerateTasks,
+    handleRegenerateTasks,
+    aiIntakeRateLimit,
+} = require('./aiIntake');
 
 const USER_STORY_DELETE_PERMISSIONS = Object.freeze([
     'qc.user_stories.delete',
@@ -147,15 +153,38 @@ router.get('/', requireAuth, requirePermission('qc.projects.view'), async (req, 
     }
 });
 
+router.get('/:id/generated-tasks', requireAuth, requirePermission('qc.projects.view'), handleGetGeneratedTasks);
+router.post('/:id/generate-tasks', requireAuth, requirePermission('qc.tasks.create'), aiIntakeRateLimit, handleGenerateTasks);
+router.post('/:id/regenerate-tasks', requireAuth, requirePermission('qc.tasks.create'), aiIntakeRateLimit, handleRegenerateTasks);
+
 router.get('/:id', requireAuth, requirePermission('qc.projects.view'), async (req, res, next) => {
     try {
         const { id } = req.params;
         const whereClause = 'us.id = $1';
         const paramValue = id;
         const result = await pool.query(
-            `SELECT us.*, p.project_name
+            `SELECT
+                us.*,
+                p.project_name,
+                COALESCE(ai_log.source_content_hash, ai_log.content_hash) AS source_content_hash,
+                COALESCE(ai_log.source_content_hash, ai_log.content_hash) AS ai_content_hash,
+                ai_log.raw_payload->>'skill_name' AS ai_skill_name,
+                ai_log.raw_payload->>'source_agent' AS ai_source_agent,
+                ai_log.raw_payload->>'source_conversation_id' AS ai_source_conversation_id,
+                COALESCE(ai_log.raw_payload->>'content_markdown', ai_log.raw_payload->>'markdown') AS ai_raw_markdown
              FROM user_stories us
              LEFT JOIN projects p ON p.id = us.project_id
+             LEFT JOIN LATERAL (
+                SELECT *
+                  FROM ai_content_generation_logs
+                 WHERE request_type = 'ai_intake_user_story'
+                   AND (
+                    user_story_id = us.id
+                    OR generated_content->>'story_id' = us.id::text
+                   )
+                 ORDER BY created_at DESC
+                 LIMIT 1
+             ) ai_log ON true
              WHERE ${whereClause} AND us.deleted_at IS NULL`,
             [paramValue]
         );

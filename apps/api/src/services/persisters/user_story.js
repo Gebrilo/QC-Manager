@@ -97,6 +97,8 @@ async function handleSync(unified, config, { query }) {
          raw_tuleap_payload = COALESCE($9, raw_tuleap_payload),
          deleted_at = NULL,
          last_sync_at = NOW(),
+         generated_by_ai = FALSE,
+         source = 'tuleap',
          sync_status = 'synced',
          last_sync_attempted_at = NOW(),
          last_sync_error = NULL,
@@ -147,9 +149,9 @@ async function handleSync(unified, config, { query }) {
        title, description, acceptance_criteria, status,
        requirement_version, priority, ba_author,
        project_id, raw_tuleap_payload, last_sync_at, pending_links,
-       sync_status, last_sync_attempted_at, last_sync_error,
+       sync_status, generated_by_ai, source, last_sync_attempted_at, last_sync_error,
        owner_team_id, visibility_scope, created_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, 'synced', NOW(), NULL, $14, $15, $16)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, 'synced', FALSE, 'tuleap', NOW(), NULL, $14, $15, $16)
      RETURNING *`,
     [
       tuleapArtifactId,
@@ -207,6 +209,8 @@ async function updateUserStory(id, unified, query) {
        ba_author = COALESCE($7, ba_author),
        tuleap_url = COALESCE($8, tuleap_url),
        raw_tuleap_payload = COALESCE($9, raw_tuleap_payload),
+       generated_by_ai = FALSE,
+       source = 'tuleap',
        last_sync_at = NOW(),
        sync_status = 'synced',
        last_sync_attempted_at = NOW(),

@@ -54,6 +54,7 @@ apiRouter.use('/bugs', require('./routes/bugs'));
 apiRouter.use('/search', require('./routes/search'));
 apiRouter.use('/tasks', coverageLinks.taskSide);
 apiRouter.use('/test-cases', coverageLinks.testCaseSide);
+apiRouter.use('/ai-intake', require('./routes/aiIntake'));
 apiRouter.use('/user-stories', require('./routes/userStories'));
 apiRouter.use('/user-stories', coverageLinks.userStorySide);
 apiRouter.use('/attachments', require('./routes/artifactAttachments'));
@@ -72,6 +73,7 @@ apiRouter.use('/teams', require('./routes/teams'));
 apiRouter.use('/public/landing-page', require('./routes/publicLandingPage'));
 apiRouter.use('/admin/landing-page', require('./routes/adminLandingPage'));
 apiRouter.use('/webhooks/landing-content', require('./routes/landingContentWebhooks'));
+apiRouter.use('/webhooks/ai-intake', require('./routes/aiIntakeWebhooks'));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

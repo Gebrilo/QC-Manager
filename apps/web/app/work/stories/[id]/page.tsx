@@ -20,7 +20,7 @@ import { StatusControl } from '@/components/shared/StatusControl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { storyStatusRegistry } from '@/lib/statusRegistry';
 import { LINK_RELATIONSHIP_OPTIONS_BY_PAIR } from '@/lib/linkRelationships';
-import { QCCard, SectionLabel, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
+import { QCCard, SectionLabel, DetailRow, EditIcon, TrashIcon } from '@/components/shared/DetailCard';
 import { AutoDetailsCard } from '@/components/shared/AutoDetailsCard';
 
 export default function UserStoryDetailPage() {
@@ -33,6 +33,7 @@ export default function UserStoryDetailPage() {
     const [story, setStory] = useState<UserStory | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showRawMarkdown, setShowRawMarkdown] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -115,6 +116,7 @@ export default function UserStoryDetailPage() {
 
     const title = story.title || `User Story ${id}`;
     const displayId = story.tuleap_artifact_id ? `US-${story.tuleap_artifact_id}` : id.slice(0, 8);
+    const isAiIntakeStory = story.generated_by_ai || story.source === 'ai_intake';
 
     return (
         <div className="max-w-[1280px] mx-auto px-6 py-6 space-y-5">
@@ -226,6 +228,37 @@ export default function UserStoryDetailPage() {
 
                 {/* Right column (1/3) */}
                 <div className="space-y-5">
+                    {isAiIntakeStory && (
+                        <QCCard>
+                            <SectionLabel>AI Source</SectionLabel>
+                            <div className="space-y-0">
+                                <DetailRow label="Channel" value={story.source || 'ai_intake'} />
+                                <DetailRow label="Agent" value={story.ai_source_agent || 'Unknown'} />
+                                <DetailRow label="Skill" value={story.ai_skill_name || 'Unknown'} />
+                                <DetailRow label="Conversation" value={story.ai_source_conversation_id || 'None'} />
+                                <DetailRow label="Content Hash" value={story.source_content_hash || story.ai_content_hash || 'Unavailable'} />
+                                <DetailRow label="Sync mode" value="Standalone" />
+                            </div>
+                            {story.ai_raw_markdown && (
+                                <div className="mt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowRawMarkdown(value => !value)}
+                                    >
+                                        {showRawMarkdown ? 'Hide Original Markdown' : 'View Original Markdown'}
+                                    </Button>
+                                    {showRawMarkdown && (
+                                        <pre className="mt-3 max-h-80 overflow-auto rounded-lg bg-slate-950 p-3 text-xs leading-relaxed text-slate-100 whitespace-pre-wrap">
+                                            {story.ai_raw_markdown}
+                                        </pre>
+                                    )}
+                                </div>
+                            )}
+                        </QCCard>
+                    )}
+
                     <SyncPanel
                         status={story.sync_status}
                         lastAttemptedAt={story.last_sync_attempted_at}
@@ -238,7 +271,7 @@ export default function UserStoryDetailPage() {
 
                     <AutoDetailsCard
                         record={story as unknown as Record<string, unknown>}
-                        exclude={['title', 'status', 'description', 'acceptance_criteria', 'tuleap_url']}
+                        exclude={['title', 'status', 'description', 'acceptance_criteria', 'tuleap_url', 'generated_by_ai', 'source', 'source_content_hash', 'ai_content_hash', 'ai_skill_name', 'ai_source_agent', 'ai_source_conversation_id', 'ai_raw_markdown']}
                     />
                 </div>
             </div>
@@ -247,10 +280,11 @@ export default function UserStoryDetailPage() {
 }
 
 function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
+    const isAiIntakeStory = story.generated_by_ai || story.source === 'ai_intake';
     const sections: LinkedArtifactsSectionConfig[] = useMemo(() => [
         {
-            title: 'Child Tasks',
-            emptyLabel: 'No child tasks yet.',
+            title: isAiIntakeStory ? 'Generated Tasks' : 'Child Tasks',
+            emptyLabel: isAiIntakeStory ? 'No generated tasks yet.' : 'No child tasks yet.',
             readOnly: true,
             viewPermission: 'qc.tasks.view',
             load: async () => {
@@ -412,7 +446,7 @@ function UserStoryLinkedArtifactsSections({ story }: { story: UserStory }) {
                 await taskTestCaseLinksApi.removeBugFromUserStory(story.id, row.artifactId);
             },
         },
-    ], [story.id]);
+    ], [story.id, isAiIntakeStory]);
 
     return (
         <div className="space-y-5">

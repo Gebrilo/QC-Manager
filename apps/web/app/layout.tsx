@@ -31,6 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/tasks': 'Tasks',
     '/work/tasks': 'Tasks',
     '/work/stories': 'Stories',
+    '/work/stories/ai-intake': 'AI Story Intake',
     '/work/bugs': 'Bugs',
     '/resources': 'Resources',
     '/team/resources': 'Resources',
