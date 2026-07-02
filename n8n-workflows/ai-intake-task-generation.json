@@ -1,0 +1,165 @@
+[
+  {
+    "name": "AI Intake -> Task Generation",
+    "active": false,
+    "nodes": [
+      {
+        "id": "ai-intake-webhook",
+        "name": "Webhook: AI Task Generation",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "b7f2c1a4-9d3e-4c6b-8a71-ai-intake-taskgen",
+        "parameters": {
+          "path": "ai-intake-task-generation",
+          "httpMethod": "POST",
+          "responseMode": "onReceived",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "ai-intake-build-prompt",
+        "name": "Build prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// AI Intake task-generation worker.\n// Trigger payload from QC-Manager (utils/n8n triggerWorkflow) arrives under $json.body.\nlet body = $json.body || $json;\nif (body && typeof body.payload === 'string') {\n  try { body = JSON.parse(body.payload); } catch (e) {}\n}\n\nconst userStoryId = body.user_story_id;\nif (!userStoryId) {\n  // No story to call back to \u2014 nothing to do.\n  return [];\n}\n\nconst maxTasks = Math.max(1, Math.min(Number(body.max_tasks) || 8, 20));\nlet md = String(body.content_markdown || '').trim();\nif (!md) md = '(no markdown provided)';\nif (md.length > 20000) md = md.slice(0, 19980).trim() + '\\n\\n...';\n\nreturn [{\n  json: {\n    user_story_id: userStoryId,\n    project_id: body.project_id || null,\n    job_id: body.job_id || null,\n    max_tasks: maxTasks,\n    callback_url: body.callback_url || '',\n    story_markdown: md,\n  },\n}];\n"
+        }
+      },
+      {
+        "id": "ai-intake-minimax",
+        "name": "AI Generate Tasks (MiniMax)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          680,
+          300
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.minimax.chat/v1/text/chatcompletion_v2",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.MINIMAX_API_KEY }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'abab6.5s-chat', max_tokens: 2000, temperature: 0.2, messages: [ { role: 'system', content: 'You are a senior delivery lead for the QC Manager product. Break the user story below into concrete, actionable engineering tasks. Rules: return AT MOST ' + $json.max_tasks + ' tasks; each task must be independently trackable; avoid vague or duplicate tasks; do not invent scope beyond the story. Respond with ONLY a JSON array (no prose, no code fences) where each element is {\"title\": string (max 120 chars), \"description\": string, \"priority\": \"High\" | \"Medium\" | \"Low\"}.' }, { role: 'user', content: $json.story_markdown } ] }) }}",
+          "options": {
+            "timeout": 60000
+          }
+        }
+      },
+      {
+        "id": "ai-intake-parse",
+        "name": "Parse tasks",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          900,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Parse the MiniMax reply into the QC-Manager task callback contract.\n// MiniMax returns { reply: \"...\", base_resp: { status_code: 0 } }.\nconst ctx = $('Build prompt').item.json;\nconst userStoryId = ctx.user_story_id;\nconst jobId = ctx.job_id;\nconst maxTasks = ctx.max_tasks || 8;\n\nfunction fail(msg) {\n  return [{ json: { user_story_id: userStoryId, callback: {\n    job_id: jobId, status: 'failed', error_message: String(msg).slice(0, 500),\n  } } }];\n}\n\nlet reply = '';\ntry {\n  if ($json.base_resp && $json.base_resp.status_code !== 0) {\n    return fail('MiniMax error: ' + JSON.stringify($json.base_resp));\n  }\n  reply = String($json.reply || '').trim();\n} catch (e) { return fail('No reply from model'); }\nif (!reply) return fail('Empty reply from model');\n\n// Strip code fences and isolate the JSON array.\nlet text = reply.replace(/```(?:json)?/gi, '').trim();\nconst start = text.indexOf('[');\nconst end = text.lastIndexOf(']');\nif (start === -1 || end === -1 || end < start) return fail('Model did not return a JSON array');\n\nlet arr;\ntry { arr = JSON.parse(text.slice(start, end + 1)); }\ncatch (e) { return fail('Could not parse task JSON: ' + e.message); }\nif (!Array.isArray(arr) || arr.length === 0) return fail('Model returned no tasks');\n\nconst allowed = { high: 'High', medium: 'Medium', low: 'Low' };\nconst tasks = arr.slice(0, maxTasks).map((t) => {\n  const title = String((t && (t.title || t.task_name || t.name)) || '').trim().slice(0, 120);\n  const description = String((t && (t.description || t.notes)) || '').trim();\n  const priority = allowed[String((t && t.priority) || '').toLowerCase()] || 'Medium';\n  return { task_name: title, title, description, priority };\n}).filter((t) => t.title);\n\nif (tasks.length === 0) return fail('No valid tasks after normalization');\n\nreturn [{ json: { user_story_id: userStoryId, callback: {\n  job_id: jobId, status: 'processed', tasks,\n} } }];\n"
+        }
+      },
+      {
+        "id": "ai-intake-callback",
+        "name": "Post tasks to QC Manager",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1120,
+          300
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "=http://qc-api:3001/webhooks/ai-intake/user-story/{{ $json.user_story_id }}/tasks",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-qc-agent-secret",
+                "value": "={{ $env.QC_AGENT_WEBHOOK_SECRET }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.callback) }}",
+          "options": {
+            "timeout": 20000
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook: AI Task Generation": {
+        "main": [
+          [
+            {
+              "node": "Build prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build prompt": {
+        "main": [
+          [
+            {
+              "node": "AI Generate Tasks (MiniMax)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Generate Tasks (MiniMax)": {
+        "main": [
+          [
+            {
+              "node": "Parse tasks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse tasks": {
+        "main": [
+          [
+            {
+              "node": "Post tasks to QC Manager",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "tags": []
+  }
+]
