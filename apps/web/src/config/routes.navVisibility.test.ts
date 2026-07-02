@@ -90,6 +90,7 @@ describe('per-role sidebar smoke test (ADR 0010 / issue #270 cutover)', () => {
         expect(paths).toContain('/admin/teams');
         expect(paths).toContain('/admin/roles');
         expect(paths).toContain('/admin/permissions/matrix');
+        expect(paths).toContain('/admin/audit-log');
         expect(paths).toContain('/admin/integrations/tuleap');
         expect(visibleSectionsFor('admin')).toEqual(
             expect.arrayContaining(['admin', 'manage', 'quality', 'my-work'])

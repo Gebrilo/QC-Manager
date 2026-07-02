@@ -75,6 +75,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/team/history': 'Team History',
     '/admin/journeys': 'Journey Management',
     '/admin/landing-config': 'Landing Page Configuration',
+    '/admin/audit-log': 'Access Audit Log',
     '/admin/permissions': 'Permissions',
     '/admin/integrations': 'Integrations',
     '/login': 'Login',

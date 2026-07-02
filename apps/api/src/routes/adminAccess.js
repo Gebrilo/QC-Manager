@@ -24,9 +24,148 @@ const {
     resolveScope,
 } = require('../../../shared/rbac/permissionMatrix.ts');
 
+const AUDIT_LIMIT_DEFAULT = 25;
+const AUDIT_LIMIT_MAX = 200;
+const CRUD_ACTIONS = new Set(['CREATE', 'UPDATE', 'DELETE', 'RESTORE']);
+
 function permissionsForArtifactType(artifactType) {
     return permissionsForArtifact(ALL_PERMISSIONS, artifactType);
 }
+
+function parseBoundedInt(value, { fallback, min, max }) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+}
+
+function parseTimestampFilter(value, name) {
+    if (!value) return null;
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) {
+        const err = new Error(`${name} must be a valid timestamp`);
+        err.status = 400;
+        throw err;
+    }
+    return date.toISOString();
+}
+
+function addWhere(where, values, clause, value) {
+    values.push(value);
+    where.push(clause.replace(/\?/g, `$${values.length}`));
+}
+
+function applyAuditEventFilter(where, values, rawEventType) {
+    const eventType = String(rawEventType || '').trim();
+    if (!eventType) return;
+
+    const normalized = eventType.toLowerCase();
+    if (normalized === 'access_denied' || normalized === 'denial' || normalized === 'denials') {
+        addWhere(where, values, 'al.action = ?', 'ACCESS_DENIED');
+        return;
+    }
+
+    const upper = eventType.toUpperCase();
+    if (CRUD_ACTIONS.has(upper)) {
+        addWhere(where, values, 'al.action = ?', upper);
+        return;
+    }
+
+    addWhere(where, values, 'al.entity_type = ?', eventType);
+}
+
+function buildAuditFilters(query) {
+    const where = [];
+    const values = [];
+    const eventType = query.event_type ?? query.entity_type;
+
+    applyAuditEventFilter(where, values, eventType);
+
+    if (query.actor_user_id) {
+        addWhere(where, values, 'al.user_id::text = ?', String(query.actor_user_id).trim());
+    }
+    if (query.target_entity_type) {
+        addWhere(where, values, 'al.entity_type = ?', String(query.target_entity_type).trim());
+    }
+    if (query.target_entity_id) {
+        const targetId = String(query.target_entity_id).trim();
+        values.push(targetId);
+        where.push(`(
+            al.entity_uuid::text = $${values.length}
+            OR al.entity_id::text = $${values.length}
+            OR al.entity_key = $${values.length}
+            OR al.details->>'target_entity_id' = $${values.length}
+            OR al.details->>'entity_id' = $${values.length}
+            OR al.details->>'artifact_id' = $${values.length}
+        )`);
+    }
+
+    const since = parseTimestampFilter(query.since, 'since');
+    if (since) addWhere(where, values, 'al.created_at >= ?::timestamptz', since);
+
+    const until = parseTimestampFilter(query.until, 'until');
+    if (until) addWhere(where, values, 'al.created_at <= ?::timestamptz', until);
+
+    return {
+        whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+        values,
+    };
+}
+
+router.get('/audit', requireAuth, requirePermission('qc.admin.view_audit_log'), async (req, res, next) => {
+    try {
+        const limit = parseBoundedInt(req.query.limit, {
+            fallback: AUDIT_LIMIT_DEFAULT,
+            min: 1,
+            max: AUDIT_LIMIT_MAX,
+        });
+        const offset = parseBoundedInt(req.query.offset, {
+            fallback: 0,
+            min: 0,
+            max: Number.MAX_SAFE_INTEGER,
+        });
+        const { whereSql, values } = buildAuditFilters(req.query);
+
+        const totalResult = await db.query(
+            `SELECT COUNT(*)::int AS total
+               FROM audit_log al
+              ${whereSql}`,
+            values
+        );
+
+        const rowsResult = await db.query(
+            `SELECT
+                al.id,
+                al.entity_type,
+                al.entity_uuid,
+                al.entity_id,
+                al.entity_key,
+                al.action,
+                al.user_id,
+                al.user_email,
+                al.before_state,
+                al.after_state,
+                al.changed_fields,
+                al.change_summary,
+                al.details,
+                al.created_at
+               FROM audit_log al
+              ${whereSql}
+              ORDER BY al.created_at DESC, al.id DESC
+              LIMIT $${values.length + 1}
+              OFFSET $${values.length + 2}`,
+            [...values, limit, offset]
+        );
+
+        res.json({
+            rows: rowsResult.rows,
+            total: Number(totalResult.rows[0]?.total || 0),
+            limit,
+            offset,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
 
 router.get('/matrix', requireAuth, requirePermission('qc.admin.roles.view'), async (req, res, next) => {
     try {

@@ -4212,6 +4212,39 @@ const runMigrations = async () => {
             console.log(`[rbac-reconcile] revoked ${grantReconcile.revoked} over-broad/stale grant(s)`);
         }
 
+        // ============================================================
+        // Migration 055: grant the admin access-audit viewer permission
+        // (issue #306)
+        // ============================================================
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rbac_admin_audit_log_seed_marker (
+                migration_id VARCHAR(120) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rbac_admin_audit_log_seed_marker_unique ON rbac_admin_audit_log_seed_marker(migration_id)`);
+        const auditLogSeed = await client.query(
+            `SELECT 1 FROM rbac_admin_audit_log_seed_marker
+             WHERE migration_id = 'issue-306-admin-audit-log-viewer'`
+        );
+        if (auditLogSeed.rows.length === 0) {
+            await client.query(`
+                INSERT INTO permissions (permission_key, domain)
+                VALUES ('qc.admin.view_audit_log', 'qc.admin')
+                ON CONFLICT (permission_key) DO UPDATE SET domain = EXCLUDED.domain
+            `);
+            await client.query(`
+                INSERT INTO role_permissions (role_identifier, permission_key, granted_by)
+                VALUES ('admin', 'qc.admin.view_audit_log', 'system-seed')
+                ON CONFLICT (role_identifier, permission_key) DO NOTHING
+            `);
+            await client.query(`
+                INSERT INTO rbac_admin_audit_log_seed_marker (migration_id)
+                VALUES ('issue-306-admin-audit-log-viewer')
+                ON CONFLICT DO NOTHING
+            `);
+        }
+
         console.log('Database migrations completed successfully');
     } catch (err) {
         console.error('Migration error:', err.message);

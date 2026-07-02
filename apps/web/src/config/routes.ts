@@ -99,6 +99,7 @@ const ROUTES: RouteConfig[] = [
     { path: '/admin/journeys/[id]', label: 'Edit Journey', permission: PERMISSIONS.JOURNEYS_VIEW, scopes: ACTIVE_ONLY_SCOPES },
     { path: '/admin/roles', label: 'Roles & Permissions', permission: PERMISSIONS.ADMIN_ROLES_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10, icon: ShieldCheck },
     { path: '/admin/permissions/matrix', label: 'Permissions Matrix', permission: PERMISSIONS.ADMIN_MANAGE_PERMISSIONS, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.2, icon: ShieldCheck },
+    { path: '/admin/audit-log', label: 'Access Audit Log', permission: PERMISSIONS.ADMIN_VIEW_AUDIT_LOG, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.3, icon: History },
     { path: '/admin/landing-config', label: 'Landing Page', permission: PERMISSIONS.ADMIN_LANDING_PAGE_MANAGE, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 10.4, icon: Megaphone },
     { path: '/admin/integrations/tuleap', label: 'Tuleap Integration', permission: PERMISSIONS.ADMIN_SETTINGS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 9.1, icon: Settings2 },
     { path: '/admin/users', label: 'Users', permission: PERMISSIONS.ADMIN_USERS_VIEW, scopes: ACTIVE_ONLY_SCOPES, showInNavbar: true, navOrder: 11, icon: UserCog },
@@ -181,6 +182,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
             { path: '/admin/landing-config', label: 'Landing Page', icon: Megaphone },
             { path: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck },
             { path: '/admin/permissions/matrix', label: 'Permissions Matrix', icon: ShieldCheck },
+            { path: '/admin/audit-log', label: 'Access Audit Log', icon: History },
             {
                 label: 'Integrations',
                 icon: Settings2,
