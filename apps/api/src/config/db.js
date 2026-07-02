@@ -457,6 +457,16 @@ const runMigrations = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_stories_project_id ON user_stories(project_id) WHERE deleted_at IS NULL`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_user_stories_status ON user_stories(status) WHERE deleted_at IS NULL`);
 
+        // AI Intake columns — add up-front so the analytics views further down (which SELECT
+        // p.ai_intake_enabled and t.generated_by_ai/t.source) don't abort the bootstrap on an
+        // existing DB, where CREATE TABLE IF NOT EXISTS is a no-op and the later ADD COLUMNs
+        // never run. Idempotent; the duplicate ALTERs below become no-ops. See ADR 0012.
+        await client.query(`ALTER TABLE projects     ADD COLUMN IF NOT EXISTS ai_intake_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
+        await client.query(`ALTER TABLE user_stories ADD COLUMN IF NOT EXISTS generated_by_ai   BOOLEAN NOT NULL DEFAULT FALSE`);
+        await client.query(`ALTER TABLE user_stories ADD COLUMN IF NOT EXISTS source            VARCHAR(30) NOT NULL DEFAULT 'manual'`);
+        await client.query(`ALTER TABLE tasks        ADD COLUMN IF NOT EXISTS generated_by_ai   BOOLEAN NOT NULL DEFAULT FALSE`);
+        await client.query(`ALTER TABLE tasks        ADD COLUMN IF NOT EXISTS source            VARCHAR(30) NOT NULL DEFAULT 'manual'`);
+
         await client.query(`
             DO $$
             BEGIN
