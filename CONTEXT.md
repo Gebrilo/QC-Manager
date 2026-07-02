@@ -64,6 +64,20 @@ _Avoid_: "resource 2".
 **Estimate Accuracy**:
 A per-`Assignment` verdict on closed work comparing a person's `actual_hrs` to their `estimate_hrs`: `ratio = actual_hrs / estimate_hrs` → **Over-estimated (padded)** `< 0.75` / **Accurate** `0.75–1.25` / **Under-estimated (blew past)** `> 1.25`. The ±25% band is a single configurable constant. Distinct from **utilization**, which is estimate-vs-capacity over open work.
 
+### AI Intake
+
+**AI Intake**:
+The channel by which externally-authored **Markdown** (written by an AI skill or agent — Superpower, GSD, Grill-me, Codex, a customer agent) becomes a QC-native **User Story** under a **QC Project**, with **Tasks** generated from it. Enters via three surfaces that share one backend: API, webhook, and manual UI upload/paste. Distinct from **Inbound** sync, which mirrors **Artifacts** that already exist in Tuleap — AI Intake originates the artifact in QC.
+_Avoid_: "import", "AI sync", "PRD import".
+
+**Standalone Artifact**:
+A QC-native **Artifact** created in QC-Manager with no Tuleap origin: `sync_status = 'standalone'`, no `tuleap_artifact_id`. All **AI Intake** artifacts are Standalone and are *never* auto-emitted to Tuleap while unreviewed — even when the **QC Project** has a **Tracker Config** that would normally push a QC-created artifact outbound. Contrast with a mirrored Artifact, which always carries a `tuleap_artifact_id`.
+_Avoid_: "local artifact", "draft" (Draft is a status, not an origin).
+
+**Artifact Origin** (the `source` column):
+Which channel *created* an **Artifact** — an enum first established on `changelog_entries` (`manual`, `ai_agent`, `github`, `n8n`, `system`), extended for this feature with `ai_intake` (and, later, `mcp`). Carried alongside `generated_by_ai`. Distinct from **Bug Source** (which describes how a Bug was *discovered*, not how it was created).
+_Avoid_: "source_channel", "source_type", "intake method" (all fold into the single `source` value).
+
 ## Relationships
 
 - A **Tuleap Project** contains many **Trackers**; each **Tracker** holds many **Artifacts**
@@ -77,6 +91,7 @@ A per-`Assignment` verdict on closed work comparing a person's `actual_hrs` to t
 
 - **"project"** is overloaded between **Tuleap Project** (Tuleap-side container) and **QC Project** (QC-side workspace). Always qualify which one. Schema: Tuleap's is the integer `tuleap_project_id`; QC's is the UUID `qc_project_id`.
 - **"sync"** is overloaded between (a) the inbound data flow direction and (b) the `sync` **Action** value. Prefer **Inbound** for the direction; reserve "sync" for the action.
+- **"source"** is overloaded between **Bug Source** (discovery method — `TEST_CASE`/`EXPLORATORY`) and **Artifact Origin** (creation channel — the `source` column, `manual`/`ai_intake`/…). Different axes; always say which. A Bug can be `source = ai_intake`-adjacent in origin yet `EXPLORATORY` in discovery.
 - **`tuleap_sync_config` table name vs "Tracker Config" domain term** — the table is named for its original inbound-only role; today the same row drives outbound artifact creation too. Don't rename the table (migration cost), but speak in terms of "Tracker Config" in design conversations.
 - **`tracker_type` column** holds the artifact subtype (`bug`/`task`/`user_story`/`test_case`), not a Tuleap concept. A Tuleap Tracker has no notion of "type"; QC assigns one per Tracker Config so the transform engine knows which field schema applies.
 - **Three identities for the same Test Case** (and User Story, and Task): the QC `id` UUID, the QC business key `test_case_id` (e.g. `"T-123"`), and the Tuleap `tuleap_artifact_id` integer (e.g. `140`). Resolved: the QC UUID is canonical for any **Artifact Link** stored on the QC side; the others are display-only or boundary-translation values. See ADR 0006.
